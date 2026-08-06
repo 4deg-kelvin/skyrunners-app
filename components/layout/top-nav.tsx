@@ -6,21 +6,34 @@ import { ChevronDown, Plane } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/my-work", label: "My Work", hasAlert: true },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/my-work", label: "My Work" },
+  { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },
   { href: "/calendar", label: "Calendar" },
 ];
 
-export function TopNav({ userName }: { userName: string }) {
+export function TopNav({
+  userName,
+  isLeadership,
+  alertCount = 0,
+}: {
+  userName: string;
+  isLeadership: boolean;
+  /** Real count of things needing attention — drives the nav dot. */
+  alertCount?: number;
+}) {
   const pathname = usePathname();
+
+  const items = NAV_ITEMS.filter(
+    (item) => !item.leadershipOnly || isLeadership
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-card">
       <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-6 px-5 sm:px-8">
-        {/* Wordmark */}
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        {/* Wordmark — goes to the member's own home, same as "/" */}
+        <Link href="/my-work" className="flex items-center gap-2.5">
           <span className="flex size-8 items-center justify-center rounded-full bg-cardinal-600 text-white">
             <Plane className="size-4" strokeWidth={2.5} />
           </span>
@@ -33,8 +46,10 @@ export function TopNav({ userName }: { userName: string }) {
 
         {/* Primary navigation */}
         <nav className="hidden items-center gap-1 md:flex">
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const active = pathname.startsWith(item.href);
+            const showAlert = item.href === "/my-work" && alertCount > 0;
+
             return (
               <Link
                 key={item.href}
@@ -47,10 +62,10 @@ export function TopNav({ userName }: { userName: string }) {
                 )}
               >
                 {item.label}
-                {item.hasAlert ? (
+                {showAlert ? (
                   <span
                     className="size-2 rounded-full bg-cardinal-600"
-                    aria-label="needs attention"
+                    aria-label={`${alertCount} item${alertCount === 1 ? "" : "s"} need attention`}
                   />
                 ) : null}
               </Link>

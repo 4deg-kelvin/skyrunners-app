@@ -3,79 +3,60 @@ import { Clock, Mail, PenLine, Plus, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
-import {
-  CURRENT_USER_ID,
-  getMember,
-  hoursOnProject,
-  lastEntryForProject,
-  myProjects,
-  myUpdate,
-  projectBreadcrumb,
-  projectREs,
-} from "@/lib/mock-data";
-import { PHASE_LABELS, type ProjectHealth } from "@/lib/types";
+import { getMyWork } from "@/lib/data/my-work";
+import { getViewer } from "@/lib/data/viewer";
+import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
+import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
-const healthTone: Record<ProjectHealth, "ok" | "warn" | "risk" | "neutral"> = {
-  on_track: "ok",
-  at_risk: "warn",
-  blocked: "risk",
-  complete: "neutral",
-};
+export default async function MyWorkPage() {
+  const viewer = await getViewer();
+  const view = await getMyWork(viewer.member.id);
+  const { me, projects, currentUpdate, totals } = view;
 
-const healthLabel: Record<ProjectHealth, string> = {
-  on_track: "On track",
-  at_risk: "At risk",
-  blocked: "Blocked",
-  complete: "Complete",
-};
+  const mayLogHours = can.logOwnHours(viewer.actor, me.id);
+  const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
 
-export default function MyWorkPage() {
-  const me = getMember(CURRENT_USER_ID);
-  const mine = myProjects(CURRENT_USER_ID);
-  const reCount = mine.filter((m) => m.membership.role === "re").length;
-  const totalHours = mine.reduce(
-    (sum, m) => sum + hoursOnProject(CURRENT_USER_ID, m.project.id),
-    0
-  );
-
-  const dueDate = new Date(myUpdate.dueAt);
+  const dueDate = new Date(currentUpdate.update.dueAt);
+  const firstName = me.preferredName ?? me.fullName.split(" ")[0];
 
   return (
     <div className="space-y-6">
       <PageHeader
         label="My Work"
-        title={`Hi, ${me?.preferredName ?? me?.fullName.split(" ")[0]}`}
+        title={`Hi, ${firstName}`}
         description="Everything you're working on, and the update you owe on each."
         action={
-          <Button>
-            <Plus className="size-4" strokeWidth={2.5} />
-            Log hours
-          </Button>
+          mayLogHours ? (
+            <Button>
+              <Plus className="size-4" strokeWidth={2.5} />
+              Log hours
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
           label="My projects"
-          value={mine.length}
-          hint={reCount > 0 ? `RE on ${reCount}` : undefined}
+          value={totals.projectCount}
+          hint={totals.reCount > 0 ? `RE on ${totals.reCount}` : undefined}
         />
         <StatTile
           label="Hours logged"
-          value={formatNumber(totalHours, 1)}
+          value={formatNumber(totals.hoursLogged, 1)}
           hint="this period"
         />
         <StatTile
           label="Next update due"
-          value={dueDate.toLocaleDateString("en-US", {
-            weekday: "long",
-          })}
+          value={dueDate.toLocaleDateString("en-US", { weekday: "long" })}
           hint={dueDate.toLocaleTimeString("en-US", {
             hour: "numeric",
             minute: "2-digit",
@@ -98,30 +79,33 @@ export default function MyWorkPage() {
                 what you&apos;re talking about.
               </p>
             </div>
-            <Badge tone="warn">Not submitted</Badge>
+            <Badge tone={UPDATE_STATUS_TONES[currentUpdate.update.status]}>
+              {UPDATE_STATUS_LABELS[currentUpdate.update.status]}
+            </Badge>
           </div>
 
           <div className="mt-6 space-y-3">
-            {myUpdate.entries.map((entry) => {
-              const project = mine.find(
-                (m) => m.project.id === entry.projectId
-              )?.project;
-              if (!project) return null;
-
-              return (
+            {currentUpdate.sections.length === 0 ? (
+              <EmptyState
+                message="No hours logged yet this period, so there's nothing to report on."
+                actionLabel="Browse projects"
+                actionHref="/projects"
+              />
+            ) : (
+              currentUpdate.sections.map(({ entry, project, breadcrumb }) => (
                 <div
                   key={entry.id}
                   className="rounded-tile border border-line px-4 py-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Breadcrumb
-                        trail={projectBreadcrumb(project.id)}
-                        className="mb-1"
-                      />
-                      <p className="text-[15px] font-bold text-ink">
+                      <Breadcrumb trail={breadcrumb} className="mb-1" />
+                      <Link
+                        href={`/projects/${project.slug}`}
+                        className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                      >
                         {project.name}
-                      </p>
+                      </Link>
                     </div>
                     <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-ink-soft">
                       <Clock className="size-3.5" />
@@ -131,23 +115,25 @@ export default function MyWorkPage() {
 
                   <div className="mt-3 rounded-tile border border-dashed border-line px-3.5 py-3">
                     <p className="text-sm text-ink-muted">
-                      No progress written yet for this project.
+                      {entry.progress || "No progress written yet for this project."}
                     </p>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button>
-              <PenLine className="size-4" strokeWidth={2.5} />
-              Write my update
-            </Button>
-            <ButtonLink href="/updates" variant="secondary">
-              Past updates
-            </ButtonLink>
-          </div>
+          {maySubmitUpdate ? (
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button>
+                <PenLine className="size-4" strokeWidth={2.5} />
+                Write my update
+              </Button>
+              <ButtonLink href="/updates" variant="secondary">
+                Past updates
+              </ButtonLink>
+            </div>
+          ) : null}
 
           <p className="mt-4 text-sm text-ink-muted">
             The full submit form arrives in Phase 4.
@@ -168,34 +154,29 @@ export default function MyWorkPage() {
             </Link>
           </div>
 
-          {mine.length === 0 ? (
-            <div className="mt-5 rounded-tile border border-dashed border-line px-4 py-8 text-center">
-              <p className="text-[15px] text-ink-soft">
-                You&apos;re not on any projects yet.
-              </p>
-              <Link
-                href="/projects"
-                className="mt-2 inline-block text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-              >
-                Browse projects and join one
-              </Link>
-            </div>
+          {projects.length === 0 ? (
+            <EmptyState
+              className="mt-5 py-8"
+              message="You're not on any projects yet."
+              actionLabel="Browse projects and join one"
+              actionHref="/projects"
+            />
           ) : (
             <div className="mt-5 space-y-3">
-              {mine.map(({ project, membership }) => {
-                const res = projectREs(project.id);
-                const hours = hoursOnProject(CURRENT_USER_ID, project.id);
-                const last = lastEntryForProject(CURRENT_USER_ID, project.id);
-
-                return (
+              {projects.map(
+                ({
+                  project,
+                  membership,
+                  breadcrumb,
+                  res,
+                  hoursLogged,
+                  lastUpdate,
+                }) => (
                   <div
                     key={project.id}
                     className="rounded-tile border border-line px-4 py-4"
                   >
-                    <Breadcrumb
-                      trail={projectBreadcrumb(project.id)}
-                      className="mb-1.5"
-                    />
+                    <Breadcrumb trail={breadcrumb} className="mb-1.5" />
 
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <Link
@@ -208,38 +189,33 @@ export default function MyWorkPage() {
                         {membership.role === "re" ? (
                           <Badge tone="cardinal">You are RE</Badge>
                         ) : null}
-                        <Badge tone="neutral">
-                          {PHASE_LABELS[project.phase]}
-                        </Badge>
-                        <Badge tone={healthTone[project.health]}>
-                          {healthLabel[project.health]}
-                        </Badge>
+                        <ProjectBadges project={project} />
                       </div>
                     </div>
 
                     {membership.responsibility ? (
                       <p className="mt-2.5 text-[15px] text-ink-soft">
-                        <span className="font-semibold text-ink">
-                          You own:
-                        </span>{" "}
+                        <span className="font-semibold text-ink">You own:</span>{" "}
                         {membership.responsibility}
                       </p>
                     ) : null}
 
-                    {/* Who to ask — a stated requirement */}
+                    {/* Who to ask — easy to find the RE */}
                     {res.length > 0 ? (
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                         <SectionLabel tone="muted">
-                          {res.length > 1 ? "Responsible Engineers" : "Responsible Engineer"}
+                          {res.length > 1
+                            ? "Responsible Engineers"
+                            : "Responsible Engineer"}
                         </SectionLabel>
                         {res.map((re) => (
                           <a
-                            key={re!.id}
-                            href={`mailto:${re!.email}`}
+                            key={re.id}
+                            href={`mailto:${re.email}`}
                             className="flex items-center gap-1.5 text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
                           >
                             <Mail className="size-3.5" />
-                            {re!.fullName}
+                            {re.fullName}
                           </a>
                         ))}
                       </div>
@@ -248,7 +224,7 @@ export default function MyWorkPage() {
                     <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
                       <span className="flex items-center gap-1.5">
                         <Clock className="size-3.5" />
-                        {formatNumber(hours, 1)} hrs logged
+                        {formatNumber(hoursLogged, 1)} hrs logged
                       </span>
                       {project.targetDate ? (
                         <span>
@@ -265,18 +241,20 @@ export default function MyWorkPage() {
                     </div>
 
                     {/* Last thing this member said about THIS project */}
-                    {last ? (
+                    {lastUpdate ? (
                       <div className="mt-3.5 rounded-tile bg-surface px-3.5 py-3">
                         <SectionLabel tone="muted">
                           Your last update here
                         </SectionLabel>
                         <p className="mt-1.5 text-sm text-ink-soft">
-                          {last.entry.progress}
+                          {lastUpdate.entry.progress}
                         </p>
-                        {last.entry.blockers ? (
-                          <p className="mt-2 flex items-start gap-1.5 text-sm font-medium text-cardinal-600">
-                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                            {last.entry.blockers}
+                        {lastUpdate.entry.blockers ? (
+                          <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
+                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+                            <span className="font-medium">
+                              {lastUpdate.entry.blockers}
+                            </span>
                           </p>
                         ) : null}
                       </div>
@@ -286,8 +264,8 @@ export default function MyWorkPage() {
                       </p>
                     )}
                   </div>
-                );
-              })}
+                )
+              )}
             </div>
           )}
         </CardBody>

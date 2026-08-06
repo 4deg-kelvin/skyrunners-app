@@ -1,0 +1,47 @@
+name: CI
+
+# Runs on every push and pull request. The point is that neither of you can
+# accidentally break main for the other — a red check is much cheaper to find
+# here than three days later.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches .nvmrc. Node 22.6+ is required by `npm test`, which uses
+          # --experimental-strip-types to run TypeScript tests directly.
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build must succeed without real secrets, so a fork or a fresh clone
+          # can verify the app compiles.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder

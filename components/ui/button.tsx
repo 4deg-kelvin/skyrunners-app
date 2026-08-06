@@ -1,5 +1,20 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+/**
+ * `"use client"` is required here because `Button` accepts `onClick`.
+ *
+ * Every page in this app is a Server Component, and a Server Component cannot
+ * pass a function to a component that isn't a Client Component — you get
+ * "Functions cannot be passed directly to Client Components", an error whose
+ * message points nowhere near the cause. Marking the button as a client
+ * component up front avoids that entirely.
+ *
+ * `ButtonLink` below is for navigation and needs no handler, but lives here so
+ * both share one set of styles.
+ */
 
 type Variant = "primary" | "secondary" | "ghost";
 
@@ -21,6 +36,7 @@ export function Button({
   type = "button",
   disabled,
   onClick,
+  title,
 }: {
   children: React.ReactNode;
   variant?: Variant;
@@ -28,12 +44,14 @@ export function Button({
   type?: "button" | "submit" | "reset";
   disabled?: boolean;
   onClick?: () => void;
+  title?: string;
 }) {
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
+      title={title}
       className={cn(base, variantStyles[variant], className)}
     >
       {children}

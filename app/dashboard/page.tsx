@@ -6,42 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { Donut } from "@/components/ui/donut";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ProjectBadges } from "@/components/ui/project-badges";
 import { FieldLabel, SectionLabel } from "@/components/ui/section-label";
 import { DetailRow, StatTile } from "@/components/ui/stat-tile";
-import {
-  activeMembers,
-  atRiskProjects,
-  awaitingReview,
-  club,
-  divisions,
-  getMember,
-  getProject,
-  hoursThisWeek,
-  projects,
-  updateCompliance,
-} from "@/lib/mock-data";
-import { PHASE_LABELS, type ProjectHealth } from "@/lib/types";
+import { getDashboard } from "@/lib/data/dashboard";
+import { getViewer } from "@/lib/data/viewer";
+import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
+import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
-const healthTone: Record<ProjectHealth, "ok" | "warn" | "risk" | "neutral"> = {
-  on_track: "ok",
-  at_risk: "warn",
-  blocked: "risk",
-  complete: "neutral",
-};
+export default async function DashboardPage() {
+  const [view, viewer] = await Promise.all([getDashboard(), getViewer()]);
+  const { compliance, counts, club, reviewQueue, flaggedProjects } = view;
 
-const healthLabel: Record<ProjectHealth, string> = {
-  on_track: "On track",
-  at_risk: "At risk",
-  blocked: "Blocked",
-  complete: "Complete",
-};
-
-export default function DashboardPage() {
-  const compliance = updateCompliance();
-  const reviewQueue = awaitingReview();
-  const flagged = atRiskProjects();
-  const memberCount = activeMembers().length;
+  const mayLogHours = can.logOwnHours(viewer.actor, viewer.member.id);
 
   return (
     <div className="space-y-6">
@@ -50,10 +29,12 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Stay on top of team health, update windows, and project status for ${club.name}.`}
         action={
-          <Button>
-            <Plus className="size-4" strokeWidth={2.5} />
-            Log hours
-          </Button>
+          mayLogHours ? (
+            <Button>
+              <Plus className="size-4" strokeWidth={2.5} />
+              Log hours
+            </Button>
+          ) : undefined
         }
       />
 
@@ -74,11 +55,11 @@ export default function DashboardPage() {
               <CardDivider />
               <DetailRow label="Description">{club.description}</DetailRow>
               <CardDivider />
-              <DetailRow label="Members">{memberCount}</DetailRow>
+              <DetailRow label="Members">{counts.members}</DetailRow>
               <CardDivider />
-              <DetailRow label="Divisions">{divisions().length}</DetailRow>
+              <DetailRow label="Divisions">{counts.divisions}</DetailRow>
               <CardDivider />
-              <DetailRow label="Active projects">{projects.length}</DetailRow>
+              <DetailRow label="Active projects">{counts.projects}</DetailRow>
               <CardDivider />
               <DetailRow label="Date created">
                 {new Date(club.createdAt).toLocaleDateString("en-US", {
@@ -117,7 +98,7 @@ export default function DashboardPage() {
                 <StatTile label="Annual cycle" value={club.cycle} />
                 <StatTile
                   label="Hours logged this week"
-                  value={formatNumber(hoursThisWeek(), 1)}
+                  value={formatNumber(view.hoursThisWeek, 1)}
                 />
                 <StatTile
                   label="Updates awaiting review"
@@ -149,60 +130,61 @@ export default function DashboardPage() {
                       actionHref="/updates"
                     />
                   ) : (
-                    reviewQueue.map((update) => {
-                      const author = getMember(update.memberId);
-                      return (
-                        <div
-                          key={update.id}
-                          className="rounded-tile border border-line px-4 py-3.5"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-[15px] font-bold text-ink">
-                              {author?.fullName}
-                            </p>
-                            <Badge
-                              tone={update.status === "late" ? "warn" : "ok"}
-                            >
-                              {update.status === "late" ? "Late" : "Submitted"}
-                            </Badge>
-                          </div>
-
-                          {/* One block per project, so it's always clear which
-                              piece of work each note refers to. */}
-                          <div className="mt-2.5 space-y-2.5">
-                            {update.entries.map((entry) => {
-                              const project = getProject(entry.projectId);
-                              return (
-                                <div
-                                  key={entry.id}
-                                  className="border-l-2 border-line-soft pl-3"
-                                >
-                                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                    <p className="text-[13px] font-semibold text-cardinal-600">
-                                      {project?.name ?? "Unknown project"}
-                                    </p>
-                                    <span className="text-xs text-ink-muted">
-                                      {formatNumber(entry.hours, 1)} hrs
-                                    </span>
-                                  </div>
-                                  <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
-                                    {entry.progress}
-                                  </p>
-                                  {entry.blockers ? (
-                                    <p className="mt-1.5 flex items-start gap-1.5 text-sm text-cardinal-600">
-                                      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                                      <span className="font-medium">
-                                        {entry.blockers}
-                                      </span>
-                                    </p>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
+                    reviewQueue.map(({ update, author, sections }) => (
+                      <div
+                        key={update.id}
+                        className="rounded-tile border border-line px-4 py-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-[15px] font-bold text-ink">
+                            {author?.fullName ?? "Unknown member"}
+                          </p>
+                          <Badge tone={UPDATE_STATUS_TONES[update.status]}>
+                            {UPDATE_STATUS_LABELS[update.status]}
+                          </Badge>
                         </div>
-                      );
-                    })
+
+                        {/* One block per project, so it's always clear which
+                            piece of work each note refers to. */}
+                        <div className="mt-2.5 space-y-2.5">
+                          {sections.map(({ entry, project }) => (
+                            <div
+                              key={entry.id}
+                              className="border-l-2 border-line-soft pl-3"
+                            >
+                              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                {project ? (
+                                  <Link
+                                    href={`/projects/${project.slug}`}
+                                    className="text-[13px] font-semibold text-cardinal-600 hover:text-cardinal-700"
+                                  >
+                                    {project.name}
+                                  </Link>
+                                ) : (
+                                  <span className="text-[13px] font-semibold text-ink-muted">
+                                    Unknown project
+                                  </span>
+                                )}
+                                <span className="text-xs text-ink-muted">
+                                  {formatNumber(entry.hours, 1)} hrs
+                                </span>
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
+                                {entry.progress}
+                              </p>
+                              {entry.blockers ? (
+                                <p className="mt-1.5 flex items-start gap-1.5 text-sm text-ink-soft">
+                                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+                                  <span className="font-medium">
+                                    {entry.blockers}
+                                  </span>
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </CardBody>
@@ -217,7 +199,7 @@ export default function DashboardPage() {
                 </div>
 
                 <h3 className="mt-4 text-[17px] font-bold text-ink">
-                  Wednesday check-in
+                  Today&apos;s check-in
                 </h3>
                 <p className="mt-1.5 text-sm text-ink-soft">
                   Members submit three updates a week on the days they choose.
@@ -234,8 +216,19 @@ export default function DashboardPage() {
                   />
                 </div>
 
+                {compliance.pending > 0 ? (
+                  <p className="mt-3 text-sm text-ink-muted">
+                    {compliance.pending} not yet due — excluded from the
+                    percentage.
+                  </p>
+                ) : null}
+
                 <div className="mt-5">
-                  <ButtonLink href="/updates" variant="secondary" className="w-full">
+                  <ButtonLink
+                    href="/updates"
+                    variant="secondary"
+                    className="w-full"
+                  >
                     Open review queue
                   </ButtonLink>
                 </div>
@@ -257,14 +250,14 @@ export default function DashboardPage() {
               </div>
 
               <div className="mt-4 space-y-3">
-                {flagged.length === 0 ? (
+                {flaggedProjects.length === 0 ? (
                   <EmptyState
                     message="Every project is on track."
                     actionLabel="Browse projects"
                     actionHref="/projects"
                   />
                 ) : (
-                  flagged.map((project) => (
+                  flaggedProjects.map(({ project, res }) => (
                     <Link
                       key={project.id}
                       href={`/projects/${project.slug}`}
@@ -274,21 +267,11 @@ export default function DashboardPage() {
                         <p className="text-[15px] font-bold text-ink">
                           {project.name}
                         </p>
-                        <div className="flex items-center gap-2">
-                          <Badge tone="neutral">
-                            {PHASE_LABELS[project.phase]}
-                          </Badge>
-                          <Badge tone={healthTone[project.health]}>
-                            {healthLabel[project.health]}
-                          </Badge>
-                        </div>
+                        <ProjectBadges project={project} />
                       </div>
                       <p className="mt-1.5 text-sm text-ink-soft">
-                        RE:{" "}
-                        {project.reIds
-                          .map((id) => getMember(id)?.fullName)
-                          .filter(Boolean)
-                          .join(", ")}
+                        {res.length > 1 ? "REs" : "RE"}:{" "}
+                        {res.map((r) => r.fullName).join(", ") || "unassigned"}
                       </p>
                     </Link>
                   ))
@@ -321,36 +304,9 @@ function MiniStat({
   return (
     <div className="rounded-tile border border-line px-3 py-3 text-center">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <FieldLabel className="mt-1 tracking-normal normal-case text-[12px] font-medium">
+      <FieldLabel className="mt-1 text-[12px] font-medium normal-case tracking-normal">
         {label}
       </FieldLabel>
-    </div>
-  );
-}
-
-/**
- * Empty states always offer a next action. A new member should never hit a
- * dead end that doesn't tell them what to do — that's the "productive in five
- * minutes" principle applied at the component level.
- */
-function EmptyState({
-  message,
-  actionLabel,
-  actionHref,
-}: {
-  message: string;
-  actionLabel: string;
-  actionHref: string;
-}) {
-  return (
-    <div className="rounded-tile border border-dashed border-line px-4 py-6 text-center">
-      <p className="text-sm text-ink-soft">{message}</p>
-      <Link
-        href={actionHref}
-        className="mt-2 inline-block text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-      >
-        {actionLabel}
-      </Link>
     </div>
   );
 }

@@ -2,13 +2,21 @@
   "name": "skyrunners-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\""
+    "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "seed:generate": "node --experimental-strip-types scripts/generate-seed.ts"
   },
   "dependencies": {
     "next": "^15.0.0",
@@ -20,6 +28,7 @@
     "date-fns": "^4.1.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -28,6 +37,8 @@
     "postcss": "^8.4.49",
     "typescript": "^5.7.0",
     "eslint": "^9.17.0",
-    "eslint-config-next": "^15.0.0"
+    "eslint-config-next": "^15.0.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.9"
   }
 }

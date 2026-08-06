@@ -322,6 +322,7 @@ export const projects: Project[] = [
       "Second-generation transitioning airframe targeting 4 kg payload at 30 km range.",
     parentId: null,
     teamId: "div-evtol",
+    primaryReId: "m-priya",
     reIds: ["m-priya", "m-tyler"],
     phase: "detailed_design",
     health: "on_track",
@@ -339,6 +340,7 @@ export const projects: Project[] = [
     description: "Carbon spar reducing mass 18% while holding 3.5g limit load.",
     parentId: "p-airframe-v2",
     teamId: "team-structures",
+    primaryReId: "m-tyler",
     reIds: ["m-tyler"],
     phase: "detailed_design",
     health: "at_risk",
@@ -356,6 +358,7 @@ export const projects: Project[] = [
     description: "Repeatable wet layup procedure with coupon testing.",
     parentId: "p-wing-spar",
     teamId: "team-composites",
+    primaryReId: "m-sofia",
     reIds: ["m-sofia"],
     phase: "manufacturing",
     health: "on_track",
@@ -372,6 +375,7 @@ export const projects: Project[] = [
     description: "Static load rig and instrumented failure testing.",
     parentId: "p-wing-spar",
     teamId: "team-structures",
+    primaryReId: "m-noah",
     reIds: ["m-noah"],
     phase: "integration",
     health: "on_track",
@@ -389,6 +393,7 @@ export const projects: Project[] = [
     description: "Visual-inertial odometry stack for indoor and urban flight.",
     parentId: null,
     teamId: "div-spade",
+    primaryReId: "m-lena",
     reIds: ["m-lena", "m-amara"],
     phase: "testing",
     health: "on_track",
@@ -406,6 +411,7 @@ export const projects: Project[] = [
     description: "Real-time visual-inertial odometry on companion compute.",
     parentId: "p-gps-denied",
     teamId: "team-perception",
+    primaryReId: "m-amara",
     reIds: ["m-amara"],
     phase: "testing",
     health: "on_track",
@@ -422,6 +428,7 @@ export const projects: Project[] = [
     description: "Gazebo world and scripted scenarios for regression testing.",
     parentId: "p-gps-denied",
     teamId: "team-perception",
+    primaryReId: "m-omar",
     reIds: ["m-omar"],
     phase: "manufacturing",
     health: "blocked",
@@ -439,6 +446,7 @@ export const projects: Project[] = [
     description: "Flight controller integration, power distribution, telemetry.",
     parentId: null,
     teamId: "div-skybeta",
+    primaryReId: "m-marcus",
     reIds: ["m-marcus", "m-kenji"],
     phase: "integration",
     health: "on_track",
@@ -456,6 +464,7 @@ export const projects: Project[] = [
     description: "Custom PDB with current sensing and redundant BEC.",
     parentId: "p-avionics-bringup",
     teamId: "team-avionics",
+    primaryReId: "m-kenji",
     reIds: ["m-kenji"],
     phase: "detailed_design",
     health: "on_track",
@@ -472,6 +481,7 @@ export const projects: Project[] = [
     description: "Thrust and efficiency characterization for candidate motors.",
     parentId: null,
     teamId: "team-propulsion",
+    primaryReId: "m-hana",
     reIds: ["m-hana"],
     phase: "manufacturing",
     health: "on_track",
@@ -489,6 +499,7 @@ export const projects: Project[] = [
     description: "Four beginner build workshops for new members.",
     parentId: null,
     teamId: "div-dronehacks",
+    primaryReId: "m-james",
     reIds: ["m-james", "m-grace"],
     phase: "requirements",
     health: "on_track",
@@ -506,6 +517,7 @@ export const projects: Project[] = [
     description: "Trade study for the next-generation delivery airframe.",
     parentId: null,
     teamId: "div-skydelta",
+    primaryReId: "m-priya",
     reIds: ["m-priya"],
     phase: "concept",
     health: "on_track",
@@ -848,11 +860,56 @@ export function myProjects(memberId: string) {
     });
 }
 
-/** Who to ask about this project. */
-export function projectREs(projectId: string) {
+/**
+ * Who to ask about this project. Primary RE first — that ordering comes from
+ * `primaryReId`, not array position, so it's deterministic.
+ */
+export function projectREs(projectId: string): Member[] {
   const project = getProject(projectId);
   if (!project) return [];
-  return project.reIds.map((id) => getMember(id)).filter(Boolean);
+
+  const found = project.reIds
+    .map((id) => getMember(id))
+    .filter((m): m is Member => m !== undefined);
+
+  return found.sort((a, b) => {
+    if (a.id === project.primaryReId) return -1;
+    if (b.id === project.primaryReId) return 1;
+    return a.fullName.localeCompare(b.fullName);
+  });
+}
+
+/**
+ * Which Division a project ultimately belongs to.
+ *
+ * A project's `teamId` may point at a sub-team or sub-sub-team, so this walks up
+ * the org tree to the Division. Grouping by `teamId` directly would silently
+ * hide any project owned by a sub-team — on the page whose entire job is making
+ * work discoverable.
+ */
+export function divisionForProject(projectId: string): Team | undefined {
+  const project = getProject(projectId);
+  if (!project) return undefined;
+
+  // Divisions attach at the top of the project tree, so start from the root
+  let root = project;
+  const seenProjects = new Set<string>([project.id]);
+  while (root.parentId && !seenProjects.has(root.parentId)) {
+    seenProjects.add(root.parentId);
+    const parent = getProject(root.parentId);
+    if (!parent) break;
+    root = parent;
+  }
+
+  let team = root.teamId ? getTeam(root.teamId) : undefined;
+  const seenTeams = new Set<string>();
+  while (team && team.parentId && !seenTeams.has(team.id)) {
+    seenTeams.add(team.id);
+    const parent = getTeam(team.parentId);
+    if (!parent) break;
+    team = parent;
+  }
+  return team;
 }
 
 export function hoursOnProject(memberId: string, projectId: string) {
@@ -902,9 +959,18 @@ export function openBlockers() {
     );
 }
 
-/** Update compliance for the current window — powers the dashboard donut. */
+/**
+ * Update compliance for the current window — powers the dashboard donut.
+ *
+ * `pending` means "due but not yet past its deadline", so it is deliberately
+ * EXCLUDED from the denominator. Counting it would drag the figure down for
+ * updates nobody is late on yet, making leadership see a problem that isn't
+ * there.
+ *
+ * This definition becomes the `v_update_compliance` SQL view — get it right
+ * here first.
+ */
 export function updateCompliance() {
-  const total = progressUpdates.length;
   const onTime = progressUpdates.filter(
     (u) => u.status === "submitted" || u.status === "reviewed"
   ).length;
@@ -912,18 +978,44 @@ export function updateCompliance() {
   const missed = progressUpdates.filter((u) => u.status === "missed").length;
   const pending = progressUpdates.filter((u) => u.status === "pending").length;
 
+  const resolved = onTime + late + missed;
+
   return {
-    total,
+    total: progressUpdates.length,
+    resolved,
     onTime,
     late,
     missed,
     pending,
-    fraction: total > 0 ? onTime / total : 0,
+    fraction: resolved > 0 ? onTime / resolved : 1,
   };
 }
 
-export function hoursThisWeek() {
-  return workLogs.reduce((sum, w) => sum + w.hours, 0);
+/** Reference "today" for the mock data. Replaced by `now()` in Phase 1. */
+export const TODAY = "2026-08-06";
+
+function daysBetween(a: string, b: string): number {
+  const ms = new Date(b).getTime() - new Date(a).getTime();
+  return Math.abs(ms) / 86_400_000;
+}
+
+/** Hours logged in the trailing 7 days — matches the dashboard's label. */
+export function hoursThisWeek(): number {
+  return workLogs
+    .filter((w) => daysBetween(w.workDate, TODAY) <= 7)
+    .reduce((sum, w) => sum + w.hours, 0);
+}
+
+/** Hours a member logged on one project in the trailing 7 days. */
+export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
+  return workLogs
+    .filter(
+      (w) =>
+        w.memberId === memberId &&
+        w.projectId === projectId &&
+        daysBetween(w.workDate, TODAY) <= 7
+    )
+    .reduce((sum, w) => sum + w.hours, 0);
 }
 
 export function awaitingReview() {

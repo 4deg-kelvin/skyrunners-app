@@ -53,7 +53,7 @@ Extends Supabase's built-in `auth.users`. One row per member.
 | `class_year` | int? | |
 | `major` | text? | |
 | `phone` | text? | |
-| `global_role` | enum | `admin` \| `lead` \| `member` |
+| `global_role` | enum | `co_lead` \| `lead` \| `member` — must match `GlobalRole` in `lib/types.ts` exactly |
 | `status` | enum | `active` \| `inactive` \| `alumni` — never delete people, deactivate them |
 | `lead_id` | uuid? FK → profiles | Their **one** direct Lead. Self-referencing. |
 | `primary_team_id` | uuid? FK → teams | Home sub-team |

@@ -1,96 +1,102 @@
 import Link from "next/link";
-import { CornerDownRight, Users } from "lucide-react";
+import { CornerDownRight, TriangleAlert, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
-  childProjects,
-  divisions,
-  getMember,
-  projectMembers,
-  projects,
-} from "@/lib/mock-data";
-import { PHASE_LABELS, type Project, type ProjectHealth } from "@/lib/types";
+  getOrphanedProjects,
+  getProjectTree,
+  type ProjectTreeNode,
+} from "@/lib/data/projects";
+import { getViewer } from "@/lib/data/viewer";
+import { can } from "@/lib/permissions";
 
-const healthTone: Record<ProjectHealth, "ok" | "warn" | "risk" | "neutral"> = {
-  on_track: "ok",
-  at_risk: "warn",
-  blocked: "risk",
-  complete: "neutral",
-};
+export default async function ProjectsPage() {
+  const [tree, orphans, viewer] = await Promise.all([
+    getProjectTree(),
+    getOrphanedProjects(),
+    getViewer(),
+  ]);
 
-const healthLabel: Record<ProjectHealth, string> = {
-  on_track: "On track",
-  at_risk: "At risk",
-  blocked: "Blocked",
-  complete: "Complete",
-};
+  const mayCreate = can.createProject(viewer.actor, viewer.graph);
 
-export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
         label="All Divisions"
         title="Projects"
         description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
-        action={<Button>New project</Button>}
+        action={mayCreate ? <Button>New project</Button> : undefined}
       />
 
-      <div className="space-y-6">
-        {divisions().map((division) => {
-          const roots = projects.filter(
-            (p) => p.parentId === null && p.teamId === division.id
-          );
+      {/* Data-integrity warning rather than silently hiding work */}
+      {orphans.length > 0 ? (
+        <Card className="border-warn-fg/25 bg-warn-bg">
+          <CardBody className="py-4">
+            <p className="flex items-start gap-2 text-sm text-warn-fg">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <span className="font-semibold">
+                  {orphans.length} project
+                  {orphans.length === 1 ? "" : "s"} not linked to a division:
+                </span>{" "}
+                {orphans.map((p) => p.name).join(", ")}. Assign each an owning
+                team so members can find them.
+              </span>
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
 
-          return (
-            <Card key={division.id}>
-              <CardBody>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <SectionLabel>Division</SectionLabel>
-                    <h2 className="mt-1.5 text-2xl font-bold text-ink">
-                      {division.name}
-                    </h2>
-                    {division.description ? (
-                      <p className="mt-1.5 text-[15px] text-ink-soft">
-                        {division.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  {division.leadId ? (
-                    <div className="text-right">
-                      <SectionLabel tone="muted">Division Lead</SectionLabel>
-                      <p className="mt-1 text-[15px] font-bold text-ink">
-                        {getMember(division.leadId)?.fullName}
-                      </p>
-                    </div>
+      <div className="space-y-6">
+        {tree.map(({ division, lead, roots }) => (
+          <Card key={division.id}>
+            <CardBody>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <SectionLabel>Division</SectionLabel>
+                  <h2 className="mt-1.5 text-2xl font-bold text-ink">
+                    {division.name}
+                  </h2>
+                  {division.description ? (
+                    <p className="mt-1.5 text-[15px] text-ink-soft">
+                      {division.description}
+                    </p>
                   ) : null}
                 </div>
+                {lead ? (
+                  <div className="text-right">
+                    <SectionLabel tone="muted">Division Lead</SectionLabel>
+                    <Link
+                      href={`/members/${lead.id}`}
+                      className="mt-1 block text-[15px] font-bold text-ink hover:text-cardinal-600"
+                    >
+                      {lead.fullName}
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
 
-                <div className="mt-5 space-y-3">
-                  {roots.length === 0 ? (
-                    <div className="rounded-tile border border-dashed border-line px-4 py-6 text-center">
-                      <p className="text-sm text-ink-soft">
-                        No projects in this division yet.
-                      </p>
-                    </div>
-                  ) : (
-                    roots.map((project) => (
-                      <ProjectNode
-                        key={project.id}
-                        project={project}
-                        depth={0}
-                      />
-                    ))
-                  )}
-                </div>
-              </CardBody>
-            </Card>
-          );
-        })}
+              <div className="mt-5 space-y-3">
+                {roots.length === 0 ? (
+                  <EmptyState
+                    message="No projects in this division yet."
+                    actionLabel="See other divisions"
+                    actionHref="/projects"
+                  />
+                ) : (
+                  roots.map((node) => (
+                    <ProjectNode key={node.project.id} node={node} depth={0} />
+                  ))
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        ))}
       </div>
     </div>
   );
@@ -98,21 +104,19 @@ export default function ProjectsPage() {
 
 /**
  * Renders a project and recurses into its children.
- * The indent makes the nesting legible at a glance, which is the whole point:
- * a member should be able to see the shape of the work without asking anyone.
+ *
+ * The tree arrives fully built from `getProjectTree`, so this component does no
+ * data lookups — it walks an in-memory structure. That's what keeps a deep tree
+ * from turning into a query per row.
  */
 function ProjectNode({
-  project,
+  node,
   depth,
 }: {
-  project: Project;
+  node: ProjectTreeNode;
   depth: number;
 }) {
-  const children = childProjects(project.id);
-  const team = projectMembers(project.id);
-  const res = project.reIds
-    .map((id) => getMember(id)?.fullName)
-    .filter(Boolean);
+  const { project, res, memberCount, children } = node;
 
   return (
     <div>
@@ -136,12 +140,7 @@ function ProjectNode({
               ) : null}
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <Badge tone="neutral">{PHASE_LABELS[project.phase]}</Badge>
-              <Badge tone={healthTone[project.health]}>
-                {healthLabel[project.health]}
-              </Badge>
-            </div>
+            <ProjectBadges project={project} className="shrink-0" />
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
@@ -150,12 +149,12 @@ function ProjectNode({
                 <span className="font-semibold text-ink-soft">
                   {res.length > 1 ? "REs" : "RE"}:
                 </span>{" "}
-                {res.join(", ")}
+                {res.map((r) => r.fullName).join(", ")}
               </span>
             ) : null}
             <span className="flex items-center gap-1.5">
               <Users className="size-3.5" />
-              {team.length} {team.length === 1 ? "member" : "members"}
+              {memberCount} {memberCount === 1 ? "member" : "members"}
             </span>
             {project.timeCommitment ? <span>{project.timeCommitment}</span> : null}
             {project.openRoles ? (
@@ -170,7 +169,11 @@ function ProjectNode({
       {children.length > 0 ? (
         <div className="mt-3 space-y-3">
           {children.map((child) => (
-            <ProjectNode key={child.id} project={child} depth={depth + 1} />
+            <ProjectNode
+              key={child.project.id}
+              node={child}
+              depth={depth + 1}
+            />
           ))}
         </div>
       ) : null}

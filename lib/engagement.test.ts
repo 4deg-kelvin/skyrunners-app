@@ -43,7 +43,8 @@ describe("recommended weights", () => {
   });
 
   test("hours is the lowest-weighted measured signal", () => {
-    const { breadth, hoursLogged, ...rest } = RECOMMENDED_WEIGHTS;
+    // breadth is deliberately 0 and therefore excluded from the comparison
+    const { breadth: _breadth, hoursLogged, ...rest } = RECOMMENDED_WEIGHTS;
     for (const [name, w] of Object.entries(rest)) {
       assert.ok(w > hoursLogged, `${name} (${w}) should outweigh hours (${hoursLogged})`);
     }

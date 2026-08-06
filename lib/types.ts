@@ -10,14 +10,13 @@
 // People
 // ---------------------------------------------------------------------------
 
-/** Global role. Ordered least to most authority. */
+/**
+ * Global role. Ordered least to most authority.
+ *
+ * These strings must match the `global_role` enum in the database exactly —
+ * see docs/DATA_MODEL.md. `co_lead`, not `admin`.
+ */
 export type GlobalRole = "member" | "lead" | "co_lead";
-
-export const ROLE_LABELS: Record<GlobalRole, string> = {
-  member: "Member",
-  lead: "Team Lead",
-  co_lead: "Co-Lead",
-};
 
 export type MemberStatus = "active" | "inactive" | "alumni";
 
@@ -72,30 +71,6 @@ export type ProjectPhase =
   | "flight_test"
   | "complete";
 
-export const PHASE_LABELS: Record<ProjectPhase, string> = {
-  concept: "Concept",
-  requirements: "Requirements",
-  preliminary_design: "Preliminary Design",
-  detailed_design: "Detailed Design",
-  manufacturing: "Manufacturing",
-  integration: "Integration",
-  testing: "Testing",
-  flight_test: "Flight Test",
-  complete: "Complete",
-};
-
-export const PHASE_ORDER: ProjectPhase[] = [
-  "concept",
-  "requirements",
-  "preliminary_design",
-  "detailed_design",
-  "manufacturing",
-  "integration",
-  "testing",
-  "flight_test",
-  "complete",
-];
-
 /** Separate from phase: phase is *where*, health is *how it's going*. */
 export type ProjectHealth = "on_track" | "at_risk" | "blocked" | "complete";
 
@@ -107,7 +82,16 @@ export interface Project {
   /** Null means top-level project. */
   parentId: string | null;
   teamId?: string;
-  /** Multiple REs allowed. First entry is the primary point of contact. */
+  /**
+   * The go-to person, accountable for deliverables.
+   * Mirrors `projects.primary_re_id` — a real column, so it's deterministic.
+   */
+  primaryReId: string;
+  /**
+   * All REs including the primary. Derived from `project_members` rows with
+   * `role = 're'`, so never rely on array order for who's primary — use
+   * `primaryReId` for that.
+   */
   reIds: string[];
   phase: ProjectPhase;
   health: ProjectHealth;

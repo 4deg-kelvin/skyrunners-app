@@ -46,6 +46,7 @@ function project(
     name: id,
     slug: id,
     parentId,
+    primaryReId: reIds[0] ?? "",
     reIds,
     phase: "concept",
     health: "on_track",

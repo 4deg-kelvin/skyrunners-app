@@ -1,26 +1,19 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { events } from "@/lib/mock-data";
-import type { EventKind } from "@/lib/types";
+import { getUpcomingEvents } from "@/lib/data/events";
+import { getViewer } from "@/lib/data/viewer";
+import { EVENT_KIND_LABELS, KEY_EVENT_WEIGHT } from "@/lib/labels";
+import { can } from "@/lib/permissions";
 
-const KIND_LABELS: Record<EventKind, string> = {
-  design_review: "Design Review",
-  company_tour: "Company Tour",
-  company_visit: "Company Visit",
-  build_session: "Build Session",
-  general_meeting: "Meeting",
-  training: "Training",
-  social: "Social",
-  competition: "Competition",
-  one_on_one: "1:1",
-};
-
-export default function CalendarPage() {
-  const upcoming = [...events].sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt)
-  );
+export default async function CalendarPage() {
+  const [upcoming, viewer] = await Promise.all([
+    getUpcomingEvents(),
+    getViewer(),
+  ]);
+  const mayCreate = can.createEvent(viewer.actor);
 
   return (
     <div className="space-y-6">
@@ -28,6 +21,7 @@ export default function CalendarPage() {
         label="Schedule"
         title="Calendar"
         description="Everything happening across SkyRunners. Add any event to your own Google or Apple calendar."
+        action={mayCreate ? <Button>New event</Button> : undefined}
       />
 
       <Card>
@@ -65,8 +59,10 @@ export default function CalendarPage() {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <Badge tone="neutral">{KIND_LABELS[event.kind]}</Badge>
-                    {event.importanceWeight >= 4 ? (
+                    <Badge tone="neutral">
+                      {EVENT_KIND_LABELS[event.kind]}
+                    </Badge>
+                    {event.importanceWeight >= KEY_EVENT_WEIGHT ? (
                       <Badge tone="cardinal">Key event</Badge>
                     ) : null}
                   </div>
@@ -76,8 +72,8 @@ export default function CalendarPage() {
           </div>
 
           <p className="mt-5 text-sm text-ink-muted">
-            Calendar subscription, RSVPs, and attendance tracking arrive in
-            Phase 5.
+            Opt-in Google and Apple calendar subscription, RSVPs, and attendance
+            tracking arrive in Phase 5.
           </p>
         </CardBody>
       </Card>
