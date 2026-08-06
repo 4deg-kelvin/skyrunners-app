@@ -6,11 +6,11 @@ import { ChevronDown, Plane } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 
 const NAV_ITEMS = [
+  { href: "/my-work", label: "My Work", hasAlert: true },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },
   { href: "/calendar", label: "Calendar" },
-  { href: "/updates", label: "Updates", hasAlert: true },
 ];
 
 export function TopNav({ userName }: { userName: string }) {

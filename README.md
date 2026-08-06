@@ -37,11 +37,15 @@ working, running on sample data.
 
 | Page | State |
 |---|---|
-| Dashboard | Update compliance, review queue, projects needing attention |
+| **My Work** | Member home. Your projects with what you own on each, who the RE is, hours logged, and per-project update sections |
+| Dashboard | Leadership view. Update compliance, review queue, projects needing attention |
 | Projects | Full nested project tree grouped by division |
 | Members | Roster with roles, project counts, reporting lines |
 | Calendar | Upcoming events list |
 | Updates | Placeholder — Phase 4 |
+
+Opening the app lands you on **My Work**, not the dashboard — your own projects and the
+update you owe are what you came for.
 
 > **All data is fake**, from `lib/mock-data.ts`, and the signed-in user is hardcoded in
 > `app/layout.tsx`. Supabase and real auth arrive in Phase 1. This is deliberate — it let

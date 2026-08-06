@@ -201,7 +201,13 @@ Member submits update  →  Lead reviews & comments  →  Lead rolls up to Co-Le
 ```
 
 - Member picks their own update days
-- Structured fields: progress, blockers, next steps, hours summary, projects touched
+- **One section per project**, not one blob of text. A member on three projects writes
+  three short sections, each labeled with its project and pre-filled with the hours
+  logged there. Without this, "finished the layup, waiting on parts" is ambiguous to a
+  Lead who oversees several of that person's projects, and an RE can't tell whether a
+  blocker is theirs to clear
+- Blockers route to that project's REs automatically, via the entry's `project_id`
+- Structured per section: progress, blockers, next steps, hours
 - Auto-populated draft: pre-fills projects and hours from their logged work, so the
   update is mostly *confirming* rather than *recalling*. This single feature will do
   more for submission rates than any reminder
@@ -221,6 +227,22 @@ Member submits update  →  Lead reviews & comments  →  Lead rolls up to Co-Le
 > a term, you can dial it to two without a schema change. Watch the on-time rate in the
 > first month; if it drops below roughly 70%, the cadence is likely the cause rather
 > than the people.
+
+### 5.3a "My Work" — the member's home
+
+Members land here, not on the leadership dashboard. Everything they need in one place:
+
+- **Their projects**, REs listed first, each showing the division › parent › project
+  trail so multi-project membership stays legible at a glance
+- **What they own** on each project, from `project_members.responsibility`
+- **Who to ask** — the project's REs, with one-click email. A stated requirement: it must
+  be easy to find the RE
+- **Hours logged per project**, and their last update about that specific project
+- **The update they owe**, already split into per-project sections with hours pre-filled
+
+The design goal is that a member never has to reconstruct context. Open the app, see the
+three things you're working on, see what you said last time about each, write two lines
+under each, done.
 
 ### 5.4 Project tree and discovery
 

@@ -519,6 +519,11 @@ export const projects: Project[] = [
 ];
 
 export const projectMemberships: ProjectMembership[] = [
+  // Current user, so "My Work" has something to show
+  { projectId: "p-gps-denied", memberId: "m-anish", role: "contributor", responsibility: "Mission requirements and flight-test coordination", joinedAt: "2026-04-16" },
+  { projectId: "p-skydelta-concept", memberId: "m-anish", role: "re", responsibility: "Trade study scope and sizing review", joinedAt: "2026-07-01" },
+  { projectId: "p-avionics-bringup", memberId: "m-anish", role: "contributor", responsibility: "Telemetry link testing", joinedAt: "2026-05-06" },
+
   { projectId: "p-airframe-v2", memberId: "m-priya", role: "re", responsibility: "Overall airframe integration", joinedAt: "2026-04-01" },
   { projectId: "p-airframe-v2", memberId: "m-tyler", role: "re", responsibility: "Structural analysis", joinedAt: "2026-05-01" },
   { projectId: "p-airframe-v2", memberId: "m-sofia", role: "contributor", responsibility: "Composite fabrication", joinedAt: "2026-05-04" },
@@ -541,18 +546,155 @@ export const projectMemberships: ProjectMembership[] = [
   { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01" },
 ];
 
+/** Current user's own update, so My Work shows the per-project layout. */
+export const myUpdate: ProgressUpdate = {
+  id: "u-me",
+  memberId: CURRENT_USER_ID,
+  dueAt: "2026-08-07T23:59",
+  status: "pending",
+  hoursThisPeriod: 7.5,
+  entries: [
+    {
+      id: "ue-me-1",
+      updateId: "u-me",
+      projectId: "p-gps-denied",
+      progress: "",
+      hours: 4.5,
+    },
+    {
+      id: "ue-me-2",
+      updateId: "u-me",
+      projectId: "p-skydelta-concept",
+      progress: "",
+      hours: 3,
+    },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Updates — 3x per week cadence
 // ---------------------------------------------------------------------------
 
 export const progressUpdates: ProgressUpdate[] = [
-  { id: "u-1", memberId: "m-sofia", dueAt: "2026-08-05T23:59", submittedAt: "2026-08-05T21:14", status: "submitted", progress: "Finished three coupon layups, two came out within spec.", blockers: "Vacuum pump seal is leaking.", nextSteps: "Replace seal, run remaining coupons.", projectIds: ["p-layup"], hoursThisPeriod: 6.5 },
-  { id: "u-2", memberId: "m-tyler", dueAt: "2026-08-05T23:59", submittedAt: "2026-08-06T08:30", status: "late", progress: "Spar FEA converged, mass down 14%.", blockers: "Need the 18% target reviewed — may not be reachable without changing layup.", nextSteps: "Bring options to design review.", projectIds: ["p-wing-spar", "p-airframe-v2"], hoursThisPeriod: 9 },
-  { id: "u-3", memberId: "m-omar", dueAt: "2026-08-05T23:59", status: "missed", progress: "", projectIds: ["p-sim"], hoursThisPeriod: 1.5 },
-  { id: "u-4", memberId: "m-kenji", dueAt: "2026-08-05T23:59", submittedAt: "2026-08-05T18:02", status: "reviewed", progress: "PDB schematic complete, routing 60% done.", nextSteps: "Finish routing, send for review before fab.", projectIds: ["p-power"], hoursThisPeriod: 7 },
-  { id: "u-5", memberId: "m-amara", dueAt: "2026-08-05T23:59", submittedAt: "2026-08-05T22:40", status: "submitted", progress: "VIO holding under 30cm drift over 50m indoor runs.", nextSteps: "Outdoor testing next week.", projectIds: ["p-vio"], hoursThisPeriod: 8.5 },
-  { id: "u-6", memberId: "m-noah", dueAt: "2026-08-05T23:59", status: "pending", progress: "", projectIds: ["p-load-test"], hoursThisPeriod: 4 },
-  { id: "u-7", memberId: "m-hana", dueAt: "2026-08-05T23:59", submittedAt: "2026-08-05T20:10", status: "submitted", progress: "Test stand frame welded, load cell mounted.", blockers: "Waiting on calibration weights.", nextSteps: "Calibrate and run first motor.", projectIds: ["p-propulsion-test"], hoursThisPeriod: 5.5 },
+  {
+    id: "u-1",
+    memberId: "m-sofia",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T21:14",
+    status: "submitted",
+    hoursThisPeriod: 6.5,
+    entries: [
+      {
+        id: "ue-1",
+        updateId: "u-1",
+        projectId: "p-layup",
+        progress: "Finished three coupon layups, two came out within spec.",
+        blockers: "Vacuum pump seal is leaking.",
+        nextSteps: "Replace seal, run remaining coupons.",
+        hours: 6.5,
+      },
+    ],
+  },
+  {
+    // Tyler works on two projects — separate entries keep it unambiguous
+    id: "u-2",
+    memberId: "m-tyler",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-06T08:30",
+    status: "late",
+    hoursThisPeriod: 9,
+    entries: [
+      {
+        id: "ue-2",
+        updateId: "u-2",
+        projectId: "p-wing-spar",
+        progress: "Spar FEA converged. Mass down 14%.",
+        blockers:
+          "The 18% target may not be reachable without changing the layup schedule.",
+        nextSteps: "Bring three options to the design review.",
+        hours: 7,
+      },
+      {
+        id: "ue-3",
+        updateId: "u-2",
+        projectId: "p-airframe-v2",
+        progress: "Updated the mass budget with the new spar estimate.",
+        nextSteps: "Re-check CG margins once the spar number is final.",
+        hours: 2,
+      },
+    ],
+  },
+  {
+    id: "u-3",
+    memberId: "m-omar",
+    dueAt: "2026-08-05T23:59",
+    status: "missed",
+    hoursThisPeriod: 1.5,
+    entries: [],
+  },
+  {
+    id: "u-4",
+    memberId: "m-kenji",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T18:02",
+    status: "reviewed",
+    hoursThisPeriod: 7,
+    entries: [
+      {
+        id: "ue-4",
+        updateId: "u-4",
+        projectId: "p-power",
+        progress: "PDB schematic complete, routing 60% done.",
+        nextSteps: "Finish routing, send for review before fab.",
+        hours: 7,
+      },
+    ],
+  },
+  {
+    id: "u-5",
+    memberId: "m-amara",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T22:40",
+    status: "submitted",
+    hoursThisPeriod: 8.5,
+    entries: [
+      {
+        id: "ue-5",
+        updateId: "u-5",
+        projectId: "p-vio",
+        progress: "VIO holding under 30 cm drift over 50 m indoor runs.",
+        nextSteps: "Outdoor testing next week.",
+        hours: 8.5,
+      },
+    ],
+  },
+  {
+    id: "u-6",
+    memberId: "m-noah",
+    dueAt: "2026-08-05T23:59",
+    status: "pending",
+    hoursThisPeriod: 4,
+    entries: [],
+  },
+  {
+    id: "u-7",
+    memberId: "m-hana",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T20:10",
+    status: "submitted",
+    hoursThisPeriod: 5.5,
+    entries: [
+      {
+        id: "ue-6",
+        updateId: "u-7",
+        projectId: "p-propulsion-test",
+        progress: "Test stand frame welded, load cell mounted.",
+        blockers: "Waiting on calibration weights.",
+        nextSteps: "Calibrate and run the first motor.",
+        hours: 5.5,
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -560,6 +702,9 @@ export const progressUpdates: ProgressUpdate[] = [
 // ---------------------------------------------------------------------------
 
 export const workLogs: WorkLog[] = [
+  { id: "w-me-1", memberId: "m-anish", projectId: "p-gps-denied", workDate: "2026-08-05", hours: 2.5, description: "Flight-test planning" },
+  { id: "w-me-2", memberId: "m-anish", projectId: "p-gps-denied", workDate: "2026-08-03", hours: 2, description: "Requirements review" },
+  { id: "w-me-3", memberId: "m-anish", projectId: "p-skydelta-concept", workDate: "2026-08-04", hours: 3, description: "Sizing spreadsheet" },
   { id: "w-1", memberId: "m-sofia", projectId: "p-layup", workDate: "2026-08-05", hours: 3, description: "Coupon layup" },
   { id: "w-2", memberId: "m-sofia", projectId: "p-layup", workDate: "2026-08-04", hours: 3.5, description: "Tooling prep" },
   { id: "w-3", memberId: "m-tyler", projectId: "p-wing-spar", workDate: "2026-08-05", hours: 4, description: "FEA runs" },
@@ -626,6 +771,135 @@ export function memberProjects(memberId: string) {
 
 export function activeMembers() {
   return members.filter((m) => m.status === "active");
+}
+
+export function getTeam(id: string) {
+  return teams.find((t) => t.id === id);
+}
+
+/**
+ * Where a project sits, as a readable trail:
+ *   "Fixed Wing eVTOL › eVTOL Airframe v2 › Wing Spar Redesign"
+ *
+ * This is what makes multi-project membership legible. "Layup Process" means
+ * little on its own; showing that it lives under the spar redesign inside the
+ * eVTOL division tells you instantly which piece of work it is.
+ */
+export function projectBreadcrumb(
+  projectId: string
+): { id: string; name: string; kind: "division" | "team" | "project" }[] {
+  const project = getProject(projectId);
+  if (!project) return [];
+
+  // Walk up the project tree, collecting ancestors
+  const projectTrail: typeof projects = [];
+  const seen = new Set<string>();
+  let current: string | null = project.parentId;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    const p = getProject(current);
+    if (!p) break;
+    projectTrail.unshift(p);
+    current = p.parentId;
+  }
+
+  // Then up the org tree from whichever unit owns the topmost project
+  const owningTeamId = (projectTrail[0] ?? project).teamId;
+  const teamTrail: { id: string; name: string; kind: "division" | "team" }[] = [];
+  const seenTeams = new Set<string>();
+  let currentTeam: string | null | undefined = owningTeamId;
+  while (currentTeam && !seenTeams.has(currentTeam)) {
+    seenTeams.add(currentTeam);
+    const t = getTeam(currentTeam);
+    if (!t) break;
+    teamTrail.unshift({
+      id: t.id,
+      name: t.name,
+      kind: t.parentId === null ? "division" : "team",
+    });
+    currentTeam = t.parentId;
+  }
+
+  return [
+    ...teamTrail,
+    ...projectTrail.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: "project" as const,
+    })),
+  ];
+}
+
+/** Every project a member is on, with their role and responsibility. */
+export function myProjects(memberId: string) {
+  return projectMemberships
+    .filter((pm) => pm.memberId === memberId)
+    .map((pm) => ({
+      membership: pm,
+      project: getProject(pm.projectId)!,
+    }))
+    .filter((x) => x.project)
+    .sort((a, b) => {
+      // REs first — that's where accountability sits
+      if (a.membership.role !== b.membership.role) {
+        return a.membership.role === "re" ? -1 : 1;
+      }
+      return a.project.name.localeCompare(b.project.name);
+    });
+}
+
+/** Who to ask about this project. */
+export function projectREs(projectId: string) {
+  const project = getProject(projectId);
+  if (!project) return [];
+  return project.reIds.map((id) => getMember(id)).filter(Boolean);
+}
+
+export function hoursOnProject(memberId: string, projectId: string) {
+  return workLogs
+    .filter((w) => w.memberId === memberId && w.projectId === projectId)
+    .reduce((sum, w) => sum + w.hours, 0);
+}
+
+/** Most recent submitted entry a member wrote about a specific project. */
+export function lastEntryForProject(memberId: string, projectId: string) {
+  const candidates = progressUpdates
+    .filter((u) => u.memberId === memberId && u.submittedAt)
+    .flatMap((u) =>
+      u.entries
+        .filter((e) => e.projectId === projectId)
+        .map((e) => ({ entry: e, submittedAt: u.submittedAt! }))
+    )
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+
+  return candidates[0];
+}
+
+/** All entries about a project, from anyone — the project's activity feed. */
+export function projectUpdateFeed(projectId: string) {
+  return progressUpdates
+    .filter((u) => u.submittedAt)
+    .flatMap((u) =>
+      u.entries
+        .filter((e) => e.projectId === projectId)
+        .map((e) => ({
+          entry: e,
+          memberId: u.memberId,
+          submittedAt: u.submittedAt!,
+        }))
+    )
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
+/** Blockers across a member's projects — what a Lead most needs to see. */
+export function openBlockers() {
+  return progressUpdates
+    .filter((u) => u.submittedAt)
+    .flatMap((u) =>
+      u.entries
+        .filter((e) => e.blockers)
+        .map((e) => ({ entry: e, memberId: u.memberId, status: u.status }))
+    );
 }
 
 /** Update compliance for the current window — powers the dashboard donut. */

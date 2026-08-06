@@ -164,16 +164,36 @@ export interface UpdateSchedule {
   isPaused: boolean;
 }
 
+/**
+ * One project's worth of an update.
+ *
+ * This is the important structural bit: a member on three projects writes three
+ * entries, each attached to a specific project. Without this, an update saying
+ * "finished the layup, waiting on parts" is ambiguous to a reader who oversees
+ * several of that person's projects — and REs would have to guess whether a
+ * blocker is theirs to unblock.
+ */
+export interface UpdateEntry {
+  id: string;
+  updateId: string;
+  projectId: string;
+  progress: string;
+  blockers?: string;
+  nextSteps?: string;
+  /** Hours on this project during the period. Auto-filled from work_logs. */
+  hours: number;
+}
+
 export interface ProgressUpdate {
   id: string;
   memberId: string;
   dueAt: string;
   submittedAt?: string;
   status: UpdateStatus;
-  progress: string;
-  blockers?: string;
-  nextSteps?: string;
-  projectIds: string[];
+  /** One entry per project worked on. Auto-seeded from logged hours. */
+  entries: UpdateEntry[];
+  /** Anything not tied to a specific project. Optional. */
+  generalNote?: string;
   hoursThisPeriod: number;
 }
 

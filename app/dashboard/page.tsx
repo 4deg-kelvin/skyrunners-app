@@ -15,6 +15,7 @@ import {
   club,
   divisions,
   getMember,
+  getProject,
   hoursThisWeek,
   projects,
   updateCompliance,
@@ -165,17 +166,40 @@ export default function DashboardPage() {
                               {update.status === "late" ? "Late" : "Submitted"}
                             </Badge>
                           </div>
-                          <p className="mt-1.5 line-clamp-2 text-sm text-ink-soft">
-                            {update.progress}
-                          </p>
-                          {update.blockers ? (
-                            <p className="mt-2 flex items-start gap-1.5 text-sm text-cardinal-600">
-                              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-                              <span className="font-medium">
-                                {update.blockers}
-                              </span>
-                            </p>
-                          ) : null}
+
+                          {/* One block per project, so it's always clear which
+                              piece of work each note refers to. */}
+                          <div className="mt-2.5 space-y-2.5">
+                            {update.entries.map((entry) => {
+                              const project = getProject(entry.projectId);
+                              return (
+                                <div
+                                  key={entry.id}
+                                  className="border-l-2 border-line-soft pl-3"
+                                >
+                                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                    <p className="text-[13px] font-semibold text-cardinal-600">
+                                      {project?.name ?? "Unknown project"}
+                                    </p>
+                                    <span className="text-xs text-ink-muted">
+                                      {formatNumber(entry.hours, 1)} hrs
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
+                                    {entry.progress}
+                                  </p>
+                                  {entry.blockers ? (
+                                    <p className="mt-1.5 flex items-start gap-1.5 text-sm text-cardinal-600">
+                                      <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                                      <span className="font-medium">
+                                        {entry.blockers}
+                                      </span>
+                                    </p>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })

@@ -213,17 +213,44 @@ Index `(member_id, work_date)` and `(project_id, work_date)`.
 | `due_at` | timestamptz | Generated from the schedule |
 | `submitted_at` | timestamptz? | |
 | `status` | enum | `pending` \| `submitted` \| `late` \| `missed` \| `reviewed` |
-| `progress` | text | What got done |
-| `blockers` | text? | **Surface prominently — this is the early-warning signal** |
-| `next_steps` | text? | |
+| `general_note` | text? | Anything not tied to a specific project. Optional |
 | `hours_this_period` | numeric | Auto-computed from `work_logs` |
 | `lead_id_at_submission` | uuid? FK | Snapshot; Leads change |
 
-### `update_projects`
-Which projects an update covers. Auto-seeded from `work_logs` in the period — this is
-what makes the update mostly confirmation rather than recall.
+### `update_entries`
+**One row per project covered by an update.** The progress text lives here, not on
+`progress_updates`.
 
-`update_id` FK · `project_id` FK · `note?`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `update_id` | uuid FK → progress_updates | |
+| `project_id` | uuid FK → projects | |
+| `progress` | text | What got done **on this project** |
+| `blockers` | text? | **Surface prominently — the early-warning signal.** Routes to this project's REs |
+| `next_steps` | text? | |
+| `hours` | numeric | Hours on this project in the period. Auto-filled from `work_logs` |
+
+Unique on `(update_id, project_id)`. Index `(project_id, created_at)` for the
+per-project activity feed.
+
+> **Why this is a separate table rather than three columns on the update.**
+>
+> Members work on multiple projects — that's the whole point of open enrollment. If an
+> update is one blob of text, "finished the layup, still waiting on parts" is ambiguous
+> to a Lead who oversees several of that person's projects, and an RE can't tell whether
+> a blocker is theirs to clear. Splitting per project makes every note
+> self-locating.
+>
+> Three things fall out of this for free:
+>
+> 1. **Per-project activity feeds** — every note anyone wrote about a project, in order
+> 2. **Blockers route to the right RE** automatically, via `project_id`
+> 3. **Hours reconcile per project**, so the update and the time log agree
+>
+> Entries are **auto-seeded from `work_logs`** for the period, so submitting an update is
+> mostly confirming pre-filled sections rather than recalling what you did. That is the
+> single biggest lever on submission rates.
 
 ### `update_reviews`
 

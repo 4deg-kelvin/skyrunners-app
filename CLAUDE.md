@@ -48,9 +48,23 @@ npm run typecheck  # tsc --noEmit
 
 ## Current state
 
-Phase 0 is complete: app shell, design system, dashboard, project tree, roster,
-calendar. **All data comes from `lib/mock-data.ts`** and auth is mocked in
-`app/layout.tsx` via `CURRENT_USER_ID`. Supabase is not wired up yet.
+Phase 0 is complete: app shell, design system, **My Work** (member home), dashboard,
+project tree, roster, calendar. **All data comes from `lib/mock-data.ts`** and auth is
+mocked in `app/layout.tsx` via `CURRENT_USER_ID`. Supabase is not wired up yet.
+
+`/` redirects to `/my-work`, not the dashboard — members land on their own projects and
+the update they owe, which is what they came for. The dashboard is the leadership view.
+
+## Updates are per-project, not per-member-per-week
+
+`progress_updates` is just an envelope (who, when, status). The actual content lives in
+**`update_entries`** — one row per project, each with its own progress, blockers,
+next steps, and hours.
+
+This matters because members are on multiple projects by design. A single blob of text
+would be ambiguous to a Lead overseeing several of that person's projects, and an RE
+couldn't tell whether a blocker was theirs to clear. Anything that renders an update
+must iterate `entries` and label each with its project.
 
 ## The seven things most likely to trip you up
 
