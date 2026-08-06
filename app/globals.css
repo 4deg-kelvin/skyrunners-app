@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Sky Runners design tokens
+   Derived from the Stanford Student Robotics HQ reference UI.
+   Change a value here and it updates everywhere — never hardcode hex codes
+   in components.
+   ========================================================================== */
+
+@theme {
+  /* Stanford cardinal — the single accent color */
+  --color-cardinal-50: #fdf5f5;
+  --color-cardinal-100: #fae8e8;
+  --color-cardinal-200: #f2caca;
+  --color-cardinal-500: #a81c1c;
+  --color-cardinal-600: #8c1515; /* primary */
+  --color-cardinal-700: #6b0f0f; /* hover */
+  --color-cardinal-800: #4d0b0b;
+
+  /* Warm neutrals — the page is off-white, not pure white */
+  --color-surface: #f7f5f3; /* page background */
+  --color-card: #ffffff; /* card background */
+  --color-line: #e8e4e0; /* hairline borders */
+  --color-line-soft: #f0edea; /* internal dividers */
+
+  /* Text */
+  --color-ink: #1a1a1a; /* headings, values */
+  --color-ink-soft: #5f5f5f; /* body, descriptions */
+  --color-ink-muted: #8a8a8a; /* labels, captions */
+
+  /* Status */
+  --color-ok-bg: #e9f5ea;
+  --color-ok-fg: #2c6e33;
+  --color-warn-bg: #fdf3e3;
+  --color-warn-fg: #8a5a12;
+  --color-risk-bg: #fae8e8;
+  --color-risk-fg: #8c1515;
+  --color-neutral-bg: #f1efec;
+  --color-neutral-fg: #5f5f5f;
+
+  /* Radii — generous, matching the reference */
+  --radius-tile: 0.75rem; /* 12px — stat tiles, buttons */
+  --radius-card: 1rem; /* 16px — cards */
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ========================================================================== */
+
+html {
+  background-color: var(--color-surface);
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings in the reference are bold with slightly tightened tracking */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Consistent focus ring for keyboard users — accessibility, not decoration */
+:focus-visible {
+  outline: 2px solid var(--color-cardinal-600);
+  outline-offset: 2px;
+}

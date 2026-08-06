@@ -53,24 +53,24 @@ Extends Supabase's built-in `auth.users`. One row per member.
 | `class_year` | int? | |
 | `major` | text? | |
 | `phone` | text? | |
-| `global_role` | enum | `admin` \| `mentor` \| `member` |
+| `global_role` | enum | `admin` \| `lead` \| `member` |
 | `status` | enum | `active` \| `inactive` \| `alumni` — never delete people, deactivate them |
-| `mentor_id` | uuid? FK → profiles | Their **one** direct Mentor. Self-referencing. |
+| `lead_id` | uuid? FK → profiles | Their **one** direct Lead. Self-referencing. |
 | `primary_team_id` | uuid? FK → teams | Home sub-team |
 | `bio` | text? | |
 | `skills` | text[]? | Powers "find work" matching |
 | `joined_at` | date | |
 | `last_active_at` | timestamptz? | |
 
-> `mentor_id` self-reference creates the reporting chain. Guard against cycles — A
+> `lead_id` self-reference creates the reporting chain. Guard against cycles — A
 > reporting to B reporting to A would make recursive queries loop forever. Enforce with
 > a trigger or a check in the permission module.
 
-### `mentor_history`
-Audit trail. Reassignment is expected to be frequent, and "who was your Mentor in
+### `lead_history`
+Audit trail. Reassignment is expected to be frequent, and "who was your Lead in
 spring?" matters when reviewing old updates.
 
-`id` · `member_id` FK · `old_mentor_id?` FK · `new_mentor_id?` FK · `changed_by` FK ·
+`id` · `member_id` FK · `old_lead_id?` FK · `new_lead_id?` FK · `changed_by` FK ·
 `reason?` · `changed_at`
 
 ---
@@ -89,18 +89,20 @@ Divisions and all nested sub-teams live here. A Division is simply a team with
 | `description` | text? | |
 | `parent_id` | uuid? FK → teams | `NULL` = Division (Co-Lead configured) |
 | `kind` | enum | `division` \| `team` — derived, stored for query convenience |
-| `mentor_id` | uuid? FK → profiles | This unit's Mentor |
-| `re_id` | uuid? FK → profiles | Division-level Responsible Engineer |
+| `lead_id` | uuid? FK → profiles | This unit's Lead |
+| `re_id` | uuid? FK → profiles | Division-level Responsible Engineer. Sets up sub-teams beneath this unit |
 | `color` | text? | Visual coding across Gantt and calendar |
 | `is_active` | bool | |
 | `created_at` | timestamptz | |
 
-Seed divisions: Fixed Wing eVTOL, SkyBeta, Spade, DroneHacks, SkyDelta *(confirm)*
+Seed divisions: Fixed Wing eVTOL, SkyBeta, Spade, DroneHacks, SkyDelta.
+Names and spellings are **editable by Co-Leads in the UI** — divisions can be added and
+removed as the club's initiatives change, so nothing here is hardcoded.
 
 ### `team_memberships`
 A member's home team is `profiles.primary_team_id`, but people legitimately span units.
 
-`id` · `team_id` FK · `member_id` FK · `role` (`member` \| `mentor` \| `re`) ·
+`id` · `team_id` FK · `member_id` FK · `role` (`member` \| `lead` \| `re`) ·
 `joined_at` · `left_at?`
 
 ---
@@ -118,13 +120,14 @@ Nests arbitrarily. Attached to a team, or to a parent project, or both.
 | `description` | text? | |
 | `parent_id` | uuid? FK → projects | `NULL` = top-level project |
 | `team_id` | uuid? FK → teams | Owning org unit |
-| `re_id` | uuid FK → profiles | **Required.** Accountable for deliverables |
-| `status` | enum | `planning` \| `active` \| `blocked` \| `complete` \| `archived` |
+| `primary_re_id` | uuid FK → profiles | **Required.** The go-to person. Additional REs live in `project_members` with `role = 're'` — multiple REs per project are allowed |
+| `phase` | enum | Where in the lifecycle: `concept` \| `requirements` \| `preliminary_design` \| `detailed_design` \| `manufacturing` \| `integration` \| `testing` \| `flight_test` \| `complete` |
+| `health` | enum | How it's going: `on_track` \| `at_risk` \| `blocked` \| `complete`. Separate from phase — *where* and *how* are different questions |
 | `start_date` | date? | |
 | `target_date` | date? | |
 | `actual_end_date` | date? | |
 | `dates_overridden` | bool | If false, dates roll up from children (see Gantt) |
-| `is_open_to_join` | bool | **RE-controlled. Powers self-serve joining.** |
+| `is_open_to_join` | bool | **Defaults true.** Members enroll in anything that interests them; an RE can close a project if there's a real reason |
 | `open_roles` | text? | "Looking for: composites, CFD" |
 | `time_commitment` | text? | "~5 hrs/week" — sets expectations before joining |
 | `priority` | enum? | `low` \| `medium` \| `high` \| `critical` |
@@ -188,14 +191,14 @@ Index `(member_id, work_date)` and `(project_id, work_date)`.
 ## Updates and the review chain
 
 ### `update_schedules`
-Member-configured cadence. Deliberately flexible while "tri-weekly" is unresolved.
+**Three updates per week**, on weekdays each member picks for themselves.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
 | `member_id` | uuid FK unique | |
-| `cadence` | enum | `weekly` \| `biweekly` \| `every_3_weeks` \| `n_per_week` |
-| `weekdays` | int[] | 0–6. Multiple entries when `n_per_week` |
+| `updates_per_week` | int | Default 3. Configurable so leadership can dial the load down if it proves too heavy |
+| `weekdays` | int[] | 0–6, Sunday = 0. Length should match `updates_per_week` |
 | `due_time` | time | Default 23:59 |
 | `timezone` | text | Default `America/Los_Angeles` |
 | `is_paused` | bool | Breaks, leave of absence |
@@ -214,7 +217,7 @@ Member-configured cadence. Deliberately flexible while "tri-weekly" is unresolve
 | `blockers` | text? | **Surface prominently — this is the early-warning signal** |
 | `next_steps` | text? | |
 | `hours_this_period` | numeric | Auto-computed from `work_logs` |
-| `mentor_id_at_submission` | uuid? FK | Snapshot; Mentors change |
+| `lead_id_at_submission` | uuid? FK | Snapshot; Leads change |
 
 ### `update_projects`
 Which projects an update covers. Auto-seeded from `work_logs` in the period — this is
@@ -225,11 +228,11 @@ what makes the update mostly confirmation rather than recall.
 ### `update_reviews`
 
 `id` · `update_id` FK · `reviewer_id` FK · `comment?` ·
-`flag` (`on_track` \| `needs_support` \| `at_risk`) · `is_private` (Mentor-only note) ·
+`flag` (`on_track` \| `needs_support` \| `at_risk`) · `is_private` (Lead-only note) ·
 `reviewed_at`
 
 ### `rollup_reports`
-Mentor → up the chain.
+Lead → up the chain.
 
 `id` · `author_id` FK · `team_id?` FK · `submitted_to_id` FK · `period_start` ·
 `period_end` · `summary` · `highlights?` · `concerns?` ·
@@ -342,7 +345,7 @@ Admin-configured catalog.
 `id` · `member_id` FK · `training_type_id` FK · `completed_at` date ·
 `expires_at?` date (computed from `validity_months`) · `certificate_url?` (Storage —
 **the one-click certificate pull-up**) · `verified_by?` FK · `verified_at?` ·
-`status` (`claimed` \| `verified` \| `expired` \| `rejected`) · `notes?`
+`status` (`requested` \| `verified` \| `expired` \| `rejected`) · `notes?`
 
 ### `access_types`
 e.g. Robotics Room keycard, Lab 64 24-hour, PRL, machine shop after-hours.
@@ -386,18 +389,24 @@ Refresh nightly via Vercel Cron.
 ### `notifications`
 
 `id` · `recipient_id` FK · `kind` (`update_due` \| `update_late` \| `update_reviewed` \|
-`event_invite` \| `project_added` \| `task_assigned` \| `mentor_changed` \|
-`rollup_due` \| `training_expiring` \| `meeting_request`) · `title` · `body?` ·
+`event_invite` \| `project_added` \| `task_assigned` \| `lead_changed` \|
+`rollup_due` \| `training_expiring` \| `training_request` \| `meeting_request` \|
+**`project_deadline_approaching`** \| **`milestone_at_risk`**) · `title` · `body?` ·
 `link?` · `read_at?` · `emailed_at?` · `created_at`
+
+> The last two go to **REs**, not the assignee. An RE is accountable for the
+> deliverable, so they need to see a slipping deadline before it slips — that's what
+> makes the reminder useful rather than a post-mortem. `training_request` goes to the
+> member's Lead when a training verification is waiting on them.
 
 ### `member_invitations`
 
 `id` · `email` (`@stanford.edu` enforced) · `invited_by` FK · `intended_role` ·
-`intended_team_id?` FK · `intended_mentor_id?` FK · `token` unique ·
+`intended_team_id?` FK · `intended_lead_id?` FK · `token` unique ·
 `expires_at` · `accepted_at?` · `accepted_by?` FK
 
 ### `audit_log`
-Role changes, Mentor reassignments, and access grants need a paper trail.
+Role changes, Lead reassignments, and access grants need a paper trail.
 
 `id` · `actor_id?` FK · `action` · `entity_type` · `entity_id` · `before?` jsonb ·
 `after?` jsonb · `created_at`
@@ -409,13 +418,14 @@ Role changes, Mentor reassignments, and access grants need a paper trail.
 Things the database or permission module must guarantee:
 
 1. `profiles.email` ends in `@stanford.edu`
-2. No cycles in `profiles.mentor_id`, `teams.parent_id`, `projects.parent_id`,
+2. No cycles in `profiles.lead_id`, `teams.parent_id`, `projects.parent_id`,
    `tasks.parent_task_id`, or `task_dependencies`
-3. Every `project` has a non-null `re_id`
+3. Every `project` has a non-null `primary_re_id`, and that person also appears in
+   `project_members` with `role = 're'`
 4. `work_logs.hours` between 0 and 24; `work_date` not in the future
 5. A member has at most one active `project_members` row per project
 6. Exactly one `engagement_weights` row with `is_current = true`
-7. Deactivating a member reassigns or nulls their mentees' `mentor_id` — never orphan
+7. Deactivating a member reassigns or nulls their mentees' `lead_id` — never orphan
    someone
 8. Deleting a project requires reparenting or cascading its children, explicitly chosen
 

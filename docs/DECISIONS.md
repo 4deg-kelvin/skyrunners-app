@@ -1,15 +1,16 @@
-# Sky Runners App — Decisions & Open Questions
+# Sky Runners App — Decisions
 
-Living document. **Status:** planning complete, awaiting answers to §4 before Phase 0.
+**Status:** Phase 0 built. All blocking questions resolved.
 
-See `PROJECT_PLAN.md` for the full plan and `DATA_MODEL.md` for the schema.
+See `PROJECT_PLAN.md` for the plan, `DATA_MODEL.md` for the schema,
+`DESIGN_SYSTEM.md` for the visual language.
 
 ---
 
 ## 1. Context
 
-Stanford UAV (Sky Runners) needs an app to track **member engagement** and
-**engineering efforts** across multiple concurrent drone projects.
+Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app to track
+**member engagement** and **engineering efforts** across concurrent drone projects.
 
 **Root problem:** disorganization is the top cause of member attrition.
 
@@ -21,23 +22,42 @@ Stanford UAV (Sky Runners) needs an app to track **member engagement** and
 
 ## 2. Locked decisions
 
+### Technical
+
 | Decision | Choice | Rationale |
 |---|---|---|
 | Framework | Next.js 15, App Router | One codebase for UI + API |
-| Language | **TypeScript only — no Python** | React forces TS regardless; a second language doubles the learning and ops load for a solo beginner. See `PROJECT_PLAN.md` §2 |
-| Styling | Tailwind CSS + shadcn/ui | Owned, editable components; suits high-density UI |
+| Language | **TypeScript only — no Python** | React forces TS regardless; a second language doubles learning and ops load for a solo beginner. `PROJECT_PLAN.md` §2 |
+| Styling | Tailwind CSS v4, CSS-first tokens | Tokens in `app/globals.css`; no hardcoded colors |
 | Database | Postgres via Supabase | Recursive CTEs handle the nested team/project trees natively |
 | Auth | Supabase Auth, Google OAuth, `stanford.edu` restricted | Satisfies "Stanford only", no password handling |
 | File storage | Supabase Storage | Certificates, presentations, CAD, reports |
 | Email | Resend | Deadline nudges, invites |
-| Cron | Vercel Cron → API route | Missed-deadline checks, nightly engagement snapshots |
+| Cron | Vercel Cron → API route | Missed-update checks, RE deadline reminders, nightly engagement snapshots |
 | ORM | **Supabase client, or Drizzle. Not Prisma** | Prisma bypasses RLS with elevated privileges, defeating read protection |
-| Data access | RLS for reads; Server Actions + central permission module for writes | Reads are mostly open (transparency default); writes are complex and belong in one testable module |
-| Charts | Recharts | |
+| Data access | RLS for reads; Server Actions + `lib/permissions.ts` for writes | Reads mostly open; writes complex and belong in one tested module |
 | Gantt | Prototype `frappe-gantt`, replace with custom if nesting fights it | Nested-project Gantt is unusual; verify before committing |
-| Roles | Co-Lead (`admin`) / Mentor / Member, plus project-scoped RE | "Mentor" pending confirmation |
-| Deletion policy | Never hard-delete people or projects — deactivate | History must survive graduations |
-| Local dev path | `C:\Users\anish\skyrunners\project_and_member_managment_website\skyrunners-app` | Outside OneDrive, deliberately |
+| Tests | Node built-in test runner, `--experimental-strip-types` | Zero dependencies. Covers permissions and engagement |
+| Deletion policy | Never hard-delete people or projects — deactivate | Contribution history must survive graduations |
+
+### Product
+
+| Decision | Choice |
+|---|---|
+| Roles | **Co-Lead** → **Team Lead** → **Member**, plus project-scoped **RE** |
+| Update cadence | **3 per week**, on member-chosen weekdays. `updates_per_week` configurable |
+| REs per project | **Multiple allowed**, one primary as go-to contact |
+| Project enrollment | **Open by default** — members join anything |
+| Project status | **Phase** (lifecycle) + **health** (how it's going), as separate fields |
+| Divisions | Co-Lead editable in the UI — addable, removable, renameable |
+| Activity visibility | **Public to all members** — projects, who's on what, responsibilities, artifacts, calendar, Gantt |
+| Effort visibility | **Restricted** — hours, update contents, engagement scores visible to the member, their Lead chain, and REs of projects they contribute to |
+| Update review | Ancestor REs up the project chain, plus the Lead chain |
+| Training verification | Member submits a request; direct Lead or Co-Lead verifies |
+| Engagement weights | 30% update reliability, 25% task completion, 20% RE responsibility (size-scaled), 15% event attendance, 10% hours, 0% breadth |
+| Engagement framing | Flashlight, not scoreboard. **No leaderboard function, deliberately** |
+| Calendar sync | **Opt-in only**, Google *and* Apple |
+| Local dev path | `C:\Users\anish\skyrunners\project_and_member_managment_website\skyrunners-app` |
 
 ---
 
@@ -47,13 +67,13 @@ Anish is building app functionality; hosting and production data are yours.
 
 ### Recommended: Supabase
 
-It covers four needs at once — Postgres, Google OAuth with `stanford.edu` domain
+Covers four needs at once — Postgres, Google OAuth with `stanford.edu` domain
 restriction, file storage for certificates and engineering artifacts, and row-level
-security. Generous free tier, and it's plain Postgres underneath, so nothing here is a
-one-way door.
+security. Generous free tier, plain Postgres underneath, so nothing here is a one-way
+door.
 
-**Alternatives, if you'd rather self-manage:** Postgres on Railway / Render / Fly.io
-gives more control at the cost of building auth yourself.
+**Alternatives if you'd rather self-manage:** Postgres on Railway / Render / Fly.io,
+building auth yourself.
 
 **Please avoid Firebase/Firestore.** This data model is deeply relational — members ↔
 teams ↔ projects ↔ tasks ↔ attendance are all joins, plus two arbitrarily-nested trees
@@ -64,64 +84,56 @@ resolved with recursive CTEs. NoSQL would make the core queries painful.
 1. **Postgres, not NoSQL** — recursive CTEs are load-bearing (`DATA_MODEL.md`)
 2. **Google OAuth restricted to `stanford.edu`** — this *is* the access control model
 3. **File storage** with per-object access control
-4. **Scheduled jobs** — nightly engagement snapshots, deadline nudge emails
+4. **Scheduled jobs** — nightly engagement snapshots, missed-update nudges, RE deadline
+   reminders
 5. **Transactional email** — Resend unless you prefer otherwise
 6. **Preview deployments per branch** would help a lot, since Anish is learning and will
-   want to show the club work-in-progress
+   want to show the club work in progress
 
 ### Deployment
 
 Vercel is the path of least resistance for Next.js — free tier, per-branch preview URLs,
-built-in cron. Anything running Node works though.
+built-in cron. Anything running Node works.
 
-### Please don't finalize the schema unilaterally
+### Two things to watch
 
-`DATA_MODEL.md` is the current design and follows from documented requirements. If you
-see problems, raise them — but changes should stay in sync with that doc, since the app
-code is built against it.
+**Don't introduce Prisma.** It connects with elevated privileges and silently bypasses
+the RLS policies protecting reads.
 
----
-
-## 4. Open questions — blocking
-
-**Q1 and Q2 block Phase 0. Q3 blocks Phase 3.**
-
-1. **"Tri-weekly update" — 3× per week, or once every 3 weeks?**
-   The wording ("a 3 weekly update", "tri-weekly update days" plural, later "weekly
-   updates") supports either. Three written updates per week is a heavy ask for students
-   and risks the burnout that drives quitting; every three weeks may be too slow to
-   catch problems early. Schema is flexible either way, but defaults and UI copy need
-   the real answer.
-
-2. **Role name: "Mentor"?**
-   Chosen because it matches the described duties and avoids colliding with "Co-Lead."
-   Alternatives: **Crew Chief** (aviation-native, fits the team identity), **Section
-   Lead** (clearer hierarchy), **Advisor** (softer). Cheap to change now, painful later.
-
-3. **Should hours and updates be visible to all members, or leadership only?**
-   Full transparency drives accountability and discoverability, but can feel like
-   surveillance to slower contributors — which works against retention. Suggested middle
-   path: project activity and membership visible to everyone; raw individual hour totals
-   and engagement ranks leadership-only. Easier to open up later than to walk back.
-
-## 5. Open questions — non-blocking
-
-4. **Division names** — confirm exact spellings: Fixed Wing eVTOL, SkyBeta, Spade,
-   DroneHacks, SkyDelta. Any missing?
-5. **Club size** — rough member count and number of sub-teams, for UI density decisions
-6. **Trainings to seed** — machine shop tiers, lab equipment, safety, Stanford online
-   courses?
-7. **Facility access types to seed** — Robotics Room keycard, Lab 64 24-hour, PRL?
-8. **Competition dates** — hard external deadlines to anchor Gantt charts to?
+**Don't finalize the schema unilaterally.** `DATA_MODEL.md` follows from documented
+requirements and the app code is built against it. Raise problems rather than diverging.
 
 ---
 
-## 6. Deliberate deferrals
+## 4. Still to gather
+
+Non-blocking, needed when the relevant phase arrives:
+
+- **Trainings to seed** (Phase 7) — Anish will supply the machine and lab list
+- **Facility access types** (Phase 7) — Robotics Room keycard, Lab 64 24-hour, PRL, etc.
+- **Competition dates** — none yet; project deadlines are settable at any time
+
+---
+
+## 5. Deliberate deferrals
 
 | Deferred | Until |
 |---|---|
 | Mobile app / PWA | Phase 9. Responsive web throughout, so phones work meanwhile |
 | Offline hour logging | Phase 9 |
-| Slack / Google Calendar integration | Post-launch. iCal feed export covers most of the need |
+| Slack integration | Post-launch |
 | Python analytics service | Only if real modeling or ML work materializes |
 | Alumni / historical archive views | After a full year of data exists |
+| Breadth in engagement scoring | Weight is 0; revisit after a term of real data |
+
+---
+
+## 6. Open risks
+
+| Risk | Watch for |
+|---|---|
+| **Scope** | This is large for a solo beginner. Phase 2 alone addresses the root problem — ship it before building Gantt charts |
+| **Update fatigue** | 3 written check-ins a week is a real ask. If on-time rate drops below ~70% in month one, the cadence is the cause, not the people. `updates_per_week` is configurable for this reason |
+| **Metric gaming** | Any visible metric becomes a target. Hours weighted lowest, no leaderboard, outcomes prioritized |
+| **Permission bugs** | Nested inherited RE authority is the trickiest logic. Covered by `lib/permissions.test.ts` — extend it when rules change |
+| **Turnover** | The app must outlive Anish. Docs and `CLAUDE.md` exist for this |

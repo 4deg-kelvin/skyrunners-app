@@ -18,7 +18,7 @@ failure modes:
 
 **Design principle that follows:** *transparency by default.* Almost everything is
 readable by every member. Restrictions apply to **writes** and to a small set of
-**leadership-only views** (engagement rankings, mentor notes). This is both what the
+**leadership-only views** (engagement rankings, lead notes). This is both what the
 club needs and, conveniently, a much simpler security model than the alternative.
 
 **Second design principle:** *a new member must be productive in under 5 minutes
@@ -87,20 +87,13 @@ spread across SQL policies.
 
 | Role | Who | Club-facing name |
 |---|---|---|
-| `admin` | Team co-leads | **Co-Lead** |
-| `mentor` | Your "Managers" | **Mentor** ← *needs your confirmation* |
+| `co_lead` | Team co-leads | **Co-Lead** |
+| `lead` | Formerly "Managers" | **Team Lead** (shortened to "Lead" in prose) |
 | `member` | Everyone else | **Member** |
 
-**On the "Manager" rename:** I went with **Mentor** because it accurately describes
-the duty you wrote — checking in multiple times a week, reviewing updates, supporting
-people — and because "Lead" would collide with "Co-Lead." Alternatives if you'd rather:
-
-- **Crew Chief** — aviation-native, fits Sky Runners, slightly playful
-- **Section Lead** — clearer hierarchy, more corporate
-- **Advisor** — softer, less authoritative than reality
-
-This is a one-line change now and a find-and-replace nightmare later, so decide before
-Phase 1.
+**Decided:** the middle role is **Team Lead**. It should carry manager-like weight —
+these people review updates, check in with their reports multiple times a week, and
+roll reporting up the chain. "Lead" in running text, "Team Lead" as the formal label.
 
 ### Project-scoped role
 
@@ -122,11 +115,11 @@ Division: Fixed Wing eVTOL              Project: eVTOL Airframe v2
 └── Sub-team: Structures                └── Project: Wing Spar Redesign
     └── Sub-sub-team: Composites            ├── Project: Layup Process
                                             └── Project: Load Testing
-Each unit has a Mentor.                 Each project has an RE.
-Each member has ONE direct Mentor.      Members join projects freely.
+Each unit has a Lead.                 Each project has an RE.
+Each member has ONE direct Lead.      Members join projects freely.
 ```
 
-A member's Mentor is **not** necessarily the RE of the projects they work on. Someone
+A member's Lead is **not** necessarily the RE of the projects they work on. Someone
 in Structures might contribute to a SkyDelta software project. Keeping these separate
 is what lets people work across divisions — which is exactly the cross-pollination
 you want. Merging them would quietly rebuild the silos you're trying to remove.
@@ -138,26 +131,26 @@ you want. Merging them would quietly rebuild the silos you're trying to remove.
 | Action | Who can do it |
 |---|---|
 | Configure divisions | Co-Lead only |
-| Create sub-teams / sub-sub-teams | Division RE, or Mentor of the parent unit |
-| Assign a unit's Mentor | Mentor one level up, or Co-Lead |
-| Reassign a member's Mentor | The Mentor one level above both, or Co-Lead |
-| Create a project under a unit | Any Mentor of that unit or above |
+| Create sub-teams / sub-sub-teams | Division RE, or Lead of the parent unit |
+| Assign a unit's Lead | Lead one level up, or Co-Lead |
+| Reassign a member's Lead | The Lead one level above both, or Co-Lead |
+| Create a project under a unit | Any Lead of that unit or above |
 | Create a nested sub-project | RE of the parent project (inherited authority) |
-| Appoint an RE | RE of the parent project, or Co-Lead |
+| Appoint an RE (multiple allowed per project) | RE of that project or any ancestor, or Co-Lead |
 | Add a member to a project | RE of that project or any ancestor project |
-| **Join an open project** | **Any member, if the RE marked it open** |
+| **Enroll in a project** | **Any member, in anything they like — open by default** |
 | Log own hours | Any member |
 | Submit own update | Any member |
 | Set own update schedule | Any member |
-| Review an update | The author's direct Mentor, the RE of a referenced project, or any ancestor Mentor |
-| Submit a roll-up report | Any Mentor, to their own Mentor or a Co-Lead |
-| Create an event | Any Mentor or Co-Lead |
-| Invite anyone to an event | Any Mentor or Co-Lead — deliberately not scope-limited, per your requirement |
-| Record event attendance | Event creator, any Mentor, Co-Lead |
-| Invite a new member by email | Any Mentor or Co-Lead |
-| Verify a training / grant access record | Co-Lead, or a Mentor designated as a trainer |
+| Review an update | The author's direct Lead, the RE of a referenced project, or any ancestor Lead |
+| Submit a roll-up report | Any Lead, to their own Lead or a Co-Lead |
+| Create an event | Any Lead or Co-Lead |
+| Invite anyone to an event | Any Lead or Co-Lead — deliberately not scope-limited, per your requirement |
+| Record event attendance | Event creator, any Lead, Co-Lead |
+| Invite a new member by email | Any Lead or Co-Lead |
+| Verify a training / grant access record | Co-Lead, or a Lead designated as a trainer |
 | Configure engagement weights | Co-Lead only |
-| **View engagement rankings** | **Mentors (own reports) and Co-Leads (everyone)** |
+| **View engagement rankings** | **Leads (own reports) and Co-Leads (everyone)** |
 | View anyone's profile, projects, hours, updates | Any member — transparency default |
 
 > **A note on that last row.** Making hours and updates visible to all members is a
@@ -176,7 +169,7 @@ you want. Merging them would quietly rebuild the silos you're trying to remove.
 
 Everything you listed, at a glance:
 
-- **Header** — photo, name, class year, division/sub-team, Mentor, contact, join date
+- **Header** — photo, name, class year, division/sub-team, Lead, contact, join date
 - **Trainings & certifications** — machine shop, lab equipment, safety, Stanford online
   courses. Each with completion date, expiry if applicable, and a **certificate file**
   viewable in one click
@@ -203,7 +196,7 @@ friction here kills adoption of everything else.
 The core workflow:
 
 ```
-Member submits update  →  Mentor reviews & comments  →  Mentor rolls up to Co-Leads
+Member submits update  →  Lead reviews & comments  →  Lead rolls up to Co-Leads
       ↑ nudged if late        ↑ nudged if unreviewed        ↑ periodic digest
 ```
 
@@ -212,21 +205,22 @@ Member submits update  →  Mentor reviews & comments  →  Mentor rolls up to C
 - Auto-populated draft: pre-fills projects and hours from their logged work, so the
   update is mostly *confirming* rather than *recalling*. This single feature will do
   more for submission rates than any reminder
-- Mentor review queue with comments
-- Roll-up reports: a Mentor's dashboard aggregates their reports' updates into a
+- Lead review queue with comments
+- Roll-up reports: a Lead's dashboard aggregates their reports' updates into a
   draftable summary for the chain of command
-- Escalating notifications: in-app on due date, email the day after, Mentor notified
+- Escalating notifications: in-app on due date, email the day after, Lead notified
   if still missing
 
-> **Open question — "tri-weekly" is ambiguous.** Your wording ("a 3 weekly update",
-> "tri-weekly update days" plural) could mean *3 times per week* or *once every 3
-> weeks*, and later you wrote "weekly updates." Three written updates per week is a
-> heavy ask for students and risks the exact burnout that causes quitting; once every
-> three weeks may be too slow to catch problems.
->
-> **I've designed the schedule as fully configurable** — cadence type plus chosen
-> weekdays — so any interpretation works and you can tune it after a term of real use.
-> But tell me what you actually meant so the defaults and copy are right.
+**Cadence: three updates per week**, on weekdays each member chooses.
+
+> **One thing to watch once this is live.** Three written check-ins a week is a real
+> ask for a student on top of coursework, and update fatigue would undercut the
+> retention you're trying to fix. Two safeguards are built in: the auto-populated draft
+> means most submissions are a few clicks rather than a writing task, and
+> `updates_per_week` is configurable rather than hardcoded — so if compliance sags after
+> a term, you can dial it to two without a schema change. Watch the on-time rate in the
+> first month; if it drops below roughly 70%, the cadence is likely the cause rather
+> than the people.
 
 ### 5.4 Project tree and discovery
 
@@ -262,7 +256,7 @@ Derived, never hand-maintained — that's what makes it stay accurate.
   meeting, social
 - **Importance weight** per event, set by leadership — feeds engagement scoring, so a
   design review counts for more than a social
-- Any Mentor or Co-Lead can invite anyone, regardless of division
+- Any Lead or Co-Lead can invite anyone, regardless of division
 - RSVP plus actual attendance (they differ, and the gap is itself informative)
 - Fast check-in for the person running the event
 
@@ -277,33 +271,46 @@ Derived, never hand-maintained — that's what makes it stay accurate.
 
 ### 5.8 Engagement scoring
 
-Configurable weighted score, since the right formula isn't knowable in advance:
+Implemented in `lib/engagement.ts`, with tests in `lib/engagement.test.ts` that enforce
+the design intent rather than just the arithmetic.
 
-| Signal | Notes |
-|---|---|
-| Hours logged | Consider diminishing returns so it doesn't become a race |
-| Update on-time rate | Reliability, not just volume |
-| Event attendance | Weighted by that event's importance |
-| Task completion | Delivered vs. assigned |
-| Breadth | Cross-division contribution, if you want to reward it |
-| RE responsibility | Carrying accountability is itself contribution |
+### Recommended weights
 
-- Co-Leads tune weights in the UI; changes are versioned so history stays interpretable
-- Leaderboard for leadership, to inform future leadership selection — your stated goal
-- Trend view per member: improving or fading
+| Weight | Signal | Why this number |
+|---:|---|---|
+| **30%** | Update reliability | Best predictor of dependability and the hardest thing to fake — you can't fake having submitted. Late counts at half credit, because late beats absent |
+| **25%** | Task completion | Delivered outcomes. What actually moves a project |
+| **20%** | RE responsibility | Carrying accountability *is* contribution. **Scaled by project size** (subtree depth + headcount → 1×/2×/3×), per your note |
+| **15%** | Event attendance | Importance-weighted, so missing a design review costs far more than skipping a social |
+| **10%** | Hours logged | Deliberately the lowest. Square-root curve for diminishing returns, capped at 8 hrs/week |
+| **0%** | Breadth | Not rewarded — cross-division work is a member's own choice, per your call |
 
-> **Worth thinking about before you ship this.** Any metric people can see, they will
-> optimize. Hours logged is the easy one to game and the weakest proxy for real
-> contribution — you'd be rewarding time spent over work delivered, and possibly
-> encouraging people to sit in the lab performing busyness. Two mitigations: weight
-> *delivered outcomes* (tasks, REs held, updates) above raw hours, and treat the score
-> as a conversation-starter for Mentors rather than an automatic ranking. It's a
-> flashlight, not a scoreboard.
+**Properties the tests lock in**, so a future retune can't quietly break them:
+
+- Weights sum to 1.0
+- Update reliability is the single heaviest signal
+- Every measured signal outweighs raw hours
+- Doubling hours does not double the hours component
+- Someone who *only* logs hours scores ≤ 10 out of 100
+- A reliable low-hours member outscores an unreliable high-hours member
+
+### Guardrails on how it's used
+
+- Co-Leads tune weights in the UI; changes are versioned so old scores stay interpretable
+- Visible to leadership only — Leads see their own reports, Co-Leads see everyone
+- Trend per member: improving or fading matters more than the absolute number
+- **No leaderboard function is provided.** The data supports one and it would be three
+  lines. It's omitted on purpose: the moment a ranking exists in the UI, the score stops
+  being a diagnostic and becomes a target. Scores appear next to a member's projects and
+  updates, where the number can be interpreted instead of merely compared.
+
+That last point is the whole philosophy in one design decision — a flashlight, not a
+scoreboard.
 
 ### 5.9 Onboarding and invitations
 
-- Mentor or Co-Lead invites by `@stanford.edu` email
-- Invite carries a pre-assigned division, sub-team, and Mentor, so nobody lands nowhere
+- Lead or Co-Lead invites by `@stanford.edu` email
+- Invite carries a pre-assigned division, sub-team, and Lead, so nobody lands nowhere
 - Google sign-in only, `stanford.edu` enforced — satisfies "Stanford members only"
 - Guided first-run: fill profile → declare trainings → browse open projects → join one.
   A new member's first session should end with them on a project
@@ -319,7 +326,7 @@ which is how you get feedback while it's still cheap to act on.
 | Phase | Deliverable | Why this order |
 |---|---|---|
 | **0** | Scaffold, Stanford Google auth, empty shell + nav | Nothing works without auth |
-| **1** | Org tree (divisions, nested teams), member roster, profiles, Mentor assignment | Everything references people and units |
+| **1** | Org tree (divisions, nested teams), member roster, profiles, Lead assignment | Everything references people and units |
 | **2** | Project tree, membership, responsibilities, browse + join, artifacts | The discoverability payload — the core value |
 | **3** | Hours logging + quick-add | Highest frequency, immediately useful, generates data for later phases |
 | **4** | Updates, review queue, roll-ups, notifications | The workflow that fixes the reporting chain |
@@ -347,25 +354,40 @@ addresses your biggest problem, and real usage will reshape everything after it.
 
 ---
 
-## 8. Open questions
+## 8. Resolved
 
-1. **"Tri-weekly"** — 3× per week, or once every 3 weeks? (§5.3)
-2. **"Mentor"** — approve, or prefer Crew Chief / Section Lead / other? (§3)
-3. **Hours visibility** — all members, or leadership only? (§4)
-4. **Real division list** — confirm: Fixed Wing eVTOL, SkyBeta, Spade, DroneHacks,
-   SkyDelta. Exact spellings and any missing?
-5. **Club size** — roughly how many members and sub-teams? Affects UI density choices
-6. **Existing training and access lists** — what trainings and facility accesses should
-   be seeded? (machine shop tiers, Lab 64, Robotics Room, PRL…)
-7. **Competition dates** — hard external deadlines to anchor Gantt charts to?
+| Question | Answer |
+|---|---|
+| Update cadence | **Three per week**, on weekdays each member picks |
+| Middle role name | **Team Lead** — should feel manager-like |
+| Hours & update visibility | **Restricted.** REs of projects the member contributes to, plus their Lead chain. Project activity and who's-on-what stays public |
+| Divisions | Fixed Wing eVTOL, SkyBeta, Spade, DroneHacks, SkyDelta — **all editable, addable, removable by Co-Leads in the UI** |
+| Club size | 30–40 members, growing. Contribution history is never deleted, even for departed members |
+| REs per project | **Multiple allowed.** One primary as the go-to contact |
+| Project enrollment | **Open by default.** Members join anything that interests them |
+| Project status | Lifecycle **phase** (concept → flight test) plus **health** (on track / at risk / blocked) |
+| Update review access | Ancestor REs up the project chain, plus the member's Lead chain |
+| Training verification | Member submits a request; their direct Lead or a Co-Lead verifies |
+| Breadth reward | **None.** Cross-division work is a member's own choice |
+| Calendar sync | **Opt-in only**, and must support Apple Calendar as well as Google |
+| Competition dates | None yet. Project deadlines settable at any time; REs get reminders |
+| Engagement philosophy | Outcomes over hours; a flashlight, not a scoreboard |
+
+### Still to gather, when we reach those phases
+
+- **Trainings to seed** — Anish will supply the machine and lab list during the design
+  cycle for Phase 7
+- **Facility access types** — same
+- Whether to keep breadth at zero weight after a term of real data
 
 ---
 
 ## 9. Next actions
 
-1. You answer §8 — questions 1–3 block Phase 0/1 naming and schema
-2. I scaffold Phase 0 and you get it running locally
-3. Set up Supabase (yours for dev; teammate handles production)
-4. Build Phase 1
+1. ~~Answer the blocking questions~~ — done
+2. ~~Scaffold Phase 0~~ — done. `npm install && npm run dev`
+3. Set up Supabase (Anish for dev; teammate handles production)
+4. Wire real auth, replacing the mock session in `app/layout.tsx`
+5. Build Phase 1: org tree, roster, profiles, Lead assignment
 
 See `DATA_MODEL.md` for the schema and `DECISIONS.md` for infrastructure notes.
