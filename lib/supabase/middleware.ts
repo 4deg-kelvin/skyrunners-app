@@ -14,9 +14,20 @@
  * It also does the route gating, because middleware runs before any page does.
  */
 
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseConfig } from "@/lib/env";
+
+/**
+ * The shape `setAll` receives — identical to the library's own `SetAllCookies`.
+ *
+ * It has to be written out. `createServerClient` declares two overloads and the
+ * deprecated get/set/remove one comes first, so TypeScript tries that, fails to
+ * infer this parameter, and reports an implicit `any` under `strict` rather than
+ * falling through to the overload we actually match. Annotating fixes the build
+ * and changes nothing at runtime.
+ */
+type CookiesToSet = { name: string; value: string; options: CookieOptions }[];
 
 /** Routes reachable without being signed in. */
 const PUBLIC_PATHS = ["/login", "/auth"];
@@ -63,7 +74,7 @@ export async function updateSession(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookiesToSet) {
         // Write to both: the request (so this render sees it) and the response
         // (so the browser stores it).
         cookiesToSet.forEach(({ name, value }) =>

@@ -8,9 +8,16 @@
  * Returns null in demo mode.
  */
 
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { supabaseConfig } from "@/lib/env";
+
+/**
+ * See the identical note in `lib/supabase/middleware.ts` — `createServerClient`
+ * declares the deprecated cookie-method overload first, so this parameter has to
+ * be annotated or `strict` rejects it as an implicit `any`.
+ */
+type CookiesToSet = { name: string; value: string; options: CookieOptions }[];
 
 export async function createClient() {
   const config = supabaseConfig();
@@ -23,7 +30,7 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
