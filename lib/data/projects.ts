@@ -8,6 +8,7 @@
  */
 
 import {
+  artifactsFor,
   childProjects,
   divisionForProject,
   getMember,
@@ -30,6 +31,7 @@ import type {
   JoinRequest,
   Member,
   Project,
+  ProjectArtifact,
   ProjectAttentionFlag,
   ProjectMembership,
   Team,
@@ -118,6 +120,8 @@ export interface ProjectDetailView {
   parent?: Project;
   /** The whole task model: one flat list, one owner each. */
   deliverables: DeliverableRowData[];
+  /** The project's engineering record — mostly links, not uploads. */
+  artifacts: { artifact: ProjectArtifact; uploadedBy?: Member }[];
   progress: ReturnType<typeof projectProgress>;
   /** Why this project may need leadership attention. */
   attentionFlags: ProjectAttentionFlag[];
@@ -162,6 +166,10 @@ export async function getProjectBySlug(
       deliverable: d,
       owner: getMember(d.ownerId),
       overdue: isOverdue(d),
+    })),
+    artifacts: artifactsFor(project.id).map((a) => ({
+      artifact: a,
+      uploadedBy: getMember(a.uploadedById),
     })),
     progress: projectProgress(project.id),
     attentionFlags: allFlags.filter((f) => f.projectId === project.id),

@@ -19,12 +19,32 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseConfig } from "@/lib/env";
 
 /** Routes reachable without being signed in. */
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/error"];
+const PUBLIC_PATHS = ["/login", "/auth"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
+}
+
+/**
+ * Redirect while KEEPING the refreshed auth cookies.
+ *
+ * This is subtle and it bites hard. `getUser()` below may refresh the token,
+ * and `setAll` writes the new pair onto `response`. Returning a bare
+ * `NextResponse.redirect()` throws those away — the browser keeps a refresh
+ * token that Supabase has already consumed, and once the reuse grace window
+ * passes the session dies.
+ *
+ * Result: login works, then people are randomly signed out minutes later. It
+ * cannot be reproduced in demo mode, so it would only show up in production.
+ */
+function redirectKeepingCookies(url: URL, carrying: NextResponse) {
+  const redirect = NextResponse.redirect(url);
+  carrying.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie);
+  });
+  return redirect;
 }
 
 export async function updateSession(request: NextRequest) {
@@ -72,7 +92,7 @@ export async function updateSession(request: NextRequest) {
     // Remember where they were headed, so they land there after signing in
     // rather than being dumped on the home page.
     if (pathname !== "/") url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return redirectKeepingCookies(url, response);
   }
 
   // Already signed in and looking at the login page? Send them to their work.
@@ -80,7 +100,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/my-work";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectKeepingCookies(url, response);
   }
 
   // Must return `response`, not a fresh NextResponse — it carries the refreshed

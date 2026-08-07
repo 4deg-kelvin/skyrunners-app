@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { ArtifactList } from "@/components/ui/artifact-list";
 import {
   DeliverableRow,
   ProgressBar,
@@ -53,6 +54,7 @@ export default async function ProjectDetailPage({
     children,
     updateFeed,
     deliverables,
+    artifacts,
     progress,
     attentionFlags,
   } = view;
@@ -516,17 +518,21 @@ export default async function ProjectDetailPage({
 
           <Card className="h-fit">
             <CardBody>
-              <SectionLabel>Artifacts</SectionLabel>
-              <p className="mt-3 text-sm text-ink-soft">
-                Presentations, GitHub links, requirements, and test reports arrive
-                in Phase 2.
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionLabel>Engineering Record</SectionLabel>
+                {mayManage ? (
+                  <Button variant="ghost" className="px-2 py-1" disabled>
+                    Add link
+                  </Button>
+                ) : null}
+              </div>
+              <p className="mt-2 text-sm text-ink-soft">
+                Slides, requirements, CAD and reports — everything you&apos;d read
+                to understand this project.
               </p>
-              {mayManage ? (
-                <p className="mt-2 text-sm text-ink-muted">
-                  You have RE authority here, so you&apos;ll be able to upload
-                  them.
-                </p>
-              ) : null}
+              <div className="mt-4">
+                <ArtifactList rows={artifacts} canAdd={mayManage} />
+              </div>
             </CardBody>
           </Card>
         </div>

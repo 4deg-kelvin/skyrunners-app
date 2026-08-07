@@ -8,6 +8,9 @@ import { AccountMenu } from "./account-menu";
 
 const NAV_ITEMS = [
   { href: "/my-work", label: "My Work" },
+  // High in the nav on purpose: "I have nothing to do" is the club's biggest
+  // retention problem, and this page is the answer to it.
+  { href: "/find-work", label: "Find Work" },
   { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },

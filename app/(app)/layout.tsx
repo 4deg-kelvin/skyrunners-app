@@ -17,13 +17,27 @@ export default async function AppLayout({
 }) {
   const viewer = await getViewer();
 
-  // Real count rather than a hardcoded dot: an alert should mean something.
-  const myWork = await getMyWork(viewer.member.id);
-  const updateNeedsAttention =
-    myWork.currentUpdate.update.status === "pending" ||
-    myWork.currentUpdate.update.status === "late";
-  const alertCount =
-    (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
+  /**
+   * Real count rather than a hardcoded dot: an alert should mean something.
+   *
+   * Wrapped in try/catch on purpose. This layout wraps every authenticated page,
+   * and `error.tsx` in this segment cannot catch errors thrown by its own
+   * layout — so an exception here becomes a bare, unstyled 500 on every single
+   * route. A nav badge must never be able to take down the app.
+   */
+  let alertCount = 0;
+  try {
+    const myWork = await getMyWork(viewer.member.id);
+    const updateNeedsAttention =
+      myWork.currentUpdate.update.status === "pending" ||
+      myWork.currentUpdate.update.status === "late";
+    alertCount =
+      (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
+  } catch {
+    // Expected in live mode until lib/data/* is switched over to Postgres: the
+    // mock lookups key on ids like "m-anish" and won't find a real UUID.
+    alertCount = 0;
+  }
 
   return (
     <>

@@ -6,7 +6,11 @@ Database schema and seed data.
 
 | File | Purpose |
 |---|---|
-| `migrations/0001_core_schema.sql` | Phase 1: people, org tree, project tree, work logs, cycle guards, views |
+| `migrations/0001_core_schema.sql` | People, org tree, project tree, work logs, cycle guards, views |
+| `migrations/0002_deliverables_terms_commitment.sql` | Deliverables, academic terms, commitment level |
+| `migrations/0003_join_requests.sql` | RE-controlled membership, join requests |
+| `migrations/0004_rls_policies.sql` | **Row Level Security. Required before real data.** |
+| `migrations/0005_profile_provisioning.sql` | **Links auth users to profiles by email. Required or nobody can sign in.** |
 | `seed.sql` | Realistic sample data so the app isn't empty in development |
 
 ## The one rule
@@ -46,10 +50,14 @@ entirely. The view resolves the true Division instead.
 project has authority over every descendant. Use it rather than reimplementing the walk
 in application code.
 
-## Row Level Security
+## Row Level Security — in `0004`, and not optional
 
-Not in `0001`. RLS policies come with auth, in `0002`, once real user IDs exist to write
-policies against. The shape to aim for, from `docs/DECISIONS.md`:
+**Apply `0004_rls_policies.sql` before the database holds anything real.** The anon key
+ships in the browser bundle by design; RLS is the only thing deciding what it can read.
+With RLS off, any visitor can read and write every row directly against the PostgREST
+endpoint — no login, no Stanford check.
+
+The shape, from `docs/DECISIONS.md`:
 
 - **Reads:** open to any authenticated `@stanford.edu` member for projects, teams,
   membership, artifacts, and events — transparency by default

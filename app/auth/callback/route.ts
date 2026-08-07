@@ -11,8 +11,30 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isAllowedEmail } from "@/lib/env";
 
+/**
+ * The public origin to redirect back to.
+ *
+ * `request.nextUrl.origin` is the *internal* origin behind a proxy or load
+ * balancer, so a successful production sign-in could bounce someone to
+ * `http://localhost:3000`. Prefer the configured public URL, then the forwarded
+ * headers, and only fall back to nextUrl.
+ */
+function publicOrigin(request: NextRequest): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) return configured.replace(/\/$/, "");
+
+  const host = request.headers.get("x-forwarded-host");
+  if (host) {
+    const proto = request.headers.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}`;
+  }
+
+  return request.nextUrl.origin;
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+  const origin = publicOrigin(request);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/my-work";
 

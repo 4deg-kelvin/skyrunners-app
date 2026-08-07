@@ -10,6 +10,7 @@
  */
 
 import type {
+  ArtifactKind,
   AttentionReason,
   DeliverableStatus,
   EventKind,
@@ -197,6 +198,40 @@ export const TIER_TONES: Record<CommitmentTier, BadgeTone> = {
 // ---------------------------------------------------------------------------
 // Project attention flags
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Project artifacts
+// ---------------------------------------------------------------------------
+
+export const ARTIFACT_KIND_LABELS: Record<ArtifactKind, string> = {
+  presentation: "Presentation",
+  github: "Code",
+  requirements: "Requirements",
+  cad: "CAD",
+  test_report: "Test report",
+  analysis: "Analysis",
+  drawing: "Drawing",
+  doc: "Document",
+  link: "Link",
+};
+
+/**
+ * Grouping order for the artifacts list.
+ *
+ * Presentations and requirements first because those are what someone new to a
+ * project reads to understand it — which is the main reason this list exists.
+ */
+export const ARTIFACT_KIND_ORDER: ArtifactKind[] = [
+  "presentation",
+  "requirements",
+  "cad",
+  "github",
+  "analysis",
+  "test_report",
+  "drawing",
+  "doc",
+  "link",
+];
 
 // ---------------------------------------------------------------------------
 // Weekdays

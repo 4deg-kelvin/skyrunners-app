@@ -62,24 +62,40 @@ Verified: typecheck clean, 68 tests, lint clean, demo mode boots with zero env v
 Everything here is his, and none of it blocks Anish.
 
 - Create the Supabase project
-- Apply migrations `0001` → `0003`, load `seed.sql` (dev only)
+- Apply migrations `0001` → `0005` (all five are written and waiting)
 - Google OAuth restricted to `stanford.edu`
-- Write `0004_rls_policies.sql`
-- Vercel project and environment variables
+- Uncomment the bootstrap Co-Lead block in `0005` with Anish's real address, and run it
+  **before** he first signs in
+- Load `seed.sql` (dev only)
+- Vercel project and environment variables, including `NEXT_PUBLIC_APP_URL`
 
-**Handoff notes:** `docs/PHASE_1_KICKOFF.md` and `supabase/README.md`.
-The one thing to check when it's live: refresh a page while signed in. If it logs you out,
-the middleware matcher is wrong — nothing else.
+**His doc is `docs/INFRA.md`** — written so his AI agent can work from it without touching
+app code.
 
-### Phase 2 — Project discovery **[App]** ← *ship this to the club*
+**Two migrations are hard requirements**, both found by an audit rather than in production:
+
+- `0004_rls_policies.sql` — the anon key ships in the browser bundle, and RLS is the only
+  thing deciding what it can read. Without it the whole database is public.
+- `0005_profile_provisioning.sql` — links auth users to profiles by email. Without it every
+  sign-in dead-ends at `/auth/no-profile`, forever, for everyone.
+
+The one thing to check when it's live: sign in, then refresh. If you're logged out, the
+middleware matcher is wrong — that's the only cause.
+
+### Phase 2 — Project discovery **[App]** ← *in progress, ship this to the club*
 
 The phase that justifies the whole project. Everything else is plumbing.
 
-- Project artifacts: presentations, GitHub links, requirements, test reports
-- **Ask-to-join flow** end to end, with the RE's queue and stale-request escalation
-- Follow / unfollow
-- "Find work" view: open needs across the club, filtered by skill area
-- RE actions: add and remove members, assign deliverables
+- [x] **Project artifacts** — slides, GitHub, requirements, CAD, test reports. Grouped by
+      kind, mostly links rather than uploads
+- [x] **Find Work page** — every active project ranked by where a member would help most,
+      with skill matching and the RE's contact on every card
+- [ ] Ask-to-join writes to the database *(needs Phase 1b)*
+- [ ] Follow / unfollow actions *(needs Phase 1b)*
+- [ ] RE actions: add and remove members, assign deliverables *(needs Phase 1b)*
+
+**Read-only discovery is done.** The remaining items are all writes, which need a real
+database — so this is the natural handoff point back to Kelvin.
 
 **Done when** a member can answer "what's happening in this club and who do I talk to?"
 without asking a Co-Lead.

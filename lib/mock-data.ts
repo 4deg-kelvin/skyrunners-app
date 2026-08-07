@@ -16,6 +16,7 @@ import {
   type Member,
   type Project,
   type ProjectAttentionFlag,
+  type ProjectArtifact,
   type ProjectMembership,
   type ProgressUpdate,
   type Team,
@@ -566,6 +567,44 @@ export const projectMemberships: ProjectMembership[] = [
   { projectId: "p-outreach", memberId: "m-grace", role: "re", responsibility: "Curriculum and logistics", joinedAt: "2026-08-01", commitment: "committed" },
   { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01", commitment: "committed" },
 ];
+
+// ---------------------------------------------------------------------------
+// Project artifacts
+// ---------------------------------------------------------------------------
+
+export const projectArtifacts: ProjectArtifact[] = [
+  { id: "a-1", projectId: "p-airframe-v2", kind: "presentation", title: "Airframe v2 PDR slides", externalUrl: "https://drive.google.com/skyrunners/pdr-airframe-v2", version: "rev C", uploadedById: "m-priya", createdAt: "2026-06-12" },
+  { id: "a-2", projectId: "p-airframe-v2", kind: "requirements", title: "Airframe requirements baseline", description: "42 requirements, 8 verified.", externalUrl: "https://drive.google.com/skyrunners/airframe-reqs", version: "v1.2", uploadedById: "m-priya", createdAt: "2026-05-30" },
+  { id: "a-3", projectId: "p-airframe-v2", kind: "cad", title: "Full assembly (Onshape)", externalUrl: "https://cad.onshape.com/documents/skyrunners-airframe-v2", uploadedById: "m-tyler", createdAt: "2026-06-02" },
+  { id: "a-4", projectId: "p-airframe-v2", kind: "analysis", title: "Mass budget spreadsheet", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-mass-budget", uploadedById: "m-tyler", createdAt: "2026-08-01" },
+
+  { id: "a-5", projectId: "p-wing-spar", kind: "analysis", title: "Spar FEA results, 3.5g load case", description: "Abaqus run with the updated layup schedule.", externalUrl: "https://drive.google.com/skyrunners/spar-fea", uploadedById: "m-tyler", createdAt: "2026-08-05" },
+  { id: "a-6", projectId: "p-wing-spar", kind: "cad", title: "Spar geometry v3", externalUrl: "https://cad.onshape.com/documents/skyrunners-spar-v3", version: "v3", uploadedById: "m-tyler", createdAt: "2026-07-22" },
+
+  { id: "a-7", projectId: "p-layup", kind: "doc", title: "Wet layup procedure (draft)", description: "Step-by-step with cure schedule. Needs review before it's the official process.", externalUrl: "https://docs.google.com/document/skyrunners-layup-procedure", uploadedById: "m-sofia", createdAt: "2026-07-28" },
+  { id: "a-8", projectId: "p-layup", kind: "test_report", title: "Coupon batch 1 tensile results", externalUrl: "https://drive.google.com/skyrunners/coupon-batch-1", uploadedById: "m-noah", createdAt: "2026-07-30" },
+
+  { id: "a-9", projectId: "p-gps-denied", kind: "presentation", title: "Autonomy architecture review", externalUrl: "https://drive.google.com/skyrunners/autonomy-arch", uploadedById: "m-lena", createdAt: "2026-06-15" },
+  { id: "a-10", projectId: "p-gps-denied", kind: "requirements", title: "Mission requirements", description: "Baselined. 30km range, 4kg payload, GPS-denied for the final 500m.", externalUrl: "https://docs.google.com/document/skyrunners-mission-reqs", version: "v1.0", uploadedById: "m-anish", createdAt: "2026-07-02" },
+
+  { id: "a-11", projectId: "p-vio", kind: "github", title: "skyrunners/vio-pipeline", description: "Main branch runs on the companion compute.", externalUrl: "https://github.com/4deg-kelvin/vio-pipeline", uploadedById: "m-amara", createdAt: "2026-05-10" },
+  { id: "a-12", projectId: "p-vio", kind: "test_report", title: "Indoor drift test, 50m runs", description: "Holding under 30cm across 12 runs.", externalUrl: "https://drive.google.com/skyrunners/vio-drift-indoor", uploadedById: "m-amara", createdAt: "2026-08-04" },
+
+  { id: "a-13", projectId: "p-sim", kind: "github", title: "skyrunners/gazebo-worlds", externalUrl: "https://github.com/4deg-kelvin/gazebo-worlds", uploadedById: "m-omar", createdAt: "2026-06-05" },
+
+  { id: "a-14", projectId: "p-power", kind: "cad", title: "PDB schematic + layout (KiCad)", externalUrl: "https://github.com/4deg-kelvin/skyrunners-pdb", version: "rev B", uploadedById: "m-kenji", createdAt: "2026-07-28" },
+  { id: "a-15", projectId: "p-power", kind: "requirements", title: "Power budget and PDB requirements", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-power-budget", uploadedById: "m-marcus", createdAt: "2026-06-20" },
+
+  { id: "a-16", projectId: "p-propulsion-test", kind: "drawing", title: "Test stand fabrication drawings", externalUrl: "https://drive.google.com/skyrunners/test-stand-drawings", uploadedById: "m-hana", createdAt: "2026-06-28" },
+
+  { id: "a-17", projectId: "p-skydelta-concept", kind: "analysis", title: "Sizing trade study (in progress)", description: "Comparing four configurations against the mission profile.", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-skydelta-sizing", uploadedById: "m-anish", createdAt: "2026-08-04" },
+];
+
+export function artifactsFor(projectId: string): ProjectArtifact[] {
+  return projectArtifacts
+    .filter((a) => a.projectId === projectId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
 
 // ---------------------------------------------------------------------------
 // Join requests — the RE gate, made visible

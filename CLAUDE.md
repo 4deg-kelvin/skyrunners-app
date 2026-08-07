@@ -18,6 +18,7 @@ those three.
 |---|---|
 | `CONTRIBUTING.md` | Setup, git workflow, the seven rules |
 | `docs/PHASE_PLAN.md` | **Current build order and what's deliberately not planned** |
+| `docs/INFRA.md` | **Everything server/database/deploy — the doc for Kelvin and his agent** |
 | `docs/PHASE_1_KICKOFF.md` | Step-by-step Phase 1 plan, split between the two developers |
 | `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |
 | `docs/PRODUCT_REVIEW.md` | Independent critique of the org design, and what changed because of it |
@@ -31,8 +32,9 @@ those three.
 
 - **Anish Bayya** — app functionality. **New to coding.** Explain reasoning, name
   tradeoffs, don't just emit code. Avoid unexplained jargon.
-- **Teammate (@4deg-kelvin)** — server management, hosting, deployment, production
-  database. Infrastructure notes are in `docs/DECISIONS.md` §3.
+- **Kelvin (@4deg-kelvin)** — server management, hosting, deployment, production database.
+  **His doc is `docs/INFRA.md`.** If you're working on his behalf, start there and avoid
+  changing application code.
 
 ## Stack
 
@@ -223,6 +225,11 @@ its project.
 
 ## Key product decisions
 
+- **`/find-work` is the point of the app.** The club's root problem is "I can't find
+  something to do without asking a Co-Lead". That page ranks every active project by where
+  a member would help most — unstaffed and blocked first, healthy last, already-joined at
+  the bottom — and puts the RE's email on every card. Protect its ordering logic; a list
+  sorted by date or division would bury the work that needs people.
 - **Membership is RE-controlled, with no cap.** Members cannot add themselves. They see
   everything, follow anything, and *ask* — the RE decides, because the RE is accountable
   for the deliverable.

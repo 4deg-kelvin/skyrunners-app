@@ -9,6 +9,7 @@
  * Nothing downstream cares which happened. Every page just gets a `Viewer`.
  */
 
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 import type { Actor, OrgGraph } from "@/lib/permissions";
@@ -45,12 +46,20 @@ function buildMockOrgGraph(): OrgGraph {
   return { getMember, getProject, directREs };
 }
 
-export async function getViewer(): Promise<Viewer> {
+/**
+ * Wrapped in React's `cache()` so it runs once per request, not once per caller.
+ *
+ * Both the layout and every page call this. In live mode each call is a
+ * `getUser()` round trip to Supabase plus a profile query, so without dedupe a
+ * single navigation would make two or three of each. `cache()` is
+ * request-scoped, so it doesn't leak one user's session into another's.
+ */
+export const getViewer = cache(async (): Promise<Viewer> => {
   if (isLiveMode()) {
     return getLiveViewer();
   }
   return getDemoViewer();
-}
+});
 
 // ---------------------------------------------------------------------------
 // Demo mode
@@ -98,9 +107,11 @@ async function getLiveViewer(): Promise<Viewer> {
     .eq("id", user.id)
     .single();
 
-  // Signed in with a valid Stanford account but no profile row = invited but not
-  // onboarded, or signed in before an admin added them. Send them somewhere that
-  // explains it rather than crashing.
+  // Signed in with a valid Stanford account but no profile row.
+  //
+  // `0005_profile_provisioning.sql` links an auth user to their pre-created
+  // profile by email on first sign-in, so this should be rare — it means nobody
+  // has invited them yet. Send them somewhere that explains it.
   if (error || !profile) redirect("/auth/no-profile");
 
   if (profile.status !== "active") redirect("/auth/inactive");
@@ -130,13 +141,4 @@ async function getLiveViewer(): Promise<Viewer> {
     graph: buildMockOrgGraph(),
     isDemo: false,
   };
-}
-
-/**
- * Sign out. Used by the account menu.
- * Exported here so no component needs to know about Supabase directly.
- */
-export async function signOut(): Promise<void> {
-  const supabase = await createClient();
-  await supabase?.auth.signOut();
 }

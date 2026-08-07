@@ -50,8 +50,9 @@ never waits on it.
 |---|---|
 | **My Work** | Your projects, what you own on each, who the RE is, hours logged, per-project update sections |
 | Dashboard | Leadership view — update compliance, review queue, projects needing attention |
+| **Find Work** | Active projects ranked by where you'd help most, with skill matching and the RE's contact |
 | Projects | Nested project tree grouped by division |
-| Project detail | Phase progress, team and responsibilities, sub-projects, per-project update feed |
+| Project detail | Phase progress, deliverables, team, sub-projects, engineering record, per-project update feed |
 | Members | Roster with roles, project counts, reporting lines |
 | Member profile | Projects and responsibilities, direct reports, restricted effort data |
 | Calendar | Upcoming events |
@@ -84,6 +85,7 @@ app/
     projects/           Tree + [slug] detail
     members/            Roster + [id] profiles
     settings/           Check-in days, academic pause
+    find-work/          Where to help most
     calendar/  updates/  how-we-lead/
 
 middleware.ts           Session refresh + route gating (must be at the root)

@@ -94,22 +94,36 @@ export default async function SettingsPage() {
             </p>
           </div>
 
+          {/*
+            Disabled on purpose until this writes to the database.
+            An enabled button that silently does nothing would be worse than no
+            button here: the copy above tells members to pause instead of going
+            quiet, so someone would click it, believe they were paused, and then
+            go quiet — the exact outcome this feature exists to prevent.
+          */}
           <div className="mt-5 flex flex-wrap gap-3">
             {isPaused ? (
-              <Button>Resume my check-ins</Button>
+              <Button disabled title="Arrives in Phase 1b">
+                Resume my check-ins
+              </Button>
             ) : (
               <>
-                <Button variant="secondary">
+                <Button variant="secondary" disabled title="Arrives in Phase 1b">
                   <CalendarOff className="size-4" strokeWidth={2.5} />
                   Pause 1 week
                 </Button>
-                <Button variant="secondary">
+                <Button variant="secondary" disabled title="Arrives in Phase 1b">
                   <CalendarOff className="size-4" strokeWidth={2.5} />
                   Pause 2 weeks
                 </Button>
               </>
             )}
           </div>
+
+          <p className="mt-3 text-sm font-medium text-warn-fg">
+            Not wired up yet — pausing starts working once the database is
+            connected. Until then, tell your Lead directly.
+          </p>
         </CardBody>
       </Card>
 

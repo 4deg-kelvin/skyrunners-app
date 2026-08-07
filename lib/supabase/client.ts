@@ -3,7 +3,8 @@
  *
  * Uses the anon key, which is safe to expose — Row Level Security is what
  * actually protects the data. If RLS is off, the anon key is a wide-open door,
- * which is why `0004_rls_policies.sql` isn't optional.
+ * which is why `supabase/migrations/0004_rls_policies.sql` must be applied before
+ * any real data exists.
  *
  * Returns null in demo mode so callers degrade gracefully instead of crashing.
  */

@@ -122,6 +122,43 @@ export interface ProjectMembership {
 }
 
 // ---------------------------------------------------------------------------
+// Project artifacts
+// ---------------------------------------------------------------------------
+
+export type ArtifactKind =
+  | "presentation"
+  | "github"
+  | "requirements"
+  | "cad"
+  | "test_report"
+  | "analysis"
+  | "drawing"
+  | "doc"
+  | "link";
+
+/**
+ * An engineering deliverable or reference attached to a project.
+ *
+ * Two ways to attach something: `fileUrl` for an upload, `externalUrl` for a link
+ * to GitHub, Drive, Onshape and so on. Links matter more than uploads here — a
+ * student team's CAD lives in Onshape and its code lives in GitHub, and copying
+ * files into a second place guarantees the copy goes stale. The app's job is to
+ * be the index, not another silo.
+ */
+export interface ProjectArtifact {
+  id: string;
+  projectId: string;
+  kind: ArtifactKind;
+  title: string;
+  description?: string;
+  fileUrl?: string;
+  externalUrl?: string;
+  version?: string;
+  uploadedById: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------
 
