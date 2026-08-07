@@ -198,6 +198,36 @@ export const TIER_TONES: Record<CommitmentTier, BadgeTone> = {
 // Project attention flags
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Weekdays
+// ---------------------------------------------------------------------------
+
+/** Index = day number, Sunday = 0, matching JS `Date.getDay()` and the DB. */
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/**
+ * Days offered for update deadlines.
+ *
+ * Weekdays only. A Saturday deadline reads as "the club expects weekend work",
+ * which isn't the message, and it means a missed Friday becomes a weekend
+ * obligation.
+ */
+export const SELECTABLE_UPDATE_DAYS = [1, 2, 3, 4, 5] as const;
+
+// ---------------------------------------------------------------------------
+// Project attention flags
+// ---------------------------------------------------------------------------
+
 export const ATTENTION_LABELS: Record<AttentionReason, string> = {
   re_silent: "RE has gone quiet",
   blocker_stale: "Blocker unanswered",

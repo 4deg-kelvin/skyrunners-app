@@ -46,21 +46,44 @@ beginner. Revisit only if real analytics/ML work appears.
 ## Commands
 
 ```bash
-npm run dev            # local dev server
+npm run dev            # local dev server (demo mode unless .env.local has keys)
 npm run check          # typecheck + lint + tests — run before every push
-npm test               # permission + engagement tests
+npm test               # permission + contribution tests
 npm run format         # Prettier
 npm run seed:generate  # regenerate supabase/seed.sql from lib/mock-data.ts
 ```
 
 ## Current state
 
-**Phase 0 complete.** App shell, design system, My Work, dashboard, project tree with
-detail pages, roster with profiles, calendar.
+**Phase 0 and 1a complete.** Phase 1b (the Supabase project itself) belongs to Kelvin and
+is not blocking.
 
-**All data comes from `lib/mock-data.ts`, reached through `lib/data/*`.** Auth is mocked
-in `lib/data/viewer.ts` via `CURRENT_USER_ID`. Supabase is not wired up yet, but the
-schema exists as SQL in `supabase/migrations/0001_core_schema.sql`.
+### Two modes — this is the most important thing to understand
+
+`lib/env.ts` checks for Supabase env vars:
+
+- **Demo mode** (no env vars, a fresh clone): runs on `lib/mock-data.ts`, no login, yellow
+  banner. Every feature works.
+- **Live mode** (env vars set): Stanford Google sign-in, real Postgres.
+
+`lib/data/viewer.ts` is the only file that branches on this. Everything else is
+mode-agnostic. **Never add a second place that checks the mode** — if a feature needs to
+know, it belongs in `lib/data/*`.
+
+### Route structure
+
+```
+app/
+  layout.tsx        html/body/fonts ONLY — must not resolve the viewer
+  login/            outside the authenticated shell
+  auth/             callback route + no-profile / inactive pages
+  (app)/            route group: everything requiring a session
+    layout.tsx      nav, demo banner, getViewer()
+```
+
+The `(app)` group exists because if the root layout resolved the viewer, `/login` would
+render inside a layout that redirects unauthenticated visitors to `/login` — an infinite
+loop. Parentheses affect layout nesting, not URLs.
 
 `/` redirects to `/my-work`. Members land on their own projects and the update they owe;
 the dashboard is the leadership view and is hidden from plain members in the nav.
@@ -191,7 +214,7 @@ its project.
 | **Member** | Everyone else |
 | **RE** | Responsible Engineer — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project |
 | **Division** | Top-level org unit (`teams.parent_id IS NULL`). Co-Lead editable |
-| **Update** | Member's progress report. **Two per week**, on member-chosen weekdays. Pausable for academics without penalty |
+| **Check-in / Update** | Member's progress report. **Twice a week**, on member-chosen weekdays. Pausable for academics without penalty. Purpose is prompting a conversation with their Lead, not filing a report |
 | **Deliverable** | One unit of work with one owner and a date. The whole task model |
 | **Committed / Following** | Committed = an RE added them; carries deliverables and obligations. Following = self-service watch-only, unlimited |
 | **Join request** | A member's tracked ask to join. RE approves. Escalates after 5 days |

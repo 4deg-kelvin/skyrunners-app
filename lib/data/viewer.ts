@@ -1,13 +1,20 @@
 /**
- * Who is signed in, and the graph the permission module needs to answer
- * questions about them.
+ * Who is signed in, and the graph the permission module needs.
  *
- * PHASE 1: replace `getViewer` with the real Supabase session. Everything that
- * consumes it keeps working, because it only depends on the return shape.
+ * This is the ONE place the two modes diverge:
+ *
+ *   LIVE MODE — reads the Supabase session, then loads that person's profile.
+ *   DEMO MODE — returns the mock user from `CURRENT_USER_ID`.
+ *
+ * Nothing downstream cares which happened. Every page just gets a `Viewer`.
  */
+
+import { redirect } from "next/navigation";
 
 import type { Actor, OrgGraph } from "@/lib/permissions";
 import type { Member } from "@/lib/types";
+import { isLiveMode } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
 import {
   CURRENT_USER_ID,
   directREs,
@@ -21,39 +28,115 @@ export interface Viewer {
   actor: Actor;
   /** Lookups the permission rules use to walk the two trees. */
   graph: OrgGraph;
+  /** True when running on mock data with no real login. */
+  isDemo: boolean;
 }
 
 /**
  * The org graph backing permission checks.
  *
- * PHASE 1 NOTE: these three lookups get called repeatedly while walking trees,
+ * PHASE 1b NOTE: these three lookups get called repeatedly while walking trees,
  * so they must not each become a database round trip. Load the member and
- * project rows once per request and close over them, or push the whole check
- * into a recursive SQL view. Do not make these three functions query directly.
+ * project rows once per request and close over them, or push the check into the
+ * `v_project_re_authority` / `v_lead_chain` views. Do NOT make these query
+ * directly — that's how a permission check turns into fifty queries.
  */
-function buildOrgGraph(): OrgGraph {
-  return {
-    getMember,
-    getProject,
-    directREs,
-  };
+function buildMockOrgGraph(): OrgGraph {
+  return { getMember, getProject, directREs };
 }
 
 export async function getViewer(): Promise<Viewer> {
+  if (isLiveMode()) {
+    return getLiveViewer();
+  }
+  return getDemoViewer();
+}
+
+// ---------------------------------------------------------------------------
+// Demo mode
+// ---------------------------------------------------------------------------
+
+function getDemoViewer(): Viewer {
   const member = getMember(CURRENT_USER_ID);
 
   if (!member) {
-    // Once auth is real, an absent profile means "signed in but not onboarded",
-    // which should redirect to the invite-acceptance flow rather than throw.
     throw new Error(
-      `No profile found for current user "${CURRENT_USER_ID}". ` +
-        `Check CURRENT_USER_ID in lib/mock-data.ts.`
+      `No mock profile for "${CURRENT_USER_ID}". Check CURRENT_USER_ID in lib/mock-data.ts.`
     );
   }
 
   return {
     member,
     actor: { id: member.id, globalRole: member.globalRole },
-    graph: buildOrgGraph(),
+    graph: buildMockOrgGraph(),
+    isDemo: true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Live mode
+// ---------------------------------------------------------------------------
+
+async function getLiveViewer(): Promise<Viewer> {
+  const supabase = await createClient();
+  if (!supabase) return getDemoViewer();
+
+  // getUser, not getSession — getUser revalidates the token with Supabase.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Middleware should have caught this already; this is belt and braces for any
+  // route that slips past the matcher.
+  if (!user) redirect("/login");
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, email, full_name, preferred_name, photo_url, class_year, major, global_role, status, lead_id, primary_team_id, skills, joined_at"
+    )
+    .eq("id", user.id)
+    .single();
+
+  // Signed in with a valid Stanford account but no profile row = invited but not
+  // onboarded, or signed in before an admin added them. Send them somewhere that
+  // explains it rather than crashing.
+  if (error || !profile) redirect("/auth/no-profile");
+
+  if (profile.status !== "active") redirect("/auth/inactive");
+
+  const member: Member = {
+    id: profile.id,
+    fullName: profile.full_name,
+    preferredName: profile.preferred_name ?? undefined,
+    email: profile.email,
+    photoUrl: profile.photo_url ?? undefined,
+    classYear: profile.class_year ?? undefined,
+    major: profile.major ?? undefined,
+    globalRole: profile.global_role,
+    status: profile.status,
+    leadId: profile.lead_id,
+    primaryTeamId: profile.primary_team_id ?? undefined,
+    skills: profile.skills ?? undefined,
+    joinedAt: profile.joined_at,
+  };
+
+  return {
+    member,
+    actor: { id: member.id, globalRole: member.globalRole },
+    // PHASE 1b: replace with a request-scoped graph loaded from Postgres. Until
+    // the rest of lib/data is switched over, the mock graph keeps the app
+    // coherent rather than half-real.
+    graph: buildMockOrgGraph(),
+    isDemo: false,
+  };
+}
+
+/**
+ * Sign out. Used by the account menu.
+ * Exported here so no component needs to know about Supabase directly.
+ */
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  await supabase?.auth.signOut();
 }

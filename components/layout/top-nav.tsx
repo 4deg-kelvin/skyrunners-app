@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Plane } from "lucide-react";
-import { cn, initials } from "@/lib/utils";
+import { Plane } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AccountMenu } from "./account-menu";
 
 const NAV_ITEMS = [
   { href: "/my-work", label: "My Work" },
@@ -14,12 +15,16 @@ const NAV_ITEMS = [
 ];
 
 export function TopNav({
+  memberId,
   userName,
   isLeadership,
+  isDemo,
   alertCount = 0,
 }: {
+  memberId: string;
   userName: string;
   isLeadership: boolean;
+  isDemo: boolean;
   /** Real count of things needing attention — drives the nav dot. */
   alertCount?: number;
 }) {
@@ -73,17 +78,33 @@ export function TopNav({
           })}
         </nav>
 
-        {/* Account chip */}
-        <button className="flex items-center gap-2.5 rounded-full border border-line py-1.5 pl-1.5 pr-3 transition-colors hover:bg-surface">
-          <span className="flex size-8 items-center justify-center rounded-full bg-neutral-bg text-xs font-bold text-ink-soft">
-            {initials(userName)}
-          </span>
-          <span className="hidden text-[15px] font-medium text-ink sm:inline">
-            {userName}
-          </span>
-          <ChevronDown className="size-4 text-ink-muted" />
-        </button>
+        <AccountMenu
+          memberId={memberId}
+          userName={userName}
+          isDemo={isDemo}
+        />
       </div>
+
+      {/* Mobile nav — hours get logged in the lab, on phones */}
+      <nav className="flex items-center gap-1 overflow-x-auto border-t border-line px-5 py-2 md:hidden">
+        {items.map((item) => {
+          const active = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "shrink-0 rounded-tile px-3 py-1.5 text-sm transition-colors",
+                active
+                  ? "font-semibold text-cardinal-600"
+                  : "text-ink-soft hover:text-ink"
+              )}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }

@@ -31,9 +31,20 @@ npm run format    # Prettier
 
 ---
 
+## Two modes
+
+A fresh clone runs in **demo mode**: sample data, no login, a yellow banner. Every feature
+works; nothing is saved. Add Supabase keys to `.env.local` and it switches to **live
+mode** — Stanford Google sign-in and a real database — with no code changes.
+
+That's deliberate. Kelvin sets up the server side on his own schedule, and app development
+never waits on it.
+
+---
+
 ## Current state
 
-**Phase 0 complete.** Working on sample data.
+**Phases 0 and 1a complete.**
 
 | Page | What's there |
 |---|---|
@@ -45,7 +56,9 @@ npm run format    # Prettier
 | Member profile | Projects and responsibilities, direct reports, restricted effort data |
 | Calendar | Upcoming events |
 | How we lead | Published expectations, tiers, and the leadership rubric |
-| Updates | Placeholder — later phase |
+| Settings | Pick your two check-in days, set an academic pause |
+| Login | Stanford Google sign-in, with a demo-mode notice |
+| Updates | Placeholder — Phase 7 |
 
 Opening the app lands you on **My Work**, not the dashboard — your own projects and the
 update you owe are what you came for.
@@ -59,15 +72,21 @@ update you owe are what you came for.
 ## How the code is organized
 
 ```
-app/                    Pages (folder name = URL)
+app/
+  layout.tsx            html/body/fonts only
   globals.css           Design tokens — all colors and radii
-  layout.tsx            Shell wrapping every page
-  my-work/              Member home
-  dashboard/            Leadership overview
-  projects/             Tree + [slug] detail pages
-  members/              Roster + [id] profiles
-  calendar/  updates/
-  not-found.tsx  error.tsx  loading.tsx
+  login/                Stanford Google sign-in
+  auth/                 OAuth callback, no-profile, inactive
+  (app)/                Everything requiring a session
+    layout.tsx          Nav, demo banner
+    my-work/            Member home
+    dashboard/          Leadership overview
+    projects/           Tree + [slug] detail
+    members/            Roster + [id] profiles
+    settings/           Check-in days, academic pause
+    calendar/  updates/  how-we-lead/
+
+middleware.ts           Session refresh + route gating (must be at the root)
 
 components/
   ui/                   Card, Badge, Button, StatTile, Donut, Breadcrumb,
