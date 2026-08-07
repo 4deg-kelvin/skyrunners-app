@@ -13,12 +13,12 @@ failure modes:
 | Failure mode | What it looks like today | What the app must do |
 |---|---|---|
 | **Members can't find work** | You have to ask a co-lead "what should I do?" | Make all work across the club browsable and joinable without permission-seeking |
-| **Leaders can't see effort** | No idea who's contributing or coasting | Make contribution visible and rankable without manual chasing |
+| **Leaders can't see effort** | No idea who's contributing or coasting | Make contribution visible without manual chasing |
 | **Updates don't flow** | Progress lives in people's heads and DMs | Make the update → review → roll-up chain the path of least resistance |
 
 **Design principle that follows:** *transparency by default.* Almost everything is
 readable by every member. Restrictions apply to **writes** and to a small set of
-**leadership-only views** (engagement rankings, lead notes). This is both what the
+**leadership-only views** (individual hour totals, update contents, private lead notes). This is both what the
 club needs and, conveniently, a much simpler security model than the alternative.
 
 **Second design principle:** *a new member must be productive in under 5 minutes
@@ -46,7 +46,7 @@ Python's real advantages — data science, ML, scientific computing — aren't t
 bottleneck here. Your hardest problems are *nested tree queries*, *permissions*, and
 *UI density*. Postgres handles the first, and the other two live in the frontend.
 
-**If you later need real analytics** (engagement modeling, forecasting), add a small
+**If you later need real analytics** (contribution modeling, forecasting), add a small
 Python service then, for exactly that. That door stays open.
 
 ### Recommended stack
@@ -60,7 +60,7 @@ Python service then, for exactly that. That door stays open.
 | File storage | **Supabase Storage** | Certificates, presentations, CAD, test reports |
 | Email | **Resend** | Missed-deadline nudges, event invites, member invites |
 | Scheduled jobs | **Vercel Cron** → API route | Deadline checks, digest emails |
-| Charts | **Recharts** | Engagement trends, hours over time |
+| Charts | **Recharts** | Hours trends over time |
 | Gantt | Custom (CSS grid + SVG) — evaluate `frappe-gantt` first | Your nested-project Gantt is unusual; off-the-shelf libraries may fight you. Prototype with frappe-gantt, replace if it doesn't nest well. |
 | Hosting | **Vercel** | Your teammate owns this call — see `DECISIONS.md` |
 
@@ -102,7 +102,7 @@ carries real meaning: the go-to person accountable for deliverables.
 
 RE authority is **inherited downward**. An RE of a project can act on that project
 *and every project nested beneath it*: add members, create sub-projects, appoint REs
-for those sub-projects, upload artifacts, manage tasks.
+for those sub-projects, upload artifacts, manage deliverables.
 
 ### Two independent hierarchies — this is the key structural insight
 
@@ -138,7 +138,10 @@ you want. Merging them would quietly rebuild the silos you're trying to remove.
 | Create a nested sub-project | RE of the parent project (inherited authority) |
 | Appoint an RE (multiple allowed per project) | RE of that project or any ancestor, or Co-Lead |
 | Add a member to a project | RE of that project or any ancestor project |
-| **Enroll in a project** | **Any member, in anything they like — open by default** |
+| **Follow a project** | **Any member, unlimited** |
+| **Ask to join a project** | **Any member, any project** |
+| **Add a member to a project** | **RE of that project or any ancestor, or Co-Lead — members cannot add themselves** |
+| Accept or decline a join request | RE of that project or any ancestor, or Co-Lead |
 | Log own hours | Any member |
 | Submit own update | Any member |
 | Set own update schedule | Any member |
@@ -149,8 +152,12 @@ you want. Merging them would quietly rebuild the silos you're trying to remove.
 | Record event attendance | Event creator, any Lead, Co-Lead |
 | Invite a new member by email | Any Lead or Co-Lead |
 | Verify a training / grant access record | Co-Lead, or a Lead designated as a trainer |
-| Configure engagement weights | Co-Lead only |
-| **View engagement rankings** | **Leads (own reports) and Co-Leads (everyone)** |
+| Configure hours expectation and tiers | Co-Lead only |
+| **View own contribution record** | **Every member, always** |
+| View another member's record | Their Lead chain, REs of projects they contribute to, Co-Leads |
+| Manage the academic calendar | Co-Lead only |
+| Manage a project's deliverables | RE of that project or any ancestor, Co-Lead |
+| Update a deliverable's status | Its owner, or any RE above it |
 | View anyone's profile, projects, hours, updates | Any member — transparency default |
 
 > **A note on that last row.** Making hours and updates visible to all members is a
@@ -158,7 +165,7 @@ you want. Merging them would quietly rebuild the silos you're trying to remove.
 > discoverability you want, and it's how many strong student teams run. But it can also
 > make slower contributors feel surveilled, which cuts against your retention goal.
 > A middle path: everyone sees *project* activity and *who's on what*, while raw
-> individual hour totals and engagement ranks stay leadership-only. I'd suggest
+> individual hour totals and update contents stay leadership-only. I'd suggest
 > starting there — it's easier to open up later than to walk back.
 
 ---
@@ -176,8 +183,8 @@ Everything you listed, at a glance:
 - **Facility access** — Robotics Room keycard, Lab 64 24-hour access, PRL, etc., with
   status and expiry. Answers "can this person work unsupervised at 2am?" instantly
 - **Projects** — every project they're on, and **what they're responsible for** on each
-- **Update history** — their tri-weekly updates, with on-time / late / missed status
-- **Engagement snapshot** — hours trend, update reliability, event attendance
+- **Update history** — their twice-weekly updates, with on-time / late / missed status
+- **Contribution record** — deliverables finished, hours tier, update reliability
 
 ### 5.2 Hours logging — optimize this ruthlessly
 
@@ -217,7 +224,7 @@ Member submits update  →  Lead reviews & comments  →  Lead rolls up to Co-Le
 - Escalating notifications: in-app on due date, email the day after, Lead notified
   if still missing
 
-**Cadence: three updates per week**, on weekdays each member chooses.
+**Cadence: two updates per week**, on weekdays each member chooses.
 
 > **One thing to watch once this is live.** Three written check-ins a week is a real
 > ask for a student on top of coursework, and update fatigue would undercut the
@@ -276,7 +283,7 @@ Derived, never hand-maintained — that's what makes it stay accurate.
 
 - Event types: design review, company tour, company visit, build session, general
   meeting, social
-- **Importance weight** per event, set by leadership — feeds engagement scoring, so a
+- **Importance weight** per event, set by leadership — feeds contribution tracking, so a
   design review counts for more than a social
 - Any Lead or Co-Lead can invite anyone, regardless of division
 - RSVP plus actual attendance (they differ, and the gap is itself informative)
@@ -291,43 +298,85 @@ Derived, never hand-maintained — that's what makes it stay accurate.
 - Subscribable via iCal feed so it lands in people's existing Google Calendar —
   meeting people where they already are
 
-### 5.8 Engagement scoring
+### 5.8 Contribution tracking
 
-Implemented in `lib/engagement.ts`, with tests in `lib/engagement.test.ts` that enforce
-the design intent rather than just the arithmetic.
+Implemented in `lib/contribution.ts`, tested as **personas** in
+`lib/contribution.test.ts` — because the previous composite score passed every property
+test it had while ranking an absent member almost as high as a reliable contributor.
 
-### Recommended weights
+### Four signals, no composite number
 
-| Weight | Signal | Why this number |
-|---:|---|---|
-| **30%** | Update reliability | Best predictor of dependability and the hardest thing to fake — you can't fake having submitted. Late counts at half credit, because late beats absent |
-| **25%** | Task completion | Delivered outcomes. What actually moves a project |
-| **20%** | RE responsibility | Carrying accountability *is* contribution. **Scaled by project size** (subtree depth + headcount → 1×/2×/3×), per your note |
-| **15%** | Event attendance | Importance-weighted, so missing a design review costs far more than skipping a social |
-| **10%** | Hours logged | Deliberately the lowest. Square-root curve for diminishing returns, capped at 8 hrs/week |
-| **0%** | Breadth | Not rewarded — cross-division work is a member's own choice, per your call |
+Anish's framing, which is better than the score it replaced:
 
-**Properties the tests lock in**, so a future retune can't quietly break them:
+> "We don't really need to see a score. We just need to see that members are being
+> dedicated, and that they know their efforts are being tracked and not wasted."
 
-- Weights sum to 1.0
-- Update reliability is the single heaviest signal
-- Every measured signal outweighs raw hours
-- Doubling hours does not double the hours component
-- Someone who *only* logs hours scores ≤ 10 out of 100
-- A reliable low-hours member outscores an unreliable high-hours member
+| Signal | What it is | Notes |
+|---|---|---|
+| **Delivered** | Deliverables finished, projects carried to completion | **Primary.** Finished work is the only thing that can't be inflated |
+| **Commitment** | Hours/week against the 10–12 hr expectation, as a named tier | Context, not achievement. Twelve hours with nothing shipped isn't a strong quarter |
+| **Reliability** | Updates submitted on time | Being predictable is what lets others depend on you |
+| **Scope** | RE roles held, projects committed to | **Reported, never blended in** |
 
-### Guardrails on how it's used
+**A single number invites optimization. Four columns invite judgment.**
 
-- Co-Leads tune weights in the UI; changes are versioned so old scores stay interpretable
-- Visible to leadership only — Leads see their own reports, Co-Leads see everyone
-- Trend per member: improving or fading matters more than the absolute number
-- **No leaderboard function is provided.** The data supports one and it would be three
-  lines. It's omitted on purpose: the moment a ranking exists in the UI, the score stops
-  being a diagnostic and becomes a target. Scores appear next to a member's projects and
-  updates, where the number can be interpreted instead of merely compared.
+### Rules the tests lock in
 
-That last point is the whole philosophy in one design decision — a flashlight, not a
-scoreboard.
+- No composite score exists anywhere in the returned record
+- A component with no data returns `null`, never `0` — nobody is punished for data that
+  doesn't exist
+- An absent member cannot approach a contributing member's standing
+- Hours alone cannot make someone look productive
+- Holding three RE titles cannot disguise weak delivery
+- The published rubric leads with Delivered
+
+### Commitment tiers, not grades
+
+| Tier | Hours/week |
+|---|---|
+| **Core** | 12+ |
+| **Committed** | 8–12 |
+| **Contributing** | 4–8 |
+| **Getting started** | under 4 |
+| **On academic pause** | nothing counted, nothing owed |
+
+Tiers are rungs on a ladder. "You're Contributing at 6.5 hrs/week; Core is 12+" gives
+someone somewhere to go. "You scored 54" gives them a verdict.
+
+> **The honest tradeoff on the 10–12 hour bar.** That's roughly a part-time job on top of
+> a Stanford course load. Serious teams do run this way and it produces excellent results
+> — but it works by **self-selection**, so it has to be stated at recruiting, never
+> discovered in week six. And it will shrink the club toward its committed core. That may
+> be exactly what "high class team" means, but it is a different goal from "stop people
+> quitting," and the two can pull against each other. Worth choosing deliberately.
+
+### Guardrails
+
+- **Members see their own record.** Weights, tiers and the leadership rubric are published
+  at `/how-we-lead`. Nothing that affects someone's standing is hidden from them
+- **No ranking function exists**, deliberately. The data supports one; it's absent because
+  the moment a leaderboard exists these numbers stop describing work and become a target
+- Leadership reads the four columns next to the member's actual projects, where numbers can
+  be interpreted rather than merely compared
+
+### 5.8a Deliverables — the whole task model
+
+One flat list per project. Four fields: **title, one owner, a due date, a status.**
+
+No dependencies, no sub-tasks, no critical path. That design would cost an RE an hour a
+week, and on a volunteer team whose availability swings with midterms the dependency graph
+is wrong the day after it's entered — and a wrong schedule is worse than none, because
+people plan against it.
+
+What five minutes of RE upkeep a week buys:
+
+- Every member sees exactly what they own, on My Work and on the project
+- Update drafts pre-fill from open deliverables
+- Project progress is a real percentage
+- "Projects completed" becomes a trustworthy leadership signal
+- Dated deliverables give an honest timeline **without a Gantt chart**
+
+**Exactly one owner, always.** Shared ownership means nobody owns it.
 
 ### 5.9 Onboarding and invitations
 
@@ -340,6 +389,9 @@ scoreboard.
 ---
 
 ## 6. Build phases
+
+> **Superseded by `PHASE_PLAN.md`**, which is the current ordering. Kept here for the
+> reasoning behind vertical slices.
 
 Each phase is a **vertical slice** — a working, usable feature end to end — rather than
 "all the UI, then all the backend." You'll have something demoable to the club early,
@@ -355,7 +407,7 @@ which is how you get feedback while it's still cheap to act on.
 | **5** | Events, invitations, attendance, calendar | Depends on people + weighting |
 | **6** | Tasks, dependencies, milestones, auto-Gantt | Richest feature; needs the project tree solid first |
 | **7** | Trainings, certifications, facility access on profiles | Self-contained, can slot earlier if urgent |
-| **8** | Engagement scoring, weights config, leadership dashboard | Needs phases 3–6 producing real data first |
+| **8** | Contribution tracking, weights config, leadership dashboard | Needs phases 3–6 producing real data first |
 | **9** | Mobile/PWA polish, offline hour logging | Responsive throughout, dedicated pass at the end |
 
 **Ship Phase 2 to the club as soon as it works.** Project discoverability alone
@@ -380,7 +432,7 @@ addresses your biggest problem, and real usage will reshape everything after it.
 
 | Question | Answer |
 |---|---|
-| Update cadence | **Three per week**, on weekdays each member picks |
+| Update cadence | **Two per week**, on weekdays each member picks |
 | Middle role name | **Team Lead** — should feel manager-like |
 | Hours & update visibility | **Restricted.** REs of projects the member contributes to, plus their Lead chain. Project activity and who's-on-what stays public |
 | Divisions | Fixed Wing eVTOL, SkyBeta, Spade, DroneHacks, SkyDelta — **all editable, addable, removable by Co-Leads in the UI** |
@@ -393,7 +445,7 @@ addresses your biggest problem, and real usage will reshape everything after it.
 | Breadth reward | **None.** Cross-division work is a member's own choice |
 | Calendar sync | **Opt-in only**, and must support Apple Calendar as well as Google |
 | Competition dates | None yet. Project deadlines settable at any time; REs get reminders |
-| Engagement philosophy | Outcomes over hours; a flashlight, not a scoreboard |
+| Contribution philosophy | Four separate signals, no composite score. Delivered work leads |
 
 ### Still to gather, when we reach those phases
 

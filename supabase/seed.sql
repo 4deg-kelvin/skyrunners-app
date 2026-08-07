@@ -17,6 +17,10 @@
 begin;
 
 -- Wipe in dependency order so re-seeding is idempotent
+delete from update_schedules;
+delete from join_requests;
+delete from terms;
+delete from deliverables;
 delete from work_logs;
 delete from project_members;
 delete from projects;
@@ -84,29 +88,87 @@ insert into projects (id, name, slug, description, parent_id, team_id, primary_r
 insert into projects (id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'SkyDelta Concept Study', 'skydelta-concept-study', 'Trade study for the next-generation delivery airframe.', null, '24ce8449-c198-5b7e-aa06-c319404083a6', 'acb421eb-3cd9-5642-8d98-2901b8306020', 'concept', 'on_track', '2026-07-01', '2027-01-31', true, true, 'sizing analysis, mission modeling', '~3 hrs/week');
 
 -- Project membership and responsibilities
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'cec91677-20a4-5de6-98e5-0e03982a0419', 'contributor', 'Mission requirements and flight-test coordination', '2026-04-16');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'cec91677-20a4-5de6-98e5-0e03982a0419', 're', 'Trade study scope and sizing review', '2026-07-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', 'cec91677-20a4-5de6-98e5-0e03982a0419', 'contributor', 'Telemetry link testing', '2026-05-06');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', 'acb421eb-3cd9-5642-8d98-2901b8306020', 're', 'Overall airframe integration', '2026-04-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', '323d292a-dea1-55ff-be73-69d95648b247', 're', 'Structural analysis', '2026-05-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 'contributor', 'Composite fabrication', '2026-05-04');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', '323d292a-dea1-55ff-be73-69d95648b247', 're', 'Spar design and analysis', '2026-05-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 'contributor', 'Material characterization', '2026-06-02');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 're', 'Process documentation', '2026-06-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 'contributor', 'Coupon testing', '2026-06-10');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('ab67c335-292a-559b-a60a-ff7771eaaeeb', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 're', 'Test rig and instrumentation', '2026-07-15');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', '66e42efd-ba99-52f8-a088-8893c181a1e7', 're', 'Autonomy architecture', '2026-04-15');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'e0d2abbf-cb43-5248-b1dd-8617a5a0938a', 're', 'Perception stack', '2026-04-20');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', 'e0d2abbf-cb43-5248-b1dd-8617a5a0938a', 're', 'VIO implementation', '2026-05-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', '7f43a5c8-12de-5538-99b8-fb229103cd9b', 'contributor', 'Dataset collection', '2026-05-20');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('c584a753-ae75-5def-b6b4-c448be927d17', '7f43a5c8-12de-5538-99b8-fb229103cd9b', 're', 'Simulation environment', '2026-06-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', '81b38125-92a4-5c98-8f09-5ff1b75974d8', 're', 'Avionics integration', '2026-04-20');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', 're', 'Electronics design', '2026-04-25');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('da7aed08-92b2-5d8f-8b84-ed29d4d25f07', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', 're', 'PDB schematic and layout', '2026-06-15');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('bbf85d46-32e2-56bd-af26-50f67907792d', '59c7a175-a379-579c-beb5-c50176dce830', 're', 'Test stand and data', '2026-05-20');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', '17b5e85e-f27c-5865-9bc7-e6f66864e1c0', 're', 'Workshop program', '2026-08-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', '949d3a52-47cf-5c7d-a25c-894d48f64310', 're', 'Curriculum and logistics', '2026-08-01');
-insert into project_members (project_id, member_id, role, responsibility, joined_at) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'acb421eb-3cd9-5642-8d98-2901b8306020', 're', 'Trade study lead', '2026-07-01');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'cec91677-20a4-5de6-98e5-0e03982a0419', 'contributor', 'Mission requirements and flight-test coordination', '2026-04-16', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'cec91677-20a4-5de6-98e5-0e03982a0419', 're', 'Trade study scope and sizing review', '2026-07-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', 'cec91677-20a4-5de6-98e5-0e03982a0419', 'observer', null, '2026-05-06', 'following');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', 'acb421eb-3cd9-5642-8d98-2901b8306020', 're', 'Overall airframe integration', '2026-04-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', '323d292a-dea1-55ff-be73-69d95648b247', 're', 'Structural analysis', '2026-05-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 'contributor', 'Composite fabrication', '2026-05-04', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', '323d292a-dea1-55ff-be73-69d95648b247', 're', 'Spar design and analysis', '2026-05-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 'contributor', 'Material characterization', '2026-06-02', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 're', 'Process documentation', '2026-06-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 'contributor', 'Coupon testing', '2026-06-10', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('ab67c335-292a-559b-a60a-ff7771eaaeeb', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', 're', 'Test rig and instrumentation', '2026-07-15', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', '66e42efd-ba99-52f8-a088-8893c181a1e7', 're', 'Autonomy architecture', '2026-04-15', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'e0d2abbf-cb43-5248-b1dd-8617a5a0938a', 're', 'Perception stack', '2026-04-20', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', 'e0d2abbf-cb43-5248-b1dd-8617a5a0938a', 're', 'VIO implementation', '2026-05-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', '7f43a5c8-12de-5538-99b8-fb229103cd9b', 'contributor', 'Dataset collection', '2026-05-20', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('c584a753-ae75-5def-b6b4-c448be927d17', '7f43a5c8-12de-5538-99b8-fb229103cd9b', 're', 'Simulation environment', '2026-06-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', '81b38125-92a4-5c98-8f09-5ff1b75974d8', 're', 'Avionics integration', '2026-04-20', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('9c354344-2e74-5be4-a644-3bcfd3564ef8', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', 're', 'Electronics design', '2026-04-25', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('da7aed08-92b2-5d8f-8b84-ed29d4d25f07', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', 're', 'PDB schematic and layout', '2026-06-15', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('bbf85d46-32e2-56bd-af26-50f67907792d', '59c7a175-a379-579c-beb5-c50176dce830', 're', 'Test stand and data', '2026-05-20', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', '17b5e85e-f27c-5865-9bc7-e6f66864e1c0', 're', 'Workshop program', '2026-08-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', '949d3a52-47cf-5c7d-a25c-894d48f64310', 're', 'Curriculum and logistics', '2026-08-01', 'committed');
+insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'acb421eb-3cd9-5642-8d98-2901b8306020', 're', 'Trade study lead', '2026-07-01', 'committed');
+
+-- Deliverables
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'Spar FEA converged at 3.5g limit load', '323d292a-dea1-55ff-be73-69d95648b247', '2026-08-15', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'Mass reduction options memo for CDR', '323d292a-dea1-55ff-be73-69d95648b247', '2026-08-12', 'open', null, null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'Material allowables from coupon data', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', '2026-07-30', 'blocked', null, 'Waiting on coupon results from the layup project.', 3);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d1456ca5-2a34-5666-9b6b-bda8fe6e98d1', 'Preliminary spar geometry in CAD', '323d292a-dea1-55ff-be73-69d95648b247', null, 'done', '2026-06-20', null, 4);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'Wet layup procedure written and reviewed', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', '2026-08-20', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'Six coupons cured within spec', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', '2026-08-25', 'blocked', null, 'Vacuum pump seal is leaking.', 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'Coupon tensile test report', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', '2026-08-28', 'open', null, null, 3);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('50db4512-2fce-55b7-bea5-3baac47a28c1', 'Tooling fabricated', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', null, 'done', '2026-07-10', null, 4);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', 'Mass budget updated with spar estimate', '323d292a-dea1-55ff-be73-69d95648b247', '2026-08-14', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', 'CDR package assembled', 'acb421eb-3cd9-5642-8d98-2901b8306020', '2026-08-11', 'in_progress', null, null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('d9d1650a-5f75-5985-aeca-ad522d27de5e', 'Interface control document v1', 'acb421eb-3cd9-5642-8d98-2901b8306020', null, 'done', '2026-06-28', null, 3);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'Flight-test plan for outdoor VIO runs', 'cec91677-20a4-5de6-98e5-0e03982a0419', '2026-08-18', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'Mission requirements baselined', 'cec91677-20a4-5de6-98e5-0e03982a0419', null, 'done', '2026-07-02', null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('13171b85-aeb0-59e1-812e-211bd03a2ef1', 'Autonomy architecture diagram', '66e42efd-ba99-52f8-a088-8893c181a1e7', null, 'done', '2026-06-15', null, 3);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', 'Drift under 30cm over 50m indoors', 'e0d2abbf-cb43-5248-b1dd-8617a5a0938a', null, 'done', '2026-08-04', null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', 'Outdoor dataset collected and labelled', '7f43a5c8-12de-5538-99b8-fb229103cd9b', '2026-08-22', 'open', null, null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('c584a753-ae75-5def-b6b4-c448be927d17', 'ROS 2 migration of the Gazebo world', '7f43a5c8-12de-5538-99b8-fb229103cd9b', '2026-07-25', 'blocked', null, 'Plugin API changed; need guidance on whether to pin ROS 1.', 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('da7aed08-92b2-5d8f-8b84-ed29d4d25f07', 'PDB schematic complete', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', null, 'done', '2026-07-28', null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('da7aed08-92b2-5d8f-8b84-ed29d4d25f07', 'Board routing finished and reviewed', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', '2026-08-16', 'in_progress', null, null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('bbf85d46-32e2-56bd-af26-50f67907792d', 'Test stand frame welded', '59c7a175-a379-579c-beb5-c50176dce830', null, 'done', '2026-08-05', null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('bbf85d46-32e2-56bd-af26-50f67907792d', 'Load cell calibrated', '59c7a175-a379-579c-beb5-c50176dce830', '2026-08-19', 'blocked', null, 'Need calibration weights — do we own any?', 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'Mission sizing spreadsheet v1', 'cec91677-20a4-5de6-98e5-0e03982a0419', '2026-08-29', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('c3cb16ca-1275-5366-91ac-f690f1dab212', 'Trade study scope agreed with Co-Leads', 'cec91677-20a4-5de6-98e5-0e03982a0419', null, 'done', '2026-07-20', null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', 'Four workshop lesson plans drafted', '949d3a52-47cf-5c7d-a25c-894d48f64310', '2026-09-10', 'open', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('fdd82e35-8f1a-5838-9f7a-cab3b6fda405', 'Parts list and budget for workshop kits', '17b5e85e-f27c-5865-9bc7-e6f66864e1c0', '2026-09-01', 'open', null, null, 2);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('ab67c335-292a-559b-a60a-ff7771eaaeeb', 'Load rig CAD complete', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', '2026-08-30', 'in_progress', null, null, 1);
+insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values ('ab67c335-292a-559b-a60a-ff7771eaaeeb', 'Instrumentation plan', 'b6ee3b13-568b-521d-ad04-1aefba71d60c', '2026-09-15', 'open', null, null, 2);
+
+-- Join requests
+insert into join_requests (project_id, member_id, note, status, requested_at, decided_at, decided_by_id) values ('ab67c335-292a-559b-a60a-ff7771eaaeeb', '949d3a52-47cf-5c7d-a25c-894d48f64310', 'I want to learn instrumentation and data acquisition — happy to start on wiring.', 'pending', '2026-08-04', null, null);
+insert into join_requests (project_id, member_id, note, status, requested_at, decided_at, decided_by_id) values ('68968f93-e860-5538-b9d3-5eb3d3030d85', '323d292a-dea1-55ff-be73-69d95648b247', 'Interested in the perception side; I''ve done some OpenCV work.', 'pending', '2026-07-28', null, null);
+insert into join_requests (project_id, member_id, note, status, requested_at, decided_at, decided_by_id) values ('da7aed08-92b2-5d8f-8b84-ed29d4d25f07', '53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 'Would like to pick up soldering and board bring-up.', 'accepted', '2026-07-01', '2026-07-02', '5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684');
+
+-- Academic terms. Obligations generate ONLY where generates_obligations is true,
+-- so finals and breaks never produce missed-update rows.
+insert into terms (name, kind, starts_on, ends_on, generates_obligations) values ('Summer 2026', 'summer', '2026-06-15', '2026-09-20', false);
+insert into terms (name, kind, starts_on, ends_on, generates_obligations) values ('Autumn 2026', 'quarter', '2026-09-21', '2026-12-04', true);
+insert into terms (name, kind, starts_on, ends_on, generates_obligations) values ('Autumn finals', 'finals', '2026-12-05', '2026-12-12', false);
+insert into terms (name, kind, starts_on, ends_on, generates_obligations) values ('Winter break', 'break', '2026-12-13', '2027-01-04', false);
+insert into terms (name, kind, starts_on, ends_on, generates_obligations) values ('Winter 2027', 'quarter', '2027-01-05', '2027-03-19', true);
+
+-- Update schedules: two per week, on days each member picks
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('cec91677-20a4-5de6-98e5-0e03982a0419', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('acb421eb-3cd9-5642-8d98-2901b8306020', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('81b38125-92a4-5c98-8f09-5ff1b75974d8', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('66e42efd-ba99-52f8-a088-8893c181a1e7', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('17b5e85e-f27c-5865-9bc7-e6f66864e1c0', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('2d07b15f-9bc6-5657-b68e-a7686f961725', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('53c0b7ef-b3ac-53cb-8239-3f880a2e8b6d', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('5b2e4ad2-aa90-55fe-aee0-a3c7ffa59684', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('e0d2abbf-cb43-5248-b1dd-8617a5a0938a', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('323d292a-dea1-55ff-be73-69d95648b247', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('59c7a175-a379-579c-beb5-c50176dce830', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('7f43a5c8-12de-5538-99b8-fb229103cd9b', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('949d3a52-47cf-5c7d-a25c-894d48f64310', 2, array[1, 4], '23:59');
+insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values ('b6ee3b13-568b-521d-ad04-1aefba71d60c', 2, array[1, 4], '23:59');
 
 -- Logged hours
 insert into work_logs (member_id, project_id, work_date, hours, description) values ('cec91677-20a4-5de6-98e5-0e03982a0419', '13171b85-aeb0-59e1-812e-211bd03a2ef1', '2026-08-05', 2.5, 'Flight-test planning');

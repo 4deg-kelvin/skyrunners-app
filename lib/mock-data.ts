@@ -6,15 +6,23 @@
  * replaced by queries and the components shouldn't need to change.
  */
 
-import type {
-  ClubEvent,
-  Member,
-  Project,
-  ProjectMembership,
-  ProgressUpdate,
-  Team,
-  WorkLog,
-} from "./types";
+import {
+  JOIN_REQUEST_STALE_DAYS,
+  RE_SILENT_DAYS,
+  UPDATES_PER_WEEK_DEFAULT,
+  type ClubEvent,
+  type JoinRequest,
+  type Deliverable,
+  type Member,
+  type Project,
+  type ProjectAttentionFlag,
+  type ProjectMembership,
+  type ProgressUpdate,
+  type Team,
+  type Term,
+  type WorkLog,
+} from "./types.ts";
+import type { ContributionInputs } from "./contribution.ts";
 
 // ---------------------------------------------------------------------------
 // Club
@@ -532,31 +540,198 @@ export const projects: Project[] = [
 
 export const projectMemberships: ProjectMembership[] = [
   // Current user, so "My Work" has something to show
-  { projectId: "p-gps-denied", memberId: "m-anish", role: "contributor", responsibility: "Mission requirements and flight-test coordination", joinedAt: "2026-04-16" },
-  { projectId: "p-skydelta-concept", memberId: "m-anish", role: "re", responsibility: "Trade study scope and sizing review", joinedAt: "2026-07-01" },
-  { projectId: "p-avionics-bringup", memberId: "m-anish", role: "contributor", responsibility: "Telemetry link testing", joinedAt: "2026-05-06" },
+  { projectId: "p-gps-denied", memberId: "m-anish", role: "contributor", responsibility: "Mission requirements and flight-test coordination", joinedAt: "2026-04-16", commitment: "committed" },
+  { projectId: "p-skydelta-concept", memberId: "m-anish", role: "re", responsibility: "Trade study scope and sizing review", joinedAt: "2026-07-01", commitment: "committed" },
+  // Following: he chose to watch this one, nobody added him to it
+  { projectId: "p-avionics-bringup", memberId: "m-anish", role: "observer", joinedAt: "2026-05-06", commitment: "following" },
 
-  { projectId: "p-airframe-v2", memberId: "m-priya", role: "re", responsibility: "Overall airframe integration", joinedAt: "2026-04-01" },
-  { projectId: "p-airframe-v2", memberId: "m-tyler", role: "re", responsibility: "Structural analysis", joinedAt: "2026-05-01" },
-  { projectId: "p-airframe-v2", memberId: "m-sofia", role: "contributor", responsibility: "Composite fabrication", joinedAt: "2026-05-04" },
-  { projectId: "p-wing-spar", memberId: "m-tyler", role: "re", responsibility: "Spar design and analysis", joinedAt: "2026-05-01" },
-  { projectId: "p-wing-spar", memberId: "m-noah", role: "contributor", responsibility: "Material characterization", joinedAt: "2026-06-02" },
-  { projectId: "p-layup", memberId: "m-sofia", role: "re", responsibility: "Process documentation", joinedAt: "2026-06-01" },
-  { projectId: "p-layup", memberId: "m-noah", role: "contributor", responsibility: "Coupon testing", joinedAt: "2026-06-10" },
-  { projectId: "p-load-test", memberId: "m-noah", role: "re", responsibility: "Test rig and instrumentation", joinedAt: "2026-07-15" },
-  { projectId: "p-gps-denied", memberId: "m-lena", role: "re", responsibility: "Autonomy architecture", joinedAt: "2026-04-15" },
-  { projectId: "p-gps-denied", memberId: "m-amara", role: "re", responsibility: "Perception stack", joinedAt: "2026-04-20" },
-  { projectId: "p-vio", memberId: "m-amara", role: "re", responsibility: "VIO implementation", joinedAt: "2026-05-01" },
-  { projectId: "p-vio", memberId: "m-omar", role: "contributor", responsibility: "Dataset collection", joinedAt: "2026-05-20" },
-  { projectId: "p-sim", memberId: "m-omar", role: "re", responsibility: "Simulation environment", joinedAt: "2026-06-01" },
-  { projectId: "p-avionics-bringup", memberId: "m-marcus", role: "re", responsibility: "Avionics integration", joinedAt: "2026-04-20" },
-  { projectId: "p-avionics-bringup", memberId: "m-kenji", role: "re", responsibility: "Electronics design", joinedAt: "2026-04-25" },
-  { projectId: "p-power", memberId: "m-kenji", role: "re", responsibility: "PDB schematic and layout", joinedAt: "2026-06-15" },
-  { projectId: "p-propulsion-test", memberId: "m-hana", role: "re", responsibility: "Test stand and data", joinedAt: "2026-05-20" },
-  { projectId: "p-outreach", memberId: "m-james", role: "re", responsibility: "Workshop program", joinedAt: "2026-08-01" },
-  { projectId: "p-outreach", memberId: "m-grace", role: "re", responsibility: "Curriculum and logistics", joinedAt: "2026-08-01" },
-  { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01" },
+  { projectId: "p-airframe-v2", memberId: "m-priya", role: "re", responsibility: "Overall airframe integration", joinedAt: "2026-04-01", commitment: "committed" },
+  { projectId: "p-airframe-v2", memberId: "m-tyler", role: "re", responsibility: "Structural analysis", joinedAt: "2026-05-01", commitment: "committed" },
+  { projectId: "p-airframe-v2", memberId: "m-sofia", role: "contributor", responsibility: "Composite fabrication", joinedAt: "2026-05-04", commitment: "committed" },
+  { projectId: "p-wing-spar", memberId: "m-tyler", role: "re", responsibility: "Spar design and analysis", joinedAt: "2026-05-01", commitment: "committed" },
+  { projectId: "p-wing-spar", memberId: "m-noah", role: "contributor", responsibility: "Material characterization", joinedAt: "2026-06-02", commitment: "committed" },
+  { projectId: "p-layup", memberId: "m-sofia", role: "re", responsibility: "Process documentation", joinedAt: "2026-06-01", commitment: "committed" },
+  { projectId: "p-layup", memberId: "m-noah", role: "contributor", responsibility: "Coupon testing", joinedAt: "2026-06-10", commitment: "committed" },
+  { projectId: "p-load-test", memberId: "m-noah", role: "re", responsibility: "Test rig and instrumentation", joinedAt: "2026-07-15", commitment: "committed" },
+  { projectId: "p-gps-denied", memberId: "m-lena", role: "re", responsibility: "Autonomy architecture", joinedAt: "2026-04-15", commitment: "committed" },
+  { projectId: "p-gps-denied", memberId: "m-amara", role: "re", responsibility: "Perception stack", joinedAt: "2026-04-20", commitment: "committed" },
+  { projectId: "p-vio", memberId: "m-amara", role: "re", responsibility: "VIO implementation", joinedAt: "2026-05-01", commitment: "committed" },
+  { projectId: "p-vio", memberId: "m-omar", role: "contributor", responsibility: "Dataset collection", joinedAt: "2026-05-20", commitment: "committed" },
+  { projectId: "p-sim", memberId: "m-omar", role: "re", responsibility: "Simulation environment", joinedAt: "2026-06-01", commitment: "committed" },
+  { projectId: "p-avionics-bringup", memberId: "m-marcus", role: "re", responsibility: "Avionics integration", joinedAt: "2026-04-20", commitment: "committed" },
+  { projectId: "p-avionics-bringup", memberId: "m-kenji", role: "re", responsibility: "Electronics design", joinedAt: "2026-04-25", commitment: "committed" },
+  { projectId: "p-power", memberId: "m-kenji", role: "re", responsibility: "PDB schematic and layout", joinedAt: "2026-06-15", commitment: "committed" },
+  { projectId: "p-propulsion-test", memberId: "m-hana", role: "re", responsibility: "Test stand and data", joinedAt: "2026-05-20", commitment: "committed" },
+  { projectId: "p-outreach", memberId: "m-james", role: "re", responsibility: "Workshop program", joinedAt: "2026-08-01", commitment: "committed" },
+  { projectId: "p-outreach", memberId: "m-grace", role: "re", responsibility: "Curriculum and logistics", joinedAt: "2026-08-01", commitment: "committed" },
+  { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01", commitment: "committed" },
 ];
+
+// ---------------------------------------------------------------------------
+// Join requests — the RE gate, made visible
+// ---------------------------------------------------------------------------
+
+export const joinRequests: JoinRequest[] = [
+  {
+    id: "jr-1",
+    projectId: "p-load-test",
+    memberId: "m-grace",
+    note: "I want to learn instrumentation and data acquisition — happy to start on wiring.",
+    status: "pending",
+    requestedAt: "2026-08-04",
+  },
+  {
+    id: "jr-2",
+    projectId: "p-vio",
+    memberId: "m-tyler",
+    note: "Interested in the perception side; I've done some OpenCV work.",
+    status: "pending",
+    // Deliberately stale, to demonstrate escalation
+    requestedAt: "2026-07-28",
+  },
+  {
+    id: "jr-3",
+    projectId: "p-power",
+    memberId: "m-sofia",
+    note: "Would like to pick up soldering and board bring-up.",
+    status: "accepted",
+    requestedAt: "2026-07-01",
+    decidedAt: "2026-07-02",
+    decidedById: "m-kenji",
+  },
+];
+
+export function pendingRequestsFor(projectId: string): JoinRequest[] {
+  return joinRequests.filter(
+    (r) => r.projectId === projectId && r.status === "pending"
+  );
+}
+
+export function myJoinRequests(memberId: string) {
+  return joinRequests
+    .filter((r) => r.memberId === memberId)
+    .map((r) => ({
+      request: r,
+      project: getProject(r.projectId),
+      isStale:
+        r.status === "pending" &&
+        daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS,
+    }));
+}
+
+/**
+ * Requests waiting on the current user as an RE — their queue.
+ *
+ * This is the obligation that comes with RE-controlled membership: if you
+ * control the gate, you owe people an answer.
+ */
+export function joinRequestsAwaitingMe(memberId: string) {
+  return joinRequests
+    .filter((r) => r.status === "pending")
+    .filter((r) => getProject(r.projectId)?.reIds.includes(memberId))
+    .map((r) => ({
+      request: r,
+      project: getProject(r.projectId),
+      requester: getMember(r.memberId),
+      isStale: daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS,
+    }));
+}
+
+/** Requests nobody has answered in too long — a silent RE blocks a member. */
+export function staleJoinRequests() {
+  return joinRequests
+    .filter(
+      (r) =>
+        r.status === "pending" &&
+        daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS
+    )
+    .map((r) => ({
+      request: r,
+      project: getProject(r.projectId),
+      requester: getMember(r.memberId),
+      daysWaiting: Math.round(daysBetween(r.requestedAt, TODAY)),
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// Deliverables — one flat list per project, one owner each
+// ---------------------------------------------------------------------------
+
+export const deliverables: Deliverable[] = [
+  // Wing spar redesign
+  { id: "d-1", projectId: "p-wing-spar", title: "Spar FEA converged at 3.5g limit load", ownerId: "m-tyler", dueDate: "2026-08-15", status: "in_progress", sortOrder: 1 },
+  { id: "d-2", projectId: "p-wing-spar", title: "Mass reduction options memo for CDR", ownerId: "m-tyler", dueDate: "2026-08-12", status: "open", sortOrder: 2 },
+  { id: "d-3", projectId: "p-wing-spar", title: "Material allowables from coupon data", ownerId: "m-noah", dueDate: "2026-07-30", status: "blocked", blockerNote: "Waiting on coupon results from the layup project.", sortOrder: 3 },
+  { id: "d-4", projectId: "p-wing-spar", title: "Preliminary spar geometry in CAD", ownerId: "m-tyler", status: "done", completedAt: "2026-06-20", sortOrder: 4 },
+
+  // Layup qualification
+  { id: "d-5", projectId: "p-layup", title: "Wet layup procedure written and reviewed", ownerId: "m-sofia", dueDate: "2026-08-20", status: "in_progress", sortOrder: 1 },
+  { id: "d-6", projectId: "p-layup", title: "Six coupons cured within spec", ownerId: "m-sofia", dueDate: "2026-08-25", status: "blocked", blockerNote: "Vacuum pump seal is leaking.", sortOrder: 2 },
+  { id: "d-7", projectId: "p-layup", title: "Coupon tensile test report", ownerId: "m-noah", dueDate: "2026-08-28", status: "open", sortOrder: 3 },
+  { id: "d-8", projectId: "p-layup", title: "Tooling fabricated", ownerId: "m-sofia", status: "done", completedAt: "2026-07-10", sortOrder: 4 },
+
+  // Airframe v2
+  { id: "d-9", projectId: "p-airframe-v2", title: "Mass budget updated with spar estimate", ownerId: "m-tyler", dueDate: "2026-08-14", status: "in_progress", sortOrder: 1 },
+  { id: "d-10", projectId: "p-airframe-v2", title: "CDR package assembled", ownerId: "m-priya", dueDate: "2026-08-11", status: "in_progress", sortOrder: 2 },
+  { id: "d-11", projectId: "p-airframe-v2", title: "Interface control document v1", ownerId: "m-priya", status: "done", completedAt: "2026-06-28", sortOrder: 3 },
+
+  // GPS-denied navigation
+  { id: "d-12", projectId: "p-gps-denied", title: "Flight-test plan for outdoor VIO runs", ownerId: "m-anish", dueDate: "2026-08-18", status: "in_progress", sortOrder: 1 },
+  { id: "d-13", projectId: "p-gps-denied", title: "Mission requirements baselined", ownerId: "m-anish", status: "done", completedAt: "2026-07-02", sortOrder: 2 },
+  { id: "d-14", projectId: "p-gps-denied", title: "Autonomy architecture diagram", ownerId: "m-lena", status: "done", completedAt: "2026-06-15", sortOrder: 3 },
+
+  // VIO pipeline
+  { id: "d-15", projectId: "p-vio", title: "Drift under 30cm over 50m indoors", ownerId: "m-amara", status: "done", completedAt: "2026-08-04", sortOrder: 1 },
+  { id: "d-16", projectId: "p-vio", title: "Outdoor dataset collected and labelled", ownerId: "m-omar", dueDate: "2026-08-22", status: "open", sortOrder: 2 },
+
+  // Simulation
+  { id: "d-17", projectId: "p-sim", title: "ROS 2 migration of the Gazebo world", ownerId: "m-omar", dueDate: "2026-07-25", status: "blocked", blockerNote: "Plugin API changed; need guidance on whether to pin ROS 1.", sortOrder: 1 },
+
+  // Power distribution board
+  { id: "d-18", projectId: "p-power", title: "PDB schematic complete", ownerId: "m-kenji", status: "done", completedAt: "2026-07-28", sortOrder: 1 },
+  { id: "d-19", projectId: "p-power", title: "Board routing finished and reviewed", ownerId: "m-kenji", dueDate: "2026-08-16", status: "in_progress", sortOrder: 2 },
+
+  // Propulsion test stand
+  { id: "d-20", projectId: "p-propulsion-test", title: "Test stand frame welded", ownerId: "m-hana", status: "done", completedAt: "2026-08-05", sortOrder: 1 },
+  { id: "d-21", projectId: "p-propulsion-test", title: "Load cell calibrated", ownerId: "m-hana", dueDate: "2026-08-19", status: "blocked", blockerNote: "Need calibration weights — do we own any?", sortOrder: 2 },
+
+  // SkyDelta concept study
+  { id: "d-22", projectId: "p-skydelta-concept", title: "Mission sizing spreadsheet v1", ownerId: "m-anish", dueDate: "2026-08-29", status: "in_progress", sortOrder: 1 },
+  { id: "d-23", projectId: "p-skydelta-concept", title: "Trade study scope agreed with Co-Leads", ownerId: "m-anish", status: "done", completedAt: "2026-07-20", sortOrder: 2 },
+
+  // Outreach
+  { id: "d-24", projectId: "p-outreach", title: "Four workshop lesson plans drafted", ownerId: "m-grace", dueDate: "2026-09-10", status: "open", sortOrder: 1 },
+  { id: "d-25", projectId: "p-outreach", title: "Parts list and budget for workshop kits", ownerId: "m-james", dueDate: "2026-09-01", status: "open", sortOrder: 2 },
+
+  // Load testing
+  { id: "d-26", projectId: "p-load-test", title: "Load rig CAD complete", ownerId: "m-noah", dueDate: "2026-08-30", status: "in_progress", sortOrder: 1 },
+  { id: "d-27", projectId: "p-load-test", title: "Instrumentation plan", ownerId: "m-noah", dueDate: "2026-09-15", status: "open", sortOrder: 2 },
+];
+
+// ---------------------------------------------------------------------------
+// Academic calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * Obligations are generated ONLY inside terms where `generatesObligations` is
+ * true. Without this, everyone accrues weeks of `missed` updates over finals and
+ * breaks, and by autumn the contribution data is meaningless.
+ */
+export const terms: Term[] = [
+  { id: "t-su26", name: "Summer 2026", kind: "summer", startsOn: "2026-06-15", endsOn: "2026-09-20", generatesObligations: false },
+  { id: "t-au26", name: "Autumn 2026", kind: "quarter", startsOn: "2026-09-21", endsOn: "2026-12-04", generatesObligations: true },
+  { id: "t-au26f", name: "Autumn finals", kind: "finals", startsOn: "2026-12-05", endsOn: "2026-12-12", generatesObligations: false },
+  { id: "t-wbreak", name: "Winter break", kind: "break", startsOn: "2026-12-13", endsOn: "2027-01-04", generatesObligations: false },
+  { id: "t-wi27", name: "Winter 2027", kind: "quarter", startsOn: "2027-01-05", endsOn: "2027-03-19", generatesObligations: true },
+];
+
+export function termFor(date: string): Term | undefined {
+  return terms.find((t) => date >= t.startsOn && date <= t.endsOn);
+}
+
+export function inSession(date: string): boolean {
+  return termFor(date)?.generatesObligations ?? false;
+}
 
 /** Current user's own update, so My Work shows the per-project layout. */
 export const myUpdate: ProgressUpdate = {
@@ -840,6 +1015,199 @@ export function projectBreadcrumb(
       kind: "project" as const,
     })),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Deliverables
+// ---------------------------------------------------------------------------
+
+export function projectDeliverables(projectId: string): Deliverable[] {
+  return deliverables
+    .filter((d) => d.projectId === projectId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/** What one person owns on one project — the "what am I responsible for" answer. */
+export function myDeliverablesOn(
+  memberId: string,
+  projectId: string
+): Deliverable[] {
+  return projectDeliverables(projectId).filter((d) => d.ownerId === memberId);
+}
+
+export function myDeliverables(memberId: string): Deliverable[] {
+  return deliverables
+    .filter((d) => d.ownerId === memberId)
+    .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+}
+
+export function isOverdue(d: Deliverable): boolean {
+  return d.status !== "done" && !!d.dueDate && d.dueDate < TODAY;
+}
+
+/** Real percentage rather than a vibe — the payoff of one flat list. */
+export function projectProgress(projectId: string) {
+  const list = projectDeliverables(projectId);
+  const done = list.filter((d) => d.status === "done").length;
+  const blocked = list.filter((d) => d.status === "blocked").length;
+  const overdue = list.filter(isOverdue).length;
+  return {
+    total: list.length,
+    done,
+    blocked,
+    overdue,
+    fraction: list.length > 0 ? done / list.length : 0,
+  };
+}
+
+/** Blockers surfaced from deliverables, so nobody waits for their update day. */
+export function openBlockerDeliverables(): Deliverable[] {
+  return deliverables.filter((d) => d.status === "blocked");
+}
+
+// ---------------------------------------------------------------------------
+// RE liveness
+// ---------------------------------------------------------------------------
+
+/**
+ * Stand-in for "last time this member did anything". Once auth is real this
+ * comes from `profiles.last_active_at`.
+ */
+const MOCK_LAST_ACTIVE: Record<string, string> = {
+  "m-omar": "2026-07-18", // deliberately stale, to demonstrate the flag
+};
+
+function lastActive(memberId: string): string {
+  return MOCK_LAST_ACTIVE[memberId] ?? TODAY;
+}
+
+/**
+ * Projects that need leadership attention.
+ *
+ * Because RE authority inherits downward, an RE who quietly checks out freezes
+ * their whole subtree — nobody beneath them can create sub-projects, appoint
+ * REs, or get a blocker cleared. This is the check that surfaces it instead of
+ * letting the work stall invisibly for a month.
+ */
+export function projectAttentionFlags(): ProjectAttentionFlag[] {
+  const flags: ProjectAttentionFlag[] = [];
+
+  for (const project of projects) {
+    const silentDays = daysBetween(lastActive(project.primaryReId), TODAY);
+    if (silentDays >= RE_SILENT_DAYS) {
+      flags.push({
+        projectId: project.id,
+        reason: "re_silent",
+        detail: `${getMember(project.primaryReId)?.fullName ?? "The RE"} hasn't been active in ${Math.round(silentDays)} days.`,
+        severity: 3,
+      });
+    }
+
+    // A project with children and only one RE has a single point of failure
+    if (childProjects(project.id).length > 0 && project.reIds.length < 2) {
+      flags.push({
+        projectId: project.id,
+        reason: "no_deputy_re",
+        detail:
+          "Has sub-projects but only one RE. Name a deputy so it doesn't stall if they're unavailable.",
+        severity: 1,
+      });
+    }
+
+    const stale = projectDeliverables(project.id).filter(
+      (d) => d.status === "blocked"
+    );
+    if (stale.length > 0) {
+      flags.push({
+        projectId: project.id,
+        reason: "blocker_stale",
+        detail: `${stale.length} blocked deliverable${stale.length === 1 ? "" : "s"} waiting on an answer.`,
+        severity: 2,
+      });
+    }
+
+    const overdue = projectDeliverables(project.id).filter(isOverdue);
+    if (overdue.length > 0) {
+      flags.push({
+        projectId: project.id,
+        reason: "deliverables_overdue",
+        detail: `${overdue.length} deliverable${overdue.length === 1 ? "" : "s"} past due.`,
+        severity: 2,
+      });
+    }
+  }
+
+  return flags.sort((a, b) => b.severity - a.severity);
+}
+
+// ---------------------------------------------------------------------------
+// Contribution inputs
+// ---------------------------------------------------------------------------
+
+/** Update schedules. Two per week, on days each member picks. */
+export const updateSchedules = members.map((m) => ({
+  memberId: m.id,
+  weekdays: [1, 4], // Monday and Thursday by default
+  updatesPerWeek: UPDATES_PER_WEEK_DEFAULT,
+  dueTime: "23:59",
+  pausedUntil: undefined as string | undefined,
+}));
+
+export function scheduleFor(memberId: string) {
+  return updateSchedules.find((s) => s.memberId === memberId);
+}
+
+/**
+ * Assembles everything the contribution record needs for one member.
+ *
+ * `activeWeeks` counts in-session weeks only — finals and breaks are excluded,
+ * so hours-per-week isn't diluted by three weeks of winter break when nobody was
+ * expected to work.
+ */
+export function contributionInputsFor(
+  memberId: string,
+  activeWeeks = 10
+): ContributionInputs {
+  const mine = myDeliverables(memberId);
+  const committed = projectMemberships.filter(
+    (pm) => pm.memberId === memberId && pm.commitment === "committed"
+  );
+
+  const completedProjectIds = new Set(
+    mine
+      .filter((d) => d.status === "done")
+      .map((d) => d.projectId)
+      .filter((pid) => getProject(pid)?.phase === "complete")
+  );
+
+  const myUpdates = progressUpdates.filter((u) => u.memberId === memberId);
+  const schedule = scheduleFor(memberId);
+
+  return {
+    activeWeeks,
+    isPaused: !!schedule?.pausedUntil && schedule.pausedUntil > TODAY,
+    deliverablesCompleted: mine.filter((d) => d.status === "done").length,
+    deliverablesOpen: mine.filter((d) => d.status !== "done").length,
+    deliverablesOverdue: mine.filter(isOverdue).length,
+    projectsCompleted: completedProjectIds.size,
+    hoursTotal: workLogs
+      .filter((w) => w.memberId === memberId)
+      .reduce((sum, w) => sum + w.hours, 0),
+    updatesDue: myUpdates.length,
+    updatesOnTime: myUpdates.filter(
+      (u) => u.status === "submitted" || u.status === "reviewed"
+    ).length,
+    updatesLate: myUpdates.filter((u) => u.status === "late").length,
+    reRoleCount: projects.filter((p) => p.reIds.includes(memberId)).length,
+    projectsCommitted: committed.length,
+  };
+}
+
+/** How many projects an RE has actually put this member on. No cap. */
+export function committedProjectCount(memberId: string): number {
+  return projectMemberships.filter(
+    (pm) => pm.memberId === memberId && pm.commitment === "committed"
+  ).length;
 }
 
 /** Every project a member is on, with their role and responsibility. */

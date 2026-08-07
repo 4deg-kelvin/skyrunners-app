@@ -8,31 +8,65 @@
 
 import {
   activeMembers,
+  committedProjectCount,
+  contributionInputsFor,
   getMember,
   hoursOnProject,
+  isOverdue,
   memberProjects,
   members,
+  myDeliverables,
   projectBreadcrumb,
   projectREs,
 } from "@/lib/mock-data";
-import type { Member, Project, ProjectMembership } from "@/lib/types";
+import {
+  buildContributionRecord,
+  commitmentTier,
+  type CommitmentTier,
+  type ContributionRecord,
+} from "@/lib/contribution";
+import type {
+  Deliverable,
+  Member,
+  Project,
+  ProjectMembership,
+} from "@/lib/types";
 import type { BreadcrumbNode } from "./my-work";
 
 export interface RosterRow {
   member: Member;
   lead?: Member;
-  projectCount: number;
+  /** Committed only — following isn't staffing. */
+  committedCount: number;
   reCount: number;
+  /** Delivered work, the signal that leads. */
+  deliverablesCompleted: number;
+  openDeliverables: number;
+  overdueDeliverables: number;
+  /** Shown only where the viewer is allowed to see effort data. */
+  tier: CommitmentTier;
+  hoursPerWeek: number;
 }
 
 export async function getRoster(): Promise<RosterRow[]> {
   return activeMembers().map((member) => {
     const mine = memberProjects(member.id);
+    const deliverables = myDeliverables(member.id);
+    const inputs = contributionInputsFor(member.id);
+    const hoursPerWeek =
+      inputs.activeWeeks > 0 ? inputs.hoursTotal / inputs.activeWeeks : 0;
+
     return {
       member,
       lead: member.leadId ? getMember(member.leadId) : undefined,
-      projectCount: mine.length,
+      committedCount: committedProjectCount(member.id),
       reCount: mine.filter((p) => p.role === "re").length,
+      deliverablesCompleted: deliverables.filter((d) => d.status === "done")
+        .length,
+      openDeliverables: deliverables.filter((d) => d.status !== "done").length,
+      overdueDeliverables: deliverables.filter(isOverdue).length,
+      tier: commitmentTier(hoursPerWeek, inputs.isPaused),
+      hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
     };
   });
 }
@@ -43,6 +77,8 @@ export interface MemberProjectRow {
   breadcrumb: BreadcrumbNode[];
   res: Member[];
   hoursLogged: number;
+  /** What this person owns here — concrete, not a text field. */
+  deliverables: Deliverable[];
 }
 
 export interface MemberProfileView {
@@ -52,11 +88,13 @@ export interface MemberProfileView {
   directReports: Member[];
   projects: MemberProjectRow[];
   /**
-   * Whether the viewer may see hours, update contents, and engagement.
-   * Decided by the caller via `lib/permissions.ts` — this layer only carries
-   * the answer through so the page doesn't re-derive it.
+   * Whether the viewer may see hours, update contents, and their contribution
+   * record. Decided by the caller via `lib/permissions.ts` — this layer only
+   * carries the answer through so the page doesn't re-derive it.
    */
   canViewEffort: boolean;
+  /** Only populated when `canViewEffort` is true. */
+  contribution?: ContributionRecord;
 }
 
 export async function getMemberProfile(
@@ -83,10 +121,17 @@ export async function getMemberProfile(
           hoursLogged: canViewEffort
             ? hoursOnProject(memberId, pm.project.id)
             : 0,
+          deliverables: myDeliverables(memberId).filter(
+            (d) => d.projectId === pm.project!.id
+          ),
         },
       ];
     }),
     canViewEffort,
+    // Never even compute it for a viewer who isn't allowed to see it
+    contribution: canViewEffort
+      ? buildContributionRecord(contributionInputsFor(memberId))
+      : undefined,
   };
 }
 

@@ -191,14 +191,15 @@ Index `(member_id, work_date)` and `(project_id, work_date)`.
 ## Updates and the review chain
 
 ### `update_schedules`
-**Three updates per week**, on weekdays each member picks for themselves.
+**Two updates per week**, on weekdays each member picks for themselves.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
 | `member_id` | uuid FK unique | |
-| `updates_per_week` | int | Default 3. Configurable so leadership can dial the load down if it proves too heavy |
+| `updates_per_week` | int | **Default 2.** Configurable so leadership can dial the load down if it proves too heavy |
 | `weekdays` | int[] | 0–6, Sunday = 0. Length should match `updates_per_week` |
+| `paused_until` | date? | **Academic pause.** Suppresses obligations AND nudges, and generates no `missed` rows — a lapse must be a pause, never a debt |
 | `due_time` | time | Default 23:59 |
 | `timezone` | text | Default `America/Los_Angeles` |
 | `is_paused` | bool | Breaks, leave of absence |
@@ -329,7 +330,7 @@ be slow once there are hundreds of tasks.
 | `title` | text | |
 | `description` | text? | |
 | `kind` | enum | `design_review` \| `company_tour` \| `company_visit` \| `build_session` \| `general_meeting` \| `training` \| `social` \| `competition` \| `one_on_one` |
-| `importance_weight` | numeric | Default per kind. **Feeds engagement scoring** |
+| `importance_weight` | numeric | Default per kind. **Feeds contribution tracking** |
 | `starts_at` / `ends_at` | timestamptz | |
 | `location` | text? | |
 | `team_id?` / `project_id?` | uuid FK | Optional scoping |
@@ -387,9 +388,9 @@ e.g. Robotics Room keycard, Lab 64 24-hour, PRL, machine shop after-hours.
 
 ---
 
-## Engagement scoring
+## Contribution tracking
 
-### `engagement_weights`
+### `terms`
 Versioned so historical scores stay interpretable after leadership retunes them.
 
 `id` · `version` int · `hours_weight` · `update_ontime_weight` ·
@@ -397,7 +398,7 @@ Versioned so historical scores stay interpretable after leadership retunes them.
 `breadth_weight` · `hours_diminishing_threshold` numeric? · `effective_from` date ·
 `created_by` FK · `is_current` bool
 
-### `engagement_snapshots`
+### `member_contribution`
 Computed periodically rather than on every page load — the underlying query spans five
 tables and shouldn't run per request.
 
@@ -451,7 +452,7 @@ Things the database or permission module must guarantee:
    `project_members` with `role = 're'`
 4. `work_logs.hours` between 0 and 24; `work_date` not in the future
 5. A member has at most one active `project_members` row per project
-6. Exactly one `engagement_weights` row with `is_current = true`
+6. Exactly one `terms` row with `is_current = true`
 7. Deactivating a member reassigns or nulls their mentees' `lead_id` — never orphan
    someone
 8. Deleting a project requires reparenting or cascading its children, explicitly chosen

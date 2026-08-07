@@ -12,27 +12,43 @@ import {
   divisionForProject,
   getMember,
   getProject,
+  isOverdue,
+  pendingRequestsFor,
+  projectAttentionFlags,
   projectBreadcrumb,
+  projectDeliverables,
   projectMembers,
+  projectProgress,
   projectREs,
   projects,
   projectUpdateFeed,
   divisions,
+  TODAY,
 } from "@/lib/mock-data";
 import type {
+  Deliverable,
+  JoinRequest,
   Member,
   Project,
+  ProjectAttentionFlag,
   ProjectMembership,
   Team,
   UpdateEntry,
 } from "@/lib/types";
+
+function daysWaitingOn(since: string): number {
+  const ms = new Date(TODAY).getTime() - new Date(since).getTime();
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
 import type { BreadcrumbNode } from "./my-work";
 
 export interface ProjectTreeNode {
   project: Project;
   /** Primary RE first. */
   res: Member[];
+  /** Committed members only — following doesn't count as staffing. */
   memberCount: number;
+  progress: ReturnType<typeof projectProgress>;
   children: ProjectTreeNode[];
 }
 
@@ -46,7 +62,10 @@ function buildNode(project: Project): ProjectTreeNode {
   return {
     project,
     res: projectREs(project.id),
-    memberCount: projectMembers(project.id).length,
+    memberCount: projectMembers(project.id).filter(
+      (pm) => pm.commitment === "committed"
+    ).length,
+    progress: projectProgress(project.id),
     children: childProjects(project.id).map(buildNode),
   };
 }
@@ -83,6 +102,12 @@ export interface ProjectMemberRow {
   member?: Member;
 }
 
+export interface DeliverableRowData {
+  deliverable: Deliverable;
+  owner?: Member;
+  overdue: boolean;
+}
+
 export interface ProjectDetailView {
   project: Project;
   breadcrumb: BreadcrumbNode[];
@@ -91,19 +116,36 @@ export interface ProjectDetailView {
   members: ProjectMemberRow[];
   children: ProjectTreeNode[];
   parent?: Project;
+  /** The whole task model: one flat list, one owner each. */
+  deliverables: DeliverableRowData[];
+  progress: ReturnType<typeof projectProgress>;
+  /** Why this project may need leadership attention. */
+  attentionFlags: ProjectAttentionFlag[];
   /** Every update entry written about this project, newest first. */
   updateFeed: {
     entry: UpdateEntry;
     author?: Member;
     submittedAt: string;
   }[];
+  /** Requests waiting on the RE, with requester attached. */
+  pendingRequests: {
+    request: JoinRequest;
+    requester?: Member;
+    daysWaiting: number;
+  }[];
+  /** The viewer's own pending request, if they've already asked. */
+  myPendingRequest?: JoinRequest;
 }
 
 export async function getProjectBySlug(
-  slug: string
+  slug: string,
+  viewerId: string
 ): Promise<ProjectDetailView | null> {
   const project = projects.find((p) => p.slug === slug);
   if (!project) return null;
+
+  const allFlags = projectAttentionFlags();
+  const requests = pendingRequestsFor(project.id);
 
   return {
     project,
@@ -116,11 +158,24 @@ export async function getProjectBySlug(
     })),
     children: childProjects(project.id).map(buildNode),
     parent: project.parentId ? getProject(project.parentId) : undefined,
+    deliverables: projectDeliverables(project.id).map((d) => ({
+      deliverable: d,
+      owner: getMember(d.ownerId),
+      overdue: isOverdue(d),
+    })),
+    progress: projectProgress(project.id),
+    attentionFlags: allFlags.filter((f) => f.projectId === project.id),
     updateFeed: projectUpdateFeed(project.id).map((f) => ({
       entry: f.entry,
       author: getMember(f.memberId),
       submittedAt: f.submittedAt,
     })),
+    pendingRequests: requests.map((r) => ({
+      request: r,
+      requester: getMember(r.memberId),
+      daysWaiting: daysWaitingOn(r.requestedAt),
+    })),
+    myPendingRequest: requests.find((r) => r.memberId === viewerId),
   };
 }
 

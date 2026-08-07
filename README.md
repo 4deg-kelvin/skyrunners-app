@@ -2,9 +2,11 @@
 
 Project and member management for **Stanford UAV / Sky Runners**.
 
-Tracks engineering efforts and member engagement across the club's drone projects, so
-members can find work without asking a co-lead and leadership can see what's actually
+Tracks engineering efforts and member contribution across the club's drone projects, so
+members can see everything the club is building and leadership can see what's actually
 happening.
+
+**Build order lives in [`docs/PHASE_PLAN.md`](docs/PHASE_PLAN.md).**
 
 New here? Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup and workflow.
 
@@ -23,7 +25,7 @@ Open **http://localhost:3000**. `Ctrl+C` stops the server.
 
 ```bash
 npm run check     # typecheck + lint + tests — run before pushing
-npm test          # permission and engagement tests
+npm test          # permission and contribution tests
 npm run format    # Prettier
 ```
 
@@ -42,7 +44,8 @@ npm run format    # Prettier
 | Members | Roster with roles, project counts, reporting lines |
 | Member profile | Projects and responsibilities, direct reports, restricted effort data |
 | Calendar | Upcoming events |
-| Updates | Placeholder — Phase 4 |
+| How we lead | Published expectations, tiers, and the leadership rubric |
+| Updates | Placeholder — later phase |
 
 Opening the app lands you on **My Work**, not the dashboard — your own projects and the
 update you owe are what you came for.
@@ -74,12 +77,12 @@ components/
 lib/
   data/                 ★ The ONLY place that touches the data source
   permissions.ts        ★ Every "who can do what" rule. Tested
-  engagement.ts         ★ Engagement scoring. Tested
+  contribution.ts       ★ The four contribution signals. Tested
   labels.ts             All display strings and badge tones
   types.ts              Domain types, mirroring the database
   mock-data.ts          Sample data — replaced in Phase 1
 
-docs/                   Plan, schema, design system, decisions
+docs/                   Phase plan, schema, design system, decisions, product review
 supabase/               Migrations, views, seed
 scripts/                Seed generation
 ```
@@ -128,8 +131,10 @@ across divisions.
 **Roles.** Co-Lead → Team Lead → Member, plus the project-scoped RE. Multiple REs per
 project, one primary contact.
 
-**Open enrollment.** Members join any project that interests them, no permission needed.
-The main fix for the club's biggest problem.
+**See everything, ask to join.** Every project is readable by every member — phase, team,
+who owns what, what's blocked, who the RE is. Joining goes through that RE, because they're
+accountable for the deliverable. Requests are tracked objects that escalate if unanswered,
+so "ask the RE" never means waiting in silence.
 
 **Per-project updates.** An update carries one section per project, so a note is never
 ambiguous and a blocker routes to the right RE.

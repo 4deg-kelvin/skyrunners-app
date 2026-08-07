@@ -10,6 +10,8 @@
  */
 
 import type {
+  AttentionReason,
+  DeliverableStatus,
   EventKind,
   GlobalRole,
   ProjectHealth,
@@ -19,6 +21,7 @@ import type {
   TrainingStatus,
   UpdateStatus,
 } from "./types";
+import type { CommitmentTier } from "./contribution";
 import type { BadgeTone } from "@/components/ui/badge";
 
 // ---------------------------------------------------------------------------
@@ -154,4 +157,51 @@ export const TRAINING_STATUS_TONES: Record<TrainingStatus, BadgeTone> = {
   verified: "ok",
   expired: "risk",
   rejected: "neutral",
+};
+
+// ---------------------------------------------------------------------------
+// Deliverables
+// ---------------------------------------------------------------------------
+
+export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
+  open: "Not started",
+  in_progress: "In progress",
+  blocked: "Blocked",
+  done: "Done",
+};
+
+export const DELIVERABLE_STATUS_TONES: Record<DeliverableStatus, BadgeTone> = {
+  open: "neutral",
+  in_progress: "warn",
+  blocked: "risk",
+  done: "ok",
+};
+
+// ---------------------------------------------------------------------------
+// Commitment tiers
+// ---------------------------------------------------------------------------
+
+/**
+ * Tiers read as rungs on a ladder, never as a pass/fail. Someone at 6 hrs/week
+ * during midterms is "Contributing" — a real category with somewhere to go, not
+ * a failure state.
+ */
+export const TIER_TONES: Record<CommitmentTier, BadgeTone> = {
+  core: "cardinal",
+  committed: "ok",
+  contributing: "neutral",
+  light: "neutral",
+  paused: "neutral",
+};
+
+// ---------------------------------------------------------------------------
+// Project attention flags
+// ---------------------------------------------------------------------------
+
+export const ATTENTION_LABELS: Record<AttentionReason, string> = {
+  re_silent: "RE has gone quiet",
+  blocker_stale: "Blocker unanswered",
+  deliverables_overdue: "Deliverables overdue",
+  no_deputy_re: "No deputy RE",
+  health_flagged: "Flagged by its RE",
 };

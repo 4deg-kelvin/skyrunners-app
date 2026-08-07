@@ -114,6 +114,89 @@ export interface ProjectMembership {
   /** What this person owns here. Surfaces on their profile. */
   responsibility?: string;
   joinedAt: string;
+  /**
+   * `committed` — an RE added them. Carries deliverables and update obligations.
+   * `following` — they chose to watch. No obligations, self-service, unlimited.
+   */
+  commitment: "committed" | "following";
+}
+
+// ---------------------------------------------------------------------------
+// Join requests
+// ---------------------------------------------------------------------------
+
+/**
+ * Membership is RE-controlled: members cannot add themselves to a project.
+ *
+ * This table is what keeps that from recreating the problem the app exists to
+ * solve. Without it, "ask the RE" means an email that may never get answered,
+ * and the member is back in invisible limbo — which is exactly what made people
+ * quit, just with a different person to chase.
+ *
+ * A request is a tracked object instead: it appears in the RE's queue, the
+ * member can see it's pending, and it can be escalated when it goes stale. The
+ * ask becomes visible rather than lost.
+ */
+export type JoinRequestStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "withdrawn";
+
+/** A request older than this needs escalating — a silent RE is a blocked member. */
+export const JOIN_REQUEST_STALE_DAYS = 5;
+
+export interface JoinRequest {
+  id: string;
+  projectId: string;
+  memberId: string;
+  /** Why they want in, and what they'd bring. Helps the RE decide fast. */
+  note?: string;
+  status: JoinRequestStatus;
+  requestedAt: string;
+  decidedAt?: string;
+  decidedById?: string;
+  /** Optional reply, so a decline isn't just silence. */
+  responseNote?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Deliverables — the whole task model
+// ---------------------------------------------------------------------------
+
+export type DeliverableStatus = "open" | "in_progress" | "blocked" | "done";
+
+/**
+ * One flat list per project. Four fields that matter: title, ONE owner, a date,
+ * a status.
+ *
+ * This deliberately replaces a full task board with dependencies, sub-tasks and
+ * critical-path analysis. That design would have cost an RE an hour a week to
+ * maintain, and on a volunteer team whose availability swings with midterms the
+ * dependency graph is wrong the day after it's entered — a wrong schedule is
+ * worse than no schedule, because people plan against it.
+ *
+ * What this list buys, from five minutes of RE upkeep a week:
+ *   - every member can see exactly what they own, everywhere
+ *   - update drafts pre-fill from open deliverables
+ *   - project progress is a real percentage, not a vibe
+ *   - "projects completed" becomes a trustworthy leadership signal
+ *   - dated deliverables give you an honest timeline without a Gantt chart
+ *
+ * Exactly one owner, always. Shared ownership means nobody owns it.
+ */
+export interface Deliverable {
+  id: string;
+  projectId: string;
+  title: string;
+  /** Required. Never null, never a list. */
+  ownerId: string;
+  dueDate?: string;
+  status: DeliverableStatus;
+  completedAt?: string;
+  /** Why it's stuck. Routes to the project's REs. */
+  blockerNote?: string;
+  sortOrder: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,12 +223,44 @@ export type UpdateStatus =
   | "missed"
   | "reviewed";
 
+/** Club-wide default. Members pick which weekdays. */
+export const UPDATES_PER_WEEK_DEFAULT = 2;
+
 export interface UpdateSchedule {
   memberId: string;
-  /** 0 = Sunday. Three entries by default. */
+  /** 0 = Sunday. Length should match `updatesPerWeek`. */
   weekdays: number[];
+  updatesPerWeek: number;
   dueTime: string;
-  isPaused: boolean;
+  /**
+   * Academic pause. Suppresses obligations AND nudges, and generates no
+   * `missed` rows — a lapse is a pause, never a debt. Someone who drifts during
+   * midterms has to be able to come back without facing a record of failure.
+   */
+  pausedUntil?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Academic calendar
+// ---------------------------------------------------------------------------
+
+export type TermKind = "quarter" | "finals" | "break" | "summer";
+
+/**
+ * Stanford runs on quarters, and without this table every finals week and
+ * winter break silently generates weeks of `missed` updates for all 35 members.
+ * By autumn the contribution data would be meaningless, and nudge emails would
+ * be landing on students during finals — the worst possible message at the worst
+ * possible moment.
+ */
+export interface Term {
+  id: string;
+  name: string;
+  kind: TermKind;
+  startsOn: string;
+  endsOn: string;
+  /** False for finals, breaks and summer. No obligations, no nudges. */
+  generatesObligations: boolean;
 }
 
 /**
@@ -255,9 +370,41 @@ export interface ClubEvent {
   id: string;
   title: string;
   kind: EventKind;
-  /** Set by leadership. Feeds engagement scoring. */
+  /** Set by leadership. Drives how prominently the event is surfaced. */
   importanceWeight: number;
   startsAt: string;
   endsAt?: string;
   location?: string;
+}
+
+// ---------------------------------------------------------------------------
+// RE liveness
+// ---------------------------------------------------------------------------
+
+/** How long an RE can be silent before their projects get flagged. */
+export const RE_SILENT_DAYS = 14;
+/** How long a blocker can sit unanswered before escalating. */
+export const BLOCKER_STALE_DAYS = 7;
+
+/**
+ * Why a project needs leadership attention.
+ *
+ * RE authority inherits down the project tree, so an RE who checks out in
+ * January freezes their entire subtree: nobody can create sub-projects, appoint
+ * REs, or clear blockers beneath them. It happens every year, and nothing
+ * surfaces it — which is the exact disorganization this app exists to remove.
+ */
+export type AttentionReason =
+  | "re_silent"
+  | "blocker_stale"
+  | "deliverables_overdue"
+  | "no_deputy_re"
+  | "health_flagged";
+
+export interface ProjectAttentionFlag {
+  projectId: string;
+  reason: AttentionReason;
+  detail: string;
+  /** Higher is more urgent. */
+  severity: 1 | 2 | 3;
 }

@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
+import { ContributionPanel } from "@/components/ui/contribution-panel";
+import { DeliverableRow } from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -36,7 +38,8 @@ export default async function MemberProfilePage({
 
   if (!view) notFound();
 
-  const { member, lead, directReports, projects } = view;
+  const { member, lead, directReports, projects, contribution } = view;
+  const isOwnProfile = viewer.member.id === member.id;
 
   return (
     <div className="space-y-6">
@@ -133,7 +136,13 @@ export default async function MemberProfilePage({
                   />
                 ) : (
                   projects.map(
-                    ({ project, membership, breadcrumb, hoursLogged }) => (
+                    ({
+                      project,
+                      membership,
+                      breadcrumb,
+                      hoursLogged,
+                      deliverables,
+                    }) => (
                       <div
                         key={project.id}
                         className="rounded-tile border border-line px-4 py-3.5"
@@ -150,17 +159,36 @@ export default async function MemberProfilePage({
                             {membership.role === "re" ? (
                               <Badge tone="cardinal">RE</Badge>
                             ) : null}
+                            {membership.commitment === "following" ? (
+                              <Badge tone="neutral">Following</Badge>
+                            ) : null}
                             <ProjectBadges project={project} />
                           </div>
                         </div>
-                        {membership.responsibility ? (
+
+                        {/* What they own here — public, unlike hours */}
+                        {deliverables.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {deliverables.map((d) => (
+                              <DeliverableRow
+                                key={d.id}
+                                deliverable={d}
+                                showOwner={false}
+                                overdue={
+                                  d.status !== "done" &&
+                                  !!d.dueDate &&
+                                  new Date(d.dueDate) < new Date()
+                                }
+                              />
+                            ))}
+                          </div>
+                        ) : membership.responsibility ? (
                           <p className="mt-2 text-sm text-ink-soft">
-                            <span className="font-semibold text-ink">
-                              Owns:
-                            </span>{" "}
+                            <span className="font-semibold text-ink">Owns:</span>{" "}
                             {membership.responsibility}
                           </p>
                         ) : null}
+
                         {canViewEffort ? (
                           <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
                             <Clock className="size-3.5" />
@@ -199,24 +227,38 @@ export default async function MemberProfilePage({
             </Card>
           ) : null}
 
-          {/* Effort data is restricted — say so rather than hiding silently */}
+          {/* Contribution: four signals, no composite score, no ranking */}
           <Card>
             <CardBody>
-              <SectionLabel>Effort &amp; Engagement</SectionLabel>
-              {canViewEffort ? (
-                <p className="mt-3 text-[15px] text-ink-soft">
-                  Hours breakdown, update history, and engagement trend arrive in
-                  Phases 3, 4 and 8.
-                </p>
+              {canViewEffort && contribution ? (
+                <>
+                  <ContributionPanel
+                    record={contribution}
+                    isOwnRecord={isOwnProfile}
+                  />
+                  <p className="mt-5 text-sm text-ink-muted">
+                    Four independent signals, deliberately not combined into a
+                    score and never ranked against other members.{" "}
+                    <Link
+                      href="/how-we-lead"
+                      className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+                    >
+                      What leadership looks for
+                    </Link>
+                  </p>
+                </>
               ) : (
-                <p className="mt-3 flex items-start gap-2 text-[15px] text-ink-soft">
-                  <Lock className="mt-0.5 size-4 shrink-0 text-ink-muted" />
-                  <span>
-                    Hours and update contents are visible only to this
-                    member&apos;s Lead chain and the REs of projects they
-                    contribute to.
-                  </span>
-                </p>
+                <>
+                  <SectionLabel>Contribution</SectionLabel>
+                  <p className="mt-3 flex items-start gap-2 text-[15px] text-ink-soft">
+                    <Lock className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+                    <span>
+                      Hours and update contents are visible only to this
+                      member&apos;s Lead chain and the REs of projects they
+                      contribute to. Their project work is public — see above.
+                    </span>
+                  </p>
+                </>
               )}
             </CardBody>
           </Card>

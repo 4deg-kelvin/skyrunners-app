@@ -1,15 +1,19 @@
 import Link from "next/link";
-import { Clock, Mail, PenLine, Plus, TriangleAlert } from "lucide-react";
+import { Clock, Eye, Mail, PenLine, Plus, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { ContributionPanel } from "@/components/ui/contribution-panel";
+import {
+  DeliverableRow,
+  ProgressBar,
+} from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
-import { StatTile } from "@/components/ui/stat-tile";
 import { getMyWork } from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
@@ -19,7 +23,18 @@ import { formatNumber } from "@/lib/utils";
 export default async function MyWorkPage() {
   const viewer = await getViewer();
   const view = await getMyWork(viewer.member.id);
-  const { me, projects, currentUpdate, totals } = view;
+  const {
+    me,
+    committed,
+    following,
+    currentUpdate,
+    myDeliverables,
+    contribution,
+    myRequests,
+    requestsAwaitingMe,
+  } = view;
+
+  const pendingMine = myRequests.filter((r) => r.request.status === "pending");
 
   const mayLogHours = can.logOwnHours(viewer.actor, me.id);
   const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
@@ -32,7 +47,7 @@ export default async function MyWorkPage() {
       <PageHeader
         label="My Work"
         title={`Hi, ${firstName}`}
-        description="Everything you're working on, and the update you owe on each."
+        description="What you own, what you owe, and how your effort is adding up."
         action={
           mayLogHours ? (
             <Button>
@@ -43,26 +58,167 @@ export default async function MyWorkPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile
-          label="My projects"
-          value={totals.projectCount}
-          hint={totals.reCount > 0 ? `RE on ${totals.reCount}` : undefined}
-        />
-        <StatTile
-          label="Hours logged"
-          value={formatNumber(totals.hoursLogged, 1)}
-          hint="this period"
-        />
-        <StatTile
-          label="Next update due"
-          value={dueDate.toLocaleDateString("en-US", { weekday: "long" })}
-          hint={dueDate.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          })}
-        />
-      </div>
+      {/* ---------------- Contribution: effort made visible ---------------- */}
+      <Card>
+        <CardBody>
+          <ContributionPanel record={contribution} isOwnRecord />
+          <p className="mt-5 text-sm text-ink-muted">
+            Your Lead and the REs of your projects see the same four numbers.
+            There is no ranking and no hidden score —{" "}
+            <Link
+              href="/how-we-lead"
+              className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+            >
+              here&apos;s what leadership looks for
+            </Link>
+            .
+          </p>
+        </CardBody>
+      </Card>
+
+      {/* ---------------- Requests waiting on me as an RE ---------------- */}
+      {requestsAwaitingMe.length > 0 ? (
+        <Card>
+          <CardBody>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionLabel>People Asking To Join Your Projects</SectionLabel>
+              <span className="text-sm text-ink-muted">
+                {requestsAwaitingMe.length} waiting
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-ink-soft">
+              You control who joins your projects, which means you owe these
+              people an answer. A request left hanging is a member with nothing to
+              do.
+            </p>
+
+            <div className="mt-4 space-y-2.5">
+              {requestsAwaitingMe.map(
+                ({ request, project, requester, isStale }) => (
+                  <div
+                    key={request.id}
+                    className={`rounded-tile border px-4 py-3.5 ${
+                      isStale ? "border-risk-fg/30 bg-risk-bg" : "border-line"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-bold text-ink">
+                          {requester?.fullName ?? "Unknown member"}
+                        </p>
+                        {project ? (
+                          <Link
+                            href={`/projects/${project.slug}`}
+                            className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                          >
+                            {project.name}
+                          </Link>
+                        ) : null}
+                      </div>
+                      {isStale ? (
+                        <Badge tone="risk">Overdue reply</Badge>
+                      ) : (
+                        <Badge tone="warn">Pending</Badge>
+                      )}
+                    </div>
+                    {request.note ? (
+                      <p className="mt-2 text-sm text-ink-soft">
+                        &ldquo;{request.note}&rdquo;
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/* ---------------- My own pending requests ---------------- */}
+      {pendingMine.length > 0 ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>My Requests</SectionLabel>
+            <p className="mt-2 text-sm text-ink-soft">
+              Waiting on an RE. Nothing is lost — you can see exactly where each
+              ask stands.
+            </p>
+            <div className="mt-4 space-y-2.5">
+              {pendingMine.map(({ request, project, isStale }) => (
+                <div
+                  key={request.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    {project ? (
+                      <Link
+                        href={`/projects/${project.slug}`}
+                        className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                      >
+                        {project.name}
+                      </Link>
+                    ) : null}
+                    <p className="mt-0.5 text-sm text-ink-muted">
+                      Asked{" "}
+                      {new Date(request.requestedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  {isStale ? (
+                    <Badge tone="risk">No reply yet — nudge the RE</Badge>
+                  ) : (
+                    <Badge tone="warn">Pending</Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/* ---------------- What I own, across everything ---------------- */}
+      <Card>
+        <CardBody>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionLabel>What I Own</SectionLabel>
+            <span className="text-sm text-ink-muted">
+              {myDeliverables.length} open
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-2.5">
+            {myDeliverables.length === 0 ? (
+              <EmptyState
+                message="Nothing assigned to you right now."
+                actionLabel="Find work to pick up"
+                actionHref="/projects"
+              />
+            ) : (
+              myDeliverables.map(({ deliverable, project }) => (
+                <div key={deliverable.id}>
+                  <Link
+                    href={`/projects/${project.slug}`}
+                    className="mb-1 block text-[13px] font-semibold text-cardinal-600 hover:text-cardinal-700"
+                  >
+                    {project.name}
+                  </Link>
+                  <DeliverableRow
+                    deliverable={deliverable}
+                    showOwner={false}
+                    overdue={
+                      deliverable.status !== "done" &&
+                      !!deliverable.dueDate &&
+                      new Date(deliverable.dueDate) < new Date()
+                    }
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </CardBody>
+      </Card>
 
       {/* ---------------- The update, split per project ---------------- */}
       <Card>
@@ -71,12 +227,13 @@ export default async function MyWorkPage() {
             <div>
               <SectionLabel>Update Due</SectionLabel>
               <h2 className="mt-2 text-2xl font-bold text-ink">
-                One section per project
+                {dueDate.toLocaleDateString("en-US", { weekday: "long" })}{" "}
+                check-in
               </h2>
               <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
-                Your hours are already filled in below. Write a line or two under
-                each project so your Lead and that project&apos;s RE know exactly
-                what you&apos;re talking about.
+                {currentUpdate.updatesPerWeek} a week, on the days you picked.
+                Your hours and open deliverables are already filled in — write a
+                line under each project so your RE knows where things stand.
               </p>
             </div>
             <Badge tone={UPDATE_STATUS_TONES[currentUpdate.update.status]}>
@@ -115,7 +272,8 @@ export default async function MyWorkPage() {
 
                   <div className="mt-3 rounded-tile border border-dashed border-line px-3.5 py-3">
                     <p className="text-sm text-ink-muted">
-                      {entry.progress || "No progress written yet for this project."}
+                      {entry.progress ||
+                        "No progress written yet for this project."}
                     </p>
                   </div>
                 </div>
@@ -136,40 +294,44 @@ export default async function MyWorkPage() {
           ) : null}
 
           <p className="mt-4 text-sm text-ink-muted">
-            The full submit form arrives in Phase 4.
+            Heads-down on academics? You&apos;ll be able to pause without it
+            counting against you. Full form arrives in Phase 4.
           </p>
         </CardBody>
       </Card>
 
-      {/* ---------------- Project cards ---------------- */}
+      {/* ---------------- Committed projects ---------------- */}
       <Card>
         <CardBody>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionLabel>My Projects</SectionLabel>
             <Link
               href="/projects"
               className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
             >
-              Find more work
+              Find work
             </Link>
           </div>
 
-          {projects.length === 0 ? (
+          {committed.length === 0 ? (
             <EmptyState
               className="mt-5 py-8"
-              message="You're not on any projects yet."
-              actionLabel="Browse projects and join one"
+              message="You're not on a project yet. Browse everything the club is building, then ask the RE of anything that interests you."
+              actionLabel="Browse projects"
               actionHref="/projects"
             />
           ) : (
             <div className="mt-5 space-y-3">
-              {projects.map(
+              {committed.map(
                 ({
                   project,
                   membership,
                   breadcrumb,
                   res,
                   hoursLogged,
+                  myDeliverables: mine,
+                  overdueCount,
+                  progress,
                   lastUpdate,
                 }) => (
                   <div
@@ -189,24 +351,50 @@ export default async function MyWorkPage() {
                         {membership.role === "re" ? (
                           <Badge tone="cardinal">You are RE</Badge>
                         ) : null}
+                        {overdueCount > 0 ? (
+                          <Badge tone="risk">{overdueCount} overdue</Badge>
+                        ) : null}
                         <ProjectBadges project={project} />
                       </div>
                     </div>
 
-                    {membership.responsibility ? (
-                      <p className="mt-2.5 text-[15px] text-ink-soft">
-                        <span className="font-semibold text-ink">You own:</span>{" "}
-                        {membership.responsibility}
-                      </p>
+                    {progress.total > 0 ? (
+                      <ProgressBar
+                        fraction={progress.fraction}
+                        className="mt-3"
+                      />
                     ) : null}
 
-                    {/* Who to ask — easy to find the RE */}
+                    {/* What I own here — concrete, not a text field */}
+                    {mine.length > 0 ? (
+                      <div className="mt-4">
+                        <SectionLabel tone="muted">My deliverables</SectionLabel>
+                        <div className="mt-2 space-y-2">
+                          {mine.map((d) => (
+                            <DeliverableRow
+                              key={d.id}
+                              deliverable={d}
+                              showOwner={false}
+                              overdue={
+                                d.status !== "done" &&
+                                !!d.dueDate &&
+                                new Date(d.dueDate) < new Date()
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-ink-muted">
+                        Nothing assigned to you here yet — ask the RE what needs
+                        picking up.
+                      </p>
+                    )}
+
                     {res.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
                         <SectionLabel tone="muted">
-                          {res.length > 1
-                            ? "Responsible Engineers"
-                            : "Responsible Engineer"}
+                          {res.length > 1 ? "REs" : "RE"}
                         </SectionLabel>
                         {res.map((re) => (
                           <a
@@ -226,21 +414,11 @@ export default async function MyWorkPage() {
                         <Clock className="size-3.5" />
                         {formatNumber(hoursLogged, 1)} hrs logged
                       </span>
-                      {project.targetDate ? (
-                        <span>
-                          Target{" "}
-                          {new Date(project.targetDate).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric" }
-                          )}
-                        </span>
-                      ) : null}
                       {project.timeCommitment ? (
                         <span>{project.timeCommitment}</span>
                       ) : null}
                     </div>
 
-                    {/* Last thing this member said about THIS project */}
                     {lastUpdate ? (
                       <div className="mt-3.5 rounded-tile bg-surface px-3.5 py-3">
                         <SectionLabel tone="muted">
@@ -258,11 +436,7 @@ export default async function MyWorkPage() {
                           </p>
                         ) : null}
                       </div>
-                    ) : (
-                      <p className="mt-3.5 text-sm text-ink-muted">
-                        No update written for this project yet.
-                      </p>
-                    )}
+                    ) : null}
                   </div>
                 )
               )}
@@ -270,6 +444,36 @@ export default async function MyWorkPage() {
           )}
         </CardBody>
       </Card>
+
+      {/* ---------------- Following ---------------- */}
+      {following.length > 0 ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Following</SectionLabel>
+            <p className="mt-2 text-sm text-ink-soft">
+              Watching only — no deliverables, no update obligations.
+            </p>
+            <div className="mt-4 space-y-2.5">
+              {following.map(({ project, breadcrumb }) => (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.slug}`}
+                  className="block rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                >
+                  <Breadcrumb trail={breadcrumb} className="mb-1" />
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-[15px] font-bold text-ink">
+                      <Eye className="size-3.5 text-ink-muted" />
+                      {project.name}
+                    </span>
+                    <ProjectBadges project={project} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
     </div>
   );
 }

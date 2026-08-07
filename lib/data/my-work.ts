@@ -8,15 +8,28 @@
  */
 
 import {
+  contributionInputsFor,
   getMember,
   hoursOnProject,
+  isOverdue,
+  joinRequestsAwaitingMe,
   lastEntryForProject,
+  myDeliverablesOn,
+  myJoinRequests,
   myProjects,
   myUpdate,
   projectBreadcrumb,
+  projectProgress,
   projectREs,
+  scheduleFor,
 } from "@/lib/mock-data";
+import {
+  buildContributionRecord,
+  type ContributionRecord,
+} from "@/lib/contribution";
 import type {
+  Deliverable,
+  JoinRequest,
   Member,
   Project,
   ProjectMembership,
@@ -40,6 +53,10 @@ export interface MyProjectCard {
   hoursLogged: number;
   /** What this member last said about THIS project, if anything. */
   lastUpdate?: { entry: UpdateEntry; submittedAt: string };
+  /** What this person owns here — the concrete answer, not a text field. */
+  myDeliverables: Deliverable[];
+  overdueCount: number;
+  progress: ReturnType<typeof projectProgress>;
 }
 
 /** A section of the current update, tied to a specific project. */
@@ -51,32 +68,62 @@ export interface UpdateDraftSection {
 
 export interface MyWorkView {
   me: Member;
-  projects: MyProjectCard[];
+  /** Projects they've committed to — these carry obligations. */
+  committed: MyProjectCard[];
+  /** Projects they're only watching. Unlimited. */
+  following: MyProjectCard[];
   currentUpdate: {
     update: ProgressUpdate;
     sections: UpdateDraftSection[];
+    updatesPerWeek: number;
   };
-  totals: {
-    projectCount: number;
-    reCount: number;
-    hoursLogged: number;
-  };
+  /** Everything they own across all projects, soonest due first. */
+  myDeliverables: { deliverable: Deliverable; project: Project }[];
+  /** Their own record — always visible to them. */
+  contribution: ContributionRecord;
+  /** Requests they've sent, so an ask is never invisible. */
+  myRequests: {
+    request: JoinRequest;
+    project?: Project;
+    isStale: boolean;
+  }[];
+  /**
+   * Requests waiting on THEM as an RE. Controlling the gate means owing people
+   * an answer, so this sits on their home page rather than somewhere they'd have
+   * to go looking.
+   */
+  requestsAwaitingMe: {
+    request: JoinRequest;
+    project?: Project;
+    requester?: Member;
+    isStale: boolean;
+  }[];
 }
 
 export async function getMyWork(memberId: string): Promise<MyWorkView> {
   const me = getMember(memberId);
   if (!me) throw new Error(`Member not found: ${memberId}`);
 
-  const projects: MyProjectCard[] = myProjects(memberId).map(
-    ({ project, membership }) => ({
-      project,
-      membership,
-      breadcrumb: projectBreadcrumb(project.id),
-      res: projectREs(project.id),
-      hoursLogged: hoursOnProject(memberId, project.id),
-      lastUpdate: lastEntryForProject(memberId, project.id),
-    })
+  const cards: MyProjectCard[] = myProjects(memberId).map(
+    ({ project, membership }) => {
+      const mine = myDeliverablesOn(memberId, project.id);
+      return {
+        project,
+        membership,
+        breadcrumb: projectBreadcrumb(project.id),
+        res: projectREs(project.id),
+        hoursLogged: hoursOnProject(memberId, project.id),
+        lastUpdate: lastEntryForProject(memberId, project.id),
+        myDeliverables: mine,
+        overdueCount: mine.filter(isOverdue).length,
+        progress: projectProgress(project.id),
+      };
+    }
   );
+
+  const committed = cards.filter((c) => c.membership.commitment === "committed");
+  const following = cards.filter((c) => c.membership.commitment === "following");
+  const projects = committed;
 
   // Only include sections whose project still resolves — a member could have
   // left a project after the draft was seeded.
@@ -90,12 +137,25 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
 
   return {
     me,
-    projects,
-    currentUpdate: { update: myUpdate, sections },
-    totals: {
-      projectCount: projects.length,
-      reCount: projects.filter((p) => p.membership.role === "re").length,
-      hoursLogged: projects.reduce((sum, p) => sum + p.hoursLogged, 0),
+    committed,
+    following,
+    currentUpdate: {
+      update: myUpdate,
+      sections,
+      updatesPerWeek: scheduleFor(memberId)?.updatesPerWeek ?? 2,
     },
+    myDeliverables: cards
+      .flatMap((c) =>
+        c.myDeliverables.map((d) => ({ deliverable: d, project: c.project }))
+      )
+      .filter((x) => x.deliverable.status !== "done")
+      .sort((a, b) =>
+        (a.deliverable.dueDate ?? "9999").localeCompare(
+          b.deliverable.dueDate ?? "9999"
+        )
+      ),
+    contribution: buildContributionRecord(contributionInputsFor(memberId)),
+    myRequests: myJoinRequests(memberId),
+    requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
   };
 }

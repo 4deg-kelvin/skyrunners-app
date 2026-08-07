@@ -248,15 +248,117 @@ describe("training verification", () => {
   });
 });
 
-describe("self-enrollment is open by default", () => {
-  test("any member can join an open project", () => {
-    const open = project("open", null, []);
-    assert.equal(can.joinProject(actor("worker"), open), true);
+describe("membership is RE-controlled, with no cap", () => {
+  const open = project("open", null, []);
+  const closed = { ...project("closed", null, []), isOpenToJoin: false };
+
+  test("anyone can follow anything — visibility is never gated", () => {
+    assert.equal(can.followProject(), true);
   });
 
-  test("a closed project blocks self-enrollment", () => {
-    const closed = { ...project("closed", null, []), isOpenToJoin: false };
-    assert.equal(can.joinProject(actor("worker"), closed), false);
+  test("a member can ask to join, but cannot add themselves", () => {
+    assert.equal(can.requestToJoin(actor("worker"), open), true);
+    assert.equal(can.addProjectMember(actor("worker"), graph, "leaf"), false);
+  });
+
+  test("the project's RE can add members", () => {
+    assert.equal(can.addProjectMember(actor("reLeaf"), graph, "leaf"), true);
+  });
+
+  test("an ancestor RE can too, since authority inherits down", () => {
+    assert.equal(can.addProjectMember(actor("reRoot"), graph, "leaf"), true);
+  });
+
+  test("an unrelated RE cannot", () => {
+    assert.equal(can.addProjectMember(actor("reOther"), graph, "leaf"), false);
+  });
+
+  test("there is no commitment cap — REs staff as they see fit", () => {
+    assert.ok(!("isAtCommitmentCap" in can));
+    assert.ok(!("commitToProject" in can));
+  });
+
+  test("a closed project stops requests but not following", () => {
+    assert.equal(can.requestToJoin(actor("worker"), closed), false);
+    assert.equal(can.followProject(), true);
+  });
+});
+
+describe("join requests keep the RE gate from becoming a dead end", () => {
+  test("the RE reviews requests for their project", () => {
+    assert.equal(can.reviewJoinRequest(actor("reLeaf"), graph, "leaf"), true);
+  });
+
+  test("an ancestor RE can also review", () => {
+    assert.equal(can.reviewJoinRequest(actor("reRoot"), graph, "leaf"), true);
+  });
+
+  test("a co-lead can unblock a request an RE has ignored", () => {
+    assert.equal(can.reviewJoinRequest(actor("coLead"), graph, "leaf"), true);
+  });
+
+  test("a random member cannot approve their own way in", () => {
+    assert.equal(can.reviewJoinRequest(actor("worker"), graph, "leaf"), false);
+  });
+
+  test("a member can withdraw their own request, not someone else's", () => {
+    assert.equal(can.withdrawJoinRequest(actor("worker"), "worker"), true);
+    assert.equal(can.withdrawJoinRequest(actor("worker"), "outsider"), false);
+  });
+});
+
+describe("deliverables", () => {
+  test("an owner can update the status of their own deliverable", () => {
+    assert.equal(
+      can.updateDeliverableStatus(actor("worker"), graph, "leaf", "worker"),
+      true
+    );
+  });
+
+  test("an unrelated member cannot touch someone else's deliverable", () => {
+    assert.equal(
+      can.updateDeliverableStatus(actor("outsider"), graph, "leaf", "worker"),
+      false
+    );
+  });
+
+  test("an ancestor RE can, since they own the project subtree", () => {
+    assert.equal(
+      can.updateDeliverableStatus(actor("reRoot"), graph, "leaf", "worker"),
+      true
+    );
+  });
+
+  test("only REs and Co-Leads shape the list itself", () => {
+    assert.equal(can.manageDeliverables(actor("reLeaf"), graph, "leaf"), true);
+    assert.equal(can.manageDeliverables(actor("worker"), graph, "leaf"), false);
+  });
+});
+
+describe("contribution visibility", () => {
+  test("everyone can always see their own record", () => {
+    assert.equal(can.viewOwnContribution(), true);
+  });
+
+  test("a Lead up the chain can see a member's record", () => {
+    assert.equal(
+      can.viewMemberContribution(actor("lead1"), graph, "worker"),
+      true
+    );
+  });
+
+  test("an unrelated member cannot", () => {
+    assert.equal(
+      can.viewMemberContribution(actor("outsider"), graph, "worker"),
+      false
+    );
+  });
+
+  test("an RE above a project the member works on can", () => {
+    assert.equal(
+      can.viewMemberContribution(actor("reRoot"), graph, "worker", ["leaf"]),
+      true
+    );
   });
 });
 

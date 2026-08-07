@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import {
+  DeliverableRow,
+  ProgressBar,
+} from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -16,7 +20,12 @@ import {
   getProjectBySlug,
 } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
-import { PHASE_LABELS, PHASE_ORDER, PROJECT_ROLE_LABELS } from "@/lib/labels";
+import {
+  ATTENTION_LABELS,
+  PHASE_LABELS,
+  PHASE_ORDER,
+  PROJECT_ROLE_LABELS,
+} from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
@@ -31,14 +40,22 @@ export default async function ProjectDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [view, viewer] = await Promise.all([
-    getProjectBySlug(slug),
-    getViewer(),
-  ]);
+  const viewer = await getViewer();
+  const view = await getProjectBySlug(slug, viewer.member.id);
 
   if (!view) notFound();
 
-  const { project, breadcrumb, res, members, children, updateFeed } = view;
+  const {
+    project,
+    breadcrumb,
+    res,
+    members,
+    children,
+    updateFeed,
+    deliverables,
+    progress,
+    attentionFlags,
+  } = view;
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
   const mayAddMember = can.addProjectMember(
@@ -46,10 +63,21 @@ export default async function ProjectDetailPage({
     viewer.graph,
     project.id
   );
-  const alreadyOn = members.some(
+  const myMembership = members.find(
     (m) => m.membership.memberId === viewer.member.id
   );
-  const mayJoin = !alreadyOn && can.joinProject(viewer.actor, project);
+  const isOnProject = myMembership?.membership.commitment === "committed";
+  const isFollowing = myMembership?.membership.commitment === "following";
+
+  const mayRequest =
+    !isOnProject &&
+    !view.myPendingRequest &&
+    can.requestToJoin(viewer.actor, project);
+  const mayReviewRequests = can.reviewJoinRequest(
+    viewer.actor,
+    viewer.graph,
+    project.id
+  );
 
   const phaseIndex = PHASE_ORDER.indexOf(project.phase);
 
@@ -62,17 +90,46 @@ export default async function ProjectDetailPage({
           title={project.name}
           description={project.description}
           action={
-            mayJoin ? (
+            isOnProject ? (
+              <Badge tone="ok">You&apos;re on this project</Badge>
+            ) : view.myPendingRequest ? (
+              <Badge tone="warn">Request pending</Badge>
+            ) : mayRequest ? (
               <Button>
                 <UserPlus className="size-4" strokeWidth={2.5} />
-                Join this project
+                Ask to join
               </Button>
-            ) : alreadyOn ? (
-              <Badge tone="ok">You&apos;re on this project</Badge>
+            ) : isFollowing ? (
+              <Badge tone="neutral">Following</Badge>
             ) : undefined
           }
         />
       </div>
+
+      {/* Attention flags — surfaced rather than left to stall silently */}
+      {attentionFlags.length > 0 ? (
+        <Card className="border-warn-fg/25 bg-warn-bg">
+          <CardBody className="py-4">
+            <SectionLabel tone="muted">Needs Attention</SectionLabel>
+            <ul className="mt-2 space-y-1.5">
+              {attentionFlags.map((flag) => (
+                <li
+                  key={`${flag.reason}-${flag.detail}`}
+                  className="flex items-start gap-2 text-sm text-warn-fg"
+                >
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    <span className="font-semibold">
+                      {ATTENTION_LABELS[flag.reason]}:
+                    </span>{" "}
+                    {flag.detail}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
@@ -108,17 +165,6 @@ export default async function ProjectDetailPage({
 
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <StatTile
-                  label="Start"
-                  value={
-                    project.startDate
-                      ? new Date(project.startDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : "—"
-                  }
-                />
-                <StatTile
                   label="Target"
                   value={
                     project.targetDate
@@ -129,7 +175,64 @@ export default async function ProjectDetailPage({
                       : "—"
                   }
                 />
-                <StatTile label="Members" value={members.length} />
+                <StatTile
+                  label="Deliverables done"
+                  value={`${progress.done} / ${progress.total}`}
+                  hint={
+                    progress.overdue > 0
+                      ? `${progress.overdue} overdue`
+                      : undefined
+                  }
+                />
+                <StatTile
+                  label="Committed members"
+                  value={
+                    members.filter(
+                      (m) => m.membership.commitment === "committed"
+                    ).length
+                  }
+                />
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Deliverables — the whole task model, one flat list */}
+          <Card>
+            <CardBody>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionLabel>Deliverables</SectionLabel>
+                {mayManage ? (
+                  <Button variant="ghost" className="px-2 py-1">
+                    Add deliverable
+                  </Button>
+                ) : null}
+              </div>
+
+              {progress.total > 0 ? (
+                <ProgressBar fraction={progress.fraction} className="mt-4" />
+              ) : null}
+
+              <div className="mt-4 space-y-2.5">
+                {deliverables.length === 0 ? (
+                  <EmptyState
+                    message={
+                      mayManage
+                        ? "No deliverables yet. Adding a few makes it obvious who owns what."
+                        : "The RE hasn't listed deliverables for this project yet."
+                    }
+                    actionLabel="See your own work"
+                    actionHref="/my-work"
+                  />
+                ) : (
+                  deliverables.map(({ deliverable, owner, overdue }) => (
+                    <DeliverableRow
+                      key={deliverable.id}
+                      deliverable={deliverable}
+                      owner={owner}
+                      overdue={overdue}
+                    />
+                  ))
+                )}
               </div>
             </CardBody>
           </Card>
@@ -189,6 +292,76 @@ export default async function ProjectDetailPage({
               </div>
             </CardBody>
           </Card>
+
+          {/* Join requests — visible to the RE, so an ask can't be lost */}
+          {mayReviewRequests && view.pendingRequests.length > 0 ? (
+            <Card>
+              <CardBody>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <SectionLabel>People Asking To Join</SectionLabel>
+                  <span className="text-sm text-ink-muted">
+                    {view.pendingRequests.length} waiting on you
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  {view.pendingRequests.map(
+                    ({ request, requester, daysWaiting }) => (
+                      <div
+                        key={request.id}
+                        className="rounded-tile border border-line px-4 py-3.5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            {requester ? (
+                              <Link
+                                href={`/members/${requester.id}`}
+                                className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                              >
+                                {requester.fullName}
+                              </Link>
+                            ) : (
+                              <span className="text-[15px] font-bold text-ink-muted">
+                                Unknown member
+                              </span>
+                            )}
+                            {requester?.skills?.length ? (
+                              <p className="mt-1 text-sm text-ink-muted">
+                                {requester.skills.join(" · ")}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Badge tone={daysWaiting >= 5 ? "risk" : "warn"}>
+                            {daysWaiting === 0
+                              ? "Today"
+                              : `${daysWaiting}d waiting`}
+                          </Badge>
+                        </div>
+
+                        {request.note ? (
+                          <p className="mt-2 text-sm text-ink-soft">
+                            &ldquo;{request.note}&rdquo;
+                          </p>
+                        ) : null}
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button className="px-3 py-2">Add to project</Button>
+                          <Button variant="secondary" className="px-3 py-2">
+                            Not right now
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <p className="mt-4 text-sm text-ink-muted">
+                  Answering these is part of being RE — a request left hanging is
+                  a member with nothing to do.
+                </p>
+              </CardBody>
+            </Card>
+          ) : null}
 
           {/* Sub-projects */}
           {children.length > 0 ? (

@@ -30,7 +30,7 @@
  * actions.
  */
 
-import type { GlobalRole, Member, Project } from "./types";
+import type { GlobalRole, Member, Project } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // The actor: everything we need to know about who is asking
@@ -161,15 +161,47 @@ export const can = {
   assignRE: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
-  /** An RE can add people to their project or anything beneath it. */
+  /**
+   * ONLY an RE (or a Co-Lead) puts someone on a project.
+   *
+   * Members can't add themselves. The RE is accountable for the deliverable, so
+   * they decide who's working on it — and it keeps rosters honest, since every
+   * name on a project got there because someone with context said yes.
+   *
+   * No cap: an RE can staff a project with whoever they need, and a member can
+   * be on as many projects as REs want them on.
+   */
   addProjectMember: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
+  removeProjectMember: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
   /**
-   * Self-enrollment. Open by default — the entire point is that members
-   * can join anything that interests them without asking permission.
+   * Following a project: no permission needed, unlimited.
+   *
+   * This is the self-service half. Members see everything happening across the
+   * club and can watch anything — they just can't put themselves on the roster.
    */
-  joinProject: (_actor: Actor, project: Project) => project.isOpenToJoin,
+  followProject: () => true,
+
+  /**
+   * Asking to join: any member, any project.
+   *
+   * This is the crucial counterpart to RE-controlled membership. "Go ask the RE"
+   * via email produces silence and an invisible member; a tracked request lands
+   * in the RE's queue, is visible to the member as pending, and escalates when
+   * it goes stale. Same gate, no limbo.
+   */
+  requestToJoin: (_actor: Actor, project: Project) => project.isOpenToJoin,
+
+  /** Accepting or declining a request — the RE's call. */
+  reviewJoinRequest: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /** A member can always withdraw their own request. */
+  withdrawJoinRequest: (actor: Actor, requesterId: string) =>
+    isSelf(actor, requesterId),
 
   // --- Hours and updates ------------------------------------------------
 
@@ -237,18 +269,52 @@ export const can = {
   /** Anyone can propose a 1:1 with anyone. */
   requestMeeting: () => true,
 
-  // --- Engagement --------------------------------------------------------
+  // --- Deliverables ------------------------------------------------------
 
-  configureEngagementWeights: (actor: Actor) => isCoLead(actor),
+  /** REs shape the list; that's the five minutes a week the model costs them. */
+  manageDeliverables: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
-  /** Rankings stay with leadership — a flashlight, not a scoreboard. */
-  viewEngagementRankings: (
+  /** You can always update the status of something you own. */
+  updateDeliverableStatus: (
     actor: Actor,
     graph: OrgGraph,
-    memberId?: string
+    projectId: string,
+    ownerId: string
+  ) =>
+    isSelf(actor, ownerId) ||
+    isCoLead(actor) ||
+    isREofOrAbove(actor, graph, projectId),
+
+  // --- Contribution record ------------------------------------------------
+
+  /**
+   * A member can always see their OWN contribution record.
+   *
+   * This is the point of the whole model: "members should know their efforts are
+   * being tracked and not wasted" only works if they can see the tracking. A
+   * record that decides advancement but stays hidden from its subject is a
+   * performance review with a concealed scale.
+   */
+  viewOwnContribution: () => true,
+
+  /** Someone else's record: their Lead chain, or an RE they work for. */
+  viewMemberContribution: (
+    actor: Actor,
+    graph: OrgGraph,
+    memberId: string,
+    memberProjectIds: string[] = []
   ) =>
     isCoLead(actor) ||
-    (!!memberId && isLeadOfOrAbove(actor, graph, memberId)),
+    isSelf(actor, memberId) ||
+    isLeadOfOrAbove(actor, graph, memberId) ||
+    memberProjectIds.some((pid) => isREofOrAbove(actor, graph, pid)),
+
+  /** Co-Leads set the club's hours expectation and tier thresholds. */
+  configureExpectations: (actor: Actor) => isCoLead(actor),
+
+  /** Co-Leads manage the academic calendar that gates all obligations. */
+  manageTerms: (actor: Actor) => isCoLead(actor),
 };
 
 /**
@@ -263,7 +329,7 @@ export const can = {
  *   - the roster and everyone's profile basics, trainings, and access
  *   - Gantt charts and milestones
  *
- * Restricted: raw individual hour totals, update contents, engagement ranks,
+ * Restricted: raw individual hour totals, update contents, contribution records,
  * and private Lead notes.
  */
 export const PUBLIC_TO_ALL_MEMBERS = true;

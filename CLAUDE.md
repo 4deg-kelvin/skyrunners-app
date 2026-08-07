@@ -17,7 +17,10 @@ those three.
 | Doc | Contents |
 |---|---|
 | `CONTRIBUTING.md` | Setup, git workflow, the seven rules |
-| `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, features, phases |
+| `docs/PHASE_PLAN.md` | **Current build order and what's deliberately not planned** |
+| `docs/PHASE_1_KICKOFF.md` | Step-by-step Phase 1 plan, split between the two developers |
+| `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |
+| `docs/PRODUCT_REVIEW.md` | Independent critique of the org design, and what changed because of it |
 | `docs/DATA_MODEL.md` | Postgres schema, invariants, views |
 | `docs/DESIGN_SYSTEM.md` | Visual language, tokens, component rules |
 | `docs/DECISIONS.md` | Locked decisions, infrastructure notes |
@@ -90,6 +93,41 @@ bugs hide, which is why there are 33 tests on it.
 
 Pages get `{ actor, graph, member }` from `getViewer()` and call `can.*`.
 
+## Deliverables are the entire task model
+
+One flat list per project: **title, ONE owner, a due date, a status.** No dependencies, no
+sub-tasks, no critical path, no Gantt.
+
+That's deliberate. A dependency graph costs an RE an hour a week, and on a volunteer team
+whose availability swings with midterms it's wrong the day after it's entered — a wrong
+schedule is worse than none, because people plan against it.
+
+Five minutes of RE upkeep buys: what each member owns, update auto-drafts, real progress
+percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
+add dependencies or sub-tasks, re-read this paragraph.
+
+## There is no engagement score
+
+`lib/contribution.ts` reports **four independent signals** and deliberately computes no
+composite number.
+
+| Signal | Notes |
+|---|---|
+| **Delivered** | Deliverables and projects completed. **Primary** — can't be inflated |
+| **Commitment** | Hours/week vs the 10–12 hr expectation, as a named tier |
+| **Reliability** | Updates on time |
+| **Scope** | RE roles held. Reported, **never blended in** |
+
+Rules that must not regress:
+
+- **A component with no data returns `null`, never `0`.** The old score returned 0 for "no
+  tasks assigned" but 1 for "no updates due", which made a reliable contributor score 50
+  while a member on leave scored 45.
+- **Never blend Scope into an overall judgment.** It requires already having been appointed,
+  so it would make the metric measure having already been chosen.
+- **Members always see their own record.** The rubric is published at `/how-we-lead`.
+- **Never add a ranking function.** The data supports one; it's absent on purpose.
+
 ## Updates are per-project, not one blob
 
 `progress_updates` is an envelope (who, when, status). Content lives in **`update_entries`**
@@ -153,13 +191,21 @@ its project.
 | **Member** | Everyone else |
 | **RE** | Responsible Engineer — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project |
 | **Division** | Top-level org unit (`teams.parent_id IS NULL`). Co-Lead editable |
-| **Update** | Member's progress report. **Three per week**, on member-chosen weekdays |
+| **Update** | Member's progress report. **Two per week**, on member-chosen weekdays. Pausable for academics without penalty |
+| **Deliverable** | One unit of work with one owner and a date. The whole task model |
+| **Committed / Following** | Committed = an RE added them; carries deliverables and obligations. Following = self-service watch-only, unlimited |
+| **Join request** | A member's tracked ask to join. RE approves. Escalates after 5 days |
+| **Term** | Academic period. Obligations only generate when `generatesObligations` is true |
 | **Roll-up** | Lead's aggregated report up the chain to Co-Leads |
 
 ## Key product decisions
 
-- **Enrollment is open by default.** Members join any project without asking. The core fix
-  for "go ask a co-lead what to do."
+- **Membership is RE-controlled, with no cap.** Members cannot add themselves. They see
+  everything, follow anything, and *ask* — the RE decides, because the RE is accountable
+  for the deliverable.
+- **`join_requests` is what keeps that from being a dead end.** "Email the RE" produces
+  silence and an invisible member, which is the original problem wearing a different hat.
+  A tracked request lands in a queue, shows as pending, and escalates at 5 days.
 - **Transparency by default for *activity*.** Everyone sees projects, who's on what,
   responsibilities, the calendar, Gantt charts.
 - **Effort data is restricted.** Hours, update contents, and engagement scores are visible
@@ -172,18 +218,13 @@ its project.
 
 ## Build phase status
 
-- [x] **0** — Scaffold, design system, app shell, My Work, dashboard, projects, roster,
-      data layer, permissions wiring, CI, SQL schema
-- [ ] **1** — Supabase + Stanford Google auth, real org tree, Lead assignment
-      ← *next*
-- [ ] **2** — Project artifacts, enrollment actions, find-work view ← *ship to the club*
-- [ ] **3** — Hours logging
-- [ ] **4** — Updates, reviews, roll-ups, notifications
-- [ ] **5** — Events, attendance, calendar, opt-in iCal
-- [ ] **6** — Tasks, dependencies, auto-Gantt, RE deadline reminders
-- [ ] **7** — Trainings, certifications, facility access (Anish supplies the machine list)
-- [ ] **8** — Engagement scoring UI, weights config, leadership dashboard
-- [ ] **9** — Mobile/PWA polish
+**`docs/PHASE_PLAN.md` is canonical.** Phase 0 is complete; Phase 1 (auth + real data) is
+next, with a step-by-step plan in `docs/PHASE_1_KICKOFF.md`.
+
+Explicitly **not** planned: critical-path Gantt, a composite engagement score, a
+leaderboard, self-enrollment, a project commitment cap. Each was considered and rejected —
+read the reasoning in `DECISIONS.md` and `PRODUCT_REVIEW.md` before re-opening any of them.
+
 
 ## Phase 1 starting points
 

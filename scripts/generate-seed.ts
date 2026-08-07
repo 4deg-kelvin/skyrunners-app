@@ -15,10 +15,14 @@ import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import {
   club,
+  deliverables,
   members,
   projectMemberships,
   projects,
   teams,
+  joinRequests,
+  terms,
+  updateSchedules,
   workLogs,
 } from "../lib/mock-data.ts";
 
@@ -68,6 +72,10 @@ lines.push(`-- =================================================================
 begin;
 
 -- Wipe in dependency order so re-seeding is idempotent
+delete from update_schedules;
+delete from join_requests;
+delete from terms;
+delete from deliverables;
 delete from work_logs;
 delete from project_members;
 delete from projects;
@@ -181,13 +189,89 @@ lines.push(`
 -- Project membership and responsibilities`);
 for (const pm of projectMemberships) {
   lines.push(
-    `insert into project_members (project_id, member_id, role, responsibility, joined_at) values (` +
+    `insert into project_members (project_id, member_id, role, responsibility, joined_at, commitment) values (` +
       [
         q(uuid(pm.projectId)),
         q(uuid(pm.memberId)),
         q(pm.role),
         q(pm.responsibility),
         q(pm.joinedAt),
+        q(pm.commitment),
+      ].join(", ") +
+      `);`
+  );
+}
+
+// --- deliverables ----------------------------------------------------------
+// The whole task model: one flat list per project, one owner each.
+lines.push(`
+-- Deliverables`);
+for (const d of deliverables) {
+  lines.push(
+    `insert into deliverables (project_id, title, owner_id, due_date, status, completed_at, blocker_note, sort_order) values (` +
+      [
+        q(uuid(d.projectId)),
+        q(d.title),
+        q(uuid(d.ownerId)),
+        q(d.dueDate),
+        q(d.status),
+        d.completedAt ? q(d.completedAt) : "null",
+        q(d.blockerNote),
+        d.sortOrder,
+      ].join(", ") +
+      `);`
+  );
+}
+
+// --- join requests ---------------------------------------------------------
+// Membership is RE-controlled, so these are how members ask in.
+lines.push(`
+-- Join requests`);
+for (const r of joinRequests) {
+  lines.push(
+    `insert into join_requests (project_id, member_id, note, status, requested_at, decided_at, decided_by_id) values (` +
+      [
+        q(uuid(r.projectId)),
+        q(uuid(r.memberId)),
+        q(r.note),
+        q(r.status),
+        q(r.requestedAt),
+        r.decidedAt ? q(r.decidedAt) : "null",
+        r.decidedById ? q(uuid(r.decidedById)) : "null",
+      ].join(", ") +
+      `);`
+  );
+}
+
+// --- academic calendar -----------------------------------------------------
+lines.push(`
+-- Academic terms. Obligations generate ONLY where generates_obligations is true,
+-- so finals and breaks never produce missed-update rows.`);
+for (const t of terms) {
+  lines.push(
+    `insert into terms (name, kind, starts_on, ends_on, generates_obligations) values (` +
+      [
+        q(t.name),
+        q(t.kind),
+        q(t.startsOn),
+        q(t.endsOn),
+        t.generatesObligations ? "true" : "false",
+      ].join(", ") +
+      `);`
+  );
+}
+
+// --- update schedules ------------------------------------------------------
+lines.push(`
+-- Update schedules: two per week, on days each member picks`);
+for (const s of updateSchedules) {
+  lines.push(
+    `insert into update_schedules (member_id, updates_per_week, weekdays, due_time) values (` +
+      [
+        q(uuid(s.memberId)),
+        s.updatesPerWeek,
+        `array[${s.weekdays.join(", ")}]`,
+        q(s.dueTime),
       ].join(", ") +
       `);`
   );
