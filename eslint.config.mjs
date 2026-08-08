@@ -11,6 +11,9 @@ const config = [
   {
     ignores: [
       ".next/**",
+      // Output of `npm run build:check`. Same generated code as `.next`, so
+      // linting it produces hundreds of errors about Next's own bundles.
+      ".next-build/**",
       "node_modules/**",
       "next-env.d.ts",
       "supabase/**",

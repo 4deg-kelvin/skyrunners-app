@@ -41,3 +41,7 @@ yarn-error.log*
 
 # Local disk store — dev-only persistence, never committed (lib/store/disk.ts)
 .data/
+
+# Output of `npm run build:check` — kept separate so a build can never
+# clobber a running dev server. Safe to delete.
+.next-build/

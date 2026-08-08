@@ -39,6 +39,15 @@ npm run check
 Typecheck, lint and 177 tests. Run it before every push; CI runs the same thing plus a
 Prettier check.
 
+```bash
+npm run build:check
+```
+
+Verifies the production build. **Use this rather than `npm run build` whenever the dev
+server is running** — a plain build deletes the directory the dev server is serving from,
+which breaks it with errors that look like application bugs (`Cannot find module
+'./405.js'`). If that happens: stop the server, delete `.next`, restart.
+
 ---
 
 ## Where things stand

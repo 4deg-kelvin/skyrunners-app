@@ -53,10 +53,29 @@ beginner. Revisit only if real analytics/ML work appears.
 ```bash
 npm run dev            # local dev server (demo mode unless .env.local has keys)
 npm run check          # typecheck + lint + tests — run before every push
+npm run build:check    # verify it compiles WITHOUT killing a running dev server
 npm test               # permission + contribution tests
 npm run format         # Prettier
 npm run seed:generate  # regenerate supabase/seed.sql from lib/mock-data.ts
 ```
+
+## Never run `npm run build` while `npm run dev` is up
+
+`next build` deletes and rewrites `.next`; `next dev` serves live out of it. Run both at
+once and the dev server loses its chunks mid-flight:
+
+```
+Cannot find module './405.js'
+__webpack_modules__[moduleId] is not a function
+ENOENT: .next/server/pages-manifest.json
+```
+
+Those read like application bugs and point nowhere near the cause — they cost two
+debugging sessions before the pattern was spotted. The dev server does not recover: stop
+it, delete `.next`, restart.
+
+**Use `npm run build:check` instead.** It builds into `.next-build/` and leaves the dev
+server alone.
 
 ## Current state
 
