@@ -31,7 +31,14 @@ alter table profiles add constraint profiles_stanford_email
   check (lower(email) like '%@stanford.edu');
 
 -- Emails are identity here, so make duplicates impossible regardless of case.
+--
+-- `profiles.email` was declared `unique` in 0001, which Postgres implements as a
+-- CONSTRAINT backed by an index. `drop index profiles_email_key` therefore fails
+-- with "cannot drop index ... because constraint ... requires it" — the index is
+-- owned by the constraint and can only be dropped through it.
+alter table profiles drop constraint if exists profiles_email_key;
 drop index if exists profiles_email_key;
+
 create unique index if not exists profiles_email_lower_uniq
   on profiles (lower(email));
 

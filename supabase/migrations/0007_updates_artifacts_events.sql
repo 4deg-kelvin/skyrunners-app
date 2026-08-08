@@ -241,6 +241,17 @@ create policy events_read_all on events
 create policy project_artifacts_read_all on project_artifacts
   for select to authenticated using (true);
 
+-- Writing an artifact is an RE's job, inheriting down the project tree.
+-- This policy was originally in 0004, which could not work: that migration runs
+-- before this table exists. `auth_is_re_for` is defined in 0004, so this is the
+-- earliest point both halves are available.
+create policy project_artifacts_write on project_artifacts
+  for all to authenticated using (auth_is_re_for(project_id));
+
+-- Events are club-wide, so leadership manages them rather than an RE.
+create policy events_write on events
+  for all to authenticated using (auth_is_leadership());
+
 -- Members always see their own record — a rule that must not regress.
 create policy progress_updates_read_own on progress_updates
   for select to authenticated using (member_id = auth.uid());

@@ -24,6 +24,30 @@
 -- a no-op that reports as much.
 -- ===========================================================================
 
+-- --------------------------------------------------------------------------
+-- 0. Let a profile exist before its person does
+--
+-- `profiles.id` referenced `auth.users(id)`, which makes the invite flow
+-- impossible: you cannot pre-create a row for someone who has never signed in,
+-- because no auth user exists to point at. Discovered by this migration failing
+-- with `violates foreign key constraint "profiles_id_fkey"` — but the same
+-- constraint would have broken EVERY invite, not just this bootstrap.
+--
+-- 0005's `handle_new_auth_user` trigger is built entirely around pre-created
+-- rows: it matches an invited profile by email on first sign-in and repoints it
+-- at the real auth id. That design and this foreign key cannot both exist.
+--
+-- So the key goes. `profiles.id` stays a uuid primary key; it simply stops
+-- being required to already exist in `auth.users`. A row whose id isn't yet an
+-- auth user is exactly what an outstanding invite looks like.
+--
+-- The trade: nothing at the database level now cascades a profile away when an
+-- auth user is deleted. That's acceptable here — this app never hard-deletes
+-- people (see CLAUDE.md); it deactivates them, precisely so history survives.
+-- --------------------------------------------------------------------------
+
+alter table profiles drop constraint if exists profiles_id_fkey;
+
 do $$
 declare
   target_email constant text := 'anish25@stanford.edu';

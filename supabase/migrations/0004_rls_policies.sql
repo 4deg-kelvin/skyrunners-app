@@ -136,8 +136,8 @@ alter table teams               enable row level security;
 alter table team_memberships    enable row level security;
 alter table projects            enable row level security;
 alter table project_members     enable row level security;
-alter table project_artifacts   enable row level security;
-alter table requirements        enable row level security;
+-- project_artifacts is created in 0007 and enables its own RLS there.
+-- `requirements` was removed — no migration creates it. See the note below.
 alter table deliverables        enable row level security;
 alter table join_requests       enable row level security;
 alter table work_logs           enable row level security;
@@ -200,15 +200,16 @@ create policy project_members_read on project_members
 create policy project_members_write on project_members
   for all using (auth_is_re_for(project_id));
 
-create policy project_artifacts_read on project_artifacts
-  for select using (auth_is_member());
-create policy project_artifacts_write on project_artifacts
-  for all using (auth_is_re_for(project_id));
-
-create policy requirements_read on requirements
-  for select using (auth_is_member());
-create policy requirements_write on requirements
-  for all using (auth_is_re_for(project_id));
+-- `project_artifacts` policies used to live here and could not work: the table
+-- isn't created until 0007, so this migration failed on a clean database with
+-- `relation "project_artifacts" does not exist`. They now live in 0007,
+-- alongside the table itself.
+--
+-- The `requirements` policies were also removed. No migration has ever created
+-- that table and none is planned — it's a leftover from an earlier design where
+-- requirements were a first-class entity rather than a project artifact. A
+-- policy on a table that doesn't exist is not a harmless no-op; it aborts the
+-- whole migration.
 
 -- --------------------------------------------------------------------------
 -- Deliverables — public to read, so everyone can see who owns what

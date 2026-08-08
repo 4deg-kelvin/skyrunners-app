@@ -983,8 +983,8 @@ alter table teams               enable row level security;
 alter table team_memberships    enable row level security;
 alter table projects            enable row level security;
 alter table project_members     enable row level security;
-alter table project_artifacts   enable row level security;
-alter table requirements        enable row level security;
+-- project_artifacts is created in 0007 and enables its own RLS there.
+-- `requirements` was removed — no migration creates it. See the note below.
 alter table deliverables        enable row level security;
 alter table join_requests       enable row level security;
 alter table work_logs           enable row level security;
@@ -1047,15 +1047,16 @@ create policy project_members_read on project_members
 create policy project_members_write on project_members
   for all using (auth_is_re_for(project_id));
 
-create policy project_artifacts_read on project_artifacts
-  for select using (auth_is_member());
-create policy project_artifacts_write on project_artifacts
-  for all using (auth_is_re_for(project_id));
-
-create policy requirements_read on requirements
-  for select using (auth_is_member());
-create policy requirements_write on requirements
-  for all using (auth_is_re_for(project_id));
+-- `project_artifacts` policies used to live here and could not work: the table
+-- isn't created until 0007, so this migration failed on a clean database with
+-- `relation "project_artifacts" does not exist`. They now live in 0007,
+-- alongside the table itself.
+--
+-- The `requirements` policies were also removed. No migration has ever created
+-- that table and none is planned — it's a leftover from an earlier design where
+-- requirements were a first-class entity rather than a project artifact. A
+-- policy on a table that doesn't exist is not a harmless no-op; it aborts the
+-- whole migration.
 
 -- --------------------------------------------------------------------------
 -- Deliverables — public to read, so everyone can see who owns what
@@ -1185,7 +1186,14 @@ alter table profiles add constraint profiles_stanford_email
   check (lower(email) like '%@stanford.edu');
 
 -- Emails are identity here, so make duplicates impossible regardless of case.
+--
+-- `profiles.email` was declared `unique` in 0001, which Postgres implements as a
+-- CONSTRAINT backed by an index. `drop index profiles_email_key` therefore fails
+-- with "cannot drop index ... because constraint ... requires it" — the index is
+-- owned by the constraint and can only be dropped through it.
+alter table profiles drop constraint if exists profiles_email_key;
 drop index if exists profiles_email_key;
+
 create unique index if not exists profiles_email_lower_uniq
   on profiles (lower(email));
 
@@ -1356,6 +1364,30 @@ create trigger on_auth_user_signin
 -- Requires only 0001. If 0005's block was already uncommented and run, this is
 -- a no-op that reports as much.
 -- ===========================================================================
+
+-- --------------------------------------------------------------------------
+-- 0. Let a profile exist before its person does
+--
+-- `profiles.id` referenced `auth.users(id)`, which makes the invite flow
+-- impossible: you cannot pre-create a row for someone who has never signed in,
+-- because no auth user exists to point at. Discovered by this migration failing
+-- with `violates foreign key constraint "profiles_id_fkey"` — but the same
+-- constraint would have broken EVERY invite, not just this bootstrap.
+--
+-- 0005's `handle_new_auth_user` trigger is built entirely around pre-created
+-- rows: it matches an invited profile by email on first sign-in and repoints it
+-- at the real auth id. That design and this foreign key cannot both exist.
+--
+-- So the key goes. `profiles.id` stays a uuid primary key; it simply stops
+-- being required to already exist in `auth.users`. A row whose id isn't yet an
+-- auth user is exactly what an outstanding invite looks like.
+--
+-- The trade: nothing at the database level now cascades a profile away when an
+-- auth user is deleted. That's acceptable here — this app never hard-deletes
+-- people (see CLAUDE.md); it deactivates them, precisely so history survives.
+-- --------------------------------------------------------------------------
+
+alter table profiles drop constraint if exists profiles_id_fkey;
 
 do $$
 declare
@@ -1672,6 +1704,17 @@ create policy events_read_all on events
 
 create policy project_artifacts_read_all on project_artifacts
   for select to authenticated using (true);
+
+-- Writing an artifact is an RE's job, inheriting down the project tree.
+-- This policy was originally in 0004, which could not work: that migration runs
+-- before this table exists. `auth_is_re_for` is defined in 0004, so this is the
+-- earliest point both halves are available.
+create policy project_artifacts_write on project_artifacts
+  for all to authenticated using (auth_is_re_for(project_id));
+
+-- Events are club-wide, so leadership manages them rather than an RE.
+create policy events_write on events
+  for all to authenticated using (auth_is_leadership());
 
 -- Members always see their own record — a rule that must not regress.
 create policy progress_updates_read_own on progress_updates
