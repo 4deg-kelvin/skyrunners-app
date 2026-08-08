@@ -380,6 +380,16 @@ export interface ProgressUpdate {
   /** Anything not tied to a specific project. Optional. */
   generalNote?: string;
   hoursThisPeriod: number;
+  /**
+   * Who this person reported to AT SUBMISSION. Mirrors
+   * `progress_updates.lead_id_at_submission`.
+   *
+   * Snapshotted, not derived. Leads change mid-quarter, and a review queue that
+   * joined live to `profiles.lead_id` would silently re-file historic check-ins
+   * under the new Lead — making the old Lead's record of what they reviewed
+   * disappear.
+   */
+  leadIdAtSubmission?: string;
   /** When a Lead marked it read. Stops the escalation clock in lib/review.ts. */
   reviewedAt?: string;
   /**

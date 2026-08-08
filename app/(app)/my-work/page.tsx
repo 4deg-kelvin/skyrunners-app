@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { Clock, Eye, PenLine, TriangleAlert } from "lucide-react";
+import { Clock, Eye, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { LogHoursForm } from "@/components/forms/log-hours-form";
+import { CheckInForm } from "@/components/forms/check-in-form";
 import { JoinRequestDecision } from "@/components/forms/project-actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import {
@@ -300,13 +301,20 @@ export default async function MyWorkPage() {
           </div>
 
           {maySubmitUpdate ? (
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button>
-                <PenLine className="size-4" strokeWidth={2.5} />
-                Write my update
-              </Button>
+            <div className="mt-5 flex flex-wrap items-start gap-3">
+              <CheckInForm
+                sections={currentUpdate.sections.map((s) => ({
+                  projectId: s.project.id,
+                  projectName: s.project.name,
+                  hours: s.entry.hours,
+                  lastProgress: s.entry.progress || undefined,
+                }))}
+                dueLabel={dueDate.toLocaleDateString("en-US", {
+                  weekday: "long",
+                })}
+              />
               <ButtonLink href="/updates" variant="secondary">
-                Past updates
+                Past check-ins
               </ButtonLink>
             </div>
           ) : null}

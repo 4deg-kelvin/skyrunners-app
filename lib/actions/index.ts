@@ -32,7 +32,13 @@ import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/data/viewer";
 import { can } from "@/lib/permissions";
-import { TODAY, getProject, memberProjects, projectDeliverables } from "@/lib/mock-data";
+import {
+  TODAY,
+  getProject,
+  hoursOnProjectThisWeek,
+  memberProjects,
+  projectDeliverables,
+} from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
 
 export interface ActionResult {
@@ -215,6 +221,78 @@ export async function setDeliverableStatusAction(
   const result = await ops.setDeliverableStatus(id, status, blockerNote);
   if (result.ok) refresh();
   return toResult(result, "Updated.");
+}
+
+// ---------------------------------------------------------------------------
+// Writing a check-in
+// ---------------------------------------------------------------------------
+
+/**
+ * Submit your own twice-weekly check-in.
+ *
+ * Fields arrive as `progress:<projectId>` etc. so one form can carry a variable
+ * number of project sections without the client having to serialise anything.
+ *
+ * Hours are recomputed HERE from work logs rather than accepted from the form.
+ * They're a factual record, not a claim — letting the client post them would
+ * make the number editable in a way logging hours deliberately isn't.
+ */
+export async function submitCheckInAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  if (!can.submitOwnUpdate(viewer.actor, viewer.member.id)) {
+    return denied("submit this check-in");
+  }
+
+  const projectIds = formData.getAll("projectId").map(String);
+  const entries = projectIds.map((projectId) => ({
+    projectId,
+    progress: String(formData.get(`progress:${projectId}`) ?? ""),
+    blockers: String(formData.get(`blockers:${projectId}`) ?? ""),
+    nextSteps: String(formData.get(`nextSteps:${projectId}`) ?? ""),
+    hours: hoursOnProjectThisWeek(viewer.member.id, projectId),
+  }));
+
+  const result = await ops.submitCheckIn({
+    memberId: viewer.member.id,
+    entries,
+    generalNote: String(formData.get("generalNote") ?? ""),
+    leadId: viewer.member.leadId,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Check-in sent to your Lead.");
+}
+
+export async function setPauseAction(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const weeks = Number(formData.get("weeks") ?? 0);
+
+  if (!can.setOwnSchedule(viewer.actor, viewer.member.id)) {
+    return denied("change this schedule");
+  }
+
+  let until: string | null = null;
+  if (weeks > 0) {
+    const d = new Date(`${TODAY}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + weeks * 7);
+    until = d.toISOString().slice(0, 10);
+  }
+
+  const result = await ops.setCheckInPause({
+    memberId: viewer.member.id,
+    until,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    until ? `Paused until ${until}. No missed check-ins will build up.` : "Resumed."
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -317,6 +317,145 @@ async function updateOne(
 }
 
 // ---------------------------------------------------------------------------
+// Writing a check-in
+// ---------------------------------------------------------------------------
+
+export interface CheckInEntryInput {
+  projectId: string;
+  progress: string;
+  blockers?: string;
+  nextSteps?: string;
+  /** Hours on this project for the period, pre-computed from work logs. */
+  hours: number;
+}
+
+/**
+ * The member's own twice-weekly check-in.
+ *
+ * Finds their open obligation and fills it, rather than always inserting: an
+ * update row is generated when it becomes due, and writing a second one would
+ * both double-count their reliability and leave the original showing as missed.
+ *
+ * Empty sections are dropped. Somebody who worked on three projects and has
+ * something to say about one shouldn't be forced to type "n/a" twice — and a
+ * blank section is worse than no section, because it reads to their Lead as "no
+ * progress" rather than "not touched this week".
+ */
+export async function submitCheckIn(input: {
+  memberId: string;
+  entries: CheckInEntryInput[];
+  generalNote?: string;
+  /** Snapshotted onto the row — see `lead_id_at_submission` in 0007. */
+  leadId: string | null;
+  today: string;
+}): Promise<Result<ProgressUpdate>> {
+  const written = input.entries.filter((e) => e.progress.trim().length > 0);
+
+  if (written.length === 0 && !input.generalNote?.trim()) {
+    return fail(
+      "Write at least one line about one project — an empty check-in tells your Lead nothing."
+    );
+  }
+
+  return mutate((store) => {
+    // Their open obligation, oldest first: pending or late, never one already
+    // submitted.
+    const open = store.progressUpdates
+      .filter(
+        (u) =>
+          u.memberId === input.memberId &&
+          (u.status === "pending" || u.status === "late")
+      )
+      .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
+
+    const update: ProgressUpdate = open ?? {
+      // No obligation on record — someone checking in ahead of schedule, or
+      // mock data without a generated row. Accept it rather than refuse: the
+      // whole point is to make writing one easy.
+      id: newId("u"),
+      memberId: input.memberId,
+      dueAt: `${input.today}T23:59`,
+      status: "pending",
+      entries: [],
+      hoursThisPeriod: 0,
+    };
+
+    update.entries = written.map((e, i) => ({
+      id: newId(`ue${i}`),
+      updateId: update.id,
+      projectId: e.projectId,
+      progress: e.progress.trim(),
+      blockers: e.blockers?.trim() || undefined,
+      nextSteps: e.nextSteps?.trim() || undefined,
+      hours: e.hours,
+    }));
+
+    update.generalNote = input.generalNote?.trim() || undefined;
+    update.hoursThisPeriod = written.reduce((sum, e) => sum + e.hours, 0);
+    update.submittedAt = input.today;
+    update.leadIdAtSubmission = input.leadId ?? undefined;
+
+    // On time vs late is decided against the DUE DATE, not against whether the
+    // member feels late. Compared as dates so a submission at 23:00 on the due
+    // day counts as on time.
+    update.status =
+      input.today.slice(0, 10) <= update.dueAt.slice(0, 10)
+        ? "submitted"
+        : "late";
+
+    if (!open) store.progressUpdates.push(update);
+    return ok(update);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Academic pause
+// ---------------------------------------------------------------------------
+
+/**
+ * Pause or resume someone's check-in obligation.
+ *
+ * A pause generates no `missed` rows and no nudges — a lapse is a pause, never
+ * a debt. Someone who drifts during midterms has to be able to come back
+ * without facing a record of failure, which is the single most important
+ * retention behaviour in the app.
+ */
+export async function setCheckInPause(input: {
+  memberId: string;
+  /** ISO date to pause until, or null to resume now. */
+  until: string | null;
+  today: string;
+}): Promise<Result<null>> {
+  if (input.until && input.until <= input.today) {
+    return fail("Pick a date in the future.");
+  }
+
+  return mutate((store) => {
+    const schedule = store.updateSchedules.find(
+      (s) => s.memberId === input.memberId
+    );
+    if (!schedule) return fail<null>("You don't have a check-in schedule yet.");
+
+    schedule.pausedUntil = input.until ?? undefined;
+
+    if (input.until) {
+      // Clear obligations already sitting open. Leaving them would mean coming
+      // back from a pause to a wall of missed check-ins, which is exactly the
+      // "record of failure" this is meant to prevent.
+      store.progressUpdates = store.progressUpdates.filter(
+        (u) =>
+          !(
+            u.memberId === input.memberId &&
+            (u.status === "pending" || u.status === "late")
+          )
+      );
+    }
+
+    return ok(null);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Check-in review
 // ---------------------------------------------------------------------------
 

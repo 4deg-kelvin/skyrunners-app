@@ -1,8 +1,8 @@
-import { CalendarOff, Info } from "lucide-react";
+import { Info } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { PauseControls } from "@/components/forms/check-in-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
@@ -95,35 +95,17 @@ export default async function SettingsPage() {
           </div>
 
           {/*
-            Disabled on purpose until this writes to the database.
-            An enabled button that silently does nothing would be worse than no
-            button here: the copy above tells members to pause instead of going
-            quiet, so someone would click it, believe they were paused, and then
-            go quiet — the exact outcome this feature exists to prevent.
-          */}
-          <div className="mt-5 flex flex-wrap gap-3">
-            {isPaused ? (
-              <Button disabled title="Arrives in Phase 1b">
-                Resume my check-ins
-              </Button>
-            ) : (
-              <>
-                <Button variant="secondary" disabled title="Arrives in Phase 1b">
-                  <CalendarOff className="size-4" strokeWidth={2.5} />
-                  Pause 1 week
-                </Button>
-                <Button variant="secondary" disabled title="Arrives in Phase 1b">
-                  <CalendarOff className="size-4" strokeWidth={2.5} />
-                  Pause 2 weeks
-                </Button>
-              </>
-            )}
-          </div>
+            These were disabled placeholders for a long time, which was the
+            right call while they did nothing: the copy above tells members to
+            pause rather than go quiet, so a button that silently failed would
+            have produced exactly the outcome the feature exists to prevent.
 
-          <p className="mt-3 text-sm font-medium text-warn-fg">
-            Not wired up yet — pausing starts working once the database is
-            connected. Until then, tell your Lead directly.
-          </p>
+            They now write for real. Pausing also clears any open obligations,
+            so nobody returns from midterms to a wall of missed check-ins.
+          */}
+          <div className="mt-5">
+            <PauseControls pausedUntil={schedule.pausedUntil} />
+          </div>
         </CardBody>
       </Card>
 

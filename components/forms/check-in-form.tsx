@@ -1,0 +1,186 @@
+"use client";
+
+import { useState } from "react";
+import { PenLine, X } from "lucide-react";
+
+import { ActionForm, ActionButton } from "./action-form";
+import { setPauseAction, submitCheckInAction } from "@/lib/actions";
+import { formatNumber } from "@/lib/utils";
+
+export interface CheckInSection {
+  projectId: string;
+  projectName: string;
+  hours: number;
+  /** Whatever they wrote last time, shown as a prompt, never pre-filled. */
+  lastProgress?: string;
+}
+
+/**
+ * Writing your twice-weekly check-in.
+ *
+ * One section per project, seeded from the hours already logged — which is the
+ * whole reason hours logging came first. The member confirms and annotates
+ * rather than recalling a week from memory, and that difference is what decides
+ * whether check-ins actually get written.
+ *
+ * Only `progress` is offered per project by default; blockers and next steps are
+ * there but optional. A form with three required boxes per project, times three
+ * projects, is a form people skip.
+ *
+ * Hours are displayed but NOT editable here — the server recomputes them from
+ * work logs. They're a record, not a claim.
+ */
+export function CheckInForm({
+  sections,
+  dueLabel,
+}: {
+  sections: CheckInSection[];
+  dueLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+      >
+        <PenLine className="size-4" strokeWidth={2.5} />
+        Write my check-in
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-line bg-card p-4">
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-[15px] font-bold text-ink">Your {dueLabel} check-in</p>
+        <button
+          onClick={() => setOpen(false)}
+          aria-label="Close"
+          className="rounded-tile p-1 text-ink-muted hover:bg-surface"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+      <p className="mb-4 text-sm text-ink-muted">
+        A line per project is enough. Your Lead reads this to start a
+        conversation, not to grade you.
+      </p>
+
+      <ActionForm
+        action={submitCheckInAction}
+        submitLabel="Send to my Lead"
+        submittingLabel="Sending…"
+        className="space-y-4"
+      >
+        {sections.length === 0 ? (
+          <p className="rounded-tile bg-surface px-3.5 py-3 text-sm text-ink-soft">
+            You haven&apos;t logged hours on anything this period, so there are no
+            project sections to fill in. You can still leave a general note
+            below.
+          </p>
+        ) : (
+          sections.map((s) => (
+            <div
+              key={s.projectId}
+              className="rounded-tile border border-line px-3.5 py-3"
+            >
+              {/* Repeated field carrying the project id, so the action can
+                  reconstruct a variable number of sections from flat FormData. */}
+              <input type="hidden" name="projectId" value={s.projectId} />
+
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-sm font-bold text-ink">
+                  {s.projectName}
+                </span>
+                <span className="text-xs text-ink-muted">
+                  {formatNumber(s.hours, 1)} hrs logged
+                </span>
+              </div>
+
+              <label className="mt-2 block">
+                <span className="sr-only">Progress on {s.projectName}</span>
+                <textarea
+                  name={`progress:${s.projectId}`}
+                  rows={2}
+                  placeholder={
+                    s.lastProgress
+                      ? `Last time: ${s.lastProgress.slice(0, 70)}…`
+                      : "What moved forward?"
+                  }
+                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+                />
+              </label>
+
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input
+                  type="text"
+                  name={`blockers:${s.projectId}`}
+                  placeholder="Anything blocking you? (optional)"
+                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                />
+                <input
+                  type="text"
+                  name={`nextSteps:${s.projectId}`}
+                  placeholder="Next steps (optional)"
+                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                />
+              </div>
+            </div>
+          ))
+        )}
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-semibold text-ink">
+            Anything else{" "}
+            <span className="font-normal text-ink-muted">(optional)</span>
+          </span>
+          <textarea
+            name="generalNote"
+            rows={2}
+            placeholder="Not tied to one project — availability, questions, anything."
+            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          />
+        </label>
+
+        <p className="text-xs text-ink-muted">
+          The per-project notes appear on those projects, where anyone can see
+          them. Your total hours and reliability stay between you and your Lead.
+        </p>
+      </ActionForm>
+    </div>
+  );
+}
+
+/** Pause / resume the check-in obligation. */
+export function PauseControls({ pausedUntil }: { pausedUntil?: string }) {
+  if (pausedUntil) {
+    return (
+      <ActionButton
+        action={setPauseAction}
+        fields={{ weeks: "0" }}
+        label="Resume my check-ins"
+        pendingLabel="Resuming…"
+        tone="primary"
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      <ActionButton
+        action={setPauseAction}
+        fields={{ weeks: "1" }}
+        label="Pause 1 week"
+        pendingLabel="Pausing…"
+      />
+      <ActionButton
+        action={setPauseAction}
+        fields={{ weeks: "2" }}
+        label="Pause 2 weeks"
+        pendingLabel="Pausing…"
+      />
+    </div>
+  );
+}

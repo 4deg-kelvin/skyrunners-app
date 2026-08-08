@@ -5,6 +5,7 @@ import {
   deliverables as seedDeliverables,
   joinRequests as seedJoinRequests,
   progressUpdates as seedProgressUpdates,
+  updateSchedules as seedUpdateSchedules,
   projectMemberships as seedMemberships,
   workLogs as seedWorkLogs,
 } from "../mock-data.ts";
@@ -13,6 +14,7 @@ import type {
   JoinRequest,
   ProgressUpdate,
   ProjectMembership,
+  UpdateSchedule,
   WorkLog,
 } from "../types.ts";
 
@@ -61,6 +63,8 @@ export interface StoreShape {
   projectMemberships: ProjectMembership[];
   joinRequests: JoinRequest[];
   progressUpdates: ProgressUpdate[];
+  /** Which weekdays each member checks in on, and any academic pause. */
+  updateSchedules: UpdateSchedule[];
 }
 
 /**
@@ -71,7 +75,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -95,6 +99,7 @@ function seed(): StoreShape {
     projectMemberships: seedMemberships,
     joinRequests: seedJoinRequests,
     progressUpdates: seedProgressUpdates,
+    updateSchedules: seedUpdateSchedules,
   });
 }
 

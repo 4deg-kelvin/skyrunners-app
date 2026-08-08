@@ -57,15 +57,51 @@ const client = new pg.Client({
 });
 
 await client.connect();
-console.log(`Connected. Applying ${todo.length} migration(s).\n`);
+
+/**
+ * Which migrations have already run.
+ *
+ * The ledger is itself created by 0008, so on a database that predates it this
+ * query fails and we treat everything as unapplied — which is correct, and is
+ * exactly the bootstrap case.
+ */
+let alreadyApplied = new Set();
+try {
+  const { rows } = await client.query("select version from schema_migrations");
+  alreadyApplied = new Set(rows.map((r) => r.version));
+} catch {
+  console.log("(no schema_migrations table yet — 0008 creates it)\n");
+}
+
+const pending = todo.filter((f) => !alreadyApplied.has(f.replace(/\.sql$/, "")));
+const skipped = todo.length - pending.length;
+
+if (skipped > 0) {
+  console.log(`Skipping ${skipped} already recorded in schema_migrations.`);
+}
+if (pending.length === 0) {
+  console.log("Nothing to apply — the database is up to date.");
+  await client.end();
+  process.exit(0);
+}
+
+console.log(`Connected. Applying ${pending.length} migration(s).\n`);
 
 let applied = 0;
-for (const file of todo) {
+for (const file of pending) {
   const sql = readFileSync(join(DIR, file), "utf8");
+  const version = file.replace(/\.sql$/, "");
   process.stdout.write(`  ${file} … `);
   try {
     await client.query("begin");
     await client.query(sql);
+    // Recorded inside the same transaction as the migration itself, so the
+    // ledger can never claim something that was rolled back.
+    await client.query(
+      `insert into schema_migrations (version, checksum) values ($1, $2)
+       on conflict (version) do nothing`,
+      [version, String(sql.length)]
+    );
     await client.query("commit");
     console.log("ok");
     applied++;
