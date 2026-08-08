@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:check": "node scripts/build-check.mjs",
+    "db:check": "node scripts/db-check.mjs",
+    "db:bundle": "node scripts/build-migration-bundle.mjs",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

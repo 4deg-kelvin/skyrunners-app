@@ -35,12 +35,34 @@ on infrastructure.
 
 ## What is blocked, and on exactly what
 
-**One thing: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.**
+**Nothing is blocked on credentials any more. It's blocked on one SQL run.**
 
-Kelvin has the app hosted and the database set up. That work produces no repo commits —
-creating a Supabase project, running migrations, configuring OAuth and setting Vercel env
-vars are all dashboard actions. So there is never anything to "pull" from him; what's
-needed is those two strings, plus confirmation of which migrations he has applied.
+The Supabase project exists and the publishable key works — verified 2026-08-08. But
+**no migrations have been applied**: every table returns `PGRST205 "Could not find the
+table"`. Check for yourself at any time:
+
+```bash
+npm run db:check
+```
+
+### Fixing it — about two minutes
+
+1. Generate the combined script (already committed, but regenerate if migrations change):
+
+   ```bash
+   npm run db:bundle
+   ```
+
+2. Open `supabase/APPLY_ALL.sql`, copy all of it.
+3. Supabase Dashboard → **SQL Editor** → **New query** → paste → **Run**.
+4. Confirm with `npm run db:check`. It should report all 15 tables present.
+5. Uncomment the two Supabase lines in `.env.local` and restart `npm run dev`.
+
+The keys sit in `.env.local` **commented out on purpose**. Uncommenting them before the
+migrations exist would swap a working demo app for a completely broken live one — every
+page failing, because there is nothing to read.
+
+Then, and only then, the Phase 1d data-layer swap becomes verifiable work.
 
 Once they land, the swap is mechanical and already de-risked:
 
@@ -70,6 +92,37 @@ mistake in step 1 fails `npm test` rather than becoming a 400 on launch day.
   policies are written, so a Lead cannot yet read the reports they're meant to review.
 
 ---
+
+## Why pushing doesn't update the website
+
+Pushing to a feature branch does not deploy. Vercel only publishes the **production
+branch**, which is `main`; every other branch gets its own throwaway preview URL. So work
+on `claude/*` will never appear on the club's site, by design — that's what makes it safe
+to keep building while people are using it.
+
+To get a change live:
+
+```bash
+git checkout main && git merge claude/test-env-concurrent-dev-696b41 && git push
+```
+
+Vercel picks that up and redeploys within a minute or two.
+
+**You also need access to the Vercel project itself** — for environment variables,
+rollbacks and deploy logs, none of which live in this repo. Ask Kelvin to invite you:
+Vercel → the project → Settings → Members. Until then you can push code but cannot see
+whether it deployed, which is the worst of both.
+
+Two environment variables must be set in Vercel or live mode will not work there, no
+matter what is in your local `.env.local`:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://ldijsmcnjrihwvxtypqy.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the `sb_publishable_…` key |
+
+Do **not** set `SKYRUNNERS_TEST_ENV` there. It's ignored in live mode anyway, but leaving
+it unset means nobody has to reason about that.
 
 ## Known gaps
 

@@ -20,7 +20,6 @@ those three.
 | `docs/STATUS.md` | **What is built, what is blocked, and on exactly what. Read first** |
 | `docs/PHASE_PLAN.md` | Roadmap and what is deliberately not planned |
 | `docs/INFRA.md` | **Everything server/database/deploy — the doc for Kelvin and his agent** |
-| `docs/PHASE_1_KICKOFF.md` | Step-by-step Phase 1 plan, split between the two developers |
 | `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |
 | `docs/PRODUCT_REVIEW.md` | Independent critique of the org design, and what changed because of it |
 | `docs/DATA_MODEL.md` | Postgres schema, invariants, views |
@@ -54,6 +53,8 @@ beginner. Revisit only if real analytics/ML work appears.
 npm run dev            # local dev server (demo mode unless .env.local has keys)
 npm run check          # typecheck + lint + tests — run before every push
 npm run build:check    # verify it compiles WITHOUT killing a running dev server
+npm run db:check       # are the Supabase migrations actually applied?
+npm run db:bundle      # regenerate supabase/APPLY_ALL.sql (all migrations, one paste)
 npm test               # permission + contribution tests
 npm run format         # Prettier
 npm run seed:generate  # regenerate supabase/seed.sql from lib/mock-data.ts
@@ -79,8 +80,17 @@ server alone.
 
 ## Current state
 
-**Phase 0 and 1a complete.** Phase 1b (the Supabase project itself) belongs to Kelvin and
-is not blocking.
+**Phases 0–4 are built and working on local data.** Members find work, ask to join, log
+hours and mark work done; REs assign, sign off and manage their roster; Leads get a scoped
+review queue with escalation, and can mark check-ins read.
+
+**The one blocker is that no migrations have been applied to Supabase.** The project and
+key exist; the tables do not. Run `npm run db:check` to confirm, then paste
+`supabase/APPLY_ALL.sql` into the Supabase SQL editor. Full instructions in
+`docs/STATUS.md`.
+
+Writes persist to `.data/store.json` via `lib/store/` — deliberately temporary, and it
+cannot run on Vercel. `lib/store/operations.ts` is the file that becomes Postgres calls.
 
 ### Two modes — this is the most important thing to understand
 

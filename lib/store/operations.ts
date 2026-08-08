@@ -26,6 +26,7 @@ import type {
   Deliverable,
   DeliverableStatus,
   JoinRequest,
+  ProgressUpdate,
   WorkLog,
 } from "../types.ts";
 
@@ -312,6 +313,46 @@ async function updateOne(
     const found = store.deliverables.find((d) => d.id === deliverableId);
     if (!found) return fail<Deliverable>("That deliverable no longer exists.");
     return fn(found);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Check-in review
+// ---------------------------------------------------------------------------
+
+/**
+ * A Lead marks a report read.
+ *
+ * The queue and the escalation were both built before this existed, which meant
+ * a Lead could see what they owed but had no way to discharge it — the queue
+ * only ever grew. This is the write that closes the loop and stops the
+ * escalation clock.
+ *
+ * `reviewedBy` is recorded because "who read this" has to stay answerable after
+ * the person has moved on, the same reason `lead_id_at_submission` is
+ * snapshotted on the row.
+ */
+export async function markUpdateReviewed(input: {
+  updateId: string;
+  reviewedBy: string;
+  today: string;
+}): Promise<Result<ProgressUpdate>> {
+  return mutate((store) => {
+    const update = store.progressUpdates.find((u) => u.id === input.updateId);
+    if (!update) return fail<ProgressUpdate>("That check-in no longer exists.");
+
+    if (update.status === "reviewed") {
+      return fail<ProgressUpdate>("Already marked as read.");
+    }
+    if (update.status !== "submitted" && update.status !== "late") {
+      // Nothing has been written yet, so there is nothing to have read.
+      return fail<ProgressUpdate>("That check-in hasn't been submitted yet.");
+    }
+
+    update.status = "reviewed";
+    update.reviewedAt = input.today;
+    update.reviewedBy = input.reviewedBy;
+    return ok(update);
   });
 }
 

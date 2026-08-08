@@ -312,8 +312,15 @@ export default async function MyWorkPage() {
           ) : null}
 
           <p className="mt-4 text-sm text-ink-muted">
-            Heads-down on academics? You&apos;ll be able to pause without it
-            counting against you. Full form arrives in Phase 4.
+            Heads-down on academics?{" "}
+            <Link
+              href="/settings"
+              className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+            >
+              Pause your check-ins
+            </Link>{" "}
+            — it doesn&apos;t count against you, and there&apos;s no backlog when
+            you come back.
           </p>
         </CardBody>
       </Card>

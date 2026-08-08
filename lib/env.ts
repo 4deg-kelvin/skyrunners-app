@@ -29,12 +29,29 @@
  * graduation.
  */
 
+/**
+ * The browser-safe API key.
+ *
+ * Supabase renamed this. Projects created before the change hand you an
+ * "anon key" (`NEXT_PUBLIC_SUPABASE_ANON_KEY`); the current dashboard hands you
+ * a "publishable key" (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, prefixed
+ * `sb_publishable_`). They occupy exactly the same slot — both ship to the
+ * browser, and RLS is what decides what they can read.
+ *
+ * Accepting either means the app works whichever the dashboard shows on the day,
+ * and nobody has to debug "I pasted the key and it's still in demo mode".
+ * Publishable wins if both are set, since that's the newer name.
+ */
+function publishableKey(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
+
 /** True when Supabase credentials are configured. */
 export function isLiveMode(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && publishableKey());
 }
 
 /** True when running on mock data with no login. */
@@ -79,8 +96,10 @@ export function isTestEnvEnabled(): boolean {
  */
 export function supabaseConfig(): { url: string; anonKey: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = publishableKey();
   if (!url || !anonKey) return null;
+  // Field stays named `anonKey` because that's the argument name Supabase's own
+  // client takes. Renaming it here would only add a translation step.
   return { url, anonKey };
 }
 

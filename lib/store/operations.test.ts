@@ -405,6 +405,74 @@ describe("blocking", () => {
   });
 });
 
+describe("marking a check-in read", () => {
+  // u-1 is m-sofia's submitted check-in in the seed.
+  const SUBMITTED = "u-1";
+
+  test("a submitted check-in can be marked read, and records who", async () => {
+    const r = await ops.markUpdateReviewed({
+      updateId: SUBMITTED,
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.equal(r.value.status, "reviewed");
+      assert.equal(r.value.reviewedBy, "m-dev");
+      assert.equal(r.value.reviewedAt, TODAY);
+    }
+  });
+
+  test("it stops the escalation clock", async () => {
+    // The whole point: an unread report escalates, a read one doesn't.
+    const before = disk
+      .readStore()
+      .progressUpdates.filter((u) => u.status === "submitted").length;
+    await ops.markUpdateReviewed({
+      updateId: SUBMITTED,
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    const after = disk
+      .readStore()
+      .progressUpdates.filter((u) => u.status === "submitted").length;
+    assert.equal(after, before - 1);
+  });
+
+  test("marking the same one twice is refused", async () => {
+    await ops.markUpdateReviewed({
+      updateId: SUBMITTED,
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    const again = await ops.markUpdateReviewed({
+      updateId: SUBMITTED,
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    assert.equal(again.ok, false);
+  });
+
+  test("an unsubmitted check-in cannot be marked read", async () => {
+    // u-6 is m-noah's, still pending — there is nothing to have read.
+    const r = await ops.markUpdateReviewed({
+      updateId: "u-6",
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  test("an unknown id fails rather than throwing", async () => {
+    const r = await ops.markUpdateReviewed({
+      updateId: "nope",
+      reviewedBy: "m-dev",
+      today: TODAY,
+    });
+    assert.equal(r.ok, false);
+  });
+});
+
 describe("concurrent writes", () => {
   test("simultaneous logs don't lose each other", async () => {
     // Next handles requests concurrently even in dev, and a double-clicked

@@ -218,6 +218,34 @@ export async function setDeliverableStatusAction(
 }
 
 // ---------------------------------------------------------------------------
+// Check-in review
+// ---------------------------------------------------------------------------
+
+export async function markUpdateReviewedAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const updateId = String(formData.get("updateId") ?? "");
+  const authorId = String(formData.get("authorId") ?? "");
+
+  // Lead chain only. REs deliberately cannot mark a personal report read —
+  // that's what keeps the obligation on exactly one person and makes the
+  // escalation in lib/review.ts mean something.
+  if (!can.reviewUpdate(viewer.actor, viewer.graph, authorId)) {
+    return denied("review this check-in");
+  }
+
+  const result = await ops.markUpdateReviewed({
+    updateId,
+    reviewedBy: viewer.member.id,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Marked as read.");
+}
+
+// ---------------------------------------------------------------------------
 // Phase 2 — membership
 // ---------------------------------------------------------------------------
 

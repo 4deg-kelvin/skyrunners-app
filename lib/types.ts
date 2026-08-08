@@ -380,6 +380,14 @@ export interface ProgressUpdate {
   /** Anything not tied to a specific project. Optional. */
   generalNote?: string;
   hoursThisPeriod: number;
+  /** When a Lead marked it read. Stops the escalation clock in lib/review.ts. */
+  reviewedAt?: string;
+  /**
+   * Which Lead read it. Snapshotted rather than derived, because Leads change
+   * and "who was responsible for reading this" has to stay answerable after
+   * they've moved on — same reasoning as `lead_id_at_submission`.
+   */
+  reviewedBy?: string;
 }
 
 // ---------------------------------------------------------------------------
