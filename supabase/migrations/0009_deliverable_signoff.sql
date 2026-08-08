@@ -1,0 +1,34 @@
+-- ===========================================================================
+-- 0009_deliverable_signoff.sql
+--
+-- Adds the `submitted` state to `deliverable_status`. NOTHING ELSE.
+--
+-- The two-step sign-off (owner claims `submitted`, an RE agrees `done`) existed
+-- only in TypeScript; the enum had no such value. Left alone, the first person
+-- to click "Mark done" in live mode would have hit an invalid-enum error.
+--
+-- ---------------------------------------------------------------------------
+-- Why this file is one line
+-- ---------------------------------------------------------------------------
+--
+-- Postgres will not let a new enum value be USED in the transaction that adds
+-- it:
+--
+--   ERROR: unsafe use of new value "submitted" of enum type deliverable_status
+--   HINT:  New enum values must be committed before they can be used.
+--
+-- The migration runner wraps each file in a transaction, so anything
+-- referencing 'submitted' — the CHECK constraint, the partial index — has to
+-- live in a later file. That's 0010.
+--
+-- Do not add anything to this migration that mentions 'submitted'.
+-- ===========================================================================
+
+alter type deliverable_status add value if not exists 'submitted' before 'done';
+
+-- ===========================================================================
+-- Verify
+-- ===========================================================================
+--
+--   select unnest(enum_range(null::deliverable_status));
+--   -- expect: open, in_progress, blocked, submitted, done

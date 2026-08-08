@@ -4,6 +4,10 @@ import { join } from "path";
 import {
   members as seedMembers,
   projects as seedProjects,
+  teams as seedTeams,
+  terms as seedTerms,
+  events as seedEvents,
+  projectArtifacts as seedArtifacts,
   deliverables as seedDeliverables,
   joinRequests as seedJoinRequests,
   progressUpdates as seedProgressUpdates,
@@ -12,8 +16,12 @@ import {
   workLogs as seedWorkLogs,
 } from "../mock-data.ts";
 import type {
+  ClubEvent,
   Member,
   Project,
+  ProjectArtifact,
+  Team,
+  Term,
   Deliverable,
   JoinRequest,
   ProgressUpdate,
@@ -76,6 +84,15 @@ export interface StoreShape {
   progressUpdates: ProgressUpdate[];
   /** Which weekdays each member checks in on, and any academic pause. */
   updateSchedules: UpdateSchedule[];
+  /**
+   * The remaining collections. Everything the app reads now lives here, so the
+   * Postgres backend is a straight table-per-collection mapping rather than a
+   * mix of "some from the store, some from a module".
+   */
+  teams: Team[];
+  terms: Term[];
+  events: ClubEvent[];
+  projectArtifacts: ProjectArtifact[];
 }
 
 /**
@@ -86,7 +103,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 4;
+const STORE_VERSION = 5;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -113,6 +130,10 @@ function seed(): StoreShape {
     joinRequests: seedJoinRequests,
     progressUpdates: seedProgressUpdates,
     updateSchedules: seedUpdateSchedules,
+    teams: seedTeams,
+    terms: seedTerms,
+    events: seedEvents,
+    projectArtifacts: seedArtifacts,
   });
 }
 

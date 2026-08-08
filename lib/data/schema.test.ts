@@ -28,6 +28,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { QUERIED_COLUMNS } from "./graph.ts";
+import { COLLECTIONS } from "../store/mapping.ts";
 
 const MIGRATIONS_DIR = join(import.meta.dirname, "..", "..", "supabase", "migrations");
 
@@ -78,12 +79,25 @@ function parseSchema(): Map<string, Set<string>> {
     }
 
     // --- alter table add column ------------------------------------------
-    const alterRe =
-      /alter table (\w+)\s+add column (?:if not exists )?([a-z_][a-z0-9_]*)/g;
+    //
+    // One statement can add several columns:
+    //
+    //   alter table deliverables
+    //     add column if not exists submitted_at timestamptz,
+    //     add column if not exists confirmed_by uuid references ...;
+    //
+    // Matching only the first `add column` after the table name silently missed
+    // the rest, which showed up as a real column being reported as missing.
+    const alterRe = /alter table (\w+)([\s\S]*?);/g;
     while ((match = alterRe.exec(sql)) !== null) {
-      const [, table, column] = match;
+      const [, table, body] = match;
+      const added = [
+        ...body.matchAll(/add column (?:if not exists )?([a-z_][a-z0-9_]*)/g),
+      ];
+      if (added.length === 0) continue;
+
       const columns = tables.get(table) ?? new Set<string>();
-      columns.add(column);
+      for (const a of added) columns.add(a[1]);
       tables.set(table, columns);
     }
   }
@@ -256,6 +270,47 @@ describe("the tables the app renders but 0001-0006 never created", () => {
     const columns = schema.get("project_artifacts");
     assert.ok(columns?.has("external_url"));
     assert.ok(columns?.has("file_url"));
+  });
+});
+
+/**
+ * Every column the Postgres store maps, checked against the real SQL.
+ *
+ * This is the check that matters most for going live. `lib/store/mapping.ts`
+ * claims a column for every field in `lib/types.ts`, and a claim that's wrong
+ * doesn't fail at build time — it fails the first time a member clicks the
+ * button that touches it. Adding `submitted_at` to the TypeScript type without
+ * adding it to `deliverables` is exactly the drift this caught.
+ *
+ * Add a collection to COLLECTIONS and it's covered here automatically, which is
+ * what keeps this honest as features get added.
+ */
+describe("the Postgres mapping matches the real schema", () => {
+  for (const spec of COLLECTIONS) {
+    test(`${spec.table} has every column ${String(spec.key)} maps`, () => {
+      const actual = schema.get(spec.table);
+      assert.ok(actual, `No "create table ${spec.table}" in supabase/migrations/`);
+
+      const missing = spec.columns
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c && !actual.has(c));
+
+      assert.deepEqual(
+        missing,
+        [],
+        `${spec.table} is missing: ${missing.join(", ")}.\n` +
+          `Either add them in a migration, or stop mapping them.\n` +
+          `Available: ${[...actual].sort().join(", ")}`
+      );
+    });
+  }
+
+  test("every mapped table actually exists", () => {
+    const missing = COLLECTIONS.map((c) => c.table).filter(
+      (t) => !schema.has(t)
+    );
+    assert.deepEqual(missing, []);
   });
 });
 

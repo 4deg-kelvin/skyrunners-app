@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql
 
 
 -- ==========================================================================
@@ -1915,4 +1915,105 @@ create policy work_logs_read_project_re on work_logs
 
 -- ==========================================================================
 -- END 0008_migration_ledger_and_review_rls.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0009_deliverable_signoff.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0009_deliverable_signoff.sql
+--
+-- Adds the `submitted` state to `deliverable_status`. NOTHING ELSE.
+--
+-- The two-step sign-off (owner claims `submitted`, an RE agrees `done`) existed
+-- only in TypeScript; the enum had no such value. Left alone, the first person
+-- to click "Mark done" in live mode would have hit an invalid-enum error.
+--
+-- ---------------------------------------------------------------------------
+-- Why this file is one line
+-- ---------------------------------------------------------------------------
+--
+-- Postgres will not let a new enum value be USED in the transaction that adds
+-- it:
+--
+--   ERROR: unsafe use of new value "submitted" of enum type deliverable_status
+--   HINT:  New enum values must be committed before they can be used.
+--
+-- The migration runner wraps each file in a transaction, so anything
+-- referencing 'submitted' — the CHECK constraint, the partial index — has to
+-- live in a later file. That's 0010.
+--
+-- Do not add anything to this migration that mentions 'submitted'.
+-- ===========================================================================
+
+alter type deliverable_status add value if not exists 'submitted' before 'done';
+
+-- ===========================================================================
+-- Verify
+-- ===========================================================================
+--
+--   select unnest(enum_range(null::deliverable_status));
+--   -- expect: open, in_progress, blocked, submitted, done
+
+
+-- ==========================================================================
+-- END 0009_deliverable_signoff.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0010_deliverable_signoff_columns.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0010_deliverable_signoff_columns.sql
+--
+-- The rest of the two-step sign-off: who claimed the work, who agreed, and the
+-- constraint and index that reference the `submitted` state.
+--
+-- Separate from 0009 because Postgres refuses to use a new enum value in the
+-- transaction that created it. 0009 adds the value; this runs afterwards, once
+-- it's committed. Both must be applied — 0009 alone leaves the columns missing,
+-- and this alone fails on an unknown enum value.
+-- ===========================================================================
+
+alter table deliverables
+  add column if not exists submitted_at timestamptz,
+  -- Snapshotted rather than derived: REs change over a project's life, and
+  -- "who signed this off" has to stay answerable after they've moved on.
+  add column if not exists confirmed_by uuid references profiles (id) on delete set null;
+
+comment on column deliverables.submitted_at is
+  'When the OWNER marked it done. Not the same as delivered.';
+comment on column deliverables.confirmed_by is
+  'Which RE signed it off. Only `done` counts toward the Delivered signal.';
+
+-- The RE's queue: work waiting on a signature, oldest first.
+create index if not exists deliverables_awaiting_signoff_idx
+  on deliverables (project_id, submitted_at)
+  where status = 'submitted';
+
+-- 0002 asserts a `done` deliverable has `completed_at`. Same idea here: a
+-- `submitted` one must say when, or "how long has this been waiting?" is
+-- unanswerable and `pendingSignOffs()` in lib/review.ts silently treats it as
+-- zero days old — which is precisely the escalation that stops a quiet RE from
+-- freezing everyone's record.
+alter table deliverables drop constraint if exists deliverables_submitted_has_timestamp;
+alter table deliverables add constraint deliverables_submitted_has_timestamp
+  check (status <> 'submitted' or submitted_at is not null);
+
+-- ===========================================================================
+-- Verify
+-- ===========================================================================
+--
+--   select column_name from information_schema.columns
+--   where table_name = 'deliverables'
+--     and column_name in ('submitted_at', 'confirmed_by');
+--   -- expect both
+
+
+-- ==========================================================================
+-- END 0010_deliverable_signoff_columns.sql
 -- ==========================================================================
