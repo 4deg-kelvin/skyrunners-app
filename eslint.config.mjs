@@ -10,11 +10,18 @@ const config = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     ignores: [
-      ".next/**",
-      // Output of `npm run build:check`. Same generated code as `.next`, so
-      // linting it produces hundreds of errors about Next's own bundles.
-      ".next-build/**",
-      "node_modules/**",
+      // `**/` prefixes are load-bearing. A git worktree lives at
+      // `.claude/worktrees/<name>/`, INSIDE this directory, so a root-anchored
+      // `.next/**` doesn't match the worktree's build output — and linting from
+      // the main checkout then reports hundreds of errors in Next's own
+      // generated bundles, which look like real failures and block CI.
+      "**/.next/**",
+      // Output of `npm run build:check`, same generated code as `.next`.
+      "**/.next-build/**",
+      "**/node_modules/**",
+      // Agent worktrees and local settings — another checkout's source is not
+      // this checkout's problem.
+      ".claude/**",
       "next-env.d.ts",
       "supabase/**",
     ],
