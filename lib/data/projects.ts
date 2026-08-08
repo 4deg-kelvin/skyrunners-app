@@ -8,6 +8,7 @@
  */
 
 import {
+  activeMembers,
   artifactsFor,
   childProjects,
   divisionForProject,
@@ -139,6 +140,15 @@ export interface ProjectDetailView {
   }[];
   /** The viewer's own pending request, if they've already asked. */
   myPendingRequest?: JoinRequest;
+  /**
+   * Who an RE can hand work to: everyone active, not just current members.
+   *
+   * Assigning a deliverable is how someone gets added (the action auto-adds
+   * them), so limiting this to existing members would reintroduce the two-step
+   * that decision removed. It lives here rather than in the page because pages
+   * are not allowed to import `lib/mock-data` — ESLint enforces that boundary.
+   */
+  assignableMembers: { id: string; fullName: string }[];
 }
 
 export async function getProjectBySlug(
@@ -184,6 +194,10 @@ export async function getProjectBySlug(
       daysWaiting: daysWaitingOn(r.requestedAt),
     })),
     myPendingRequest: requests.find((r) => r.memberId === viewerId),
+    assignableMembers: activeMembers().map((m) => ({
+      id: m.id,
+      fullName: m.fullName,
+    })),
   };
 }
 

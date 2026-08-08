@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,8 +18,28 @@ import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
 export default async function DashboardPage() {
-  const [view, viewer] = await Promise.all([getDashboard(), getViewer()]);
-  const { compliance, counts, club, reviewQueue, flaggedProjects } = view;
+  const viewer = await getViewer();
+  const view = await getDashboard(viewer.actor, viewer.graph);
+  const {
+    compliance,
+    counts,
+    club,
+    reviewQueue,
+    escalations,
+    flaggedProjects,
+  } = view;
+
+  /**
+   * The gate. Hiding the nav link is not access control — this route was
+   * reachable by URL and renders other people's hours and review queue.
+   *
+   * Sends them to /my-work rather than showing a 403: for a plain member this
+   * isn't a permissions error to understand, it's a page that was never meant
+   * for them, and their own work is where they were going anyway.
+   */
+  if (!can.viewLeadershipDashboard(viewer.actor, !view.isLeadOfNobody)) {
+    redirect("/my-work");
+  }
 
   const mayLogHours = can.logOwnHours(viewer.actor, viewer.member.id);
 
@@ -55,7 +76,9 @@ export default async function DashboardPage() {
               <CardDivider />
               <DetailRow label="Description">{club.description}</DetailRow>
               <CardDivider />
-              <DetailRow label="Members">{counts.members}</DetailRow>
+              <DetailRow label="People you oversee">
+                {counts.peopleOverseen}
+              </DetailRow>
               <CardDivider />
               <DetailRow label="Divisions">{counts.divisions}</DetailRow>
               <CardDivider />
@@ -83,8 +106,10 @@ export default async function DashboardPage() {
                     Cycle summary
                   </h2>
                   <p className="mt-2 text-[15px] text-ink-soft">
-                    A quick snapshot of update compliance, effort, and project
-                    health.
+                    Compliance, effort and project health for the{" "}
+                    {counts.peopleOverseen}{" "}
+                    {counts.peopleOverseen === 1 ? "person" : "people"} you
+                    oversee — not the whole club.
                   </p>
                 </div>
                 <Donut
@@ -108,6 +133,57 @@ export default async function DashboardPage() {
             </CardBody>
           </Card>
 
+          {/*
+            Escalations — Leads under you who are leaving people unheard.
+            Rendered only when non-empty: a permanent "0 escalations" panel is
+            noise that trains you to skip the whole column.
+
+            Reports on LEADS, not on updates. "Marcus has 2 people waiting,
+            oldest 5 days" is one conversation; a list of thirty unread reports
+            is a spreadsheet.
+          */}
+          {escalations.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Not Being Read</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  These Leads have check-ins they haven&apos;t read. A report
+                  nobody reads is worse than no report — the member spent effort
+                  on it.
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  {escalations.map(({ lead, overdue, worstAgeDays }) => (
+                    <div
+                      key={lead.id}
+                      className="rounded-tile border border-warn-fg/30 bg-warn-bg/40 px-4 py-3.5"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <Link
+                          href={`/members/${lead.id}`}
+                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        >
+                          {lead.fullName}
+                        </Link>
+                        <span className="text-sm font-semibold text-warn-fg">
+                          oldest waiting {worstAgeDays}{" "}
+                          {worstAgeDays === 1 ? "day" : "days"}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-ink-soft">
+                        {overdue.length}{" "}
+                        {overdue.length === 1 ? "person" : "people"} waiting:{" "}
+                        {overdue
+                          .map((r) => r.author?.fullName ?? "someone")
+                          .join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           <div className="grid gap-6 md:grid-cols-2">
             {/* Review queue */}
             <Card>
@@ -130,14 +206,34 @@ export default async function DashboardPage() {
                       actionHref="/updates"
                     />
                   ) : (
-                    reviewQueue.map(({ update, author, sections }) => (
+                    reviewQueue.map(({ update, author, sections, ageDays, escalated }) => (
                       <div
                         key={update.id}
-                        className="rounded-tile border border-line px-4 py-3.5"
+                        className={
+                          escalated
+                            ? "rounded-tile border border-cardinal-600 px-4 py-3.5"
+                            : "rounded-tile border border-line px-4 py-3.5"
+                        }
                       >
                         <div className="flex items-start justify-between gap-3">
                           <p className="text-[15px] font-bold text-ink">
                             {author?.fullName ?? "Unknown member"}
+                            {/* Age, not a count. "12 unread" is ignorable;
+                                "waiting 5 days" names a specific person kept
+                                waiting, and is the same weight of problem
+                                whether you lead three people or fifteen. */}
+                            <span
+                              className={
+                                escalated
+                                  ? "ml-2 text-sm font-semibold text-cardinal-600"
+                                  : "ml-2 text-sm font-normal text-ink-muted"
+                              }
+                            >
+                              {ageDays === 0
+                                ? "today"
+                                : `waiting ${ageDays} ${ageDays === 1 ? "day" : "days"}`}
+                              {escalated ? " — your Lead can see this" : ""}
+                            </span>
                           </p>
                           <Badge tone={UPDATE_STATUS_TONES[update.status]}>
                             {UPDATE_STATUS_LABELS[update.status]}

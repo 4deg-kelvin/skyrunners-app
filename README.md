@@ -1,169 +1,118 @@
 # SkyRunners HQ
 
-Project and member management for **Stanford UAV / Sky Runners**.
+Project and member management for **Stanford UAV / Sky Runners**, a ~35-person student
+drone team.
 
-Tracks engineering efforts and member contribution across the club's drone projects, so
-members can see everything the club is building and leadership can see what's actually
-happening.
+## The problem it solves
 
-**Build order lives in [`docs/PHASE_PLAN.md`](docs/PHASE_PLAN.md).**
+The club loses members to disorganisation. Three specific failures:
 
-New here? Read **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup and workflow.
+1. **You can't find work without asking a Co-Lead.** New members drift and leave.
+2. **Leaders can't see who's actually contributing.** Effort is invisible until someone
+   burns out or disappears.
+3. **Progress doesn't flow up the chain.** Leads find out things are stuck too late.
+
+Every feature here traces back to one of those three. If a proposed change doesn't, it
+probably shouldn't be built — that's the filter.
 
 ---
 
-## Run it locally
+## Run it
 
-Needs [Node.js](https://nodejs.org) **22.6+** and [Git](https://git-scm.com).
+Needs [Node.js](https://nodejs.org) **22.6+**.
 
 ```bash
 npm install
+```
+
+```bash
 npm run dev
 ```
 
-Open **http://localhost:3000**. `Ctrl+C` stops the server.
+Open **http://localhost:3000**. No login, no database, no setup — a fresh clone is a
+working app on sample data.
 
 ```bash
-npm run check     # typecheck + lint + tests — run before pushing
-npm test          # permission and contribution tests
-npm run format    # Prettier
+npm run check
 ```
 
----
-
-## Two modes
-
-A fresh clone runs in **demo mode**: sample data, no login, a yellow banner. Every feature
-works; nothing is saved. Add Supabase keys to `.env.local` and it switches to **live
-mode** — Stanford Google sign-in and a real database — with no code changes.
-
-That's deliberate. Kelvin sets up the server side on his own schedule, and app development
-never waits on it.
+Typecheck, lint and 177 tests. Run it before every push; CI runs the same thing plus a
+Prettier check.
 
 ---
 
-## Current state
+## Where things stand
 
-**Phases 0 and 1a complete.**
+**Everything works end to end on local data. The only thing blocking real use is the
+Supabase URL and anon key.**
 
-| Page | What's there |
+Read **[`docs/STATUS.md`](docs/STATUS.md)** — one page covering what's built, what's
+blocked and on exactly what, and the known gaps.
+
+---
+
+## The two modes
+
+| Mode | When | Behaviour |
+|---|---|---|
+| **Demo** | Fresh clone, no env vars | Sample data, no login, yellow banner. Writes persist to `.data/store.json` |
+| **Live** | Supabase keys in `.env.local` | Stanford Google sign-in, real Postgres |
+
+`lib/data/viewer.ts` is the only file that branches on this. That split is why app
+development never had to wait on the server side.
+
+### Seeing it as someone else
+
+Add `SKYRUNNERS_TEST_ENV=1` to `.env.local` and restart: a persona switcher appears,
+letting you browse as a Member, a Team Lead or a Co-Lead. It changes *identity*, not just a
+role badge, so permissions behave exactly as they will for a real person.
+
+It cannot run against real data — the flag is ignored whenever Supabase keys are present.
+See [`lib/test-env/README.md`](lib/test-env/README.md). Remove the whole feature with
+`npm run remove:test-env`.
+
+---
+
+## Documentation
+
+Start here, in this order:
+
+| Doc | What it's for |
 |---|---|
-| **My Work** | Your projects, what you own on each, who the RE is, hours logged, per-project update sections |
-| Dashboard | Leadership view — update compliance, review queue, projects needing attention |
-| **Find Work** | Active projects ranked by where you'd help most, with skill matching and the RE's contact |
-| Projects | Nested project tree grouped by division |
-| Project detail | Phase progress, deliverables, team, sub-projects, engineering record, per-project update feed |
-| Members | Roster with roles, project counts, reporting lines |
-| Member profile | Projects and responsibilities, direct reports, restricted effort data |
-| Calendar | Upcoming events |
-| How we lead | Published expectations, tiers, and the leadership rubric |
-| Settings | Pick your two check-in days, set an academic pause |
-| Login | Stanford Google sign-in, with a demo-mode notice |
-| Updates | Placeholder — Phase 7 |
+| **[`docs/STATUS.md`](docs/STATUS.md)** | **What's built, what's blocked. Read this first** |
+| [`CLAUDE.md`](CLAUDE.md) | Architecture and the traps most likely to bite you |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setup, git workflow, the seven rules |
+| [`docs/PHASE_PLAN.md`](docs/PHASE_PLAN.md) | Roadmap, and what's deliberately not planned |
+| [`docs/INFRA.md`](docs/INFRA.md) | **Kelvin's doc** — servers, database, deploy |
+| [`docs/TWO_TRACK_DEPLOY.md`](docs/TWO_TRACK_DEPLOY.md) | Shipping to the club while still building |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Locked decisions and the reasoning behind them |
 
-Opening the app lands you on **My Work**, not the dashboard — your own projects and the
-update you owe are what you came for.
-
-> **All data is fake**, from `lib/mock-data.ts`, and the signed-in user is mocked in
-> `lib/data/viewer.ts`. Supabase arrives in Phase 1 — the schema is already written as
-> SQL in `supabase/migrations/`.
+Reference, when you need it: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) ·
+[`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) ·
+[`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) ·
+[`docs/PRODUCT_REVIEW.md`](docs/PRODUCT_REVIEW.md)
 
 ---
 
-## How the code is organized
+## Three things that will trip you up
 
-```
-app/
-  layout.tsx            html/body/fonts only
-  globals.css           Design tokens — all colors and radii
-  login/                Stanford Google sign-in
-  auth/                 OAuth callback, no-profile, inactive
-  (app)/                Everything requiring a session
-    layout.tsx          Nav, demo banner
-    my-work/            Member home
-    dashboard/          Leadership overview
-    projects/           Tree + [slug] detail
-    members/            Roster + [id] profiles
-    settings/           Check-in days, academic pause
-    find-work/          Where to help most
-    calendar/  updates/  how-we-lead/
+Full list in [`CLAUDE.md`](CLAUDE.md); these are the ones that cost the most time.
 
-middleware.ts           Session refresh + route gating (must be at the root)
-
-components/
-  ui/                   Card, Badge, Button, StatTile, Donut, Breadcrumb,
-                        ProjectBadges, EmptyState
-  layout/               TopNav, PageHeader, ComingSoon
-
-lib/
-  data/                 ★ The ONLY place that touches the data source
-  permissions.ts        ★ Every "who can do what" rule. Tested
-  contribution.ts       ★ The four contribution signals. Tested
-  labels.ts             All display strings and badge tones
-  types.ts              Domain types, mirroring the database
-  mock-data.ts          Sample data — replaced in Phase 1
-
-docs/                   Phase plan, schema, design system, decisions, product review
-supabase/               Migrations, views, seed
-scripts/                Seed generation
-```
-
-Starred files hold the logic that's most expensive to get wrong, which is why they're the
-ones with tests.
-
----
-
-## The two boundaries
-
-### `lib/data/*` — the data boundary
-
-Pages import from here and **never** from `lib/mock-data.ts`. ESLint enforces it.
-
-Every function is `async` even though the mock behind it is instant, and each returns a
-fully-joined view model — one call per page. That means Phase 1 replaces function bodies
-in one directory instead of rewriting every page, and no page ever fires a query per
-table row.
-
-See [`lib/data/README.md`](lib/data/README.md).
-
-### `lib/permissions.ts` — the authority boundary
-
-Four questions decide everything:
-
-1. Are you a Co-Lead? → anything
-2. Are you an RE of this project **or any above it**? → you own this subtree
-3. Are you this member's Lead, **directly or up their chain**? → you oversee them
-4. Is it your own data? → you can manage it
-
-The two inheritances run in **opposite directions** — RE authority flows *down* the
-project tree, Lead authority flows *up* the reporting chain. That's where bugs would hide,
-so it has 33 tests.
-
----
-
-## Core concepts
-
-**Two separate hierarchies.** The **org tree** is who reports to whom (Division →
-sub-team → sub-sub-team, each with a Team Lead). The **project tree** is what work exists
-(projects nested in projects, each with Responsible Engineers). They're independent — a
-member's Lead isn't necessarily an RE of their projects, which is what lets people work
-across divisions.
-
-**Roles.** Co-Lead → Team Lead → Member, plus the project-scoped RE. Multiple REs per
-project, one primary contact.
-
-**See everything, ask to join.** Every project is readable by every member — phase, team,
-who owns what, what's blocked, who the RE is. Joining goes through that RE, because they're
-accountable for the deliverable. Requests are tracked objects that escalate if unanswered,
-so "ask the RE" never means waiting in silence.
-
-**Per-project updates.** An update carries one section per project, so a note is never
-ambiguous and a blocker routes to the right RE.
+- **Two hierarchies run in opposite directions.** RE authority inherits *down* the project
+  tree; Lead authority inherits *up* the reporting chain. Never check `globalRole` inline —
+  go through `lib/permissions.ts`.
+- **A check-in has a public half and a private half.** Per-project content belongs to the
+  project and everyone sees it. The personal report, total hours and reliability are
+  visible only to the member and their Lead chain.
+- **Pages never import `lib/mock-data`.** They go through `lib/data/*`. ESLint enforces it,
+  and that boundary is the entire reason swapping in Postgres won't touch a single page.
 
 ---
 
 ## Team
 
-- **Anish Bayya** — app functionality
-- **@4deg-kelvin** — hosting, deployment, production database
-  (see [`docs/DECISIONS.md`](docs/DECISIONS.md) §3 and [`supabase/README.md`](supabase/README.md))
+- **Anish Bayya** — application
+- **Kelvin (@4deg-kelvin)** — servers, hosting, production database. His doc is
+  [`docs/INFRA.md`](docs/INFRA.md)
+
+Next.js 15 · TypeScript · Tailwind v4 · Supabase · Vercel

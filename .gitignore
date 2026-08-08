@@ -38,3 +38,6 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Local disk store — dev-only persistence, never committed (lib/store/disk.ts)
+.data/

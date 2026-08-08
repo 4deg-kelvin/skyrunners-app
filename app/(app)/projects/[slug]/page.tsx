@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CornerDownRight, Mail, TriangleAlert, UserPlus } from "lucide-react";
+import { CornerDownRight, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ContactLink } from "@/components/ui/contact-link";
+import {
+  AddDeliverableForm,
+  DeliverableActions,
+} from "@/components/forms/deliverable-actions";
+import { AskToJoinButton } from "@/components/forms/project-actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -57,9 +63,11 @@ export default async function ProjectDetailPage({
     artifacts,
     progress,
     attentionFlags,
+    assignableMembers,
   } = view;
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
+
   const mayAddMember = can.addProjectMember(
     viewer.actor,
     viewer.graph,
@@ -97,10 +105,10 @@ export default async function ProjectDetailPage({
             ) : view.myPendingRequest ? (
               <Badge tone="warn">Request pending</Badge>
             ) : mayRequest ? (
-              <Button>
-                <UserPlus className="size-4" strokeWidth={2.5} />
-                Ask to join
-              </Button>
+              <AskToJoinButton
+                projectId={project.id}
+                projectName={project.name}
+              />
             ) : isFollowing ? (
               <Badge tone="neutral">Following</Badge>
             ) : undefined
@@ -204,9 +212,10 @@ export default async function ProjectDetailPage({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <SectionLabel>Deliverables</SectionLabel>
                 {mayManage ? (
-                  <Button variant="ghost" className="px-2 py-1">
-                    Add deliverable
-                  </Button>
+                  <AddDeliverableForm
+                    projectId={project.id}
+                    candidates={assignableMembers}
+                  />
                 ) : null}
               </div>
 
@@ -227,12 +236,23 @@ export default async function ProjectDetailPage({
                   />
                 ) : (
                   deliverables.map(({ deliverable, owner, overdue }) => (
-                    <DeliverableRow
+                    <div
                       key={deliverable.id}
-                      deliverable={deliverable}
-                      owner={owner}
-                      overdue={overdue}
-                    />
+                      className="rounded-tile border border-line px-3.5 py-3"
+                    >
+                      <DeliverableRow
+                        deliverable={deliverable}
+                        owner={owner}
+                        overdue={overdue}
+                      />
+                      <div className="mt-2.5">
+                        <DeliverableActions
+                          deliverable={deliverable}
+                          isOwner={deliverable.ownerId === viewer.member.id}
+                          canSignOff={mayManage}
+                        />
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -476,13 +496,11 @@ export default async function ProjectDetailPage({
                           <Badge tone="cardinal">Primary</Badge>
                         ) : null}
                       </div>
-                      <a
-                        href={`mailto:${re.email}`}
-                        className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-                      >
-                        <Mail className="size-3.5" />
-                        {re.email}
-                      </a>
+                      <ContactLink
+                        member={re}
+                        showLabel={false}
+                        className="mt-1"
+                      />
                     </div>
                   ))
                 )}

@@ -7,6 +7,7 @@
  * walk, so it would be several.
  */
 
+import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
   contributionInputsFor,
   getMember,
@@ -22,6 +23,7 @@ import {
   projectProgress,
   projectREs,
   scheduleFor,
+  TODAY,
 } from "@/lib/mock-data";
 import {
   buildContributionRecord,
@@ -68,6 +70,16 @@ export interface UpdateDraftSection {
 
 export interface MyWorkView {
   me: Member;
+  /**
+   * Today, and how far back hours may be dated.
+   *
+   * Surfaced through the view model because the log-hours form needs both, and
+   * pages are not allowed to import `lib/mock-data` or the store directly —
+   * ESLint enforces that boundary. Passing them down also keeps the form pure:
+   * it never calls `Date.now()` itself, so it renders identically at any moment.
+   */
+  today: string;
+  maxBackdateDays: number;
   /** Projects they've committed to — these carry obligations. */
   committed: MyProjectCard[];
   /** Projects they're only watching. Unlimited. */
@@ -137,6 +149,8 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
 
   return {
     me,
+    today: TODAY,
+    maxBackdateDays: MAX_BACKDATE_DAYS,
     committed,
     following,
     currentUpdate: {

@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { Clock, Eye, Mail, PenLine, Plus, TriangleAlert } from "lucide-react";
+import { Clock, Eye, PenLine, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ContactLink } from "@/components/ui/contact-link";
+import { LogHoursForm } from "@/components/forms/log-hours-form";
+import { JoinRequestDecision } from "@/components/forms/project-actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -32,6 +35,8 @@ export default async function MyWorkPage() {
     contribution,
     myRequests,
     requestsAwaitingMe,
+    today,
+    maxBackdateDays,
   } = view;
 
   const pendingMine = myRequests.filter((r) => r.request.status === "pending");
@@ -50,10 +55,15 @@ export default async function MyWorkPage() {
         description="What you own, what you owe, and how your effort is adding up."
         action={
           mayLogHours ? (
-            <Button>
-              <Plus className="size-4" strokeWidth={2.5} />
-              Log hours
-            </Button>
+            <LogHoursForm
+              projects={committed.map((c) => ({
+                id: c.project.id,
+                name: c.project.name,
+              }))}
+              defaultProjectId={committed[0]?.project.id}
+              today={today}
+              maxBackdateDays={maxBackdateDays}
+            />
           ) : undefined
         }
       />
@@ -125,6 +135,14 @@ export default async function MyWorkPage() {
                       <p className="mt-2 text-sm text-ink-soft">
                         &ldquo;{request.note}&rdquo;
                       </p>
+                    ) : null}
+
+                    {project ? (
+                      <JoinRequestDecision
+                        requestId={request.id}
+                        projectId={project.id}
+                        requesterName={requester?.fullName ?? "They"}
+                      />
                     ) : null}
                   </div>
                 )
@@ -397,14 +415,7 @@ export default async function MyWorkPage() {
                           {res.length > 1 ? "REs" : "RE"}
                         </SectionLabel>
                         {res.map((re) => (
-                          <a
-                            key={re.id}
-                            href={`mailto:${re.email}`}
-                            className="flex items-center gap-1.5 text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-                          >
-                            <Mail className="size-3.5" />
-                            {re.fullName}
-                          </a>
+                          <ContactLink key={re.id} member={re} showLabel={false} />
                         ))}
                       </div>
                     ) : null}

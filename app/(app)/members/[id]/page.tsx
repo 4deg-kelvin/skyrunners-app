@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Lock, Mail } from "lucide-react";
+import { Clock, Lock } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ContactLink } from "@/components/ui/contact-link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
@@ -70,13 +71,7 @@ export default async function MemberProfilePage({
               <span className="flex size-[72px] shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-2xl font-bold text-cardinal-600">
                 {initials(member.fullName)}
               </span>
-              <a
-                href={`mailto:${member.email}`}
-                className="flex items-center gap-1.5 text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-              >
-                <Mail className="size-3.5" />
-                Email
-              </a>
+              <ContactLink member={member} />
             </div>
 
             <div className="mt-5">

@@ -17,7 +17,8 @@ those three.
 | Doc | Contents |
 |---|---|
 | `CONTRIBUTING.md` | Setup, git workflow, the seven rules |
-| `docs/PHASE_PLAN.md` | **Current build order and what's deliberately not planned** |
+| `docs/STATUS.md` | **What is built, what is blocked, and on exactly what. Read first** |
+| `docs/PHASE_PLAN.md` | Roadmap and what is deliberately not planned |
 | `docs/INFRA.md` | **Everything server/database/deploy — the doc for Kelvin and his agent** |
 | `docs/PHASE_1_KICKOFF.md` | Step-by-step Phase 1 plan, split between the two developers |
 | `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |
@@ -254,8 +255,25 @@ its project.
   A tracked request lands in a queue, shows as pending, and escalates at 5 days.
 - **Transparency by default for *activity*.** Everyone sees projects, who's on what,
   responsibilities, the calendar, Gantt charts.
-- **Effort data is restricted.** Hours, update contents, and engagement scores are visible
-  only to the member, their Lead chain, and REs of projects they contribute to.
+- **A check-in has a public half and a private half.** This is the rule most likely to be
+  got wrong, so it's spelled out:
+
+  | Thing | Who sees it | Rule |
+  |---|---|---|
+  | Per-project entry (progress, blockers, next steps) | **Everyone** — it's the project's history | `can.viewProjectUpdates` |
+  | Hours on one project | That project's REs, inheriting **down** the tree | `can.viewMemberHoursOnProject` |
+  | The personal report, total hours, reliability | The member and their **Lead chain only** | `can.viewMemberEffort`, `can.reviewUpdate` |
+
+  **REs deliberately cannot read someone's personal report.** They get the per-project half
+  publicly instead. Reviewing is one named person's obligation — that's what makes the
+  escalation in `lib/review.ts` meaningful.
+- **An unread check-in escalates after 3 days** to the Lead *above* the Lead who didn't read
+  it. On age, not on count: "12 unread" is ignorable and punishes Leads with more reports,
+  whereas "Kenji has been waiting 6 days" names one person and is actionable.
+- **The dashboard is scoped to who you oversee**, not the club. A Lead opening thirty
+  reports, twenty-six of which aren't theirs, cannot tell what they owe — and the design
+  target is a 15-minute weekly obligation. `/dashboard` also redirects anyone who oversees
+  nobody; hiding the nav link is not access control.
 - **Engagement is a flashlight, not a scoreboard.** Outcomes outweigh hours; no
   leaderboard function exists, deliberately. See `lib/engagement.ts`.
 - **Calendar sync is opt-in**, Google and Apple.

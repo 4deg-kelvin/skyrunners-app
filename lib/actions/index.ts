@@ -1,0 +1,317 @@
+"use server";
+
+/**
+ * ============================================================================
+ * Server Actions — the ONLY place permissions are enforced on writes
+ * ============================================================================
+ *
+ * `lib/store/operations.ts` validates data but deliberately checks no
+ * permissions: it has no access to the request-scoped org graph. These actions
+ * are the layer that does, and they are the only callers.
+ *
+ * Every action follows the same four steps, in this order:
+ *
+ *   1. resolve the viewer (never trust an id from the client)
+ *   2. check `can.*`
+ *   3. call the operation
+ *   4. revalidate
+ *
+ * Step 1 matters more than it looks. A Server Action is a POST endpoint the
+ * moment it exists — anyone can call it with any arguments. So no action takes
+ * an "actor id" parameter; it always derives identity from the session. The only
+ * ids accepted from the caller are the *objects* being acted on, and those are
+ * then checked against the viewer's authority.
+ *
+ * Actions return `ActionResult` rather than throwing. A thrown error in a Server
+ * Action surfaces to the user as a generic "something went wrong" — useless when
+ * the real answer is "those hours are locked because you already submitted a
+ * check-in covering that day".
+ */
+
+import { revalidatePath } from "next/cache";
+
+import { getViewer } from "@/lib/data/viewer";
+import { can } from "@/lib/permissions";
+import { TODAY, getProject, memberProjects, projectDeliverables } from "@/lib/mock-data";
+import * as ops from "@/lib/store/operations";
+
+export interface ActionResult {
+  ok: boolean;
+  /** Shown to the user verbatim, so it has to be a sentence they can act on. */
+  error?: string;
+  message?: string;
+}
+
+function denied(what: string): ActionResult {
+  return { ok: false, error: `You don't have permission to ${what}.` };
+}
+
+function toResult(
+  result: ops.Result<unknown>,
+  successMessage: string
+): ActionResult {
+  return result.ok
+    ? { ok: true, message: successMessage }
+    : { ok: false, error: result.error };
+}
+
+/**
+ * Refresh everything.
+ *
+ * Coarse on purpose: a single hour logged changes My Work, the project page, the
+ * member profile, and the dashboard's rollups. Enumerating those paths would be
+ * a list that silently goes stale as pages are added, and the cost of
+ * over-revalidating a 34-person app is nil.
+ */
+function refresh() {
+  revalidatePath("/", "layout");
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — hours
+// ---------------------------------------------------------------------------
+
+export async function logHoursAction(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const workDate = String(formData.get("workDate") ?? TODAY);
+  const hours = Number(formData.get("hours"));
+  const description = String(formData.get("description") ?? "");
+
+  if (!can.logOwnHours(viewer.actor, viewer.member.id)) {
+    return denied("log hours");
+  }
+  if (!projectId) return { ok: false, error: "Pick a project." };
+
+  // You can only log against projects you're actually on. Otherwise the hours
+  // would appear on an RE's project from someone they've never added, which
+  // makes the per-project totals meaningless.
+  const mine = memberProjects(viewer.member.id);
+  if (!mine.some((m) => m.projectId === projectId)) {
+    return {
+      ok: false,
+      error: "You're not on that project. Ask to join it first.",
+    };
+  }
+
+  const result = await ops.logHours({
+    memberId: viewer.member.id,
+    projectId,
+    workDate,
+    hours,
+    description,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, `Logged ${hours} hrs.`);
+}
+
+export async function deleteHoursAction(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const logId = String(formData.get("logId") ?? "");
+
+  const result = await ops.deleteWorkLog(logId, viewer.member.id, TODAY);
+  if (result.ok) refresh();
+  return toResult(result, "Entry removed.");
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — deliverables
+// ---------------------------------------------------------------------------
+
+export async function createDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const title = String(formData.get("title") ?? "");
+  const ownerId = String(formData.get("ownerId") ?? "");
+  const dueDate = String(formData.get("dueDate") ?? "");
+
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("add deliverables to this project");
+  }
+
+  const result = await ops.createDeliverable({
+    projectId,
+    title,
+    ownerId,
+    dueDate: dueDate || undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Deliverable added.");
+}
+
+/** The owner says it's finished. Does not complete it — an RE must confirm. */
+export async function submitDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const id = String(formData.get("deliverableId") ?? "");
+
+  const result = await ops.submitDeliverable(id, viewer.member.id, TODAY);
+  if (result.ok) refresh();
+  return toResult(result, "Sent to your RE for sign-off.");
+}
+
+export async function confirmDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const id = String(formData.get("deliverableId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+
+  // Sign-off is what makes work count, so this is the check that keeps the
+  // Delivered signal honest. Inherits down the tree: an RE of a parent project
+  // can sign off on its children.
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("sign off on this project's work");
+  }
+
+  const result = await ops.confirmDeliverable(id, viewer.member.id, TODAY);
+  if (result.ok) refresh();
+  return toResult(result, "Signed off.");
+}
+
+export async function reopenDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const id = String(formData.get("deliverableId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("send work back on this project");
+  }
+
+  const result = await ops.reopenDeliverable(id, reason, TODAY);
+  if (result.ok) refresh();
+  return toResult(result, "Sent back with your note.");
+}
+
+export async function setDeliverableStatusAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const id = String(formData.get("deliverableId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+  const status = String(formData.get("status") ?? "") as
+    | "open"
+    | "in_progress"
+    | "blocked";
+  const blockerNote = String(formData.get("blockerNote") ?? "");
+
+  // The owner can move their own work along; so can an RE. Anyone else can't —
+  // otherwise a passer-by could mark someone's work blocked.
+  const deliverable = projectDeliverables(projectId).find((d) => d.id === id);
+  const isOwner = deliverable?.ownerId === viewer.member.id;
+  if (!isOwner && !can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("change this deliverable");
+  }
+
+  const result = await ops.setDeliverableStatus(id, status, blockerNote);
+  if (result.ok) refresh();
+  return toResult(result, "Updated.");
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — membership
+// ---------------------------------------------------------------------------
+
+export async function requestToJoinAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const note = String(formData.get("note") ?? "");
+
+  const project = getProject(projectId);
+  if (!project) return { ok: false, error: "That project no longer exists." };
+  if (!can.requestToJoin(viewer.actor, project)) {
+    return { ok: false, error: "This project isn't taking new people right now." };
+  }
+
+  const result = await ops.requestToJoin({
+    projectId,
+    memberId: viewer.member.id,
+    note,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Asked to join — the RE will see it.");
+}
+
+export async function decideJoinRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+  const accept = String(formData.get("accept") ?? "") === "yes";
+  const responseNote = String(formData.get("responseNote") ?? "");
+
+  if (!can.reviewJoinRequest(viewer.actor, viewer.graph, projectId)) {
+    return denied("answer requests for this project");
+  }
+
+  const result = await ops.decideJoinRequest({
+    requestId,
+    decidedById: viewer.member.id,
+    accept,
+    responseNote,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, accept ? "Added to the project." : "Declined.");
+}
+
+export async function setFollowingAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const following = String(formData.get("following") ?? "") === "yes";
+
+  // Following is unconditionally allowed — watching needs nobody's permission.
+  if (!can.followProject()) return denied("follow projects");
+
+  const result = await ops.setFollowing({
+    projectId,
+    memberId: viewer.member.id,
+    following,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, following ? "Following." : "Unfollowed.");
+}
+
+export async function removeProjectMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.removeProjectMember(viewer.actor, viewer.graph, projectId)) {
+    return denied("remove people from this project");
+  }
+
+  const result = await ops.removeProjectMember({ projectId, memberId });
+  if (result.ok) refresh();
+
+  if (result.ok && result.value.reassigned > 0) {
+    return {
+      ok: true,
+      message: `Removed. ${result.value.reassigned} open ${
+        result.value.reassigned === 1 ? "deliverable" : "deliverables"
+      } marked blocked for you to reassign.`,
+    };
+  }
+  return toResult(result, "Removed from the project.");
+}

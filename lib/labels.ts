@@ -168,6 +168,10 @@ export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
   open: "Not started",
   in_progress: "In progress",
   blocked: "Blocked",
+  // Says who it's waiting on, not just that it's waiting. "Submitted" would
+  // read to the owner as "I'm finished" — they are, but the RE isn't, and the
+  // whole point of the extra step is that the difference is visible.
+  submitted: "Awaiting RE sign-off",
   done: "Done",
 };
 
@@ -175,6 +179,9 @@ export const DELIVERABLE_STATUS_TONES: Record<DeliverableStatus, BadgeTone> = {
   open: "neutral",
   in_progress: "warn",
   blocked: "risk",
+  // Deliberately not "ok" — it isn't delivered yet, and a green badge here
+  // would make the sign-off step feel decorative.
+  submitted: "cardinal",
   done: "ok",
 };
 

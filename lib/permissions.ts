@@ -219,27 +219,83 @@ export const can = {
    *   - anyone up your reporting chain
    *   - an RE of a project you contribute to (or any ancestor of it)
    */
-  viewMemberEffort: (
+  /**
+   * A person's WHOLE effort record — total hours, reliability, their private
+   * twice-weekly report.
+   *
+   * Reporting chain only. An RE used to qualify here via any shared project,
+   * which leaked more than it should: being RE of one project a person
+   * contributes to revealed their hours on every OTHER project, plus their
+   * compliance record. An RE needs to know what's happening on their project,
+   * not how someone is doing overall — that's the Lead's job.
+   *
+   * For the narrower question, use `viewMemberHoursOnProject`.
+   */
+  viewMemberEffort: (actor: Actor, graph: OrgGraph, memberId: string) =>
+    isCoLead(actor) ||
+    isSelf(actor, memberId) ||
+    isLeadOfOrAbove(actor, graph, memberId),
+
+  /**
+   * Hours ONE person logged on ONE project.
+   *
+   * The RE's legitimate need: "who is actually putting time into the thing I'm
+   * accountable for?" Scoped to that project, and inheriting down the project
+   * tree — an RE of a parent sees time on its children, because they're
+   * accountable for that subtree.
+   */
+  viewMemberHoursOnProject: (
     actor: Actor,
     graph: OrgGraph,
     memberId: string,
-    memberProjectIds: string[] = []
+    projectId: string
   ) =>
     isCoLead(actor) ||
     isSelf(actor, memberId) ||
     isLeadOfOrAbove(actor, graph, memberId) ||
-    memberProjectIds.some((pid) => isREofOrAbove(actor, graph, pid)),
+    isREofOrAbove(actor, graph, projectId),
 
-  /** Reviewing an update: their Lead chain, or an RE of a referenced project. */
-  reviewUpdate: (
-    actor: Actor,
-    graph: OrgGraph,
-    authorId: string,
-    updateProjectIds: string[] = []
-  ) =>
-    isCoLead(actor) ||
-    isLeadOfOrAbove(actor, graph, authorId) ||
-    updateProjectIds.some((pid) => isREofOrAbove(actor, graph, pid)),
+  /**
+   * Reading someone's private twice-weekly report, and marking it reviewed.
+   *
+   * Reporting chain ONLY — deliberately not REs. A Lead reviews their own
+   * reports and nobody else's, which is what makes the 15-minute weekly
+   * obligation achievable and what makes the escalation in `lib/review.ts`
+   * meaningful: if a report goes unread, exactly one person is accountable.
+   *
+   * REs are not cut out of the loop; they get the per-project half of the same
+   * update through `viewProjectUpdates`, which is public.
+   */
+  reviewUpdate: (actor: Actor, graph: OrgGraph, authorId: string) =>
+    isCoLead(actor) || isLeadOfOrAbove(actor, graph, authorId),
+
+  /**
+   * The per-project half of an update — progress, blockers, next steps.
+   *
+   * Public, on purpose. It belongs to the PROJECT, not to the person: it's the
+   * project's history, it's how anyone finds out what's happening without
+   * asking a Co-Lead, and it's what lets a passing member unblock someone.
+   *
+   * What stays private is the personal envelope around it — the general note,
+   * the total across every project, and the reliability record.
+   */
+  viewProjectUpdates: () => true,
+
+  /**
+   * Opening the leadership dashboard at all.
+   *
+   * The nav already hides the link from plain members, but hiding a link is not
+   * access control — the route was reachable by typing the URL, and it renders
+   * other people's hours and a review queue. Anyone who oversees at least one
+   * person has a reason to be here; nobody else does.
+   *
+   * Takes `graph` and the viewer's own id rather than just the role, because
+   * "leads somebody" is a fact about the org tree, not about `globalRole`. A
+   * member who has been given reports should see it; a `lead` with none has
+   * nothing to look at.
+   */
+  viewLeadershipDashboard: (actor: Actor, hasReports: boolean) =>
+    isCoLead(actor) || hasReports,
 
   /** Leads roll their reports' updates up the chain. */
   submitRollup: (actor: Actor) => actor.globalRole !== "member",
@@ -299,16 +355,18 @@ export const can = {
   viewOwnContribution: () => true,
 
   /** Someone else's record: their Lead chain, or an RE they work for. */
-  viewMemberContribution: (
-    actor: Actor,
-    graph: OrgGraph,
-    memberId: string,
-    memberProjectIds: string[] = []
-  ) =>
+  /**
+   * The four contribution signals for one person.
+   *
+   * Same reporting-chain-only rule as `viewMemberEffort`, and for the same
+   * reason: reliability and commitment describe the person, not the project, so
+   * they belong to whoever is responsible for supporting that person. An RE
+   * sharing one project is not that.
+   */
+  viewMemberContribution: (actor: Actor, graph: OrgGraph, memberId: string) =>
     isCoLead(actor) ||
     isSelf(actor, memberId) ||
-    isLeadOfOrAbove(actor, graph, memberId) ||
-    memberProjectIds.some((pid) => isREofOrAbove(actor, graph, pid)),
+    isLeadOfOrAbove(actor, graph, memberId),
 
   /** Co-Leads set the club's hours expectation and tier thresholds. */
   configureExpectations: (actor: Actor) => isCoLead(actor),

@@ -43,7 +43,7 @@ import type { OrgGraph } from "../permissions.ts";
  * fails here, loudly, instead of arriving as an `undefined` three layers away.
  */
 export const PROFILE_COLUMNS =
-  "id, email, full_name, preferred_name, photo_url, class_year, major, global_role, status, lead_id, primary_team_id, skills, joined_at";
+  "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at";
 
 export const PROJECT_COLUMNS =
   "id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment";
@@ -81,6 +81,7 @@ interface ProfileRow {
   photo_url: string | null;
   class_year: number | null;
   major: string | null;
+  phone: string | null;
   global_role: Member["globalRole"];
   status: Member["status"];
   lead_id: string | null;
@@ -127,6 +128,7 @@ export function toMember(row: ProfileRow): Member {
     photoUrl: optional(row.photo_url),
     classYear: optional(row.class_year),
     major: optional(row.major),
+    phone: optional(row.phone),
     globalRole: row.global_role,
     status: row.status,
     // Stays `null`, not `undefined` — `Member.leadId` is `string | null`, and

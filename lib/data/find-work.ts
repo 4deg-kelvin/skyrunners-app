@@ -22,13 +22,12 @@
  * genuinely useful.
  */
 
+import { readStore } from "@/lib/store/disk";
 import {
   artifactsFor,
   divisionForProject,
   getMember,
-  isOverdue,
-  joinRequests,
-  projectDeliverables,
+  isOverdue,  projectDeliverables,
   projectMembers,
   projectProgress,
   projectREs,
@@ -138,7 +137,9 @@ export async function getFindWork(
       const mine = projectMembers(project.id).find(
         (pm) => pm.memberId === viewerId
       );
-      const hasRequested = joinRequests.some(
+      // Live, not the seed: after asking to join, the card must immediately say
+      // "Request pending" rather than offering the button again.
+      const hasRequested = readStore().joinRequests.some(
         (r) =>
           r.projectId === project.id &&
           r.memberId === viewerId &&

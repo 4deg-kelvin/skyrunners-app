@@ -184,7 +184,7 @@ describe("co-lead is unconditional", () => {
   });
 });
 
-describe("effort visibility is restricted", () => {
+describe("effort visibility is restricted to the reporting chain", () => {
   test("you can always see your own", () => {
     assert.equal(can.viewMemberEffort(actor("worker"), graph, "worker"), true);
   });
@@ -194,38 +194,88 @@ describe("effort visibility is restricted", () => {
     assert.equal(can.viewMemberEffort(actor("coLead"), graph, "worker"), true);
   });
 
-  test("an RE above a project you contribute to can see it", () => {
+  test("an RE of a project you work on CANNOT see your whole record", () => {
+    // Changed deliberately. An RE used to qualify via any shared project, which
+    // meant being RE of one thing revealed a person's hours on everything else
+    // plus their reliability record. The RE's narrower, legitimate question is
+    // covered by viewMemberHoursOnProject below.
     assert.equal(
-      can.viewMemberEffort(actor("reRoot"), graph, "worker", ["leaf"]),
-      true
+      can.viewMemberEffort(actor("reRoot"), graph, "worker"),
+      false
     );
   });
 
   test("an unrelated member cannot", () => {
     assert.equal(
-      can.viewMemberEffort(actor("outsider"), graph, "worker", ["leaf"]),
+      can.viewMemberEffort(actor("outsider"), graph, "worker"),
       false
     );
   });
 });
 
-describe("update review", () => {
-  test("RE of an ancestor of a referenced project can review", () => {
+describe("an RE sees time on their own project only", () => {
+  test("RE of the project can see hours logged on it", () => {
     assert.equal(
-      can.reviewUpdate(actor("reRoot"), graph, "worker", ["leaf"]),
+      can.viewMemberHoursOnProject(actor("reLeaf"), graph, "worker", "leaf"),
       true
     );
   });
 
-  test("unrelated RE cannot review", () => {
+  test("RE of a PARENT can too — authority inherits down the tree", () => {
     assert.equal(
-      can.reviewUpdate(actor("reOther"), graph, "worker", ["leaf"]),
+      can.viewMemberHoursOnProject(actor("reRoot"), graph, "worker", "leaf"),
+      true
+    );
+  });
+
+  test("...but not on a project outside their subtree", () => {
+    assert.equal(
+      can.viewMemberHoursOnProject(actor("reOther"), graph, "worker", "leaf"),
       false
     );
   });
 
-  test("direct lead can review regardless of projects", () => {
-    assert.equal(can.reviewUpdate(actor("lead2"), graph, "worker", []), true);
+  test("the person themselves always can", () => {
+    assert.equal(
+      can.viewMemberHoursOnProject(actor("worker"), graph, "worker", "leaf"),
+      true
+    );
+  });
+
+  test("the lead chain can, on any project", () => {
+    assert.equal(
+      can.viewMemberHoursOnProject(actor("lead2"), graph, "worker", "other"),
+      true
+    );
+  });
+});
+
+describe("update review is the Lead's job, and only theirs", () => {
+  test("direct lead can review", () => {
+    assert.equal(can.reviewUpdate(actor("lead2"), graph, "worker"), true);
+  });
+
+  test("a lead further up the chain can review", () => {
+    assert.equal(can.reviewUpdate(actor("coLead"), graph, "worker"), true);
+  });
+
+  test("an RE CANNOT read someone's private report", () => {
+    // Changed deliberately. Reviewing is the Lead's obligation and exactly one
+    // person's, which is what makes the escalation in lib/review.ts mean
+    // something. REs get the per-project half publicly instead.
+    assert.equal(can.reviewUpdate(actor("reRoot"), graph, "worker"), false);
+  });
+
+  test("an unrelated member cannot", () => {
+    assert.equal(can.reviewUpdate(actor("outsider"), graph, "worker"), false);
+  });
+});
+
+describe("per-project update content is public", () => {
+  test("anyone can read what's happening on a project", () => {
+    // It belongs to the project, not the person: it's how someone finds work
+    // and how a passing member spots a blocker they can clear.
+    assert.equal(can.viewProjectUpdates(), true);
   });
 });
 
@@ -354,10 +404,13 @@ describe("contribution visibility", () => {
     );
   });
 
-  test("an RE above a project the member works on can", () => {
+  test("an RE above a project the member works on CANNOT", () => {
+    // Changed deliberately, alongside viewMemberEffort. Reliability and
+    // commitment describe the person, so they belong to whoever supports that
+    // person — their Lead. An RE sharing one project is not that.
     assert.equal(
-      can.viewMemberContribution(actor("reRoot"), graph, "worker", ["leaf"]),
-      true
+      can.viewMemberContribution(actor("reRoot"), graph, "worker"),
+      false
     );
   });
 });

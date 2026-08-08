@@ -1,15 +1,10 @@
 import Link from "next/link";
-import {
-  Mail,
-  Sparkles,
-  TriangleAlert,
-  UserPlus,
-  Users,
-} from "lucide-react";
+import { Sparkles, TriangleAlert, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ContactLink } from "@/components/ui/contact-link";
+import { AskToJoinButton } from "@/components/forms/project-actions";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProgressBar } from "@/components/ui/deliverable-row";
@@ -229,10 +224,10 @@ export default async function FindWorkPage() {
                       {viewerStatus === "requested" ? (
                         <Badge tone="warn">Request pending</Badge>
                       ) : (
-                        <Button className="px-4 py-2.5">
-                          <UserPlus className="size-4" strokeWidth={2.5} />
-                          Ask to join
-                        </Button>
+                        <AskToJoinButton
+                          projectId={project.id}
+                          projectName={project.name}
+                        />
                       )}
 
                       {res.length > 0 ? (
@@ -241,14 +236,11 @@ export default async function FindWorkPage() {
                             {res.length > 1 ? "REs:" : "RE:"}
                           </span>
                           {res.map((re) => (
-                            <a
+                            <ContactLink
                               key={re.id}
-                              href={`mailto:${re.email}?subject=${encodeURIComponent(`Joining ${project.name}`)}`}
-                              className="flex items-center gap-1.5 text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-                            >
-                              <Mail className="size-3.5" />
-                              {re.fullName}
-                            </a>
+                              member={re}
+                              subject={`Joining ${project.name}`}
+                            />
                           ))}
                         </div>
                       ) : (

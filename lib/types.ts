@@ -28,6 +28,20 @@ export interface Member {
   photoUrl?: string;
   classYear?: number;
   major?: string;
+  /**
+   * How you actually reach this person, and the PREFERRED contact method.
+   *
+   * Email stays on the record because it's the auth identity — Stanford Google
+   * sign-in, and `profiles.email` is what links an invite to an account. But a
+   * student emailing an RE about joining a project waits days; a text gets
+   * answered. Since `/find-work` lives or dies on someone actually making
+   * contact, the phone number is what gets shown.
+   *
+   * Optional, and the UI falls back to email — never assume it's set. Render it
+   * through `<ContactLink>` rather than reading it directly, so the fallback
+   * lives in one place.
+   */
+  phone?: string;
   globalRole: GlobalRole;
   status: MemberStatus;
   /** The one person they report to. Null for co-leads. */
@@ -119,6 +133,14 @@ export interface ProjectMembership {
    * `following` — they chose to watch. No obligations, self-service, unlimited.
    */
   commitment: "committed" | "following";
+  /**
+   * Which RE added them. Undefined means they self-enrolled (i.e. followed).
+   *
+   * Mirrors `project_members.added_by`. Worth recording on an RE-controlled
+   * roster: when someone asks "why am I on this project?", the answer should
+   * exist somewhere other than one person's memory.
+   */
+  addedBy?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +223,29 @@ export interface JoinRequest {
 // Deliverables — the whole task model
 // ---------------------------------------------------------------------------
 
-export type DeliverableStatus = "open" | "in_progress" | "blocked" | "done";
+/**
+ * `submitted` is the owner saying "I'm done"; `done` is the RE agreeing.
+ *
+ * Two steps rather than one because "Delivered" is the primary contribution
+ * signal and the one thing that must not be inflatable — if finishing your own
+ * work were self-certified, the number would measure confidence rather than
+ * output.
+ *
+ * The cost is real and has to be designed around: an RE who goes quiet freezes
+ * their whole project's record. So unconfirmed work escalates the same way an
+ * unread check-in does (`lib/review.ts`), which turns a silent bottleneck into a
+ * visible one.
+ *
+ * **Only `done` counts as delivered.** Anything that treats `submitted` as
+ * complete — progress bars, the contribution record, "projects completed" —
+ * quietly reintroduces self-certification.
+ */
+export type DeliverableStatus =
+  | "open"
+  | "in_progress"
+  | "blocked"
+  | "submitted"
+  | "done";
 
 /**
  * One flat list per project. Four fields that matter: title, ONE owner, a date,
@@ -230,7 +274,12 @@ export interface Deliverable {
   ownerId: string;
   dueDate?: string;
   status: DeliverableStatus;
+  /** When the OWNER marked it done. Not the same as being delivered. */
+  submittedAt?: string;
+  /** When an RE confirmed it. This is the one that counts. */
   completedAt?: string;
+  /** Which RE confirmed. Snapshotted — REs change over a project's life. */
+  confirmedById?: string;
   /** Why it's stuck. Routes to the project's REs. */
   blockerNote?: string;
   sortOrder: number;

@@ -1,6 +1,7 @@
 # Phase Plan
 
-**Updated:** 2026-08-06. This is the canonical build order.
+**Updated:** 2026-08-07. Roadmap and rationale. For *what is built right now*, see
+[`STATUS.md`](STATUS.md) — that is the page to trust.
 
 Two organising principles:
 
@@ -77,7 +78,7 @@ synchronous and get called in loops while walking trees. 18 tests, plus
 
 ### Phase 1d — The rest of the data layer **[App — blocked on keys]**
 
-The remaining app-side Phase 1 work is `PHASE_1_KICKOFF.md` §4: replace the other
+The remaining app-side Phase 1 work is: replace the other
 12 `lib/data/*` function bodies with real queries, then delete `lib/mock-data.ts`.
 
 **Deliberately not done blind.** The kickoff says "one file at a time", and each
@@ -142,17 +143,22 @@ The phase that justifies the whole project. Everything else is plumbing.
       kind, mostly links rather than uploads
 - [x] **Find Work page** — every active project ranked by where a member would help most,
       with skill matching and the RE's contact on every card
-- [ ] Ask-to-join writes to the database *(needs Phase 1b)*
-- [ ] Follow / unfollow actions *(needs Phase 1b)*
-- [ ] RE actions: add and remove members, assign deliverables *(needs Phase 1b)*
+- [x] **Ask-to-join** — a tracked request, visible as pending, escalating at 5 days
+- [x] Follow / unfollow
+- [x] RE actions: answer requests, add and remove members, assign deliverables
 
-**Read-only discovery is done.** The remaining items are all writes, which need a real
-database — so this is the natural handoff point back to Kelvin.
+**Done 2026-08-07.** The writes did not wait for Postgres after all — they persist to a
+local disk store (`lib/store/`), so the whole flow is usable and testable now and becomes
+SQL when the keys land.
 
 **Done when** a member can answer "what's happening in this club and who do I talk to?"
 without asking a Co-Lead.
 
-### Phase 3 — Hours logging **[App]**
+### Phase 3 — Hours logging ✅ **[App]**
+
+Done 2026-08-07, except bulk week entry. Backdating is capped at 7 days and hours lock
+once a submitted check-in has reported them, so a report a Lead has already read cannot
+change underneath them.
 
 Moved earlier — it's the highest-frequency action, it's satisfying to use, and it feeds
 every later phase.
@@ -163,12 +169,17 @@ every later phase.
 - Phone-first, because this happens in the lab
 - Your own tier and progress toward Core
 
-### Phase 4 — Deliverables and RE tooling **[App]**
+### Phase 4 — Deliverables and RE tooling ✅ **[App]**
 
-- Create, assign, re-order, complete deliverables
-- Mark blocked with a reason
-- RE liveness alerts: quiet RE, stale blockers, overdue deliverables
-- Deputy-RE prompt on any project with sub-projects
+Done 2026-08-07, except re-ordering and the deputy-RE prompt.
+
+- [x] Create, assign, complete deliverables. Assigning to a non-member auto-adds them
+- [x] **Two-step completion** — the owner marks `submitted`, an RE confirms `done`. Only
+      `done` counts as delivered, which is what keeps that signal from being self-certified
+- [x] Mark blocked with a reason (required — a blocker nobody can route is useless)
+- [x] Unconfirmed work escalates on the same clock as an unread check-in, so a quiet RE
+      freezing everyone's record is visible rather than silent
+- [ ] Re-ordering; deputy-RE prompt
 
 ### Phase 5 — Terms calendar and re-enrollment **[App]**
 

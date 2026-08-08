@@ -24,6 +24,7 @@ import {
   type WorkLog,
 } from "./types.ts";
 import type { ContributionInputs } from "./contribution.ts";
+import { readStore } from "./store/disk.ts";
 
 // ---------------------------------------------------------------------------
 // Club
@@ -139,6 +140,7 @@ export const members: Member[] = [
     id: "m-anish",
     fullName: "Anish Bayya",
     email: "anish25@stanford.edu",
+    phone: "(650) 555-1007",
     globalRole: "co_lead",
     status: "active",
     leadId: null,
@@ -151,6 +153,7 @@ export const members: Member[] = [
     id: "m-priya",
     fullName: "Priya Raghavan",
     email: "praghavan@stanford.edu",
+    phone: "(650) 555-1014",
     globalRole: "lead",
     status: "active",
     leadId: "m-anish",
@@ -164,6 +167,7 @@ export const members: Member[] = [
     id: "m-marcus",
     fullName: "Marcus Oyelaran",
     email: "moyelaran@stanford.edu",
+    phone: "(650) 555-1021",
     globalRole: "lead",
     status: "active",
     leadId: "m-anish",
@@ -177,6 +181,7 @@ export const members: Member[] = [
     id: "m-lena",
     fullName: "Lena Fischer",
     email: "lfischer@stanford.edu",
+    phone: "(650) 555-1028",
     globalRole: "lead",
     status: "active",
     leadId: "m-anish",
@@ -190,6 +195,7 @@ export const members: Member[] = [
     id: "m-james",
     fullName: "James Whitfield",
     email: "jwhitfield@stanford.edu",
+    phone: "(650) 555-1035",
     globalRole: "lead",
     status: "active",
     leadId: "m-anish",
@@ -202,6 +208,7 @@ export const members: Member[] = [
     id: "m-dev",
     fullName: "Dev Patel",
     email: "devpatel@stanford.edu",
+    phone: "(650) 555-1042",
     globalRole: "lead",
     status: "active",
     leadId: "m-priya",
@@ -215,6 +222,7 @@ export const members: Member[] = [
     id: "m-sofia",
     fullName: "Sofia Marquez",
     email: "smarquez@stanford.edu",
+    phone: "(650) 555-1049",
     globalRole: "member",
     status: "active",
     leadId: "m-dev",
@@ -228,6 +236,7 @@ export const members: Member[] = [
     id: "m-kenji",
     fullName: "Kenji Nakamura",
     email: "knakamura@stanford.edu",
+    phone: "(650) 555-1056",
     globalRole: "member",
     status: "active",
     leadId: "m-marcus",
@@ -241,6 +250,7 @@ export const members: Member[] = [
     id: "m-amara",
     fullName: "Amara Okonkwo",
     email: "aokonkwo@stanford.edu",
+    phone: "(650) 555-1063",
     globalRole: "member",
     status: "active",
     leadId: "m-lena",
@@ -254,6 +264,7 @@ export const members: Member[] = [
     id: "m-tyler",
     fullName: "Tyler Brooks",
     email: "tbrooks@stanford.edu",
+    phone: "(650) 555-1070",
     globalRole: "member",
     status: "active",
     leadId: "m-priya",
@@ -267,6 +278,7 @@ export const members: Member[] = [
     id: "m-hana",
     fullName: "Hana Suzuki",
     email: "hsuzuki@stanford.edu",
+    phone: "(650) 555-1077",
     globalRole: "member",
     status: "active",
     leadId: "m-marcus",
@@ -280,6 +292,7 @@ export const members: Member[] = [
     id: "m-omar",
     fullName: "Omar Haddad",
     email: "ohaddad@stanford.edu",
+    phone: "(650) 555-1084",
     globalRole: "member",
     status: "active",
     leadId: "m-lena",
@@ -305,6 +318,7 @@ export const members: Member[] = [
     id: "m-noah",
     fullName: "Noah Bergström",
     email: "nbergstrom@stanford.edu",
+    phone: "(650) 555-1098",
     globalRole: "member",
     status: "active",
     leadId: "m-dev",
@@ -313,6 +327,302 @@ export const members: Member[] = [
     major: "Materials Science",
     joinedAt: "2026-06-02",
     skills: ["materials", "testing"],
+  },
+
+  // -------------------------------------------------------------------------
+  // The rest of the club.
+  //
+  // Brings the roster to a realistic ~34. Worth having, because several things
+  // only misbehave at scale: a Lead with one report makes any review queue look
+  // manageable, and a five-person roster hides the fact that /find-work's
+  // ordering is the whole point of the page.
+  //
+  // Deliberately included:
+  //   - m-rosa, a second-level Lead under Marcus, so the reporting chain is four
+  //     deep in two different branches rather than one.
+  //   - m-blake, active but on ZERO projects — the gap called out in
+  //     lib/test-env/README.md. This is the most common real state (someone who
+  //     just joined) and nothing in the app was previously exercised against it.
+  //   - m-wei and m-fatima, inactive/alumni, so "never hard-delete" is visible.
+  // -------------------------------------------------------------------------
+
+  {
+    id: "m-rosa",
+    fullName: "Rosa Delgado",
+    email: "rdelgado@stanford.edu",
+    phone: "(650) 555-1105",
+    globalRole: "lead",
+    status: "active",
+    leadId: "m-marcus",
+    primaryTeamId: "team-propulsion",
+    classYear: 2027,
+    major: "Aeronautics & Astronautics",
+    joinedAt: "2026-03-25",
+    skills: ["propulsion", "test operations"],
+  },
+  {
+    id: "m-blake",
+    fullName: "Blake Ferris",
+    email: "bferris@stanford.edu",
+    phone: "(650) 555-1112",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-james",
+    classYear: 2029,
+    major: "Undeclared",
+    joinedAt: "2026-07-28",
+    skills: [],
+  },
+  {
+    id: "m-ines",
+    fullName: "Inés Moreau",
+    email: "imoreau@stanford.edu",
+    phone: "(650) 555-1119",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-rosa",
+    primaryTeamId: "team-propulsion",
+    classYear: 2028,
+    major: "Mechanical Engineering",
+    joinedAt: "2026-04-22",
+    skills: ["thermal", "testing"],
+  },
+  {
+    id: "m-theo",
+    fullName: "Theo Almeida",
+    email: "talmeida@stanford.edu",
+    phone: "(650) 555-1126",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-rosa",
+    primaryTeamId: "team-propulsion",
+    classYear: 2029,
+    major: "Mechanical Engineering",
+    joinedAt: "2026-05-18",
+    skills: ["machining", "fabrication"],
+  },
+  {
+    id: "m-yuki",
+    fullName: "Yuki Tanaka",
+    email: "ytanaka@stanford.edu",
+    phone: "(650) 555-1133",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-marcus",
+    primaryTeamId: "team-avionics",
+    classYear: 2028,
+    major: "Electrical Engineering",
+    joinedAt: "2026-04-09",
+    skills: ["firmware", "RF"],
+  },
+  {
+    id: "m-priyanka",
+    fullName: "Priyanka Shah",
+    email: "pshah2@stanford.edu",
+    phone: "(650) 555-1140",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-marcus",
+    primaryTeamId: "team-avionics",
+    classYear: 2029,
+    major: "Computer Science",
+    joinedAt: "2026-05-22",
+    skills: ["embedded", "Rust"],
+  },
+  {
+    id: "m-caleb",
+    fullName: "Caleb Osei",
+    email: "cosei@stanford.edu",
+    phone: "(650) 555-1147",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-lena",
+    primaryTeamId: "team-perception",
+    classYear: 2028,
+    major: "Computer Science",
+    joinedAt: "2026-04-25",
+    skills: ["deep learning", "computer vision"],
+  },
+  {
+    id: "m-mira",
+    fullName: "Mira Kaplan",
+    email: "mkaplan@stanford.edu",
+    phone: "(650) 555-1154",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-lena",
+    primaryTeamId: "team-perception",
+    classYear: 2029,
+    major: "Symbolic Systems",
+    joinedAt: "2026-06-14",
+    skills: ["Python", "data"],
+  },
+  {
+    id: "m-arjun",
+    fullName: "Arjun Nair",
+    email: "anair3@stanford.edu",
+    phone: "(650) 555-1161",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-priya",
+    primaryTeamId: "team-structures",
+    classYear: 2028,
+    major: "Aeronautics & Astronautics",
+    joinedAt: "2026-04-30",
+    skills: ["CAD", "structures"],
+  },
+  {
+    id: "m-elena",
+    fullName: "Elena Petrova",
+    email: "epetrova@stanford.edu",
+    phone: "(650) 555-1168",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-priya",
+    primaryTeamId: "team-structures",
+    classYear: 2029,
+    major: "Mechanical Engineering",
+    joinedAt: "2026-05-27",
+    skills: ["FEA", "CAD"],
+  },
+  {
+    id: "m-jonas",
+    fullName: "Jonas Weber",
+    email: "jweber@stanford.edu",
+    phone: "(650) 555-1175",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-dev",
+    primaryTeamId: "team-composites",
+    classYear: 2028,
+    major: "Materials Science",
+    joinedAt: "2026-06-08",
+    skills: ["composites", "layup"],
+  },
+  {
+    id: "m-aisha",
+    fullName: "Aisha Rahman",
+    email: "arahman@stanford.edu",
+    phone: "(650) 555-1182",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-dev",
+    primaryTeamId: "team-composites",
+    classYear: 2029,
+    major: "Chemical Engineering",
+    joinedAt: "2026-06-20",
+    skills: ["resins", "testing"],
+  },
+  {
+    id: "m-daniel",
+    fullName: "Daniel Cho",
+    email: "dcho@stanford.edu",
+    phone: "(650) 555-1189",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-james",
+    classYear: 2028,
+    major: "Product Design",
+    joinedAt: "2026-05-14",
+    skills: ["design", "prototyping"],
+  },
+  {
+    id: "m-sara",
+    fullName: "Sara Lindqvist",
+    email: "slindqvist@stanford.edu",
+    phone: "(650) 555-1196",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-james",
+    classYear: 2029,
+    major: "Communication",
+    joinedAt: "2026-06-25",
+    skills: ["outreach", "writing"],
+  },
+  {
+    id: "m-victor",
+    fullName: "Victor Nkemelu",
+    email: "vnkemelu@stanford.edu",
+    phone: "(650) 555-1203",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-rosa",
+    primaryTeamId: "team-propulsion",
+    classYear: 2028,
+    major: "Aeronautics & Astronautics",
+    joinedAt: "2026-05-06",
+    skills: ["propulsion", "CFD"],
+  },
+  {
+    id: "m-lucia",
+    fullName: "Lucía Fernández",
+    email: "lfernandez@stanford.edu",
+    phone: "(650) 555-1210",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-lena",
+    primaryTeamId: "team-perception",
+    classYear: 2028,
+    major: "Electrical Engineering",
+    joinedAt: "2026-04-28",
+    skills: ["sensors", "calibration"],
+  },
+  {
+    id: "m-owen",
+    fullName: "Owen Bradshaw",
+    email: "obradshaw@stanford.edu",
+    phone: "(650) 555-1217",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-marcus",
+    primaryTeamId: "team-avionics",
+    classYear: 2029,
+    major: "Electrical Engineering",
+    joinedAt: "2026-07-02",
+    skills: ["PCB design"],
+  },
+  {
+    id: "m-nadia",
+    fullName: "Nadia Haddad",
+    email: "nhaddad@stanford.edu",
+    phone: "(650) 555-1224",
+    globalRole: "member",
+    status: "active",
+    leadId: "m-priya",
+    primaryTeamId: "team-structures",
+    classYear: 2027,
+    major: "Civil Engineering",
+    joinedAt: "2026-04-03",
+    skills: ["structures", "analysis"],
+  },
+  {
+    id: "m-wei",
+    fullName: "Wei Zhang",
+    email: "wzhang@stanford.edu",
+    phone: "(650) 555-1231",
+    globalRole: "member",
+    // On leave for a quarter. Deactivated, never deleted — the history has to
+    // survive, and "who's on what" would be a lie if they still appeared active.
+    status: "inactive",
+    leadId: "m-lena",
+    primaryTeamId: "team-perception",
+    classYear: 2028,
+    major: "Computer Science",
+    joinedAt: "2026-04-11",
+    skills: ["SLAM"],
+  },
+  {
+    id: "m-fatima",
+    fullName: "Fatima Al-Sayed",
+    email: "falsayed@stanford.edu",
+    globalRole: "member",
+    status: "alumni",
+    leadId: "m-priya",
+    primaryTeamId: "team-structures",
+    classYear: 2026,
+    major: "Aeronautics & Astronautics",
+    joinedAt: "2026-01-15",
+    skills: ["CAD", "composites"],
   },
 ];
 
@@ -566,6 +876,34 @@ export const projectMemberships: ProjectMembership[] = [
   { projectId: "p-outreach", memberId: "m-james", role: "re", responsibility: "Workshop program", joinedAt: "2026-08-01", commitment: "committed" },
   { projectId: "p-outreach", memberId: "m-grace", role: "re", responsibility: "Curriculum and logistics", joinedAt: "2026-08-01", commitment: "committed" },
   { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01", commitment: "committed" },
+
+  // --- The wider club -------------------------------------------------------
+  // Note m-blake appears NOWHERE below. That's deliberate: a brand-new member on
+  // no projects is the state /find-work exists to fix, and it was previously
+  // unrepresentable in mock data.
+  { projectId: "p-propulsion-test", memberId: "m-rosa", role: "re", responsibility: "Propulsion test campaign", joinedAt: "2026-04-02", commitment: "committed" },
+  { projectId: "p-propulsion-test", memberId: "m-ines", role: "contributor", responsibility: "Thermal instrumentation", joinedAt: "2026-05-01", commitment: "committed" },
+  { projectId: "p-propulsion-test", memberId: "m-theo", role: "contributor", responsibility: "Stand fabrication", joinedAt: "2026-05-20", commitment: "committed" },
+  { projectId: "p-propulsion-test", memberId: "m-victor", role: "contributor", responsibility: "CFD correlation", joinedAt: "2026-05-10", commitment: "committed" },
+  { projectId: "p-avionics-bringup", memberId: "m-yuki", role: "contributor", responsibility: "Telemetry link", joinedAt: "2026-04-12", commitment: "committed" },
+  { projectId: "p-avionics-bringup", memberId: "m-priyanka", role: "contributor", responsibility: "Flight-controller firmware", joinedAt: "2026-05-25", commitment: "committed" },
+  { projectId: "p-power", memberId: "m-owen", role: "contributor", responsibility: "Connector selection", joinedAt: "2026-07-05", commitment: "committed" },
+  { projectId: "p-vio", memberId: "m-caleb", role: "contributor", responsibility: "Feature-tracker tuning", joinedAt: "2026-04-28", commitment: "committed" },
+  { projectId: "p-vio", memberId: "m-lucia", role: "contributor", responsibility: "Camera calibration", joinedAt: "2026-05-02", commitment: "committed" },
+  { projectId: "p-sim", memberId: "m-mira", role: "contributor", responsibility: "Scenario scripting", joinedAt: "2026-06-18", commitment: "committed" },
+  { projectId: "p-gps-denied", memberId: "m-caleb", role: "contributor", responsibility: "Re-localisation experiments", joinedAt: "2026-06-01", commitment: "committed" },
+  { projectId: "p-airframe-v2", memberId: "m-arjun", role: "contributor", responsibility: "Fuselage CAD", joinedAt: "2026-05-02", commitment: "committed" },
+  { projectId: "p-wing-spar", memberId: "m-elena", role: "contributor", responsibility: "FEA support", joinedAt: "2026-06-01", commitment: "committed" },
+  { projectId: "p-wing-spar", memberId: "m-nadia", role: "contributor", responsibility: "Load case definition", joinedAt: "2026-04-10", commitment: "committed" },
+  { projectId: "p-layup", memberId: "m-jonas", role: "contributor", responsibility: "Layup assistance", joinedAt: "2026-06-12", commitment: "committed" },
+  { projectId: "p-layup", memberId: "m-aisha", role: "contributor", responsibility: "Resin characterisation", joinedAt: "2026-06-22", commitment: "committed" },
+  { projectId: "p-load-test", memberId: "m-elena", role: "contributor", responsibility: "Strain gauge layout", joinedAt: "2026-07-20", commitment: "committed" },
+  { projectId: "p-outreach", memberId: "m-daniel", role: "contributor", responsibility: "Workshop materials", joinedAt: "2026-05-20", commitment: "committed" },
+  { projectId: "p-outreach", memberId: "m-sara", role: "contributor", responsibility: "School outreach", joinedAt: "2026-06-26", commitment: "committed" },
+  { projectId: "p-skydelta-concept", memberId: "m-nadia", role: "contributor", responsibility: "Structural sizing", joinedAt: "2026-07-04", commitment: "committed" },
+  // Following, not committed — watching without obligations.
+  { projectId: "p-gps-denied", memberId: "m-priyanka", role: "observer", joinedAt: "2026-06-30", commitment: "following" },
+  { projectId: "p-airframe-v2", memberId: "m-theo", role: "observer", joinedAt: "2026-07-11", commitment: "following" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -640,14 +978,39 @@ export const joinRequests: JoinRequest[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Live data
+// ---------------------------------------------------------------------------
+
+/**
+ * The mutable collections, read through the disk store rather than the literals
+ * below.
+ *
+ * The arrays in this file are the SEED. Once something has been written — an
+ * hour logged, a deliverable signed off — the truth lives in .data/store.json,
+ * and a helper still reading the literal would show the user their change
+ * silently vanishing on the next render.
+ *
+ * Static entities (members, projects, teams) are NOT in the store and are still
+ * read straight from the literals: nothing in phases 2-4 creates them, and
+ * copying them would mean two sources of truth for the org chart.
+ *
+ * The import cycle here (mock-data -> store/disk -> mock-data) is real but safe:
+ * neither module touches the other at evaluation time.  reads these
+ * arrays lazily, and  is only ever called from inside a function.
+ */
+function live() {
+  return readStore();
+}
+
 export function pendingRequestsFor(projectId: string): JoinRequest[] {
-  return joinRequests.filter(
+  return live().joinRequests.filter(
     (r) => r.projectId === projectId && r.status === "pending"
   );
 }
 
 export function myJoinRequests(memberId: string) {
-  return joinRequests
+  return live().joinRequests
     .filter((r) => r.memberId === memberId)
     .map((r) => ({
       request: r,
@@ -665,7 +1028,7 @@ export function myJoinRequests(memberId: string) {
  * control the gate, you owe people an answer.
  */
 export function joinRequestsAwaitingMe(memberId: string) {
-  return joinRequests
+  return live().joinRequests
     .filter((r) => r.status === "pending")
     .filter((r) => getProject(r.projectId)?.reIds.includes(memberId))
     .map((r) => ({
@@ -678,7 +1041,7 @@ export function joinRequestsAwaitingMe(memberId: string) {
 
 /** Requests nobody has answered in too long — a silent RE blocks a member. */
 export function staleJoinRequests() {
-  return joinRequests
+  return live().joinRequests
     .filter(
       (r) =>
         r.status === "pending" &&
@@ -921,6 +1284,147 @@ export const progressUpdates: ProgressUpdate[] = [
       },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // Reports written and NOT yet read.
+  //
+  // TODAY is 2026-08-06 and the grace period is 3 days (lib/review.ts), so the
+  // ages below are chosen to sit either side of the escalation boundary:
+  //
+  //   submitted 08-05 → 1 day  → unread, not escalated
+  //   submitted 08-03 → 3 days → escalates, exactly on the boundary
+  //   submitted 08-01 → 5 days → escalates
+  //
+  // Marcus and Lena each have escalating reports, so signing in as Anish (their
+  // Co-Lead) shows a populated escalation list, and signing in as Marcus shows
+  // his own unread queue. Priya has none — a Lead who IS keeping up, so the
+  // healthy state is visible too.
+  // ---------------------------------------------------------------------------
+
+  {
+    id: "u-8",
+    memberId: "m-yuki",
+    dueAt: "2026-08-01T23:59",
+    submittedAt: "2026-08-01T18:40",
+    status: "submitted",
+    hoursThisPeriod: 7,
+    entries: [
+      {
+        id: "ue-8",
+        updateId: "u-8",
+        projectId: "p-avionics-bringup",
+        progress: "Telemetry link holding at 400 m line of sight.",
+        blockers: "Packet loss climbs above 15% once the airframe blocks LOS.",
+        nextSteps: "Try the higher-gain antenna Marcus mentioned.",
+        hours: 7,
+      },
+    ],
+  },
+  {
+    id: "u-9",
+    memberId: "m-priyanka",
+    dueAt: "2026-08-03T23:59",
+    submittedAt: "2026-08-03T22:05",
+    status: "submitted",
+    hoursThisPeriod: 5,
+    entries: [
+      {
+        id: "ue-9",
+        updateId: "u-9",
+        projectId: "p-avionics-bringup",
+        progress: "Firmware builds clean on the new toolchain.",
+        blockers: "I don't have Lab 64 access yet, so I can't flash hardware.",
+        nextSteps: "Blocked until someone can badge me in.",
+        hours: 5,
+      },
+    ],
+  },
+  {
+    id: "u-10",
+    memberId: "m-caleb",
+    dueAt: "2026-08-01T23:59",
+    submittedAt: "2026-08-01T09:15",
+    status: "submitted",
+    hoursThisPeriod: 6,
+    entries: [
+      {
+        id: "ue-10",
+        updateId: "u-10",
+        projectId: "p-vio",
+        progress: "Swapped the feature tracker; drift down roughly 20%.",
+        nextSteps: "Re-run the full indoor set for comparable numbers.",
+        hours: 6,
+      },
+    ],
+  },
+  {
+    id: "u-11",
+    memberId: "m-lucia",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T19:30",
+    status: "submitted",
+    hoursThisPeriod: 3.5,
+    entries: [
+      {
+        id: "ue-11",
+        updateId: "u-11",
+        projectId: "p-vio",
+        progress: "Camera intrinsics re-calibrated; reprojection error halved.",
+        hours: 3.5,
+      },
+    ],
+  },
+  {
+    id: "u-12",
+    memberId: "m-ines",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T21:00",
+    status: "reviewed",
+    hoursThisPeriod: 4.5,
+    entries: [
+      {
+        id: "ue-12",
+        updateId: "u-12",
+        projectId: "p-propulsion-test",
+        progress: "Thermocouples wired and reading sensibly.",
+        nextSteps: "Repeatability run once the stand is calibrated.",
+        hours: 4.5,
+      },
+    ],
+  },
+  {
+    id: "u-13",
+    memberId: "m-arjun",
+    dueAt: "2026-08-05T23:59",
+    submittedAt: "2026-08-05T17:45",
+    status: "reviewed",
+    hoursThisPeriod: 5,
+    entries: [
+      {
+        id: "ue-13",
+        updateId: "u-13",
+        projectId: "p-airframe-v2",
+        progress: "Fuselage frames modelled through station 6.",
+        hours: 5,
+      },
+    ],
+  },
+  {
+    id: "u-14",
+    memberId: "m-elena",
+    dueAt: "2026-08-05T23:59",
+    status: "missed",
+    hoursThisPeriod: 0,
+    entries: [],
+  },
+  {
+    id: "u-15",
+    memberId: "m-blake",
+    dueAt: "2026-08-05T23:59",
+    status: "pending",
+    hoursThisPeriod: 0,
+    entries: [],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -941,6 +1445,30 @@ export const workLogs: WorkLog[] = [
   { id: "w-8", memberId: "m-hana", projectId: "p-propulsion-test", workDate: "2026-08-05", hours: 5.5, description: "Frame welding" },
   { id: "w-9", memberId: "m-noah", projectId: "p-load-test", workDate: "2026-08-03", hours: 4, description: "Rig CAD" },
   { id: "w-10", memberId: "m-omar", projectId: "p-sim", workDate: "2026-08-01", hours: 1.5, description: "ROS 2 migration attempt" },
+
+  // --- The wider club's hours ------------------------------------------------
+  // Spread across the week so "hours this week" and the per-project totals an RE
+  // sees are non-trivial. m-blake has none, which is the point of m-blake.
+  { id: "w-11", memberId: "m-yuki", projectId: "p-avionics-bringup", workDate: "2026-08-05", hours: 4, description: "Telemetry range testing" },
+  { id: "w-12", memberId: "m-yuki", projectId: "p-avionics-bringup", workDate: "2026-08-02", hours: 3, description: "Antenna comparison" },
+  { id: "w-13", memberId: "m-priyanka", projectId: "p-avionics-bringup", workDate: "2026-08-04", hours: 5, description: "Firmware toolchain migration" },
+  { id: "w-14", memberId: "m-owen", projectId: "p-power", workDate: "2026-08-05", hours: 2, description: "Connector trade study" },
+  { id: "w-15", memberId: "m-caleb", projectId: "p-vio", workDate: "2026-08-04", hours: 3.5, description: "Feature tracker swap" },
+  { id: "w-16", memberId: "m-caleb", projectId: "p-gps-denied", workDate: "2026-08-01", hours: 2.5, description: "Re-localisation experiments" },
+  { id: "w-17", memberId: "m-lucia", projectId: "p-vio", workDate: "2026-08-05", hours: 3.5, description: "Camera calibration" },
+  { id: "w-18", memberId: "m-mira", projectId: "p-sim", workDate: "2026-08-03", hours: 2, description: "Scenario scripting" },
+  { id: "w-19", memberId: "m-arjun", projectId: "p-airframe-v2", workDate: "2026-08-05", hours: 5, description: "Fuselage frame CAD" },
+  { id: "w-20", memberId: "m-elena", projectId: "p-wing-spar", workDate: "2026-08-02", hours: 3, description: "FEA mesh support" },
+  { id: "w-21", memberId: "m-nadia", projectId: "p-wing-spar", workDate: "2026-08-04", hours: 4.5, description: "Load case definition" },
+  { id: "w-22", memberId: "m-nadia", projectId: "p-skydelta-concept", workDate: "2026-08-05", hours: 2, description: "Structural sizing pass" },
+  { id: "w-23", memberId: "m-jonas", projectId: "p-layup", workDate: "2026-08-03", hours: 4, description: "Layup assistance" },
+  { id: "w-24", memberId: "m-aisha", projectId: "p-layup", workDate: "2026-08-05", hours: 3, description: "Resin cure trials" },
+  { id: "w-25", memberId: "m-ines", projectId: "p-propulsion-test", workDate: "2026-08-04", hours: 4.5, description: "Thermocouple wiring" },
+  { id: "w-26", memberId: "m-theo", projectId: "p-propulsion-test", workDate: "2026-08-02", hours: 6, description: "Stand fabrication" },
+  { id: "w-27", memberId: "m-victor", projectId: "p-propulsion-test", workDate: "2026-08-05", hours: 3.5, description: "CFD correlation" },
+  { id: "w-28", memberId: "m-rosa", projectId: "p-propulsion-test", workDate: "2026-08-04", hours: 5, description: "Test campaign planning" },
+  { id: "w-29", memberId: "m-daniel", projectId: "p-outreach", workDate: "2026-08-03", hours: 2.5, description: "Workshop materials" },
+  { id: "w-30", memberId: "m-sara", projectId: "p-outreach", workDate: "2026-08-05", hours: 2, description: "School scheduling" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -984,13 +1512,13 @@ export function childProjects(parentId: string | null) {
 }
 
 export function projectMembers(projectId: string) {
-  return projectMemberships
+  return live().projectMemberships
     .filter((pm) => pm.projectId === projectId)
     .map((pm) => ({ ...pm, member: getMember(pm.memberId) }));
 }
 
 export function memberProjects(memberId: string) {
-  return projectMemberships
+  return live().projectMemberships
     .filter((pm) => pm.memberId === memberId)
     .map((pm) => ({ ...pm, project: getProject(pm.projectId) }));
 }
@@ -1061,7 +1589,7 @@ export function projectBreadcrumb(
 // ---------------------------------------------------------------------------
 
 export function projectDeliverables(projectId: string): Deliverable[] {
-  return deliverables
+  return live().deliverables
     .filter((d) => d.projectId === projectId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
@@ -1075,13 +1603,19 @@ export function myDeliverablesOn(
 }
 
 export function myDeliverables(memberId: string): Deliverable[] {
-  return deliverables
+  return live().deliverables
     .filter((d) => d.ownerId === memberId)
     .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
 }
 
 export function isOverdue(d: Deliverable): boolean {
-  return d.status !== "done" && !!d.dueDate && d.dueDate < TODAY;
+  // `submitted` is excluded on purpose. The owner has finished and is waiting on
+  // an RE to sign off — marking their work "overdue" because someone else is
+  // slow blames the wrong person, and it's the exact unfairness the RE-confirms
+  // rule risks introducing. The delay still surfaces, but against the RE, via
+  // `pendingSignOffs()` in lib/review.ts.
+  if (d.status === "done" || d.status === "submitted") return false;
+  return !!d.dueDate && d.dueDate < TODAY;
 }
 
 /** Real percentage rather than a vibe — the payoff of one flat list. */
@@ -1101,7 +1635,7 @@ export function projectProgress(projectId: string) {
 
 /** Blockers surfaced from deliverables, so nobody waits for their update day. */
 export function openBlockerDeliverables(): Deliverable[] {
-  return deliverables.filter((d) => d.status === "blocked");
+  return live().deliverables.filter((d) => d.status === "blocked");
 }
 
 // ---------------------------------------------------------------------------
@@ -1244,14 +1778,14 @@ export function contributionInputsFor(
 
 /** How many projects an RE has actually put this member on. No cap. */
 export function committedProjectCount(memberId: string): number {
-  return projectMemberships.filter(
+  return live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
   ).length;
 }
 
 /** Every project a member is on, with their role and responsibility. */
 export function myProjects(memberId: string) {
-  return projectMemberships
+  return live().projectMemberships
     .filter((pm) => pm.memberId === memberId)
     .map((pm) => ({
       membership: pm,
@@ -1320,7 +1854,7 @@ export function divisionForProject(projectId: string): Team | undefined {
 }
 
 export function hoursOnProject(memberId: string, projectId: string) {
-  return workLogs
+  return live().workLogs
     .filter((w) => w.memberId === memberId && w.projectId === projectId)
     .reduce((sum, w) => sum + w.hours, 0);
 }
@@ -1341,7 +1875,7 @@ export function lastEntryForProject(memberId: string, projectId: string) {
 
 /** All entries about a project, from anyone — the project's activity feed. */
 export function projectUpdateFeed(projectId: string) {
-  return progressUpdates
+  return live().progressUpdates
     .filter((u) => u.submittedAt)
     .flatMap((u) =>
       u.entries
@@ -1357,7 +1891,7 @@ export function projectUpdateFeed(projectId: string) {
 
 /** Blockers across a member's projects — what a Lead most needs to see. */
 export function openBlockers() {
-  return progressUpdates
+  return live().progressUpdates
     .filter((u) => u.submittedAt)
     .flatMap((u) =>
       u.entries
@@ -1408,14 +1942,14 @@ function daysBetween(a: string, b: string): number {
 
 /** Hours logged in the trailing 7 days — matches the dashboard's label. */
 export function hoursThisWeek(): number {
-  return workLogs
+  return live().workLogs
     .filter((w) => daysBetween(w.workDate, TODAY) <= 7)
     .reduce((sum, w) => sum + w.hours, 0);
 }
 
 /** Hours a member logged on one project in the trailing 7 days. */
 export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
-  return workLogs
+  return live().workLogs
     .filter(
       (w) =>
         w.memberId === memberId &&
@@ -1426,7 +1960,7 @@ export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
 }
 
 export function awaitingReview() {
-  return progressUpdates.filter((u) => u.status === "submitted" || u.status === "late");
+  return live().progressUpdates.filter((u) => u.status === "submitted" || u.status === "late");
 }
 
 export function atRiskProjects() {
