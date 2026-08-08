@@ -26,6 +26,8 @@ those three.
 | `docs/DESIGN_SYSTEM.md` | Visual language, tokens, component rules |
 | `docs/DECISIONS.md` | Locked decisions, infrastructure notes |
 | `lib/data/README.md` | Why the data layer exists and how to extend it |
+| `lib/test-env/README.md` | The persona switcher — browse as Member / Lead / Co-Lead |
+| `docs/TWO_TRACK_DEPLOY.md` | Shipping to the club while still building |
 | `supabase/README.md` | Migrations, views, RLS plan |
 
 ## Team
@@ -72,6 +74,13 @@ is not blocking.
 mode-agnostic. **Never add a second place that checks the mode** — if a feature needs to
 know, it belongs in `lib/data/*`.
 
+**Test environment.** `SKYRUNNERS_TEST_ENV=1` in `.env.local` adds a persona switcher so
+you can browse as a Member, a Team Lead or a Co-Lead. It's gated on demo mode as well as
+the flag, so it can never run against real data. Six personas, chosen to exercise the
+permission crossing rather than one per role — including **a plain member who is an RE**,
+the case that catches inline `globalRole` checks. See `lib/test-env/README.md`. Remove the
+whole thing with `npm run remove:test-env`.
+
 ### Route structure
 
 ```
@@ -117,6 +126,13 @@ project tree, Lead authority flows **up** the reporting chain. That asymmetry is
 bugs hide, which is why there are 33 tests on it.
 
 Pages get `{ actor, graph, member }` from `getViewer()` and call `can.*`.
+
+**`OrgGraph`'s three lookups are synchronous, and that's load-bearing.** They're called in
+loops while walking both trees, so they must never each become a query. `lib/data/graph.ts`
+loads every profile, project and RE membership in three parallel queries and closes over
+Maps. Backing them with per-call queries turns one permission check into fifty.
+
+Argument order is `(actor, graph, projectId)` — the graph is always second.
 
 ## Deliverables are the entire task model
 

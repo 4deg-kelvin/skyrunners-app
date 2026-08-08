@@ -1,0 +1,284 @@
+/**
+ * Does the code agree with the database schema?
+ *
+ * Run with:  npm test
+ *
+ * ---------------------------------------------------------------------------
+ * Why this exists
+ * ---------------------------------------------------------------------------
+ *
+ * The rest of Phase 1 is "replace each `lib/data/*` body with a real query",
+ * and it has to be written before there's a database to run it against. The most
+ * likely mistake by a wide margin isn't logic — it's naming: `full_name` typed as
+ * `fullname`, a column renamed in a later migration, a table that was never
+ * created.
+ *
+ * PostgREST reports those at runtime, as a 400 on a page nobody loads until
+ * launch day. This turns the same class of mistake into a failing test, today,
+ * with no database, by reading `supabase/migrations/*.sql` and checking every
+ * column the code names actually exists.
+ *
+ * It cannot check semantics — whether a join is right, whether RLS allows the
+ * read. It checks spelling, which is what actually goes wrong.
+ */
+
+import assert from "node:assert/strict";
+import { test, describe } from "node:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { QUERIED_COLUMNS } from "./graph.ts";
+
+const MIGRATIONS_DIR = join(import.meta.dirname, "..", "..", "supabase", "migrations");
+
+/**
+ * Parse `create table` and `alter table ... add column` out of the migrations.
+ *
+ * A deliberately small parser, not a SQL engine. It only has to cope with the
+ * style used in this repo — one column per line, lowercase keywords — and it's
+ * better for it to under-report than to guess: an unparsed column shows up as a
+ * test failure to investigate, which is the safe direction.
+ */
+function parseSchema(): Map<string, Set<string>> {
+  const tables = new Map<string, Set<string>>();
+
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort(); // 0001, 0002, ... so later migrations amend earlier ones
+
+  for (const file of files) {
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+
+    // --- create table -----------------------------------------------------
+    const createRe = /create table (?:if not exists )?(\w+)\s*\(([\s\S]*?)\n\);/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = createRe.exec(sql)) !== null) {
+      const [, table, body] = match;
+      const columns = tables.get(table) ?? new Set<string>();
+
+      for (const rawLine of body.split("\n")) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith("--")) continue;
+
+        // Table-level clauses, not columns.
+        if (
+          /^(constraint|primary key|unique|check|foreign key|exclude)\b/i.test(
+            line
+          )
+        ) {
+          continue;
+        }
+
+        const column = line.match(/^([a-z_][a-z0-9_]*)\s+\S/);
+        if (column) columns.add(column[1]);
+      }
+
+      tables.set(table, columns);
+    }
+
+    // --- alter table add column ------------------------------------------
+    const alterRe =
+      /alter table (\w+)\s+add column (?:if not exists )?([a-z_][a-z0-9_]*)/g;
+    while ((match = alterRe.exec(sql)) !== null) {
+      const [, table, column] = match;
+      const columns = tables.get(table) ?? new Set<string>();
+      columns.add(column);
+      tables.set(table, columns);
+    }
+  }
+
+  return tables;
+}
+
+const schema = parseSchema();
+
+describe("the migration parser itself", () => {
+  // If the parser silently stopped working, every test below would pass
+  // vacuously. These are the canary.
+  test("found the core tables", () => {
+    for (const table of [
+      "profiles",
+      "projects",
+      "project_members",
+      "teams",
+      "deliverables",
+      "join_requests",
+    ]) {
+      assert.ok(schema.has(table), `Parser did not find table "${table}"`);
+    }
+  });
+
+  test("found a realistic number of columns on profiles", () => {
+    const count = schema.get("profiles")?.size ?? 0;
+    assert.ok(count > 10, `Only parsed ${count} columns on profiles`);
+  });
+
+  test("does not mistake constraints for columns", () => {
+    const columns = schema.get("profiles");
+    assert.ok(!columns?.has("constraint"));
+    assert.ok(!columns?.has("profiles_stanford_email"));
+  });
+
+  test("picks up a column it would be easy to miss", () => {
+    // `primary_re_id` sits after a two-line comment in 0001. If the parser
+    // tripped over comments, this is where it would show.
+    assert.ok(schema.get("projects")?.has("primary_re_id"));
+  });
+});
+
+describe("every column the data layer reads exists in the schema", () => {
+  for (const { table, columns } of QUERIED_COLUMNS) {
+    test(`${table}: ${columns.slice(0, 45)}${columns.length > 45 ? "…" : ""}`, () => {
+      const actual = schema.get(table);
+      assert.ok(actual, `No "create table ${table}" in supabase/migrations/`);
+
+      const missing = columns
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c && !actual.has(c));
+
+      assert.deepEqual(
+        missing,
+        [],
+        `${table} has no column(s): ${missing.join(", ")}.\n` +
+          `Available: ${[...actual].sort().join(", ")}`
+      );
+    });
+  }
+});
+
+/**
+ * Enum values must match between the SQL and `lib/types.ts`.
+ *
+ * This is CLAUDE.md's trap #2, and it's the nastiest failure mode in the repo
+ * because it doesn't throw. `global_role` being `admin` in SQL and `co_lead` in
+ * TypeScript wouldn't error — `isCoLead()` would simply return false forever,
+ * silently disabling every leadership permission in the app.
+ *
+ * Comparing them as SETS: order is irrelevant to correctness, and Postgres enum
+ * order only affects sorting.
+ */
+describe("SQL enums match the TypeScript unions", () => {
+  const sql = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
+    .join("\n");
+
+  const typesSrc = readFileSync(
+    join(import.meta.dirname, "..", "types.ts"),
+    "utf8"
+  );
+
+  function sqlEnum(name: string): string[] | null {
+    const match = sql.match(
+      new RegExp(`create type ${name} as enum\\s*\\(([^)]*)\\)`)
+    );
+    if (!match) return null;
+    return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+  }
+
+  function tsUnion(name: string): string[] | null {
+    // Matches both one-per-line unions and single-line ones.
+    const match = typesSrc.match(
+      new RegExp(`export type ${name} =([\\s\\S]*?);`)
+    );
+    if (!match) return null;
+    return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
+  }
+
+  const PAIRS: Array<[sqlName: string, tsName: string]> = [
+    ["global_role", "GlobalRole"],
+    ["member_status", "MemberStatus"],
+    ["project_role", "ProjectRole"],
+    ["project_phase", "ProjectPhase"],
+    ["project_health", "ProjectHealth"],
+    ["update_status", "UpdateStatus"],
+    ["artifact_kind", "ArtifactKind"],
+    ["event_kind", "EventKind"],
+  ];
+
+  for (const [sqlName, tsName] of PAIRS) {
+    test(`${sqlName} === ${tsName}`, () => {
+      const fromSql = sqlEnum(sqlName);
+      const fromTs = tsUnion(tsName);
+
+      assert.ok(fromSql, `No "create type ${sqlName}" in supabase/migrations/`);
+      assert.ok(fromTs, `No "export type ${tsName}" in lib/types.ts`);
+      assert.deepEqual(
+        fromSql,
+        fromTs,
+        `${sqlName} (SQL) and ${tsName} (TS) disagree. This does NOT throw at ` +
+          `runtime — comparisons just silently fail forever.`
+      );
+    });
+  }
+});
+
+describe("the tables the app renders but 0001-0006 never created", () => {
+  // Added by 0007. Without these, `my-work`, `dashboard`, `events` and
+  // `find-work` cannot leave mock data — there is nothing to query.
+  test("progress_updates and update_entries exist", () => {
+    assert.ok(schema.has("progress_updates"));
+    assert.ok(schema.has("update_entries"));
+  });
+
+  test("the update envelope holds no content", () => {
+    // Content belongs in `update_entries`, one row per project. A `progress`
+    // or `blockers` column here would recreate the single-blob update that
+    // CLAUDE.md explicitly rejects.
+    const columns = schema.get("progress_updates");
+    assert.ok(!columns?.has("progress"), "progress belongs on update_entries");
+    assert.ok(!columns?.has("blockers"), "blockers belongs on update_entries");
+  });
+
+  test("update_entries is per-project", () => {
+    const columns = schema.get("update_entries");
+    assert.ok(columns?.has("project_id"));
+    assert.ok(columns?.has("progress"));
+    assert.ok(columns?.has("blockers"));
+    assert.ok(columns?.has("hours"));
+  });
+
+  test("the Lead at submission is snapshotted, not joined live", () => {
+    // Leads change mid-quarter. Joining live to profiles.lead_id would re-file
+    // historic updates under the new Lead.
+    assert.ok(schema.get("progress_updates")?.has("lead_id_at_submission"));
+  });
+
+  test("project_artifacts and events exist", () => {
+    assert.ok(schema.has("project_artifacts"));
+    assert.ok(schema.has("events"));
+  });
+
+  test("an artifact can be a link or a file", () => {
+    const columns = schema.get("project_artifacts");
+    assert.ok(columns?.has("external_url"));
+    assert.ok(columns?.has("file_url"));
+  });
+});
+
+describe("assumptions the org graph is built on", () => {
+  test("profiles.lead_id exists — the reporting chain depends on it", () => {
+    assert.ok(schema.get("profiles")?.has("lead_id"));
+  });
+
+  test("projects.parent_id exists — the project tree depends on it", () => {
+    assert.ok(schema.get("projects")?.has("parent_id"));
+  });
+
+  test("project_members has left_at, so departures can be filtered out", () => {
+    // Never-hard-delete: without this column the RE filter would count people
+    // who left the club last year.
+    assert.ok(schema.get("project_members")?.has("left_at"));
+  });
+
+  test("the two hierarchies are still separate tables", () => {
+    // teams.parent_id is the org tree; projects.parent_id is the work tree.
+    // Merging them rebuilds the silos this app exists to remove.
+    assert.ok(schema.get("teams")?.has("parent_id"));
+    assert.ok(schema.get("projects")?.has("parent_id"));
+    assert.notEqual(schema.get("teams"), schema.get("projects"));
+  });
+});

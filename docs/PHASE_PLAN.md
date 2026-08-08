@@ -57,15 +57,67 @@ Verified: typecheck clean, 68 tests, lint clean, demo mode boots with zero env v
 
 ## Next
 
+### Phase 1c — The org graph on Postgres ✅ **[App]**
+
+*Added 2026-08-07.* Found while finishing Phase 1, not in the original plan.
+
+`getLiveViewer()` returned a real profile (a genuine auth UUID) but handed
+`lib/permissions.ts` the **mock** graph. Every rule starts with
+`graph.getMember(actor.id)`, so in live mode it was reasoning about someone who,
+as far as the graph was concerned, didn't exist.
+
+It failed *closed* — nobody gained access they shouldn't have — but every Lead and
+RE would have silently lost theirs, presenting as "why can't I edit my own
+project?" with nothing pointing at the cause.
+
+`lib/data/graph.ts` now loads profiles, projects and RE memberships in three
+parallel queries and closes over Maps, because `OrgGraph`'s methods are
+synchronous and get called in loops while walking trees. 18 tests, plus
+`schema.test.ts` (below).
+
+### Phase 1d — The rest of the data layer **[App — blocked on keys]**
+
+The remaining app-side Phase 1 work is `PHASE_1_KICKOFF.md` §4: replace the other
+12 `lib/data/*` function bodies with real queries, then delete `lib/mock-data.ts`.
+
+**Deliberately not done blind.** The kickoff says "one file at a time", and each
+of these needs to be run against a real database to be worth anything — several
+build heavy aggregates (`getMyWork`, `getDashboard`, `getFindWork`) that are a
+rewrite of half the app's logic in SQL. Writing all twelve unverified would
+produce code that looks finished and isn't.
+
+**Unblocked by:** the Supabase URL and anon key in `.env.local`. That's it.
+
+To reduce the risk when it does happen, `lib/data/schema.test.ts` parses
+`supabase/migrations/*.sql` and asserts every column the code names actually
+exists — so a typo or a renamed column fails `npm test` instead of becoming a 400
+on a page nobody opens until launch day. **Add to `QUERIED_COLUMNS` in
+`graph.ts` as you add queries.**
+
 ### Phase 1b — Auth, infrastructure side **[Infra — Kelvin]**
 
 Everything here is his, and none of it blocks Anish.
 
+**Status 2026-08-07:** Kelvin has the app hosted and data management set up, but
+nothing of it is in the repo — `origin/main` is identical to local `main`, and his
+last commit is `dbd685c`. That's expected: creating a Supabase project, running
+migrations and setting env vars are dashboard actions that produce no commits.
+What's needed from him isn't code, it's the two facts below.
+
+**What Anish needs to unblock Phase 1d:**
+
+1. `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+2. Which of `0001`–`0006` have actually been applied
+
 - Create the Supabase project
 - Apply migrations `0001` → `0005` (all five are written and waiting)
 - Google OAuth restricted to `stanford.edu`
-- Uncomment the bootstrap Co-Lead block in `0005` with Anish's real address, and run it
-  **before** he first signs in
+- ~~Uncomment the bootstrap Co-Lead block in `0005`~~ — **superseded by
+  `0006_bootstrap_co_lead.sql`**, which does the same thing for
+  anish25@stanford.edu and is safe to run at any time, before or after his first
+  sign-in, more than once. Written as a new migration rather than an edit to
+  `0005` because `0005` may already have been applied, and editing an applied
+  migration means the file no longer describes the database
 - Load `seed.sql` (dev only)
 - Vercel project and environment variables, including `NEXT_PUBLIC_APP_URL`
 

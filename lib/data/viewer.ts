@@ -7,6 +7,13 @@
  *   DEMO MODE — returns the mock user from `CURRENT_USER_ID`.
  *
  * Nothing downstream cares which happened. Every page just gets a `Viewer`.
+ *
+ * TEST-ENV:START — remove with `npm run remove:test-env`
+ * With `SKYRUNNERS_TEST_ENV=1`, the demo branch also honours a persona cookie so
+ * you can browse as a Member, a Team Lead or a Co-Lead. That override lives here
+ * and nowhere else, for the same reason the mode check does: this file is the one
+ * place allowed to decide who the viewer is.
+ * TEST-ENV:END
  */
 
 import { cache } from "react";
@@ -16,12 +23,16 @@ import type { Actor, OrgGraph } from "@/lib/permissions";
 import type { Member } from "@/lib/types";
 import { isLiveMode } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { loadLiveOrgGraph } from "./graph";
 import {
   CURRENT_USER_ID,
   directREs,
   getMember,
   getProject,
 } from "@/lib/mock-data";
+// TEST-ENV:START — remove with `npm run remove:test-env`
+import { readTestPersonaId } from "@/lib/test-env";
+// TEST-ENV:END
 
 export interface Viewer {
   member: Member;
@@ -34,13 +45,13 @@ export interface Viewer {
 }
 
 /**
- * The org graph backing permission checks.
+ * The org graph backing permission checks, on mock data.
  *
- * PHASE 1b NOTE: these three lookups get called repeatedly while walking trees,
- * so they must not each become a database round trip. Load the member and
- * project rows once per request and close over them, or push the check into the
- * `v_project_re_authority` / `v_lead_chain` views. Do NOT make these query
- * directly — that's how a permission check turns into fifty queries.
+ * The live equivalent is `loadLiveOrgGraph` in `./graph.ts`. Both satisfy the
+ * same synchronous `OrgGraph` interface, which is the constraint that shapes
+ * everything: these lookups are called in loops while walking trees, so they
+ * must never each become a database round trip. The live version therefore loads
+ * every row up front and closes over Maps.
  */
 function buildMockOrgGraph(): OrgGraph {
   return { getMember, getProject, directREs };
@@ -65,12 +76,18 @@ export const getViewer = cache(async (): Promise<Viewer> => {
 // Demo mode
 // ---------------------------------------------------------------------------
 
-function getDemoViewer(): Viewer {
-  const member = getMember(CURRENT_USER_ID);
+async function getDemoViewer(): Promise<Viewer> {
+  // TEST-ENV:START — remove with `npm run remove:test-env`
+  // Returns null unless SKYRUNNERS_TEST_ENV=1, so this is a no-op by default.
+  const viewerId = (await readTestPersonaId()) ?? CURRENT_USER_ID;
+  // TEST-ENV:REPLACE-WITH const viewerId = CURRENT_USER_ID;
+  // TEST-ENV:END
+
+  const member = getMember(viewerId);
 
   if (!member) {
     throw new Error(
-      `No mock profile for "${CURRENT_USER_ID}". Check CURRENT_USER_ID in lib/mock-data.ts.`
+      `No mock profile for "${viewerId}". Check CURRENT_USER_ID in lib/mock-data.ts.`
     );
   }
 
@@ -135,10 +152,10 @@ async function getLiveViewer(): Promise<Viewer> {
   return {
     member,
     actor: { id: member.id, globalRole: member.globalRole },
-    // PHASE 1b: replace with a request-scoped graph loaded from Postgres. Until
-    // the rest of lib/data is switched over, the mock graph keeps the app
-    // coherent rather than half-real.
-    graph: buildMockOrgGraph(),
+    // Real rows, keyed by real auth UUIDs. This previously used the mock graph,
+    // which meant `getMember(<real uuid>)` returned undefined and every Lead and
+    // RE silently lost their permissions in live mode.
+    graph: await loadLiveOrgGraph(supabase),
     isDemo: false,
   };
 }

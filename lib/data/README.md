@@ -37,11 +37,39 @@ So: **do the joining here, where it can become one SQL query.** Never in a compo
 
 ## When you wire up Supabase
 
-1. Add `lib/supabase/server.ts` (a server client from `@supabase/ssr`)
+1. ~~Add `lib/supabase/server.ts`~~ — done in Phase 1a
 2. Replace each function body here with a query — keep the signature and return type
-3. Delete `lib/mock-data.ts` once nothing imports it
-4. Push the joining into SQL views where it gets hairy (`docs/DATA_MODEL.md` lists the
+3. **Add the columns you read to `QUERIED_COLUMNS` in `graph.ts`** (see below)
+4. Delete `lib/mock-data.ts` once nothing imports it
+5. Push the joining into SQL views where it gets hairy (`docs/DATA_MODEL.md` lists the
    views worth creating)
 
 Return types are the contract. If a return type has to change, that's a signal the
 page's needs changed — which is fine, just change both together.
+
+`graph.ts` is the worked example — `toMember` / `toProject` show the snake_case →
+camelCase mapping, including the one rule that isn't mechanical: Postgres `null` becomes
+`undefined` for optional fields, **except** `leadId` and `parentId`, where `null` is
+meaningful ("reports to nobody", "top-level project") and both tree walks terminate on it.
+
+## Checking queries without a database
+
+`schema.test.ts` parses `supabase/migrations/*.sql` and asserts every column named in
+`QUERIED_COLUMNS` actually exists.
+
+This exists because the rest of the swap has to be written before there's a database to
+run it against, and the likeliest mistake by a wide margin is naming — `full_name` typed
+as `fullname`, a column renamed in a later migration. PostgREST reports those as a 400 at
+runtime, on a page nobody opens until launch day. This turns them into a failed `npm test`
+instead.
+
+It checks spelling, not semantics. It cannot tell you a join is wrong or that RLS will hide
+the rows — only that the columns are real. That's still the failure it's worth catching
+early, and it costs one line per query.
+
+```ts
+export const QUERIED_COLUMNS = [
+  { table: "profiles", columns: PROFILE_COLUMNS },
+  // ...add yours here
+];
+```
