@@ -141,6 +141,38 @@ export const can = {
   /** Any Lead or Co-Lead can invite a new member by Stanford email. */
   inviteMember: (actor: Actor) => actor.globalRole !== "member",
 
+  /**
+   * Promoting or demoting someone — member ↔ lead ↔ co_lead.
+   *
+   * **Co-Leads only.** This is the one permission that can change the shape of
+   * the permission system itself, so it sits at the very top and nowhere else.
+   * If a Team Lead could appoint Team Leads, authority would spread sideways
+   * with nobody accountable for it, and the reporting chain — which the whole
+   * review and escalation model rests on — would stop meaning anything.
+   *
+   * A Co-Lead cannot change their OWN role. Not a trust question: it's the
+   * lock-out guard. Demoting yourself while you're the only Co-Lead leaves a
+   * club with nobody who can appoint anyone, recoverable only by hand-editing
+   * the database. `setGlobalRole` in the store enforces the matching invariant
+   * that the last Co-Lead can't be removed by anyone.
+   */
+  setGlobalRole: (actor: Actor, targetId: string) =>
+    isCoLead(actor) && !isSelf(actor, targetId),
+
+  /**
+   * Deactivating or reactivating someone.
+   *
+   * Deliberately NOT deletion — history has to survive graduations, and a
+   * deactivated member's past check-ins and delivered work stay attached to
+   * their projects.
+   *
+   * Available to anyone above them in the chain, because the person who notices
+   * someone has left the club is almost always their Lead, not a Co-Lead.
+   */
+  setMemberStatus: (actor: Actor, graph: OrgGraph, memberId: string) =>
+    !isSelf(actor, memberId) &&
+    (isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId)),
+
   // --- Projects --------------------------------------------------------
 
   /**

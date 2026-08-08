@@ -1488,11 +1488,11 @@ export const events: ClubEvent[] = [
 // ---------------------------------------------------------------------------
 
 export function getMember(id: string) {
-  return members.find((m) => m.id === id);
+  return live().members.find((m) => m.id === id);
 }
 
 export function getProject(id: string) {
-  return projects.find((p) => p.id === id);
+  return live().projects.find((p) => p.id === id);
 }
 
 export function directREs(projectId: string) {
@@ -1508,7 +1508,7 @@ export function childTeams(parentId: string) {
 }
 
 export function childProjects(parentId: string | null) {
-  return projects.filter((p) => p.parentId === parentId);
+  return live().projects.filter((p) => p.parentId === parentId);
 }
 
 export function projectMembers(projectId: string) {
@@ -1524,7 +1524,7 @@ export function memberProjects(memberId: string) {
 }
 
 export function activeMembers() {
-  return members.filter((m) => m.status === "active");
+  return live().members.filter((m) => m.status === "active");
 }
 
 export function getTeam(id: string) {
@@ -1771,7 +1771,7 @@ export function contributionInputsFor(
       (u) => u.status === "submitted" || u.status === "reviewed"
     ).length,
     updatesLate: myUpdates.filter((u) => u.status === "late").length,
-    reRoleCount: projects.filter((p) => p.reIds.includes(memberId)).length,
+    reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId)).length,
     projectsCommitted: committed.length,
   };
 }
@@ -1964,5 +1964,5 @@ export function awaitingReview() {
 }
 
 export function atRiskProjects() {
-  return projects.filter((p) => p.health === "at_risk" || p.health === "blocked");
+  return live().projects.filter((p) => p.health === "at_risk" || p.health === "blocked");
 }

@@ -14,11 +14,11 @@ import {
   hoursOnProject,
   isOverdue,
   memberProjects,
-  members,
   myDeliverables,
   projectBreadcrumb,
   projectREs,
 } from "@/lib/mock-data";
+import { readStore } from "@/lib/store/disk";
 import {
   buildContributionRecord,
   commitmentTier,
@@ -33,6 +33,14 @@ import type {
 } from "@/lib/types";
 import type { BreadcrumbNode } from "./my-work";
 
+/** People who can be somebody's Lead — leadership plus anyone with reports. */
+export interface RosterOptions {
+  /** Candidates for the "reports to" dropdown. */
+  leadOptions: { id: string; fullName: string }[];
+  /** Everyone active, for invite defaults and project assignment. */
+  everyone: { id: string; fullName: string }[];
+}
+
 export interface RosterRow {
   member: Member;
   lead?: Member;
@@ -46,6 +54,30 @@ export interface RosterRow {
   /** Shown only where the viewer is allowed to see effort data. */
   tier: CommitmentTier;
   hoursPerWeek: number;
+}
+
+/**
+ * Options the leadership controls need.
+ *
+ * Split from `getRoster` so the roster stays one query's worth of view model,
+ * and computed here rather than in the page because pages may not import
+ * `lib/mock-data` — ESLint enforces that boundary.
+ */
+export async function getRosterOptions(): Promise<RosterOptions> {
+  const active = activeMembers();
+  return {
+    // Anyone who already leads someone stays eligible even if their global role
+    // is `member` — the reporting chain is a fact about the org tree, not about
+    // job titles, and demoting someone shouldn't silently orphan their reports.
+    leadOptions: active
+      .filter(
+        (m) =>
+          m.globalRole !== "member" ||
+          active.some((other) => other.leadId === m.id)
+      )
+      .map((m) => ({ id: m.id, fullName: m.fullName })),
+    everyone: active.map((m) => ({ id: m.id, fullName: m.fullName })),
+  };
 }
 
 export async function getRoster(): Promise<RosterRow[]> {
@@ -107,7 +139,7 @@ export async function getMemberProfile(
   return {
     member,
     lead: member.leadId ? getMember(member.leadId) : undefined,
-    directReports: members.filter(
+    directReports: readStore().members.filter(
       (m) => m.leadId === member.id && m.status === "active"
     ),
     projects: memberProjects(memberId).flatMap((pm) => {
@@ -137,5 +169,5 @@ export async function getMemberProfile(
 
 /** Every member id — used to pre-render profile pages at build time. */
 export async function getAllMemberIds(): Promise<string[]> {
-  return members.map((m) => m.id);
+  return readStore().members.map((m) => m.id);
 }

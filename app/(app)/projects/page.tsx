@@ -2,13 +2,14 @@ import Link from "next/link";
 import { CornerDownRight, TriangleAlert, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import { CreateProjectForm } from "@/components/forms/project-admin";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
   getOrphanedProjects,
+  getProjectFormOptions,
   getProjectTree,
   type ProjectTreeNode,
 } from "@/lib/data/projects";
@@ -16,9 +17,10 @@ import { getViewer } from "@/lib/data/viewer";
 import { can } from "@/lib/permissions";
 
 export default async function ProjectsPage() {
-  const [tree, orphans, viewer] = await Promise.all([
+  const [tree, orphans, formOptions, viewer] = await Promise.all([
     getProjectTree(),
     getOrphanedProjects(),
+    getProjectFormOptions(),
     getViewer(),
   ]);
 
@@ -30,7 +32,16 @@ export default async function ProjectsPage() {
         label="All Divisions"
         title="Projects"
         description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
-        action={mayCreate ? <Button>New project</Button> : undefined}
+        action={
+          mayCreate ? (
+            <CreateProjectForm
+              parents={formOptions.parents}
+              divisions={formOptions.divisions}
+              people={formOptions.people}
+              defaultReId={viewer.member.id}
+            />
+          ) : undefined
+        }
       />
 
       {/* Data-integrity warning rather than silently hiding work */}

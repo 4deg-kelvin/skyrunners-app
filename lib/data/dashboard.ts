@@ -32,11 +32,11 @@ import {
   divisions,
   getMember,
   getProject,
-  members,
-  projects,
+  memberProjects,
   TODAY,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
 import { escalationsFor, unreadReportsFor, type LeadEscalation } from "@/lib/review";
 import type { Member, Project, ProgressUpdate, UpdateEntry } from "@/lib/types";
@@ -83,6 +83,10 @@ export interface DashboardView {
   escalations: LeadEscalation[];
   /** Club-wide, deliberately: anyone may help with a blocked project. */
   flaggedProjects: FlaggedProject[];
+  /** The viewer's own committed projects, so they can log hours from here. */
+  myProjects: { id: string; name: string }[];
+  today: string;
+  maxBackdateDays: number;
 }
 
 /**
@@ -96,11 +100,14 @@ function reportsBelow(memberId: string): Member[] {
   const collected: Member[] = [];
   const seen = new Set<string>([memberId]);
   let frontier = [memberId];
+  // Read once, outside the loop: the chain walk is O(depth × members) and
+  // re-reading the store per level would multiply that for no reason.
+  const allMembers = readStore().members;
 
   while (frontier.length > 0) {
     const next: string[] = [];
     for (const id of frontier) {
-      for (const m of members) {
+      for (const m of allMembers) {
         if (m.leadId === id && !seen.has(m.id)) {
           seen.add(m.id);
           collected.push(m);
@@ -139,7 +146,7 @@ export async function getDashboard(
 
   // A Co-Lead oversees the club; everyone else oversees their own subtree.
   const overseen = isCoLead(actor)
-    ? members.filter((m) => m.id !== actor.id && m.status === "active")
+    ? readStore().members.filter((m) => m.id !== actor.id && m.status === "active")
     : reportsBelow(actor.id).filter((m) => m.status === "active");
 
   const overseenIds = new Set(overseen.map((m) => m.id));
@@ -147,7 +154,7 @@ export async function getDashboard(
   // Reports written to the viewer personally — their direct reports only. A
   // Lead two levels up sees the escalation instead, not the raw report, so the
   // obligation stays with exactly one person.
-  const directReports = members.filter(
+  const directReports = readStore().members.filter(
     (m) => m.leadId === actor.id && m.status === "active"
   );
 
@@ -199,7 +206,7 @@ export async function getDashboard(
     counts: {
       peopleOverseen: overseen.length,
       divisions: divisions().length,
-      projects: projects.length,
+      projects: readStore().projects.length,
     },
     compliance: {
       onTime,
@@ -212,7 +219,12 @@ export async function getDashboard(
     },
     hoursThisWeek,
     reviewQueue,
-    escalations: escalationsFor(actor.id, members, progressUpdates, TODAY),
+    escalations: escalationsFor(actor.id, readStore().members, progressUpdates, TODAY),
+    myProjects: memberProjects(actor.id)
+      .filter((m) => m.commitment === "committed")
+      .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
+    today: TODAY,
+    maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,
   };
 }

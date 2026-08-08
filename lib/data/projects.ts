@@ -22,11 +22,11 @@ import {
   projectMembers,
   projectProgress,
   projectREs,
-  projects,
   projectUpdateFeed,
   divisions,
   TODAY,
 } from "@/lib/mock-data";
+import { readStore } from "@/lib/store/disk";
 import type {
   Deliverable,
   JoinRequest,
@@ -82,7 +82,7 @@ function buildNode(project: Project): ProjectTreeNode {
  * and be invisible on the page whose whole job is discoverability.
  */
 export async function getProjectTree(): Promise<DivisionProjects[]> {
-  const roots = projects.filter((p) => p.parentId === null);
+  const roots = readStore().projects.filter((p) => p.parentId === null);
 
   return divisions().map((division) => ({
     division,
@@ -95,7 +95,7 @@ export async function getProjectTree(): Promise<DivisionProjects[]> {
 
 /** Projects whose division can't be resolved — a data-integrity warning. */
 export async function getOrphanedProjects(): Promise<Project[]> {
-  return projects.filter(
+  return readStore().projects.filter(
     (p) => p.parentId === null && !divisionForProject(p.id)
   );
 }
@@ -155,7 +155,7 @@ export async function getProjectBySlug(
   slug: string,
   viewerId: string
 ): Promise<ProjectDetailView | null> {
-  const project = projects.find((p) => p.slug === slug);
+  const project = readStore().projects.find((p) => p.slug === slug);
   if (!project) return null;
 
   const allFlags = projectAttentionFlags();
@@ -201,7 +201,24 @@ export async function getProjectBySlug(
   };
 }
 
+/**
+ * Options the "new project" form needs.
+ *
+ * Here rather than in the page because pages may not import `lib/mock-data`.
+ */
+export async function getProjectFormOptions(): Promise<{
+  parents: { id: string; name: string }[];
+  divisions: { id: string; name: string }[];
+  people: { id: string; name: string }[];
+}> {
+  return {
+    parents: readStore().projects.map((p) => ({ id: p.id, name: p.name })),
+    divisions: divisions().map((d) => ({ id: d.id, name: d.name })),
+    people: activeMembers().map((m) => ({ id: m.id, name: m.fullName })),
+  };
+}
+
 /** Every project slug — used to pre-render detail pages at build time. */
 export async function getAllProjectSlugs(): Promise<string[]> {
-  return projects.map((p) => p.slug);
+  return readStore().projects.map((p) => p.slug);
 }

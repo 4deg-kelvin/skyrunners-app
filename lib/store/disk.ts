@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "path";
 
 import {
+  members as seedMembers,
+  projects as seedProjects,
   deliverables as seedDeliverables,
   joinRequests as seedJoinRequests,
   progressUpdates as seedProgressUpdates,
@@ -10,6 +12,8 @@ import {
   workLogs as seedWorkLogs,
 } from "../mock-data.ts";
 import type {
+  Member,
+  Project,
   Deliverable,
   JoinRequest,
   ProgressUpdate,
@@ -58,6 +62,13 @@ import type {
 export interface StoreShape {
   /** Bumped when the shape changes, so a stale file is discarded, not merged. */
   version: number;
+  /**
+   * People and projects are mutable now: leadership invites members, changes
+   * roles and creates projects from inside the app. They used to be read-only
+   * literals in mock-data, which is why those literals are still the SEED.
+   */
+  members: Member[];
+  projects: Project[];
   workLogs: WorkLog[];
   deliverables: Deliverable[];
   projectMemberships: ProjectMembership[];
@@ -75,7 +86,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 3;
+const STORE_VERSION = 4;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -94,6 +105,8 @@ function seed(): StoreShape {
   // the "reset" button would hand back already-modified data.
   return structuredClone({
     version: STORE_VERSION,
+    members: seedMembers,
+    projects: seedProjects,
     workLogs: seedWorkLogs,
     deliverables: seedDeliverables,
     projectMemberships: seedMemberships,

@@ -25,8 +25,12 @@ import { mutate, readStore } from "./disk.ts";
 import type {
   Deliverable,
   DeliverableStatus,
+  GlobalRole,
   JoinRequest,
+  Member,
+  MemberStatus,
   ProgressUpdate,
+  Project,
   WorkLog,
 } from "../types.ts";
 
@@ -313,6 +317,363 @@ async function updateOne(
     const found = store.deliverables.find((d) => d.id === deliverableId);
     if (!found) return fail<Deliverable>("That deliverable no longer exists.");
     return fn(found);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// People — invite, roles, reporting chain, status
+// ---------------------------------------------------------------------------
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/** Invite someone by Stanford email. They become real on first sign-in. */
+export async function inviteMember(input: {
+  email: string;
+  fullName: string;
+  globalRole: GlobalRole;
+  leadId: string | null;
+  primaryTeamId?: string;
+  today: string;
+}): Promise<Result<Member>> {
+  const email = input.email.trim().toLowerCase();
+  const fullName = input.fullName.trim();
+
+  if (!fullName) return fail("Enter their name.");
+  // Same rule as lib/env.ts and the CHECK constraint in 0001. Stated three
+  // times on purpose — this IS the access model.
+  if (!email.endsWith("@stanford.edu")) {
+    return fail("Must be a stanford.edu address.");
+  }
+
+  const { members } = readStore();
+  if (members.some((m) => m.email.toLowerCase() === email)) {
+    return fail("Someone with that address is already on the roster.");
+  }
+
+  const member: Member = {
+    id: `m-${slugify(fullName) || newId("x")}`,
+    fullName,
+    email,
+    globalRole: input.globalRole,
+    // Active immediately. The alternative — invited-but-inactive — means a new
+    // member signs in and is told they can't come in yet, which is the opposite
+    // of the welcome this app exists to provide.
+    status: "active",
+    leadId: input.leadId,
+    primaryTeamId: input.primaryTeamId || undefined,
+    joinedAt: input.today,
+    skills: [],
+  };
+
+  await mutate((store) => {
+    store.members.push(member);
+    // Everyone gets a check-in schedule, or they'd have no obligation and no
+    // way to create one from Settings.
+    store.updateSchedules.push({
+      memberId: member.id,
+      weekdays: [2, 5],
+      updatesPerWeek: 2,
+      dueTime: "23:59",
+    });
+  });
+
+  return ok(member);
+}
+
+/**
+ * Promote or demote — member ↔ lead ↔ co_lead.
+ *
+ * Refuses to remove the last Co-Lead. That leaves a club where nobody can
+ * appoint anyone, fixable only by hand-editing the database, and it's the sort
+ * of thing that happens at 1am during a leadership handover.
+ */
+export async function setGlobalRole(input: {
+  memberId: string;
+  role: GlobalRole;
+}): Promise<Result<Member>> {
+  return mutate((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+    if (member.globalRole === input.role) return ok(member);
+
+    if (member.globalRole === "co_lead" && input.role !== "co_lead") {
+      const others = store.members.filter(
+        (m) => m.globalRole === "co_lead" && m.id !== member.id && m.status === "active"
+      );
+      if (others.length === 0) {
+        return fail<Member>(
+          "This is the only Co-Lead. Promote someone else first, or the club is left with nobody who can appoint anyone."
+        );
+      }
+    }
+
+    // Demoting a Lead leaves their reports pointing at someone who no longer
+    // has authority over them — the reporting chain would still route reviews
+    // and escalations to a plain member. Re-point them upward.
+    if (member.globalRole !== "member" && input.role === "member") {
+      for (const m of store.members) {
+        if (m.leadId === member.id) m.leadId = member.leadId;
+      }
+    }
+
+    member.globalRole = input.role;
+    return ok(member);
+  });
+}
+
+/** Change who someone reports to. */
+export async function setMemberLead(input: {
+  memberId: string;
+  leadId: string | null;
+}): Promise<Result<Member>> {
+  if (input.memberId === input.leadId) {
+    return fail("Nobody reports to themselves.");
+  }
+
+  return mutate((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+
+    if (input.leadId) {
+      const lead = store.members.find((m) => m.id === input.leadId);
+      if (!lead) return fail<Member>("That lead no longer exists.");
+
+      // Walk up from the proposed lead. If we reach `memberId`, this would
+      // close a loop — and every chain walk in the app (leadChain,
+      // reportsBelow, auth_is_lead_of) would spin or silently truncate.
+      let cursor: string | null = input.leadId;
+      const seen = new Set<string>();
+      while (cursor) {
+        if (cursor === input.memberId) {
+          return fail<Member>(
+            "That would create a loop — they already lead that person, directly or further up."
+          );
+        }
+        if (seen.has(cursor)) break;
+        seen.add(cursor);
+        cursor = store.members.find((m) => m.id === cursor)?.leadId ?? null;
+      }
+    }
+
+    member.leadId = input.leadId;
+    return ok(member);
+  });
+}
+
+/** Deactivate or reactivate. Never deletes — history must survive. */
+export async function setMemberStatus(input: {
+  memberId: string;
+  status: MemberStatus;
+}): Promise<Result<Member>> {
+  return mutate((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+
+    if (member.globalRole === "co_lead" && input.status !== "active") {
+      const others = store.members.filter(
+        (m) => m.globalRole === "co_lead" && m.id !== member.id && m.status === "active"
+      );
+      if (others.length === 0) {
+        return fail<Member>("This is the only active Co-Lead.");
+      }
+    }
+
+    member.status = input.status;
+
+    if (input.status !== "active") {
+      // Their people would otherwise keep reporting to someone who has left,
+      // and their check-ins would pile up unread with nobody accountable.
+      for (const m of store.members) {
+        if (m.leadId === member.id) m.leadId = member.leadId;
+      }
+      // Drop obligations rather than leaving them to accrue as missed.
+      store.progressUpdates = store.progressUpdates.filter(
+        (u) =>
+          !(
+            u.memberId === member.id &&
+            (u.status === "pending" || u.status === "late")
+          )
+      );
+    }
+
+    return ok(member);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+export async function createProject(input: {
+  name: string;
+  description?: string;
+  parentId: string | null;
+  teamId?: string;
+  primaryReId: string;
+  targetDate?: string;
+  createdBy: string;
+  today: string;
+}): Promise<Result<Project>> {
+  const name = input.name.trim();
+  if (!name) return fail("Give the project a name.");
+  if (!input.primaryReId) {
+    // A project with no accountable person is how work goes quiet. The RE is
+    // the whole point of the model.
+    return fail("Every project needs a Responsible Engineer.");
+  }
+
+  const { projects } = readStore();
+  let slug = slugify(name);
+  if (projects.some((p) => p.slug === slug)) {
+    // Slugs are the URL, so a collision would make one project unreachable.
+    slug = `${slug}-${projects.length + 1}`;
+  }
+
+  const project: Project = {
+    id: `p-${slug}`,
+    name,
+    slug,
+    description: input.description?.trim() || undefined,
+    parentId: input.parentId,
+    // A sub-project inherits its parent's team unless told otherwise, so it
+    // can't fall outside every division and vanish from /projects.
+    teamId:
+      input.teamId ||
+      (input.parentId
+        ? projects.find((p) => p.id === input.parentId)?.teamId
+        : undefined),
+    primaryReId: input.primaryReId,
+    reIds: [input.primaryReId],
+    phase: "concept",
+    health: "on_track",
+    targetDate: input.targetDate || undefined,
+    datesOverridden: false,
+    isOpenToJoin: true,
+  };
+
+  await mutate((store) => {
+    store.projects.push(project);
+    store.projectMemberships.push({
+      projectId: project.id,
+      memberId: input.primaryReId,
+      role: "re",
+      joinedAt: input.today,
+      commitment: "committed",
+      addedBy: input.createdBy,
+    });
+  });
+
+  return ok(project);
+}
+
+/** Add someone to a project, as a contributor or an RE. */
+export async function addProjectMember(input: {
+  projectId: string;
+  memberId: string;
+  asRE: boolean;
+  responsibility?: string;
+  addedBy: string;
+  today: string;
+}): Promise<Result<null>> {
+  return mutate((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<null>("That project no longer exists.");
+    if (!store.members.some((m) => m.id === input.memberId)) {
+      return fail<null>("That member no longer exists.");
+    }
+
+    const existing = store.projectMemberships.find(
+      (m) => m.projectId === input.projectId && m.memberId === input.memberId
+    );
+
+    if (existing) {
+      existing.commitment = "committed";
+      existing.role = input.asRE ? "re" : existing.role;
+      if (input.responsibility) existing.responsibility = input.responsibility.trim();
+    } else {
+      store.projectMemberships.push({
+        projectId: input.projectId,
+        memberId: input.memberId,
+        role: input.asRE ? "re" : "contributor",
+        responsibility: input.responsibility?.trim() || undefined,
+        joinedAt: input.today,
+        commitment: "committed",
+        addedBy: input.addedBy,
+      });
+    }
+
+    // `reIds` mirrors the memberships and is what permission checks read, so
+    // the two must never disagree.
+    if (input.asRE && !project.reIds.includes(input.memberId)) {
+      project.reIds.push(input.memberId);
+    }
+
+    return ok(null);
+  });
+}
+
+/** Add or remove RE status on a project. */
+export async function setProjectRE(input: {
+  projectId: string;
+  memberId: string;
+  isRE: boolean;
+}): Promise<Result<null>> {
+  return mutate((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<null>("That project no longer exists.");
+
+    if (input.isRE) {
+      if (!project.reIds.includes(input.memberId)) {
+        project.reIds.push(input.memberId);
+      }
+      const m = store.projectMemberships.find(
+        (x) => x.projectId === input.projectId && x.memberId === input.memberId
+      );
+      if (m) {
+        m.role = "re";
+        m.commitment = "committed";
+      }
+      return ok(null);
+    }
+
+    if (project.primaryReId === input.memberId) {
+      // Removing the primary would leave the project with no go-to person and
+      // `primaryReId` pointing at someone with no authority over it.
+      return fail<null>(
+        "They're the primary RE. Make someone else primary first."
+      );
+    }
+
+    project.reIds = project.reIds.filter((id) => id !== input.memberId);
+    const m = store.projectMemberships.find(
+      (x) => x.projectId === input.projectId && x.memberId === input.memberId
+    );
+    if (m) m.role = "contributor";
+    return ok(null);
+  });
+}
+
+/** Hand the go-to role to a different RE. */
+export async function setPrimaryRE(input: {
+  projectId: string;
+  memberId: string;
+}): Promise<Result<null>> {
+  return mutate((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<null>("That project no longer exists.");
+
+    if (!project.reIds.includes(input.memberId)) {
+      project.reIds.push(input.memberId);
+    }
+    project.primaryReId = input.memberId;
+    return ok(null);
   });
 }
 

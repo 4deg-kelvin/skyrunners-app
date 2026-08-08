@@ -15,7 +15,6 @@
 import {
   getMember,
   getProject,
-  members,
   TODAY,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
@@ -82,7 +81,7 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
   // Direct reports only. A Co-Lead is somebody's Lead too — they don't inherit
   // every report in the club here, or the queue becomes the unusable club-wide
   // list the dashboard rework existed to kill.
-  const directReports = members.filter(
+  const directReports = readStore().members.filter(
     (m) => m.leadId === actor.id && m.status === "active"
   );
 

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { LogHoursForm } from "@/components/forms/log-hours-form";
 import { Badge } from "@/components/ui/badge";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { Donut } from "@/components/ui/donut";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -51,10 +52,12 @@ export default async function DashboardPage() {
         description={`Stay on top of team health, update windows, and project status for ${club.name}.`}
         action={
           mayLogHours ? (
-            <Button>
-              <Plus className="size-4" strokeWidth={2.5} />
-              Log hours
-            </Button>
+            <LogHoursForm
+              projects={view.myProjects}
+              defaultProjectId={view.myProjects[0]?.id}
+              today={view.today}
+              maxBackdateDays={view.maxBackdateDays}
+            />
           ) : undefined
         }
       />

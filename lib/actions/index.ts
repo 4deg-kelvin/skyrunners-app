@@ -31,7 +31,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getViewer } from "@/lib/data/viewer";
-import { can } from "@/lib/permissions";
+import { can, isCoLead } from "@/lib/permissions";
 import {
   TODAY,
   getProject,
@@ -221,6 +221,199 @@ export async function setDeliverableStatusAction(
   const result = await ops.setDeliverableStatus(id, status, blockerNote);
   if (result.ok) refresh();
   return toResult(result, "Updated.");
+}
+
+// ---------------------------------------------------------------------------
+// People — the leadership controls
+// ---------------------------------------------------------------------------
+
+export async function inviteMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.inviteMember(viewer.actor)) return denied("invite members");
+
+  const globalRole = String(formData.get("globalRole") ?? "member") as
+    | "member"
+    | "lead"
+    | "co_lead";
+
+  // Inviting somebody straight in as leadership is the same act as promoting
+  // them, so it needs the same authority — otherwise a Team Lead could mint a
+  // Co-Lead just by using the invite form instead of the role dropdown.
+  if (globalRole !== "member" && !isCoLead(viewer.actor)) {
+    return {
+      ok: false,
+      error: "Only a Co-Lead can invite someone as a Lead or Co-Lead.",
+    };
+  }
+
+  const leadIdRaw = String(formData.get("leadId") ?? "");
+  const result = await ops.inviteMember({
+    email: String(formData.get("email") ?? ""),
+    fullName: String(formData.get("fullName") ?? ""),
+    globalRole,
+    // Default to the inviter: somebody with no Lead has nobody reading their
+    // check-ins, which is the quiet failure this whole model exists to avoid.
+    leadId: leadIdRaw || viewer.member.id,
+    primaryTeamId: String(formData.get("primaryTeamId") ?? "") || undefined,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, `Invited ${result.ok ? result.value.fullName : ""}.`);
+}
+
+export async function setGlobalRoleAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+  const role = String(formData.get("role") ?? "") as
+    | "member"
+    | "lead"
+    | "co_lead";
+
+  if (!can.setGlobalRole(viewer.actor, memberId)) {
+    return denied("change roles");
+  }
+
+  const result = await ops.setGlobalRole({ memberId, role });
+  if (result.ok) refresh();
+  return toResult(result, `Now a ${ROLE_WORD[role]}.`);
+}
+
+const ROLE_WORD: Record<string, string> = {
+  member: "Member",
+  lead: "Team Lead",
+  co_lead: "Co-Lead",
+};
+
+export async function setMemberLeadAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+  const leadId = String(formData.get("leadId") ?? "") || null;
+
+  if (!can.reassignLead(viewer.actor, viewer.graph, memberId)) {
+    return denied("change who they report to");
+  }
+
+  const result = await ops.setMemberLead({ memberId, leadId });
+  if (result.ok) refresh();
+  return toResult(result, "Reporting line updated.");
+}
+
+export async function setMemberStatusAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+  const status = String(formData.get("status") ?? "") as
+    | "active"
+    | "inactive"
+    | "alumni";
+
+  if (!can.setMemberStatus(viewer.actor, viewer.graph, memberId)) {
+    return denied("change their status");
+  }
+
+  const result = await ops.setMemberStatus({ memberId, status });
+  if (result.ok) refresh();
+  return toResult(result, status === "active" ? "Reactivated." : "Deactivated.");
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+export async function createProjectAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const parentId = String(formData.get("parentId") ?? "") || null;
+
+  if (!can.createProject(viewer.actor, viewer.graph, parentId ?? undefined)) {
+    return denied("create projects here");
+  }
+
+  const result = await ops.createProject({
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    parentId,
+    teamId: String(formData.get("teamId") ?? "") || undefined,
+    // Default the RE to the creator. Leadership creating a project almost
+    // always owns it initially, and a project with no RE is the one state the
+    // model can't represent.
+    primaryReId: String(formData.get("primaryReId") ?? "") || viewer.member.id,
+    targetDate: String(formData.get("targetDate") ?? "") || undefined,
+    createdBy: viewer.member.id,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Project created.");
+}
+
+export async function addProjectMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const asRE = String(formData.get("asRE") ?? "") === "yes";
+
+  // Making someone an RE hands them authority over the whole subtree, so it's
+  // gated on `assignRE` rather than the looser `addProjectMember`.
+  const allowed = asRE
+    ? can.assignRE(viewer.actor, viewer.graph, projectId)
+    : can.addProjectMember(viewer.actor, viewer.graph, projectId);
+  if (!allowed) return denied("add people to this project");
+
+  const result = await ops.addProjectMember({
+    projectId,
+    memberId: String(formData.get("memberId") ?? ""),
+    asRE,
+    responsibility: String(formData.get("responsibility") ?? ""),
+    addedBy: viewer.member.id,
+    today: TODAY,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, asRE ? "Added as an RE." : "Added to the project.");
+}
+
+export async function setProjectREAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.assignRE(viewer.actor, viewer.graph, projectId)) {
+    return denied("change who the REs are");
+  }
+
+  const memberId = String(formData.get("memberId") ?? "");
+  const mode = String(formData.get("mode") ?? "");
+
+  const result =
+    mode === "primary"
+      ? await ops.setPrimaryRE({ projectId, memberId })
+      : await ops.setProjectRE({
+          projectId,
+          memberId,
+          isRE: mode === "add",
+        });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    mode === "primary"
+      ? "Now the primary RE."
+      : mode === "add"
+        ? "Added as an RE."
+        : "No longer an RE."
+  );
 }
 
 // ---------------------------------------------------------------------------

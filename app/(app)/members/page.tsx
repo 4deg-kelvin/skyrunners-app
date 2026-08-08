@@ -1,19 +1,27 @@
 import Link from "next/link";
 
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  InviteMemberForm,
+  MemberAdminControls,
+} from "@/components/forms/member-admin";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getRoster } from "@/lib/data/members";
+import { getRoster, getRosterOptions } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
-import { can } from "@/lib/permissions";
+import { can, isCoLead } from "@/lib/permissions";
 import { initials } from "@/lib/utils";
 
 export default async function MembersPage() {
-  const [roster, viewer] = await Promise.all([getRoster(), getViewer()]);
+  const [roster, options, viewer] = await Promise.all([
+    getRoster(),
+    getRosterOptions(),
+    getViewer(),
+  ]);
   const mayInvite = can.inviteMember(viewer.actor);
+  const mayAppointLeadership = isCoLead(viewer.actor);
 
   return (
     <div className="space-y-6">
@@ -21,7 +29,15 @@ export default async function MembersPage() {
         label="Roster"
         title="Members"
         description={`${roster.length} active members. Anyone can see who's on what — hours and updates stay with leadership.`}
-        action={mayInvite ? <Button>Invite member</Button> : undefined}
+        action={
+          mayInvite ? (
+            <InviteMemberForm
+              leads={options.leadOptions}
+              canAppointLeadership={mayAppointLeadership}
+              defaultLeadId={viewer.member.id}
+            />
+          ) : undefined
+        }
       />
 
       <Card>
@@ -38,10 +54,12 @@ export default async function MembersPage() {
                 deliverablesCompleted,
                 overdueDeliverables,
               }) => (
-                <Link
+                // A div, not a Link. The card now holds admin controls, and
+                // buttons cannot be nested inside an anchor — the name below
+                // carries the link instead.
+                <div
                   key={member.id}
-                  href={`/members/${member.id}`}
-                  className="rounded-tile border border-line px-4 py-4 transition-colors hover:bg-surface"
+                  className="rounded-tile border border-line px-4 py-4"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-sm font-bold text-cardinal-600">
@@ -49,9 +67,12 @@ export default async function MembersPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-[15px] font-bold text-ink">
+                        <Link
+                          href={`/members/${member.id}`}
+                          className="truncate text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        >
                           {member.fullName}
-                        </p>
+                        </Link>
                         {member.globalRole !== "member" ? (
                           <Badge tone={ROLE_TONES[member.globalRole]}>
                             {ROLE_LABELS[member.globalRole]}
@@ -95,9 +116,31 @@ export default async function MembersPage() {
                           </p>
                         ) : null}
                       </div>
+
+                      <div className="mt-3">
+                        <MemberAdminControls
+                          memberId={member.id}
+                          memberName={member.fullName}
+                          role={member.globalRole}
+                          status={member.status}
+                          leadId={member.leadId}
+                          leadOptions={options.leadOptions}
+                          canSetRole={can.setGlobalRole(viewer.actor, member.id)}
+                          canReassign={can.reassignLead(
+                            viewer.actor,
+                            viewer.graph,
+                            member.id
+                          )}
+                          canSetStatus={can.setMemberStatus(
+                            viewer.actor,
+                            viewer.graph,
+                            member.id
+                          )}
+                        />
+                      </div>
                     </div>
                   </div>
-                </Link>
+                </div>
               )
             )}
           </div>
