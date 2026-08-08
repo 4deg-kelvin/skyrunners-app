@@ -26,7 +26,6 @@ those three.
 | `docs/DESIGN_SYSTEM.md` | Visual language, tokens, component rules |
 | `docs/DECISIONS.md` | Locked decisions, infrastructure notes |
 | `lib/data/README.md` | Why the data layer exists and how to extend it |
-| `lib/test-env/README.md` | The persona switcher — browse as Member / Lead / Co-Lead |
 | `docs/TWO_TRACK_DEPLOY.md` | Shipping to the club while still building |
 | `supabase/README.md` | Migrations, views, RLS plan |
 
@@ -57,7 +56,6 @@ npm run db:check       # are the Supabase migrations actually applied?
 npm run db:bundle      # regenerate supabase/APPLY_ALL.sql (all migrations, one paste)
 npm test               # permission + contribution tests
 npm run format         # Prettier
-npm run seed:generate  # regenerate supabase/seed.sql from lib/mock-data.ts
 ```
 
 ## Never run `npm run build` while `npm run dev` is up
@@ -104,12 +102,6 @@ cannot run on Vercel. `lib/store/operations.ts` is the file that becomes Postgre
 mode-agnostic. **Never add a second place that checks the mode** — if a feature needs to
 know, it belongs in `lib/data/*`.
 
-**Test environment.** `SKYRUNNERS_TEST_ENV=1` in `.env.local` adds a persona switcher so
-you can browse as a Member, a Team Lead or a Co-Lead. It's gated on demo mode as well as
-the flag, so it can never run against real data. Six personas, chosen to exercise the
-permission crossing rather than one per role — including **a plain member who is an RE**,
-the case that catches inline `globalRole` checks. See `lib/test-env/README.md`. Remove the
-whole thing with `npm run remove:test-env`.
 
 ### Route structure
 

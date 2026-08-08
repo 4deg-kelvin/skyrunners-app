@@ -59,35 +59,6 @@ export function isDemoMode(): boolean {
   return !isLiveMode();
 }
 
-// TEST-ENV:START — remove with `npm run remove:test-env`
-/**
- * The persona switcher — the bar that lets you browse as a Member, a Team Lead
- * or a Co-Lead without signing in and out. See `lib/test-env/README.md`.
- *
- * Two gates, and the second one is the important one:
- *
- *   1. `SKYRUNNERS_TEST_ENV=1` must be set. Absent by default, so a fresh clone
- *      and every deploy that doesn't opt in behaves exactly as before.
- *
- *   2. It must be DEMO MODE. This is a hard interlock, not a preference: it
- *      makes it structurally impossible for the switcher to appear anywhere
- *      real data lives, because production has Supabase keys and therefore is
- *      never demo mode. Even setting the flag in production by mistake does
- *      nothing.
- *
- * That interlock is why this is safe to leave in the repo while the club uses
- * the app. Identity-switching against real data would be a genuine backdoor —
- * this cannot become one.
- *
- * Deliberately NOT prefixed `NEXT_PUBLIC_`: it is read only on the server, so
- * it never reaches a browser bundle.
- */
-export function isTestEnvEnabled(): boolean {
-  if (process.env.SKYRUNNERS_TEST_ENV !== "1") return false;
-  return isDemoMode();
-}
-// TEST-ENV:END
-
 /**
  * Supabase config, or null in demo mode.
  *

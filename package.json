@@ -18,9 +18,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm test",
-    "seed:generate": "node --experimental-strip-types scripts/generate-seed.ts",
-    "remove:test-env": "node scripts/remove-test-env.mjs"
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
     "next": "^15.0.0",

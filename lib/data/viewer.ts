@@ -8,12 +8,6 @@
  *
  * Nothing downstream cares which happened. Every page just gets a `Viewer`.
  *
- * TEST-ENV:START — remove with `npm run remove:test-env`
- * With `SKYRUNNERS_TEST_ENV=1`, the demo branch also honours a persona cookie so
- * you can browse as a Member, a Team Lead or a Co-Lead. That override lives here
- * and nowhere else, for the same reason the mode check does: this file is the one
- * place allowed to decide who the viewer is.
- * TEST-ENV:END
  */
 
 import { cache } from "react";
@@ -31,9 +25,6 @@ import {
   getMember,
   getProject,
 } from "@/lib/mock-data";
-// TEST-ENV:START — remove with `npm run remove:test-env`
-import { readTestPersonaId } from "@/lib/test-env";
-// TEST-ENV:END
 
 export interface Viewer {
   member: Member;
@@ -78,11 +69,7 @@ export const getViewer = cache(async (): Promise<Viewer> => {
 // ---------------------------------------------------------------------------
 
 async function getDemoViewer(): Promise<Viewer> {
-  // TEST-ENV:START — remove with `npm run remove:test-env`
-  // Returns null unless SKYRUNNERS_TEST_ENV=1, so this is a no-op by default.
-  const viewerId = (await readTestPersonaId()) ?? CURRENT_USER_ID;
-  // TEST-ENV:REPLACE-WITH const viewerId = CURRENT_USER_ID;
-  // TEST-ENV:END
+  const viewerId = CURRENT_USER_ID;
 
   const member = getMember(viewerId);
 

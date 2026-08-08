@@ -29,14 +29,14 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:3000**. No login, no database, no setup — a fresh clone is a
-working app on sample data.
+Open **http://localhost:3000**. With Supabase keys in `.env.local` you get real Google
+sign-in; without them a fresh clone still runs on sample data with no setup at all.
 
 ```bash
 npm run check
 ```
 
-Typecheck, lint and 177 tests. Run it before every push; CI runs the same thing plus a
+Typecheck, lint and 184 tests. Run it before every push; CI runs the same thing plus a
 Prettier check.
 
 ```bash
@@ -52,8 +52,8 @@ which breaks it with errors that look like application bugs (`Cannot find module
 
 ## Where things stand
 
-**Everything works end to end on local data. The only thing blocking real use is the
-Supabase URL and anon key.**
+**The app is live on Supabase** — real sign-in, real Postgres, migrations 0001-0012
+applied. The club starts empty and is populated through the app itself.
 
 Read **[`docs/STATUS.md`](docs/STATUS.md)** — one page covering what's built, what's
 blocked and on exactly what, and the known gaps.
@@ -70,15 +70,6 @@ blocked and on exactly what, and the known gaps.
 `lib/data/viewer.ts` is the only file that branches on this. That split is why app
 development never had to wait on the server side.
 
-### Seeing it as someone else
-
-Add `SKYRUNNERS_TEST_ENV=1` to `.env.local` and restart: a persona switcher appears,
-letting you browse as a Member, a Team Lead or a Co-Lead. It changes *identity*, not just a
-role badge, so permissions behave exactly as they will for a real person.
-
-It cannot run against real data — the flag is ignored whenever Supabase keys are present.
-See [`lib/test-env/README.md`](lib/test-env/README.md). Remove the whole feature with
-`npm run remove:test-env`.
 
 ---
 

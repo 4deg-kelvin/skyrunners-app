@@ -2,9 +2,6 @@ import { TopNav } from "@/components/layout/top-nav";
 import { DemoBanner } from "@/components/layout/demo-banner";
 import { getViewer } from "@/lib/data/viewer";
 import { getMyWork } from "@/lib/data/my-work";
-// TEST-ENV:START — remove with `npm run remove:test-env`
-import { TestEnvBar } from "@/lib/test-env/test-env-bar";
-// TEST-ENV:END
 
 /**
  * The signed-in shell: nav, demo banner, page container.
@@ -55,11 +52,6 @@ export default async function AppLayout({
       <main className="mx-auto max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8">
         {children}
       </main>
-      {/* TEST-ENV:START — remove with `npm run remove:test-env` */}
-      {/* Renders null unless SKYRUNNERS_TEST_ENV=1. Floats over the page rather
-          than taking layout space, so nothing above needs to know it exists. */}
-      <TestEnvBar />
-      {/* TEST-ENV:END */}
     </>
   );
 }
