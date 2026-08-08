@@ -15,7 +15,7 @@
 import {
   getMember,
   getProject,
-  TODAY,
+  today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { isCoLead, type Actor } from "@/lib/permissions";
@@ -73,7 +73,7 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
       update,
       author: getMember(update.memberId),
       sections: sectionsFor(update),
-      ageDays: daysSince(update.submittedAt ?? update.dueAt, TODAY),
+      ageDays: daysSince(update.submittedAt ?? update.dueAt, today()),
       escalated: false,
     }))
     .sort((a, b) => (a.update.dueAt < b.update.dueAt ? 1 : -1));
@@ -89,7 +89,7 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
     actor.id,
     progressUpdates,
     directReports,
-    TODAY
+    today()
   ).map((r) => ({
     update: r.update,
     author: r.author,
@@ -105,7 +105,7 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
       update,
       author: getMember(update.memberId),
       sections: sectionsFor(update),
-      ageDays: daysSince(update.submittedAt ?? update.dueAt, TODAY),
+      ageDays: daysSince(update.submittedAt ?? update.dueAt, today()),
       escalated: false,
     }))
     .sort((a, b) => (a.update.dueAt < b.update.dueAt ? 1 : -1));
@@ -114,11 +114,11 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
     mine,
     toReview,
     reviewed,
-    record: reviewRecordFor(actor.id, progressUpdates, directReports, TODAY),
+    record: reviewRecordFor(actor.id, progressUpdates, directReports, today()),
     // Co-Leads see the section even with no direct reports, because they still
     // need to know the mechanism exists.
     isReviewer: directReports.length > 0 || isCoLead(actor),
     graceDays: REVIEW_GRACE_DAYS,
-    today: TODAY,
+    today: today(),
   };
 }

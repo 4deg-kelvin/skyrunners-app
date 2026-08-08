@@ -21,10 +21,12 @@ import {
   type ProgressUpdate,
   type Team,
   type Term,
+  type UpdateSchedule,
   type WorkLog,
 } from "./types.ts";
 import type { ContributionInputs } from "./contribution.ts";
 import { readStore } from "./store/disk.ts";
+import { isLiveMode } from "./env.ts";
 
 // ---------------------------------------------------------------------------
 // Club
@@ -939,8 +941,8 @@ export const projectArtifacts: ProjectArtifact[] = [
 ];
 
 export function artifactsFor(projectId: string): ProjectArtifact[] {
-  return projectArtifacts
-    .filter((a) => a.projectId === projectId)
+  return live()
+    .projectArtifacts.filter((a) => a.projectId === projectId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -1017,7 +1019,7 @@ export function myJoinRequests(memberId: string) {
       project: getProject(r.projectId),
       isStale:
         r.status === "pending" &&
-        daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS,
+        daysBetween(r.requestedAt, today()) >= JOIN_REQUEST_STALE_DAYS,
     }));
 }
 
@@ -1035,7 +1037,7 @@ export function joinRequestsAwaitingMe(memberId: string) {
       request: r,
       project: getProject(r.projectId),
       requester: getMember(r.memberId),
-      isStale: daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS,
+      isStale: daysBetween(r.requestedAt, today()) >= JOIN_REQUEST_STALE_DAYS,
     }));
 }
 
@@ -1045,13 +1047,13 @@ export function staleJoinRequests() {
     .filter(
       (r) =>
         r.status === "pending" &&
-        daysBetween(r.requestedAt, TODAY) >= JOIN_REQUEST_STALE_DAYS
+        daysBetween(r.requestedAt, today()) >= JOIN_REQUEST_STALE_DAYS
     )
     .map((r) => ({
       request: r,
       project: getProject(r.projectId),
       requester: getMember(r.memberId),
-      daysWaiting: Math.round(daysBetween(r.requestedAt, TODAY)),
+      daysWaiting: Math.round(daysBetween(r.requestedAt, today())),
     }));
 }
 
@@ -1128,7 +1130,7 @@ export const terms: Term[] = [
 ];
 
 export function termFor(date: string): Term | undefined {
-  return terms.find((t) => date >= t.startsOn && date <= t.endsOn);
+  return live().terms.find((t) => date >= t.startsOn && date <= t.endsOn);
 }
 
 export function inSession(date: string): boolean {
@@ -1136,29 +1138,9 @@ export function inSession(date: string): boolean {
 }
 
 /** Current user's own update, so My Work shows the per-project layout. */
-export const myUpdate: ProgressUpdate = {
-  id: "u-me",
-  memberId: CURRENT_USER_ID,
-  dueAt: "2026-08-07T23:59",
-  status: "pending",
-  hoursThisPeriod: 7.5,
-  entries: [
-    {
-      id: "ue-me-1",
-      updateId: "u-me",
-      projectId: "p-gps-denied",
-      progress: "",
-      hours: 4.5,
-    },
-    {
-      id: "ue-me-2",
-      updateId: "u-me",
-      projectId: "p-skydelta-concept",
-      progress: "",
-      hours: 3,
-    },
-  ],
-};
+// The single hardcoded "my update" was removed: it keyed off CURRENT_USER_ID,
+// so in live mode it showed one person's draft to everybody. `currentUpdateFor`
+// resolves it per member from the store instead.
 
 // ---------------------------------------------------------------------------
 // Updates — 3x per week cadence
@@ -1288,7 +1270,7 @@ export const progressUpdates: ProgressUpdate[] = [
   // ---------------------------------------------------------------------------
   // Reports written and NOT yet read.
   //
-  // TODAY is 2026-08-06 and the grace period is 3 days (lib/review.ts), so the
+  // today() is 2026-08-06 and the grace period is 3 days (lib/review.ts), so the
   // ages below are chosen to sit either side of the escalation boundary:
   //
   //   submitted 08-05 → 1 day  → unread, not escalated
@@ -1500,11 +1482,11 @@ export function directREs(projectId: string) {
 }
 
 export function divisions() {
-  return teams.filter((t) => t.parentId === null);
+  return live().teams.filter((t) => t.parentId === null);
 }
 
 export function childTeams(parentId: string) {
-  return teams.filter((t) => t.parentId === parentId);
+  return live().teams.filter((t) => t.parentId === parentId);
 }
 
 export function childProjects(parentId: string | null) {
@@ -1528,7 +1510,7 @@ export function activeMembers() {
 }
 
 export function getTeam(id: string) {
-  return teams.find((t) => t.id === id);
+  return live().teams.find((t) => t.id === id);
 }
 
 /**
@@ -1615,7 +1597,7 @@ export function isOverdue(d: Deliverable): boolean {
   // rule risks introducing. The delay still surfaces, but against the RE, via
   // `pendingSignOffs()` in lib/review.ts.
   if (d.status === "done" || d.status === "submitted") return false;
-  return !!d.dueDate && d.dueDate < TODAY;
+  return !!d.dueDate && d.dueDate < today();
 }
 
 /** Real percentage rather than a vibe — the payoff of one flat list. */
@@ -1651,7 +1633,7 @@ const MOCK_LAST_ACTIVE: Record<string, string> = {
 };
 
 function lastActive(memberId: string): string {
-  return MOCK_LAST_ACTIVE[memberId] ?? TODAY;
+  return MOCK_LAST_ACTIVE[memberId] ?? today();
 }
 
 /**
@@ -1665,8 +1647,10 @@ function lastActive(memberId: string): string {
 export function projectAttentionFlags(): ProjectAttentionFlag[] {
   const flags: ProjectAttentionFlag[] = [];
 
-  for (const project of projects) {
-    const silentDays = daysBetween(lastActive(project.primaryReId), TODAY);
+  // Live projects, not the seed literals: on a clean database this was still
+  // producing attention flags for mock projects that do not exist.
+  for (const project of live().projects) {
+    const silentDays = daysBetween(lastActive(project.primaryReId), today());
     if (silentDays >= RE_SILENT_DAYS) {
       flags.push({
         projectId: project.id,
@@ -1726,8 +1710,51 @@ export const updateSchedules = members.map((m) => ({
   pausedUntil: undefined as string | undefined,
 }));
 
-export function scheduleFor(memberId: string) {
-  return updateSchedules.find((s) => s.memberId === memberId);
+export function scheduleFor(memberId: string): UpdateSchedule {
+  // From the store, not the seed array — a member invited through the app has a
+  // schedule row there and none in the literals above.
+  const found = live().updateSchedules.find((s) => s.memberId === memberId);
+  if (found) return found;
+
+  // Anyone created outside the invite flow — the bootstrap Co-Lead in migration
+  // 0006, say — has no row yet. Return a sensible default rather than
+  // undefined, or Settings renders nothing and they can never pick their days.
+  return {
+    memberId,
+    weekdays: [2, 5],
+    updatesPerWeek: UPDATES_PER_WEEK_DEFAULT,
+    dueTime: "23:59",
+  };
+}
+
+/**
+ * The check-in a member currently owes.
+ *
+ * Was a single hardcoded object keyed to `CURRENT_USER_ID`, which in live mode
+ * would have shown one person's draft to everybody.
+ */
+export function currentUpdateFor(memberId: string): ProgressUpdate {
+  const mine = live().progressUpdates.filter((u) => u.memberId === memberId);
+
+  const open = mine
+    .filter((u) => u.status === "pending" || u.status === "late")
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
+  if (open) return open;
+
+  const latest = [...mine].sort((a, b) => b.dueAt.localeCompare(a.dueAt))[0];
+  if (latest) return latest;
+
+  // Nothing on record — a brand-new member on a clean database. Synthesise a
+  // pending obligation so My Work renders and the composer has somewhere to
+  // write, rather than crashing on an empty club.
+  return {
+    id: `pending-${memberId}`,
+    memberId,
+    dueAt: `${today()}T23:59`,
+    status: "pending",
+    entries: [],
+    hoursThisPeriod: 0,
+  };
 }
 
 /**
@@ -1758,7 +1785,7 @@ export function contributionInputsFor(
 
   return {
     activeWeeks,
-    isPaused: !!schedule?.pausedUntil && schedule.pausedUntil > TODAY,
+    isPaused: !!schedule?.pausedUntil && schedule.pausedUntil > today(),
     deliverablesCompleted: mine.filter((d) => d.status === "done").length,
     deliverablesOpen: mine.filter((d) => d.status !== "done").length,
     deliverablesOverdue: mine.filter(isOverdue).length,
@@ -1933,7 +1960,24 @@ export function updateCompliance() {
 }
 
 /** Reference "today" for the mock data. Replaced by `now()` in Phase 1. */
-export const TODAY = "2026-08-06";
+/**
+ * Today's date, as YYYY-MM-DD.
+ *
+ * A FUNCTION, not a constant, and that matters now the app runs live. As a
+ * module-level const it was evaluated once at import — frozen at whenever the
+ * server booted — so hours backdating, escalation ages and compliance would all
+ * have drifted a day at a time without anything looking broken.
+ *
+ * Demo mode keeps the fixed date so the sample data always tells the same story
+ * and the tests stay deterministic.
+ */
+export function today(): string {
+  if (isLiveMode()) return new Date().toISOString().slice(0, 10);
+  return DEMO_TODAY;
+}
+
+/** The date the sample data is written around. */
+export const DEMO_TODAY = "2026-08-06";
 
 function daysBetween(a: string, b: string): number {
   const ms = new Date(b).getTime() - new Date(a).getTime();
@@ -1943,7 +1987,7 @@ function daysBetween(a: string, b: string): number {
 /** Hours logged in the trailing 7 days — matches the dashboard's label. */
 export function hoursThisWeek(): number {
   return live().workLogs
-    .filter((w) => daysBetween(w.workDate, TODAY) <= 7)
+    .filter((w) => daysBetween(w.workDate, today()) <= 7)
     .reduce((sum, w) => sum + w.hours, 0);
 }
 
@@ -1954,7 +1998,7 @@ export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
       (w) =>
         w.memberId === memberId &&
         w.projectId === projectId &&
-        daysBetween(w.workDate, TODAY) <= 7
+        daysBetween(w.workDate, today()) <= 7
     )
     .reduce((sum, w) => sum + w.hours, 0);
 }

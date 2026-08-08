@@ -5,7 +5,9 @@
       "name": "skyrunners-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "port": 3000,
+      "// autoPort": "Must stay false. The Google OAuth redirect URL registered in Supabase is http://localhost:3000/auth/callback — on any other port, sign-in fails with a redirect mismatch that looks like an app bug.",
+      "autoPort": false
     }
   ]
 }

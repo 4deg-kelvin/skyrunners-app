@@ -6,9 +6,11 @@
  * club has ever held and sorting client-side stops working after a year.
  */
 
-import { events } from "@/lib/mock-data";
+import { readStore } from "@/lib/store/disk";
 import type { ClubEvent } from "@/lib/types";
 
 export async function getUpcomingEvents(): Promise<ClubEvent[]> {
-  return [...events].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  return [...readStore().events].sort((a, b) =>
+    a.startsAt.localeCompare(b.startsAt)
+  );
 }

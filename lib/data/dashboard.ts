@@ -33,7 +33,7 @@ import {
   getMember,
   getProject,
   memberProjects,
-  TODAY,
+  today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
@@ -162,7 +162,7 @@ export async function getDashboard(
     actor.id,
     progressUpdates,
     directReports,
-    TODAY
+    today()
   ).map((unread) => ({
     update: unread.update,
     author: unread.author,
@@ -188,7 +188,7 @@ export async function getDashboard(
   const pending = scopedUpdates.filter((u) => u.status === "pending").length;
   const totalDue = onTime + late + missed;
 
-  const weekStart = startOfWeek(TODAY);
+  const weekStart = startOfWeek(today());
   const hoursThisWeek = workLogs
     .filter((w) => overseenIds.has(w.memberId) && w.workDate >= weekStart)
     .reduce((sum, w) => sum + w.hours, 0);
@@ -219,11 +219,11 @@ export async function getDashboard(
     },
     hoursThisWeek,
     reviewQueue,
-    escalations: escalationsFor(actor.id, readStore().members, progressUpdates, TODAY),
+    escalations: escalationsFor(actor.id, readStore().members, progressUpdates, today()),
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
-    today: TODAY,
+    today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,
   };

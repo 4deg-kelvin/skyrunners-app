@@ -18,12 +18,12 @@ import {
   myDeliverablesOn,
   myJoinRequests,
   myProjects,
-  myUpdate,
+  currentUpdateFor,
   projectBreadcrumb,
   projectProgress,
   projectREs,
   scheduleFor,
-  TODAY,
+  today,
 } from "@/lib/mock-data";
 import {
   buildContributionRecord,
@@ -139,7 +139,8 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
 
   // Only include sections whose project still resolves — a member could have
   // left a project after the draft was seeded.
-  const sections: UpdateDraftSection[] = myUpdate.entries.flatMap((entry) => {
+  const currentUpdate = currentUpdateFor(memberId);
+  const sections: UpdateDraftSection[] = currentUpdate.entries.flatMap((entry) => {
     const card = projects.find((p) => p.project.id === entry.projectId);
     if (!card) return [];
     return [
@@ -149,12 +150,12 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
 
   return {
     me,
-    today: TODAY,
+    today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     committed,
     following,
     currentUpdate: {
-      update: myUpdate,
+      update: currentUpdate,
       sections,
       updatesPerWeek: scheduleFor(memberId)?.updatesPerWeek ?? 2,
     },

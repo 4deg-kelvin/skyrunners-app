@@ -24,7 +24,7 @@ import {
   projectREs,
   projectUpdateFeed,
   divisions,
-  TODAY,
+  today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import type {
@@ -40,7 +40,7 @@ import type {
 } from "@/lib/types";
 
 function daysWaitingOn(since: string): number {
-  const ms = new Date(TODAY).getTime() - new Date(since).getTime();
+  const ms = new Date(today()).getTime() - new Date(since).getTime();
   return Math.max(0, Math.round(ms / 86_400_000));
 }
 import type { BreadcrumbNode } from "./my-work";

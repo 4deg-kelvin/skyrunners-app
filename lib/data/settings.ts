@@ -4,7 +4,7 @@
  * PHASE 1b: these become one select and one update against `update_schedules`.
  */
 
-import { getMember, scheduleFor, TODAY, termFor } from "@/lib/mock-data";
+import { getMember, scheduleFor, today, termFor } from "@/lib/mock-data";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 
 export interface SettingsView {
@@ -30,7 +30,7 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
   if (!member) throw new Error(`Member not found: ${memberId}`);
 
   const schedule = scheduleFor(memberId);
-  const currentTerm = termFor(TODAY);
+  const currentTerm = termFor(today());
 
   return {
     member,

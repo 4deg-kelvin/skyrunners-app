@@ -33,7 +33,7 @@ import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
 import {
-  TODAY,
+  today,
   getProject,
   hoursOnProjectThisWeek,
   memberProjects,
@@ -80,7 +80,7 @@ function refresh() {
 export async function logHoursAction(formData: FormData): Promise<ActionResult> {
   const viewer = await getViewer();
   const projectId = String(formData.get("projectId") ?? "");
-  const workDate = String(formData.get("workDate") ?? TODAY);
+  const workDate = String(formData.get("workDate") ?? today());
   const hours = Number(formData.get("hours"));
   const description = String(formData.get("description") ?? "");
 
@@ -106,7 +106,7 @@ export async function logHoursAction(formData: FormData): Promise<ActionResult> 
     workDate,
     hours,
     description,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -117,7 +117,7 @@ export async function deleteHoursAction(formData: FormData): Promise<ActionResul
   const viewer = await getViewer();
   const logId = String(formData.get("logId") ?? "");
 
-  const result = await ops.deleteWorkLog(logId, viewer.member.id, TODAY);
+  const result = await ops.deleteWorkLog(logId, viewer.member.id, today());
   if (result.ok) refresh();
   return toResult(result, "Entry removed.");
 }
@@ -157,7 +157,7 @@ export async function submitDeliverableAction(
   const viewer = await getViewer();
   const id = String(formData.get("deliverableId") ?? "");
 
-  const result = await ops.submitDeliverable(id, viewer.member.id, TODAY);
+  const result = await ops.submitDeliverable(id, viewer.member.id, today());
   if (result.ok) refresh();
   return toResult(result, "Sent to your RE for sign-off.");
 }
@@ -176,7 +176,7 @@ export async function confirmDeliverableAction(
     return denied("sign off on this project's work");
   }
 
-  const result = await ops.confirmDeliverable(id, viewer.member.id, TODAY);
+  const result = await ops.confirmDeliverable(id, viewer.member.id, today());
   if (result.ok) refresh();
   return toResult(result, "Signed off.");
 }
@@ -193,7 +193,7 @@ export async function reopenDeliverableAction(
     return denied("send work back on this project");
   }
 
-  const result = await ops.reopenDeliverable(id, reason, TODAY);
+  const result = await ops.reopenDeliverable(id, reason, today());
   if (result.ok) refresh();
   return toResult(result, "Sent back with your note.");
 }
@@ -257,7 +257,7 @@ export async function inviteMemberAction(
     // check-ins, which is the quiet failure this whole model exists to avoid.
     leadId: leadIdRaw || viewer.member.id,
     primaryTeamId: String(formData.get("primaryTeamId") ?? "") || undefined,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -349,7 +349,7 @@ export async function createProjectAction(
     primaryReId: String(formData.get("primaryReId") ?? "") || viewer.member.id,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     createdBy: viewer.member.id,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -376,7 +376,7 @@ export async function addProjectMemberAction(
     asRE,
     responsibility: String(formData.get("responsibility") ?? ""),
     addedBy: viewer.member.id,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -453,7 +453,7 @@ export async function submitCheckInAction(
     entries,
     generalNote: String(formData.get("generalNote") ?? ""),
     leadId: viewer.member.leadId,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -470,7 +470,7 @@ export async function setPauseAction(formData: FormData): Promise<ActionResult> 
 
   let until: string | null = null;
   if (weeks > 0) {
-    const d = new Date(`${TODAY}T00:00:00Z`);
+    const d = new Date(`${today()}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() + weeks * 7);
     until = d.toISOString().slice(0, 10);
   }
@@ -478,7 +478,7 @@ export async function setPauseAction(formData: FormData): Promise<ActionResult> 
   const result = await ops.setCheckInPause({
     memberId: viewer.member.id,
     until,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -509,7 +509,7 @@ export async function markUpdateReviewedAction(
   const result = await ops.markUpdateReviewed({
     updateId,
     reviewedBy: viewer.member.id,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -537,7 +537,7 @@ export async function requestToJoinAction(
     projectId,
     memberId: viewer.member.id,
     note,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -562,7 +562,7 @@ export async function decideJoinRequestAction(
     decidedById: viewer.member.id,
     accept,
     responseNote,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -583,7 +583,7 @@ export async function setFollowingAction(
     projectId,
     memberId: viewer.member.id,
     following,
-    today: TODAY,
+    today: today(),
   });
 
   if (result.ok) refresh();
