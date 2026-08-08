@@ -57,9 +57,19 @@ function ok<T>(value: T): Result<T> {
   return { ok: true, value };
 }
 
-/** Stable-ish unique id. Postgres will use `gen_random_uuid()` instead. */
-function newId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+/**
+ * A real UUID.
+ *
+ * Every id column in the schema is `uuid`, so the readable ids this used to
+ * mint (`m-anish`, `p-wing-spar`) are rejected outright by Postgres. The seed
+ * data keeps its readable ids because demo mode never touches the database;
+ * anything created at runtime gets a real one.
+ *
+ * `prefix` is ignored, and kept only so call sites read as documentation of
+ * what's being created.
+ */
+function newId(_prefix: string): string {
+  return crypto.randomUUID();
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -358,7 +368,7 @@ export async function inviteMember(input: {
   }
 
   const member: Member = {
-    id: `m-${slugify(fullName) || newId("x")}`,
+    id: newId("member"),
     fullName,
     email,
     globalRole: input.globalRole,
@@ -537,7 +547,7 @@ export async function createProject(input: {
   }
 
   const project: Project = {
-    id: `p-${slug}`,
+    id: newId("project"),
     name,
     slug,
     description: input.description?.trim() || undefined,

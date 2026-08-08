@@ -23,6 +23,7 @@ import type { Actor, OrgGraph } from "@/lib/permissions";
 import type { Member } from "@/lib/types";
 import { isLiveMode } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { preloadLiveStore } from "@/lib/store/request";
 import { loadLiveOrgGraph } from "./graph";
 import {
   CURRENT_USER_ID,
@@ -106,6 +107,19 @@ async function getDemoViewer(): Promise<Viewer> {
 async function getLiveViewer(): Promise<Viewer> {
   const supabase = await createClient();
   if (!supabase) return getDemoViewer();
+
+  /**
+   * Load the whole database for this request, before anything reads it.
+   *
+   * `readStore()` is synchronous by design — `OrgGraph`'s lookups run in loops
+   * while walking trees, so making them async would turn one permission check
+   * into fifty round trips. That means the snapshot has to be in place first.
+   *
+   * This is the right place for it because every page and every Server Action
+   * already calls `getViewer()`. One thing to remember, in a spot nothing can
+   * render without.
+   */
+  await preloadLiveStore();
 
   // getUser, not getSession — getUser revalidates the token with Supabase.
   const {

@@ -204,9 +204,43 @@ function persist() {
   }
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * The live-mode seam
+ * ---------------------------------------------------------------------------
+ *
+ * In live mode the data comes from Postgres, not this file. Rather than have
+ * every caller branch, a live backend INSTALLS itself here and this module
+ * defers to it.
+ *
+ * Done as installed hooks rather than a direct import for two reasons. This
+ * file is imported by `lib/mock-data.ts`, which the test suite loads under
+ * `node --experimental-strip-types` — importing React or the Supabase client
+ * here would break every test. And it keeps the mode branch in one place
+ * instead of scattering `isLiveMode()` through the store.
+ *
+ * The resolver itself is stateless; the per-request snapshot it returns lives
+ * in `request.ts`, scoped by React's `cache()`. That matters: a module-level
+ * snapshot would be shared between concurrent users, and one person's write
+ * would land in another person's request.
+ */
+type LiveResolver = () => StoreShape | null;
+type LivePersister = (mutated: StoreShape) => Promise<void>;
+
+let liveResolver: LiveResolver | null = null;
+let livePersister: LivePersister | null = null;
+
+export function installLiveBackend(
+  resolver: LiveResolver,
+  persister: LivePersister
+): void {
+  liveResolver = resolver;
+  livePersister = persister;
+}
+
 /** Read-only snapshot. Never mutate what this returns. */
 export function readStore(): Readonly<StoreShape> {
-  return load();
+  return liveResolver?.() ?? load();
 }
 
 /**
@@ -222,7 +256,17 @@ export function readStore(): Readonly<StoreShape> {
 let queue: Promise<unknown> = Promise.resolve();
 
 export function mutate<T>(fn: (store: StoreShape) => T): Promise<T> {
-  const run = queue.then(() => {
+  const run = queue.then(async () => {
+    const live = liveResolver?.();
+
+    if (live && livePersister) {
+      // Same mutation, different destination. The operation is unchanged; the
+      // live backend diffs what it did and writes only that.
+      const result = fn(live);
+      await livePersister(live);
+      return result;
+    }
+
     const store = load();
     const result = fn(store);
     persist();
