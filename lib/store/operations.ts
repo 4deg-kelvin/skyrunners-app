@@ -398,6 +398,86 @@ export async function inviteMember(input: {
 }
 
 /**
+ * Fields a member may change about themselves.
+ *
+ * Deliberately a narrow, explicit list rather than `Partial<Member>`. Role,
+ * status, leadId and email are all absent, and that's the point — this is a
+ * self-service endpoint, so anything reachable through it is something a member
+ * can grant themselves. Adding a field later is one line here plus one input;
+ * accidentally exposing `globalRole` would be a privilege-escalation bug.
+ */
+export interface ProfileEdits {
+  preferredName?: string;
+  phone?: string;
+  major?: string;
+  classYear?: number;
+  photoUrl?: string;
+  skills?: string[];
+}
+
+/**
+ * Update your own profile.
+ *
+ * Every field is optional and blank clears it, so the same operation covers
+ * "fill this in when you join" and "fix it later" without a second code path.
+ */
+export async function updateProfile(input: {
+  memberId: string;
+  edits: ProfileEdits;
+}): Promise<Result<Member>> {
+  const { edits } = input;
+
+  if (edits.classYear !== undefined) {
+    const year = edits.classYear;
+    // A typo'd year quietly sorts someone to the top of every roster and makes
+    // "graduating soon" wrong. Cheap to catch here.
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      return fail("That doesn't look like a class year.");
+    }
+  }
+
+  if (edits.photoUrl && !/^https?:\/\//i.test(edits.photoUrl)) {
+    return fail("A photo link needs to start with http:// or https://");
+  }
+
+  return mutate((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+
+    // Empty string means "clear it"; undefined means "don't touch it". The
+    // distinction matters — a form always posts every field, so without it
+    // nobody could ever remove something they'd typed.
+    const text = (v: string | undefined) =>
+      v === undefined ? undefined : v.trim() || null;
+
+    const apply = <K extends keyof ProfileEdits>(
+      key: K,
+      value: string | null | undefined
+    ) => {
+      if (value === undefined) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (member as any)[key] = value ?? undefined;
+    };
+
+    apply("preferredName", text(edits.preferredName));
+    apply("phone", text(edits.phone));
+    apply("major", text(edits.major));
+    apply("photoUrl", text(edits.photoUrl));
+
+    if (edits.classYear !== undefined) {
+      member.classYear = edits.classYear || undefined;
+    }
+    if (edits.skills !== undefined) {
+      // Skills drive the matching on /find-work, so trim and drop blanks —
+      // a stray "" would match nothing and render as an empty chip.
+      member.skills = edits.skills.map((s) => s.trim()).filter(Boolean);
+    }
+
+    return ok(member);
+  });
+}
+
+/**
  * Promote or demote — member ↔ lead ↔ co_lead.
  *
  * Refuses to remove the last Co-Lead. That leaves a club where nobody can

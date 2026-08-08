@@ -142,6 +142,20 @@ export const can = {
   inviteMember: (actor: Actor) => actor.globalRole !== "member",
 
   /**
+   * Editing a profile — name shown, photo, major, year, phone, skills.
+   *
+   * Your own, always. A Co-Lead can also fix someone else's, because typos in a
+   * name or a wrong class year otherwise need a database edit, and the person
+   * who notices is rarely the person it belongs to.
+   *
+   * Nothing here grants authority: role, status, reporting line and email are
+   * all excluded from `ProfileEdits`, so this can never be a way to promote
+   * yourself.
+   */
+  editProfile: (actor: Actor, memberId: string) =>
+    isSelf(actor, memberId) || isCoLead(actor),
+
+  /**
    * Promoting or demoting someone — member ↔ lead ↔ co_lead.
    *
    * **Co-Leads only.** This is the one permission that can change the shape of

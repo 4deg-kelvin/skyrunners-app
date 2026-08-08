@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
+import { ProfileForm } from "@/components/forms/profile-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -29,6 +30,22 @@ export default async function SettingsPage() {
         title="Update schedule"
         description="Choose the days you check in. Twice a week, on days that fit your schedule."
       />
+
+      {/* Profile first: it's the thing a new member needs on day one. */}
+      <Card>
+        <CardBody>
+          <SectionLabel>My Profile</SectionLabel>
+          <h2 className="mt-2 text-2xl font-bold text-ink">Your details</h2>
+          <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
+            Everything here is optional except what you want people to see.
+            Skills matter most — Find Work uses them to rank projects by where
+            you&apos;d help.
+          </p>
+          <div className="mt-5">
+            <ProfileForm member={viewer.member} />
+          </div>
+        </CardBody>
+      </Card>
 
       <Card>
         <CardBody>

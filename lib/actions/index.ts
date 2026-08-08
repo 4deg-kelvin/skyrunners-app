@@ -264,6 +264,46 @@ export async function inviteMemberAction(
   return toResult(result, `Invited ${result.ok ? result.value.fullName : ""}.`);
 }
 
+/**
+ * Update a profile — your own, or anyone's if you're a Co-Lead.
+ *
+ * `memberId` is accepted from the form but checked against the viewer's
+ * authority, never trusted. The narrow `ProfileEdits` shape is what keeps this
+ * safe: role, status, reporting line and email simply aren't reachable, so a
+ * crafted POST can't promote anybody.
+ */
+export async function updateProfileAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "") || viewer.member.id;
+
+  if (!can.editProfile(viewer.actor, memberId)) {
+    return denied("edit this profile");
+  }
+
+  const yearRaw = String(formData.get("classYear") ?? "").trim();
+  const skillsRaw = String(formData.get("skills") ?? "");
+
+  const result = await ops.updateProfile({
+    memberId,
+    edits: {
+      preferredName: String(formData.get("preferredName") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      major: String(formData.get("major") ?? ""),
+      photoUrl: String(formData.get("photoUrl") ?? ""),
+      classYear: yearRaw ? Number(yearRaw) : 0,
+      // Comma-separated, because a tag widget is a lot of machinery for a
+      // field people touch once. Splitting happens here so the operation takes
+      // real data rather than a string it has to parse.
+      skills: skillsRaw.split(",").map((s) => s.trim()).filter(Boolean),
+    },
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Profile updated.");
+}
+
 export async function setGlobalRoleAction(
   formData: FormData
 ): Promise<ActionResult> {
