@@ -45,3 +45,7 @@ yarn-error.log*
 # Output of `npm run build:check` — kept separate so a build can never
 # clobber a running dev server. Safe to delete.
 .next-build/
+
+# Editor swap files — a committed .swp is just a binary blob nobody can read
+*.swp
+*.swo
