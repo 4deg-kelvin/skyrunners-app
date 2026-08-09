@@ -218,6 +218,26 @@ Five minutes of RE upkeep buys: what each member owns, update auto-drafts, real 
 percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
 add dependencies or sub-tasks, re-read this paragraph.
 
+## The commitment tiers are DATA, not constants
+
+`club_settings` holds four numbers — the Core / Committed / Contributing floors
+and the club's stated minimum — and a Co-Lead edits them from Settings. There
+was a `TIER_THRESHOLDS` constant here once, printed verbatim by the published
+rubric at `/how-we-lead`; it went for the same reason `TrainingCategory` did.
+**The club adjusts its expectations faster than anyone ships a deploy**, and a
+rubric stating a bar nobody is measured against is worse than no rubric.
+
+Read them through `getClubTiers()`. The order rule is enforced in three places
+because breaking it is silent: `commitmentTier` walks the rungs highest first
+and returns the first one you clear, so an out-of-order ladder puts every member
+in whichever tier happens to sit at the top.
+
+**Hours/week is averaged over in-session weeks since the member joined**, never
+a fixed number — it was hard-coded to 10 for everybody once, which made the
+whole roster read as inactive for two months of every quarter. Off-session hours
+still count in full while those weeks add nothing to the divisor, so working
+over a break is deliberately rewarded and resting over one is not punished.
+
 ## There is no engagement score
 
 `lib/contribution.ts` reports **four independent signals** and deliberately computes no
