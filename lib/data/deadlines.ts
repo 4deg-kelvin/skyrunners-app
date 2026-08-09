@@ -30,10 +30,12 @@ import {
   divisions,
   getMember,
   getProject,
+  projectProgress,
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { preloadLiveStore } from "@/lib/store/request";
+import { buildGantt, projectTone, type GanttChart } from "@/lib/gantt";
 import type { Member, Project, Team } from "@/lib/types";
 
 /** A project target date, or a deliverable due date. Same shape either way. */
@@ -77,6 +79,15 @@ export interface DeadlinesView {
 /** What a division card shows beneath its project tree. */
 export interface DivisionExtrasData {
   deadlines: DeadlineItem[];
+  /**
+   * The same dates as a picture.
+   *
+   * Sits above the list rather than replacing it: the chart answers "do these
+   * land on top of each other", which a date-ordered list cannot, and the list
+   * stays as the precise readout. Null when the division has no dated work —
+   * an empty axis is worse than nothing.
+   */
+  timeline: GanttChart | null;
   blocked: {
     projectId: string;
     projectSlug: string;
@@ -109,7 +120,11 @@ export async function getDivisionExtras(): Promise<
   const out: Record<string, DivisionExtrasData> = {};
 
   for (const { division, items } of view.divisions) {
-    out[division.id] = { deadlines: items, blocked: [] };
+    out[division.id] = {
+      deadlines: items,
+      blocked: [],
+      timeline: timelineFor(division.id, store.projects, now),
+    };
   }
 
   // Blocked deliverables, grouped by project, then attributed to a division.
@@ -279,4 +294,75 @@ async function getDeadlines(): Promise<DeadlinesView> {
     ),
     today: now,
   };
+}
+
+/**
+ * One division's projects as a timeline.
+ *
+ * Depth comes from walking the project tree rather than from a column, because
+ * a sub-project's division is inherited: `teamId` may point at a sub-team, or
+ * be unset entirely and resolved through the parent. Grouping by `teamId`
+ * directly is the documented way to make projects vanish from this page.
+ *
+ * Ordered by the tree, not by date — a child must render under its parent or
+ * the indentation says nothing. Date order is what the list underneath is for.
+ */
+function timelineFor(
+  divisionId: string,
+  allProjects: Project[],
+  now: string
+): GanttChart | null {
+  const mine = allProjects.filter(
+    (p) => divisionForProject(p.id)?.id === divisionId
+  );
+  if (mine.length === 0) return null;
+
+  const byParent = new Map<string | null, Project[]>();
+  for (const p of mine) {
+    // A project whose parent sits in another division is a root HERE, or it
+    // would never be reached and would silently vanish from the chart.
+    const parentId =
+      p.parentId && mine.some((m) => m.id === p.parentId) ? p.parentId : null;
+    const list = byParent.get(parentId);
+    if (list) list.push(p);
+    else byParent.set(parentId, [p]);
+  }
+
+  const rows: Parameters<typeof buildGantt>[0] = [];
+  const seen = new Set<string>();
+
+  const walk = (parentId: string | null, depth: number) => {
+    const children = [...(byParent.get(parentId) ?? [])].sort((a, b) =>
+      (a.targetDate ?? "9999").localeCompare(b.targetDate ?? "9999")
+    );
+    for (const project of children) {
+      // Cycle guard, same as everywhere else that walks this tree: `parent_id`
+      // is a plain column and a loop would hang the request.
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+
+      const progress = projectProgress(project.id);
+      rows.push({
+        id: project.id,
+        name: project.name,
+        href: `/projects/${project.slug}`,
+        start: project.startDate,
+        end: project.targetDate,
+        depth,
+        tone: projectTone(
+          project.phase,
+          project.health,
+          !!project.targetDate && project.targetDate < now
+        ),
+        progress: progress.total > 0 ? progress.fraction : undefined,
+        kind: "project",
+      });
+      walk(project.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+
+  // Nothing dated at all draws an axis with no information on it.
+  if (!rows.some((r) => r.start || r.end)) return null;
+  return buildGantt(rows, now);
 }

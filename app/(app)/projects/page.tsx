@@ -176,6 +176,7 @@ export default async function ProjectsPage() {
               */}
                 <DivisionExtras
                   deadlines={extras[division.id]?.deadlines ?? []}
+                  timeline={extras[division.id]?.timeline ?? null}
                   blocked={extras[division.id]?.blocked ?? []}
                   today={todayIso}
                 />

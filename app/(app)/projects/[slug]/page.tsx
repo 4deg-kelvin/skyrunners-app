@@ -30,6 +30,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { ArtifactList } from "@/components/ui/artifact-list";
 import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Gantt } from "@/components/ui/gantt";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -682,6 +683,33 @@ export default async function ProjectDetailPage({
 
         {/* ---------------- Sidebar ---------------- */}
         <div className="space-y-6">
+          {/*
+            This project's own timeline.
+
+            Scoped to this project: its span, its deliverables, its
+            sub-projects — and nothing above or beside it. The division chart
+            on /projects answers "how does the division's work stack up"; this
+            one answers "how does mine", which is the question somebody
+            standing on this page actually has.
+
+            Deliverables appear here and only here. On the division chart they
+            would bury five projects under a hundred diamonds.
+          */}
+          {view.timeline ? (
+            <Card className="h-fit">
+              <CardBody>
+                <SectionLabel>Timeline</SectionLabel>
+                <div className="mt-4">
+                  <Gantt
+                    chart={view.timeline}
+                    compact
+                    caption="Diamonds are deliverable due dates. The red line is today."
+                  />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           <Card className="h-fit">
             <CardBody>
               <SectionLabel>Who To Ask</SectionLabel>

@@ -49,6 +49,7 @@ function daysWaitingOn(since: string): number {
 }
 import type { BreadcrumbNode } from "./my-work";
 import { preloadLiveStore } from "@/lib/store/request";
+import { buildGantt, projectTone, type GanttChart } from "@/lib/gantt";
 import {
   isCoLead,
   leadsTeamAtOrAbove,
@@ -186,6 +187,17 @@ export interface ProjectDetailView {
   members: ProjectMemberRow[];
   children: ProjectTreeNode[];
   parent?: Project;
+  /**
+   * This project's own timeline: its span, its deliverables, its sub-projects.
+   *
+   * Scoped to the project and nothing above or beside it. The division chart
+   * on /projects answers "how does the division's work stack up"; this one
+   * answers "how does MY work stack up", which is the question somebody
+   * standing on this page actually has. Deliverables appear here and ONLY here
+   * — putting every deliverable in the club on the division chart would bury
+   * the projects under a hundred diamonds.
+   */
+  timeline: GanttChart | null;
   /** The whole task model: one flat list, one owner each. */
   deliverables: DeliverableRowData[];
   /** The project's engineering record — mostly links, not uploads. */
@@ -274,6 +286,7 @@ export async function getProjectBySlug(
     })),
     children: childProjects(project.id).map(buildNode),
     parent: project.parentId ? getProject(project.parentId) : undefined,
+    timeline: projectTimeline(project),
     deliverables: projectDeliverables(project.id).map((d) => ({
       deliverable: d,
       owner: getMember(d.ownerId),
@@ -466,3 +479,74 @@ export async function getArchivedDivisions(): Promise<ArchivedDivision[]> {
   for the same reason as `getAllMemberIds`. See the note in `lib/data/members.ts`
   and docs/HANDOFF.md §4.
 */
+
+/**
+ * One project's own timeline: its span, its deliverables, its sub-projects.
+ *
+ * Deliverables are here and nowhere else. On the division chart they'd bury
+ * five projects under a hundred diamonds; on the project you're reading, they
+ * ARE the work, and seeing that three of them land the same week is the point.
+ *
+ * Sub-projects come with their own deliverables, capped at the same two levels
+ * as everywhere else — `buildGantt` drops anything deeper and reports how much.
+ */
+function projectTimeline(project: Project): GanttChart | null {
+  const now = today();
+  const rows: Parameters<typeof buildGantt>[0] = [];
+  const seen = new Set<string>();
+
+  const addProject = (p: Project, depth: number) => {
+    // `parent_id` is a plain column; a loop would hang the request rather than
+    // fail it. Same guard as `projectChain`.
+    if (seen.has(p.id)) return;
+    seen.add(p.id);
+
+    const progress = projectProgress(p.id);
+    rows.push({
+      id: p.id,
+      name: p.name,
+      // The project you're already on doesn't need a link to itself.
+      href: p.id === project.id ? undefined : `/projects/${p.slug}`,
+      start: p.startDate,
+      end: p.targetDate,
+      depth,
+      tone: projectTone(
+        p.phase,
+        p.health,
+        !!p.targetDate && p.targetDate < now
+      ),
+      progress: progress.total > 0 ? progress.fraction : undefined,
+      kind: "project",
+    });
+
+    // Its deliverables sit one level in from it — they belong to it, and the
+    // indent is the only thing saying so once there are sub-projects too.
+    for (const d of projectDeliverables(p.id)) {
+      if (!d.dueDate) continue; // A date-less deliverable has nowhere to sit.
+      rows.push({
+        id: d.id,
+        name: d.title,
+        end: d.dueDate,
+        depth: depth + 1,
+        tone:
+          d.status === "done"
+            ? "done"
+            : d.status === "blocked"
+              ? "risk"
+              : isOverdue(d)
+                ? "warn"
+                : "neutral",
+        kind: "deliverable",
+      });
+    }
+
+    for (const child of childProjects(p.id)) addProject(child, depth + 1);
+  };
+
+  addProject(project, 0);
+
+  // Only this project, undated, and nothing under it — an axis with one
+  // nameless bar on it tells you less than the empty space would.
+  if (!rows.some((r) => r.start || r.end)) return null;
+  return buildGantt(rows, now);
+}

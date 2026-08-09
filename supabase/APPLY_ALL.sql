@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql
 
 
 -- ==========================================================================
@@ -3060,4 +3060,47 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0020_commitment_tiers.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0021_backfill_project_start_dates.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0021 — give every existing project a start date
+--
+-- `createProject` never set `start_date`. The column has existed since 0001,
+-- the type has always had the field, and the demo seed uses it — but nothing
+-- in the app wrote it, so every project made through the UI has none.
+--
+-- Nothing surfaced that until now, because nothing drew a span. A Gantt bar
+-- needs a left edge, and a project without one renders as an open-ended bar
+-- that starts wherever the chart happens to start — which reads as a decision
+-- somebody made rather than as missing data.
+--
+-- Backfilling to TODAY is Anish's call, and it's the honest one available: the
+-- real start dates were never recorded and inventing plausible ones would put
+-- fiction on a chart people plan against. Every existing project reads as
+-- starting the day the timeline shipped, which is at least true of the record.
+--
+-- LEAST(current_date, target_date) because 0001 carries
+--
+--     check (target_date is null or start_date is null or target_date >= start_date)
+--
+-- and a project already past its target — of which there are some — would
+-- otherwise fail this statement and roll the whole migration back.
+-- ---------------------------------------------------------------------------
+
+update projects
+set start_date = least(current_date, coalesce(target_date, current_date))
+where start_date is null;
+
+insert into schema_migrations (version)
+values ('0021_backfill_project_start_dates')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0021_backfill_project_start_dates.sql
 -- ==========================================================================

@@ -6,6 +6,8 @@ import { CalendarDays, TriangleAlert } from "lucide-react";
 
 import { Badge } from "./badge";
 import type { DeadlineItem } from "@/lib/data/deadlines";
+import type { GanttChart } from "@/lib/gantt";
+import { Gantt } from "./gantt";
 
 /**
  * Two collapsed strips at the bottom of a division card: what's due, and
@@ -30,10 +32,20 @@ import type { DeadlineItem } from "@/lib/data/deadlines";
  */
 export function DivisionExtras({
   deadlines,
+  timeline,
   blocked,
   today,
 }: {
   deadlines: DeadlineItem[];
+  /**
+   * The same dates as a picture, drawn above the list under the same toggle.
+   *
+   * One control rather than two: the chart and the list answer the same
+   * question at different resolutions, so splitting them would put a second
+   * toggle on every division card of an already dense page. The chart shows
+   * that four things land in the same fortnight; the list says which days.
+   */
+  timeline: GanttChart | null;
   /** Projects in this division with blocked work or an unanswered blocker. */
   blocked: {
     projectId: string;
@@ -76,6 +88,14 @@ export function DivisionExtras({
 
           {showDeadlines ? (
             <div className="mt-2.5 space-y-1.5">
+              {timeline ? (
+                <div className="rounded-tile border-line mb-3 border px-3 py-3">
+                  <Gantt
+                    chart={timeline}
+                    caption="Every project in this division. The red line is today."
+                  />
+                </div>
+              ) : null}
               {live.map((item) => (
                 <div
                   key={item.key}
