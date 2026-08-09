@@ -35,6 +35,12 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      # Controls that exist but are wired to nothing. The most repeated bug in
+      # this project, and the only one the rest of this list can't see: an
+      # unused export typechecks, lints and passes its tests.
+      - name: Dead controls
+        run: npm run sweep
+
       - name: Test
         run: npm test
 

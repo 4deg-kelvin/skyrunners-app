@@ -166,7 +166,16 @@ function weekStartOf(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function getDeadlines(): Promise<DeadlinesView> {
+/**
+ * Every upcoming date, grouped by division.
+ *
+ * Internal now, not exported: `/deadlines` was a page for a day and folded
+ * into the collapsed strip under each division, so `getDivisionExtras` is the
+ * only caller. Left as its own function because the grouping is the awkward
+ * part — a deliverable's division comes from its project, which may hang off a
+ * sub-team rather than the division itself.
+ */
+async function getDeadlines(): Promise<DeadlinesView> {
   await preloadLiveStore();
   const store = readStore();
   const now = today();
@@ -194,8 +203,7 @@ export async function getDeadlines(): Promise<DeadlinesView> {
           project,
           owner: getMember(project.primaryReId),
           daysAway: daysBetween(now, project.targetDate),
-          overdue:
-            project.targetDate < now && project.phase !== "complete",
+          overdue: project.targetDate < now && project.phase !== "complete",
           done: project.phase === "complete",
         });
       }

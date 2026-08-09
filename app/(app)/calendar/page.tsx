@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import {
   AttendToggle,
   CancelEventButton,
+  EditEventForm,
   CreateEventForm,
 } from "@/components/forms/event-actions";
 import { Badge } from "@/components/ui/badge";
@@ -109,7 +110,7 @@ export default async function CalendarPage() {
                     swallowed, and it's the thing worth knowing before you
                     commit to being in two places.
                   */
-                  <span className="text-xs font-semibold text-warn-fg">
+                  <span className="text-warn-fg text-xs font-semibold">
                     Some of these run at the same time
                   </span>
                 ) : null}
@@ -117,17 +118,21 @@ export default async function CalendarPage() {
 
               <div className="mt-4 space-y-2.5">
                 {day.events.map((row) => (
-                  <EventRow key={row.event.id} row={row} />
+                  <EventRow
+                    key={row.event.id}
+                    row={row}
+                    canSetImportance={canCreateClubEvent}
+                  />
                 ))}
 
                 {day.deadlines.map((d) => (
                   <div
                     key={d.key}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-dashed border-line px-4 py-2.5"
+                    className="rounded-tile border-line flex flex-wrap items-center justify-between gap-2 border border-dashed px-4 py-2.5"
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <CalendarDays className="size-3.5 shrink-0 text-ink-muted" />
-                      <span className="min-w-0 text-sm text-ink">
+                      <CalendarDays className="text-ink-muted size-3.5 shrink-0" />
+                      <span className="text-ink min-w-0 text-sm">
                         <span className="font-semibold">{d.title}</span>
                         <span className="text-ink-muted">
                           {" "}
@@ -153,7 +158,7 @@ export default async function CalendarPage() {
         ))
       )}
 
-      <p className="px-1 text-sm text-ink-muted">
+      <p className="text-ink-muted px-1 text-sm">
         Sessions keep running over breaks — the academic calendar pauses
         check-ins, not the club. Helping on something you&apos;re not committed
         to? Log those hours as <span className="font-semibold">misc</span>.
@@ -162,7 +167,13 @@ export default async function CalendarPage() {
   );
 }
 
-function EventRow({ row }: { row: CalendarEvent }) {
+function EventRow({
+  row,
+  canSetImportance,
+}: {
+  row: CalendarEvent;
+  canSetImportance: boolean;
+}) {
   const { event, project, attendees, organiser, isAttending, canManage } = row;
 
   // 4 and 5 are what a member should not miss. Below that the badge would be
@@ -178,7 +189,7 @@ function EventRow({ row }: { row: CalendarEvent }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[15px] font-bold text-ink">
+            <span className="text-ink text-[15px] font-bold">
               {event.title}
             </span>
             <Badge tone={isKey ? "cardinal" : "neutral"}>
@@ -188,7 +199,7 @@ function EventRow({ row }: { row: CalendarEvent }) {
             {!event.isOpen ? <Badge tone="neutral">Private</Badge> : null}
           </div>
 
-          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5">
               <Clock className="size-3.5" />
               {timeLabel(event.startsAt)}
@@ -203,7 +214,7 @@ function EventRow({ row }: { row: CalendarEvent }) {
             {project ? (
               <Link
                 href={`/projects/${project.slug}`}
-                className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+                className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
               >
                 {project.name}
               </Link>
@@ -211,11 +222,11 @@ function EventRow({ row }: { row: CalendarEvent }) {
           </p>
 
           {event.notes ? (
-            <p className="mt-1.5 text-sm text-ink-soft">{event.notes}</p>
+            <p className="text-ink-soft mt-1.5 text-sm">{event.notes}</p>
           ) : null}
 
           {attendees.length > 0 ? (
-            <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-muted">
+            <p className="text-ink-muted mt-1.5 flex items-center gap-1.5 text-sm">
               <Users className="size-3.5" />
               {attendees.map((a) => a.fullName).join(", ")}
               {organiser ? (
@@ -235,11 +246,23 @@ function EventRow({ row }: { row: CalendarEvent }) {
           {event.isOpen ? (
             <AttendToggle eventId={event.id} attending={isAttending} />
           ) : null}
-          {canManage ? (
-            <CancelEventButton eventId={event.id} title={event.title} />
-          ) : null}
         </div>
       </div>
+
+      {/*
+        Organiser controls sit under the row, full width, rather than in the
+        right-hand column: the edit form is a two-column grid and would be
+        squeezed to nothing there.
+
+        Editing exists because cancelling deletes the attendee list, and the
+        commonest change by far is a time slipping an hour.
+      */}
+      {canManage ? (
+        <div className="border-line mt-2.5 flex flex-wrap items-center gap-4 border-t pt-2.5">
+          <EditEventForm event={event} canSetImportance={canSetImportance} />
+          <CancelEventButton eventId={event.id} title={event.title} />
+        </div>
+      ) : null}
     </div>
   );
 }

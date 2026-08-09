@@ -42,13 +42,13 @@ import type { OrgGraph } from "../permissions.ts";
  * to the schema doesn't silently widen what every page pulls — and so a rename
  * fails here, loudly, instead of arriving as an `undefined` three layers away.
  */
-export const PROFILE_COLUMNS =
+const PROFILE_COLUMNS =
   "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at";
 
-export const PROJECT_COLUMNS =
+const PROJECT_COLUMNS =
   "id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment";
 
-export const PROJECT_MEMBER_COLUMNS = "project_id, member_id";
+const PROJECT_MEMBER_COLUMNS = "project_id, member_id";
 
 /**
  * Teams, for the Division-Lead-is-a-top-RE rule in `leadsTeamAbove`.
@@ -58,7 +58,7 @@ export const PROJECT_MEMBER_COLUMNS = "project_id, member_id";
  * history — correcting a record, reopening something. Archiving hides a
  * division from the tree; it doesn't revoke anybody's authority.
  */
-export const TEAM_COLUMNS = "id, name, slug, parent_id, lead_id, is_active";
+const TEAM_COLUMNS = "id, name, slug, parent_id, lead_id, is_active";
 
 /**
  * Every table/column pair this file reads, in one place.

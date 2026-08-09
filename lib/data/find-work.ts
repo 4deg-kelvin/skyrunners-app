@@ -24,20 +24,14 @@
 
 import { readStore } from "@/lib/store/disk";
 import {
-  artifactsFor,
   divisionForProject,
-  getMember,
-  isOverdue,  projectDeliverables,
+  isOverdue,
+  projectDeliverables,
   projectMembers,
   projectProgress,
   projectREs,
 } from "@/lib/mock-data";
-import type {
-  Deliverable,
-  Member,
-  Project,
-  Team,
-} from "@/lib/types";
+import type { Deliverable, Member, Project, Team } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
 export type WorkSignal =
@@ -71,7 +65,7 @@ export interface FindWorkView {
   /** Distinct skill areas across all open roles, for filtering. */
   skillAreas: string[];
   counts: {
-    total: number
+    total: number;
     needingHelp: number;
     unstaffed: number;
   };
@@ -109,7 +103,8 @@ function priorityFor(signals: WorkSignal[], project: Project): number {
   if (signals.includes("unowned_deliverables")) score += 15;
   // Early-phase projects are the easiest to join usefully — there's shaping work
   // left, rather than a half-built thing to catch up on.
-  if (project.phase === "concept" || project.phase === "requirements") score += 10;
+  if (project.phase === "concept" || project.phase === "requirements")
+    score += 10;
   return score;
 }
 
@@ -127,8 +122,8 @@ export async function getFindWork(
   await preloadLiveStore();
   const lowerSkills = viewerSkills.map((s) => s.toLowerCase());
 
-  const openWork: OpenWorkCard[] = readStore().projects
-    .filter((p) => p.phase !== "complete")
+  const openWork: OpenWorkCard[] = readStore()
+    .projects.filter((p) => p.phase !== "complete")
     .map((project) => {
       const members = projectMembers(project.id).filter(
         (pm) => pm.commitment === "committed"
@@ -166,7 +161,8 @@ export async function getFindWork(
       // "computer vision" finds "vision". Good enough, and easy to reason about.
       const roleText = (project.openRoles ?? "").toLowerCase();
       const matchedSkills = lowerSkills.filter(
-        (s) => roleText.includes(s) || s.split(" ").some((w) => roleText.includes(w))
+        (s) =>
+          roleText.includes(s) || s.split(" ").some((w) => roleText.includes(w))
       );
 
       return {
@@ -186,16 +182,18 @@ export async function getFindWork(
     .sort((a, b) => {
       // Projects the viewer is already committed to go last — they're looking
       // for something NEW.
-      if (a.viewerStatus === "committed" && b.viewerStatus !== "committed") return 1;
-      if (b.viewerStatus === "committed" && a.viewerStatus !== "committed") return -1;
+      if (a.viewerStatus === "committed" && b.viewerStatus !== "committed")
+        return 1;
+      if (b.viewerStatus === "committed" && a.viewerStatus !== "committed")
+        return -1;
       if (b.priority !== a.priority) return b.priority - a.priority;
       return a.project.name.localeCompare(b.project.name);
     });
 
   const skillAreas = Array.from(
     new Set(
-      readStore().projects
-        .flatMap((p) => (p.openRoles ?? "").split(","))
+      readStore()
+        .projects.flatMap((p) => (p.openRoles ?? "").split(","))
         .map((s) => s.trim())
         .filter(Boolean)
     )
@@ -211,26 +209,4 @@ export async function getFindWork(
       unstaffed: openWork.filter((w) => w.signals.includes("unstaffed")).length,
     },
   };
-}
-
-/** Every artifact across the club, newest first — powers a "recent work" feed. */
-export async function getRecentArtifacts(limit = 8) {
-  // Ensure the live snapshot exists before any synchronous read.
-  //
-  // Idempotent and free once loaded. It's here rather than left to the caller
-  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
-  // which starts the read BEFORE getViewer has preloaded, and every such page
-  // then died on "Live store not loaded". Guarding at the boundary means call
-  // order stops mattering.
-  await preloadLiveStore();
-  return readStore()
-    .projects.flatMap((p) =>
-      artifactsFor(p.id).map((a) => ({
-        artifact: a,
-        project: p,
-        uploadedBy: getMember(a.uploadedById),
-      }))
-    )
-    .sort((a, b) => b.artifact.createdAt.localeCompare(a.artifact.createdAt))
-    .slice(0, limit);
 }

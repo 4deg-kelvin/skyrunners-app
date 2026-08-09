@@ -16,7 +16,6 @@
  */
 
 import {
-  activeMembers,
   catalogueItemsFor,
   certificationsFor,
   getMember,
@@ -128,7 +127,9 @@ export async function getTrainings(memberId: string): Promise<TrainingsView> {
     return {
       item,
       record,
-      verifier: record?.verifiedById ? getMember(record.verifiedById) : undefined,
+      verifier: record?.verifiedById
+        ? getMember(record.verifiedById)
+        : undefined,
       clearedMembers: (clearedByItem.get(item.id) ?? []).sort((a, b) =>
         a.fullName.localeCompare(b.fullName)
       ),
@@ -152,9 +153,7 @@ export async function getTrainings(memberId: string): Promise<TrainingsView> {
     member,
     sections,
     retiredHeld: store.catalogueItems
-      .filter(
-        (i) => !i.isActive && mine.some((c) => c.itemId === i.id)
-      )
+      .filter((i) => !i.isActive && mine.some((c) => c.itemId === i.id))
       .map(row),
     counts: {
       verified: mine.filter((c) => c.status === "verified").length,
@@ -212,7 +211,9 @@ export async function getTrainingQueue(
       .filter((c) => c.status === "expired")
       .map(decorate)
       .filter((x): x is TrainingQueueItem => x !== null)
-      .sort((a, b) => (a.record.expiresAt ?? "").localeCompare(b.record.expiresAt ?? "")),
+      .sort((a, b) =>
+        (a.record.expiresAt ?? "").localeCompare(b.record.expiresAt ?? "")
+      ),
   };
 }
 
@@ -242,40 +243,11 @@ export async function getCatalogue(): Promise<{
   };
 }
 
-/**
- * "Who can run the laser cutter?" answered directly.
- *
- * A flat index of every active clearance, for the lookup view. Deliberately
- * club-wide and not scoped to a Lead's reports: the point is finding the
- * person who can help, and they're usually not on your team.
- */
-export async function getClearanceIndex(): Promise<
-  { item: CatalogueItem; sectionName: string; cleared: Member[] }[]
-> {
-  await preloadLiveStore();
-  const store = readStore();
-  const sectionName = new Map(store.trainingSections.map((s) => [s.id, s.name]));
-  const active = new Set(activeMembers().map((m) => m.id));
+/*
+  `getClearanceIndex` used to live here — a flat club-wide index answering
+  "who can run the laser cutter?".
 
-  return store.catalogueItems
-    .filter((i) => i.isActive)
-    .map((item) => ({
-      item,
-      sectionName: sectionName.get(item.sectionId) ?? "Misc",
-      cleared: store.certifications
-        .filter(
-          (c) =>
-            c.itemId === item.id &&
-            c.status === "verified" &&
-            active.has(c.memberId)
-        )
-        .map((c) => getMember(c.memberId))
-        .filter((m): m is Member => Boolean(m))
-        .sort((a, b) => a.fullName.localeCompare(b.fullName)),
-    }))
-    .sort(
-      (a, b) =>
-        a.sectionName.localeCompare(b.sectionName) ||
-        a.item.sortOrder - b.item.sortOrder
-    );
-}
+  `getTrainings` already resolves `clearedMembers` per catalogue row, and the
+  standalone /trainings page it was built for is gone (trainings moved onto the
+  member profile). Two ways to compute the same answer is how they drift.
+*/

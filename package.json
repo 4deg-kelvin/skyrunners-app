@@ -19,7 +19,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "sweep": "node scripts/dead-controls.mjs",
+    "check": "npm run typecheck && npm run lint && npm run sweep && npm test"
   },
   "dependencies": {
     "next": "^15.0.0",

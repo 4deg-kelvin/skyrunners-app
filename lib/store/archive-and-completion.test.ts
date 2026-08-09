@@ -93,7 +93,9 @@ function phaseOf(projectId: string) {
 }
 
 function noticesOn(projectId: string) {
-  return disk.readStore().projectNotices.filter((n) => n.projectId === projectId);
+  return disk
+    .readStore()
+    .projectNotices.filter((n) => n.projectId === projectId);
 }
 
 function teamById(teamId: string) {
@@ -385,7 +387,11 @@ describe("archiving a division keeps its history", () => {
 
   test("sub-teams go with the parent", async () => {
     for (const id of EVTOL_PROJECTS) {
-      assert.equal((await setPhase(id, "complete")).ok, true, `completing ${id}`);
+      assert.equal(
+        (await setPhase(id, "complete")).ok,
+        true,
+        `completing ${id}`
+      );
     }
 
     assert.equal(
@@ -399,7 +405,11 @@ describe("archiving a division keeps its history", () => {
       true
     );
 
-    for (const id of ["team-structures", "team-composites", "team-propulsion"]) {
+    for (const id of [
+      "team-structures",
+      "team-composites",
+      "team-propulsion",
+    ]) {
       assert.equal(teamById(id)?.isActive, false, id);
     }
   });
@@ -1211,7 +1221,8 @@ describe("deleting a member record", () => {
       operation with a permanent side effect is the worst kind — the caller
       sees an error and reasonably assumes nothing changed.
     */
-    disk.readStore().members.find((m) => m.id === "m-sofia")!.leadId = "m-tyler";
+    disk.readStore().members.find((m) => m.id === "m-sofia")!.leadId =
+      "m-tyler";
 
     // m-tyler is the primary RE of p-wing-spar, so this is refused.
     const result = await ops.deleteMember({
@@ -1226,5 +1237,278 @@ describe("deleting a member record", () => {
       disk.readStore().members.find((m) => m.id === "m-sofia")?.leadId,
       "m-tyler"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Nested due dates
+// ---------------------------------------------------------------------------
+
+/** Change only the target date, leaving every other field as it was. */
+async function setTarget(projectId: string, targetDate?: string) {
+  const p = disk.readStore().projects.find((x) => x.id === projectId);
+  if (!p) throw new Error(`No such project in the seed: ${projectId}`);
+
+  return ops.updateProject({
+    projectId,
+    name: p.name,
+    description: p.description,
+    phase: p.phase,
+    health: p.health,
+    targetDate,
+    openRoles: p.openRoles,
+    actorId: "m-anish",
+    today: TODAY,
+  });
+}
+
+function targetOf(projectId: string) {
+  return disk.readStore().projects.find((p) => p.id === projectId)?.targetDate;
+}
+
+describe("work inside a project can't be due after the project", () => {
+  /*
+    The seed's dates, which the tests below lean on:
+
+      p-airframe-v2   2026-12-15
+        └ p-wing-spar   2026-10-30
+            ├ p-layup     2026-08-30
+            └ p-load-test 2026-10-15
+  */
+
+  test("the seed itself satisfies the rule", () => {
+    // If this fails, the sample club ships in violation of its own constraint
+    // and every date edit below is testing a fiction.
+    assert.ok(targetOf("p-layup")! <= targetOf("p-wing-spar")!);
+    assert.ok(targetOf("p-load-test")! <= targetOf("p-wing-spar")!);
+    assert.ok(targetOf("p-wing-spar")! <= targetOf("p-airframe-v2")!);
+  });
+
+  test("a child dated after its parent is refused", async () => {
+    const result = await setTarget("p-load-test", "2026-11-30");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      // Names the parent and its date — otherwise the RE has to go and look.
+      assert.match(result.error, /Wing Spar/i);
+      assert.match(result.error, /2026-10-30/);
+    }
+    assert.equal(targetOf("p-load-test"), "2026-10-15");
+  });
+
+  test("a child dated on the parent's date exactly is fine", async () => {
+    assert.equal((await setTarget("p-load-test", "2026-10-30")).ok, true);
+    assert.equal(targetOf("p-load-test"), "2026-10-30");
+  });
+
+  test("pulling a parent in over a later child is refused too", async () => {
+    // The same mistake arriving from the other direction.
+    const result = await setTarget("p-wing-spar", "2026-09-01");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /Load Test/i);
+    assert.equal(targetOf("p-wing-spar"), "2026-10-30");
+  });
+
+  test("the check reaches grandchildren, not just direct children", async () => {
+    // p-layup is two levels under p-airframe-v2.
+    assert.equal((await setTarget("p-layup", "2026-10-20")).ok, true);
+    const result = await setTarget("p-airframe-v2", "2026-09-15");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /Layup|Spar|Load/i);
+  });
+
+  test("no parent date means no constraint", async () => {
+    assert.equal((await setTarget("p-airframe-v2", undefined)).ok, true);
+    // Far past where the parent used to be. An undated parent promises nothing,
+    // so there is nothing to be late for.
+    assert.equal((await setTarget("p-wing-spar", "2027-06-01")).ok, true);
+    assert.equal(targetOf("p-wing-spar"), "2027-06-01");
+  });
+
+  test("clearing a child's date is always allowed", async () => {
+    assert.equal((await setTarget("p-load-test", undefined)).ok, true);
+    assert.equal(targetOf("p-load-test"), undefined);
+  });
+
+  test("a top-level project takes any date", async () => {
+    assert.equal((await setTarget("p-propulsion-test", "2029-01-01")).ok, true);
+  });
+
+  test("an unrelated edit still saves when the dates already clash", async () => {
+    /*
+      The regression this guards.
+
+      Dates entered before the rule existed would otherwise freeze the project:
+      every save resends the existing date, so a rename would fail on a
+      violation the person never touched and could not see.
+    */
+    const store = disk.readStore();
+    const spar = store.projects.find((p) => p.id === "p-wing-spar")!;
+    const loadTest = store.projects.find((p) => p.id === "p-load-test")!;
+    // Reach past the operation to create the illegal pair, exactly as old data
+    // would arrive.
+    await ops.updateProject({
+      projectId: "p-wing-spar",
+      name: spar.name,
+      phase: spar.phase,
+      health: spar.health,
+      targetDate: "2026-12-01",
+      actorId: "m-anish",
+      today: TODAY,
+    });
+    await ops.updateProject({
+      projectId: "p-load-test",
+      name: loadTest.name,
+      phase: loadTest.phase,
+      health: loadTest.health,
+      targetDate: "2026-12-01",
+      actorId: "m-anish",
+      today: TODAY,
+    });
+    // Now pull the parent in, bypassing the check by leaving the date alone…
+    disk.readStore().projects.find((p) => p.id === "p-wing-spar")!.targetDate =
+      "2026-09-01";
+
+    const renamed = await ops.updateProject({
+      projectId: "p-load-test",
+      name: "Load Test (renamed)",
+      phase: loadTest.phase,
+      health: loadTest.health,
+      targetDate: "2026-12-01",
+      actorId: "m-anish",
+      today: TODAY,
+    });
+
+    assert.equal(renamed.ok, true);
+    assert.equal(
+      disk.readStore().projects.find((p) => p.id === "p-load-test")?.name,
+      "Load Test (renamed)"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Taking a sign-off back
+// ---------------------------------------------------------------------------
+
+describe("withdrawing a sign-off", () => {
+  /** Sign something off so there's an approval to overturn. */
+  async function signOffSomethingOn(projectId: string) {
+    const d = disk
+      .readStore()
+      .deliverables.find((x) => x.projectId === projectId);
+    if (!d) throw new Error(`No deliverable on ${projectId} in the seed`);
+    await ops.confirmDeliverable(d.id, "m-tyler", TODAY);
+    return d.id;
+  }
+
+  function deliverable(id: string) {
+    return disk.readStore().deliverables.find((d) => d.id === id)!;
+  }
+
+  test("a completed deliverable goes back to in progress with the reason", async () => {
+    const id = await signOffSomethingOn("p-wing-spar");
+    assert.equal(deliverable(id).status, "done");
+
+    const result = await ops.withdrawSignOff({
+      deliverableId: id,
+      reason: "Failed at 1.3g on the bench.",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    const after = deliverable(id);
+    assert.equal(after.status, "in_progress");
+    assert.equal(after.completedAt, undefined);
+    assert.equal(after.confirmedById, undefined);
+    assert.match(after.blockerNote ?? "", /1\.3g/);
+  });
+
+  test("a reason is required — this comes off somebody's record", async () => {
+    const id = await signOffSomethingOn("p-wing-spar");
+    const result = await ops.withdrawSignOff({
+      deliverableId: id,
+      reason: "   ",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(deliverable(id).status, "done");
+  });
+
+  test("something that was never signed off is refused", async () => {
+    const open = disk
+      .readStore()
+      .deliverables.find((d) => d.status !== "done")!;
+
+    const result = await ops.withdrawSignOff({
+      deliverableId: open.id,
+      reason: "Doesn't meet the requirement.",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /Send it back/i);
+  });
+
+  test("a complete project is reopened, because both can't be true", async () => {
+    // p-propulsion-test has no children, so it completes freely.
+    assert.equal((await setPhase("p-propulsion-test", "complete")).ok, true);
+    const id = await signOffSomethingOn("p-propulsion-test");
+
+    const before = noticesOn("p-propulsion-test").length;
+    const result = await ops.withdrawSignOff({
+      deliverableId: id,
+      reason: "The mount cracked.",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    assert.notEqual(phaseOf("p-propulsion-test"), "complete");
+    assert.equal(
+      disk.readStore().projects.find((p) => p.id === "p-propulsion-test")
+        ?.health,
+      "at_risk"
+    );
+
+    // And the people who were told it was finished are told it isn't.
+    const notices = noticesOn("p-propulsion-test");
+    assert.equal(notices.length, before + 1);
+    const latest = notices[notices.length - 1];
+    assert.equal(latest.kind, "reopened");
+    assert.match(latest.body, /mount cracked/i);
+    assert.ok(latest.notifiedMemberIds.length > 0);
+  });
+
+  test("an active project is left alone — only the deliverable moves", async () => {
+    const id = await signOffSomethingOn("p-wing-spar");
+    const phaseBefore = phaseOf("p-wing-spar");
+    const noticesBefore = noticesOn("p-wing-spar").length;
+
+    await ops.withdrawSignOff({
+      deliverableId: id,
+      reason: "Wrong layup schedule.",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+
+    assert.equal(phaseOf("p-wing-spar"), phaseBefore);
+    assert.equal(noticesOn("p-wing-spar").length, noticesBefore);
+  });
+
+  test("an unknown id fails rather than throwing", async () => {
+    const result = await ops.withdrawSignOff({
+      deliverableId: "d-nope",
+      reason: "Whatever.",
+      actorId: "m-priya",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
   });
 });

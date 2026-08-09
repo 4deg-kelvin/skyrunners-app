@@ -274,7 +274,10 @@ describe("a Division Lead is a top RE over their division", () => {
       reviewing one named person's obligation. `worker` reports to lead2, not
       to divLead, so the answer has to stay no.
     */
-    assert.equal(can.viewMemberEffort(actor("divLead"), graph, "worker"), false);
+    assert.equal(
+      can.viewMemberEffort(actor("divLead"), graph, "worker"),
+      false
+    );
     assert.equal(can.reviewUpdate(actor("divLead"), graph, "worker"), false);
   });
 
@@ -354,10 +357,7 @@ describe("effort visibility is restricted to the reporting chain", () => {
     // meant being RE of one thing revealed a person's hours on everything else
     // plus their reliability record. The RE's narrower, legitimate question is
     // covered by viewMemberHoursOnProject below.
-    assert.equal(
-      can.viewMemberEffort(actor("reRoot"), graph, "worker"),
-      false
-    );
+    assert.equal(can.viewMemberEffort(actor("reRoot"), graph, "worker"), false);
   });
 
   test("an unrelated member cannot", () => {
@@ -585,5 +585,120 @@ describe("project creation is deliberately easy for leadership", () => {
 
   test("an RE cannot create a sub-project under someone else's tree", () => {
     assert.equal(can.createProject(actor("reLeaf"), graph, "other"), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Approving is not the same right as doing
+// ---------------------------------------------------------------------------
+
+describe("only somebody above a project can approve it", () => {
+  /*
+    Fixture recap, since these tests turn entirely on it:
+
+      root (reRoot)   owned by team divA, led by divLead
+        └ mid (reMid)
+            └ leaf (reLeaf)
+
+    `mid` and `leaf` carry no teamId, so they inherit divA through the project
+    tree — which is exactly the case a naive implementation drops.
+  */
+
+  test("the project's own RE cannot mark it complete", () => {
+    // The whole point. reMid runs `mid` and can edit everything about it…
+    assert.equal(can.manageProject(actor("reMid"), graph, "mid"), true);
+    // …but declaring their own work finished is somebody else's job.
+    assert.equal(can.completeProject(actor("reMid"), graph, "mid"), false);
+  });
+
+  test("the RE one level up can", () => {
+    assert.equal(can.completeProject(actor("reRoot"), graph, "mid"), true);
+  });
+
+  test("an RE four levels up can, at any depth", () => {
+    assert.equal(can.completeProject(actor("reD1"), graph, "d5"), true);
+  });
+
+  test("the Division Lead can, including on projects with no teamId", () => {
+    // `leaf` has no team of its own — it inherits divA up the project tree.
+    assert.equal(can.completeProject(actor("divLead"), graph, "leaf"), true);
+    assert.equal(can.completeProject(actor("divLead"), graph, "root"), true);
+  });
+
+  test("a Division Lead who is ALSO the project's RE is still excluded", () => {
+    /*
+      Wearing both hats doesn't create a reviewer. The app can't fix an org
+      that assigns a project to the person who approves it — but it can decline
+      to pretend a review happened, and escalate to whoever is above them.
+    */
+    const selfAssigned: Project[] = projects.map((p) =>
+      p.id === "root" ? { ...p, reIds: ["divLead"], primaryReId: "divLead" } : p
+    );
+    const g: OrgGraph = {
+      ...graph,
+      getProject: (id) => selfAssigned.find((p) => p.id === id),
+      directREs: (id) => selfAssigned.find((p) => p.id === id)?.reIds ?? [],
+    };
+
+    assert.equal(can.manageProject(actor("divLead"), g, "root"), true);
+    assert.equal(can.completeProject(actor("divLead"), g, "root"), false);
+  });
+
+  test("a Co-Lead always can — that's the escape hatch", () => {
+    // Without it, a Co-Lead who is the RE of a top-level project could never
+    // complete it, and it would be stuck forever.
+    const selfAssigned: Project[] = projects.map((p) =>
+      p.id === "root" ? { ...p, reIds: ["coLead"], primaryReId: "coLead" } : p
+    );
+    const g: OrgGraph = {
+      ...graph,
+      getProject: (id) => selfAssigned.find((p) => p.id === id),
+      directREs: (id) => selfAssigned.find((p) => p.id === id)?.reIds ?? [],
+    };
+
+    assert.equal(can.completeProject(actor("coLead"), g, "root"), true);
+  });
+
+  test("a sub-team lead covers their own subtree and nothing sideways", () => {
+    assert.equal(can.completeProject(actor("subLead"), graph, "d5"), true);
+    assert.equal(can.completeProject(actor("subLead"), graph, "mid"), false);
+  });
+
+  test("an RE of a sibling tree cannot", () => {
+    assert.equal(can.completeProject(actor("reOther"), graph, "mid"), false);
+  });
+
+  test("a plain member cannot", () => {
+    assert.equal(can.completeProject(actor("worker"), graph, "leaf"), false);
+  });
+
+  test("a Lead with no project authority cannot", () => {
+    // Being somebody's Lead is the reporting chain, not the project tree.
+    assert.equal(can.completeProject(actor("lead2"), graph, "leaf"), false);
+  });
+});
+
+describe("withdrawing a sign-off needs the same authority", () => {
+  test("signing off stays with the project's own RE", () => {
+    // Unchanged, and deliberately so — that's the job the deliverable model
+    // costs them five minutes a week for.
+    assert.equal(can.manageDeliverables(actor("reMid"), graph, "mid"), true);
+  });
+
+  test("but that RE cannot overturn a sign-off on their own project", () => {
+    assert.equal(can.withdrawSignOff(actor("reMid"), graph, "mid"), false);
+  });
+
+  test("the RE above can", () => {
+    assert.equal(can.withdrawSignOff(actor("reRoot"), graph, "mid"), true);
+  });
+
+  test("so can the Division Lead and a Co-Lead", () => {
+    assert.equal(can.withdrawSignOff(actor("divLead"), graph, "leaf"), true);
+    assert.equal(can.withdrawSignOff(actor("coLead"), graph, "leaf"), true);
+  });
+
+  test("the deliverable's owner cannot, even on their own work", () => {
+    assert.equal(can.withdrawSignOff(actor("worker"), graph, "leaf"), false);
   });
 });

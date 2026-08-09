@@ -167,6 +167,61 @@ export function isREofOrAbove(
   return leadsTeamAbove(actor, graph, projectId);
 }
 
+/**
+ * Q2b — RE authority arriving from STRICTLY ABOVE this project.
+ *
+ * ---------------------------------------------------------------------------
+ * Doing the work and approving the work are different jobs
+ * ---------------------------------------------------------------------------
+ *
+ * `isREofOrAbove` answers "may you act on this project". This answers the
+ * narrower question "may you APPROVE it" — and the difference is that the
+ * project's own RE is excluded, whatever else is true about them.
+ *
+ * The assigned RE is accountable for FINISHING a project. The RE above them —
+ * or the Division Lead, who is a top RE — is accountable for reviewing it and
+ * agreeing it's actually done. Letting one person hold both means "complete"
+ * only ever means "the person who built it says so", which is exactly what the
+ * two-step deliverable sign-off already refuses at the smaller scale.
+ *
+ * Only two things go through here, and both are the same act — withdrawing or
+ * granting an approval on someone else's work:
+ *
+ *   - marking a project complete           (`can.completeProject`)
+ *   - challenging a signed-off deliverable (`can.withdrawSignOff`)
+ *
+ * Everything else about a project still runs on `isREofOrAbove`, because the
+ * assigned RE must be able to do their job.
+ *
+ * **Being the project's own RE disqualifies you even if you'd qualify another
+ * way.** A Division Lead who assigns a project to themselves is wearing both
+ * hats, and the app can't fix that organizationally — but it can decline to
+ * pretend a review happened. It escalates to whoever is above them.
+ *
+ * **Co-Leads are the escape hatch**, checked by the callers rather than here.
+ * Without one, a Co-Lead who is the RE of a top-level project could never
+ * complete it — there is nobody above them — and the project would be stuck
+ * forever. That fallback is why this can be strict everywhere else.
+ */
+export function isREaboveProject(
+  actor: Actor,
+  graph: OrgGraph,
+  projectId: string
+): boolean {
+  if (graph.directREs(projectId).includes(actor.id)) return false;
+
+  // `projectChain` starts AT the project, so drop the head: only ancestors.
+  const ancestors = projectChain(graph, projectId).slice(1);
+  if (ancestors.some((id) => graph.directREs(id).includes(actor.id))) {
+    return true;
+  }
+
+  // The Division Lead route. A team lead sits above the projects their team
+  // owns by org position rather than project position, which is what makes
+  // them the reviewer of record for a top-level project with no parent.
+  return leadsTeamAbove(actor, graph, projectId);
+}
+
 /** Walk from a member up their reporting chain, collecting their Leads. */
 export function leadChain(graph: OrgGraph, memberId: string): string[] {
   const chain: string[] = [];
@@ -285,6 +340,22 @@ export const can = {
   /** Edit details, phase, dates, artifacts, requirements, tasks. */
   manageProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /**
+   * Marking a project COMPLETE — the review step, not the editing step.
+   *
+   * Deliberately narrower than `manageProject`: the assigned RE runs the
+   * project and can change anything else about it, but cannot declare their own
+   * work finished. See `isREaboveProject` for why, and for the Co-Lead escape
+   * hatch that stops the top of the tree deadlocking.
+   *
+   * Only guards the crossing INTO complete. Reopening runs on `manageProject`,
+   * because admitting something isn't finished makes the record more
+   * conservative, not less — and an RE whose project has restarted must not
+   * need permission to say so.
+   */
+  completeProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREaboveProject(actor, graph, projectId),
 
   /** Appoint or remove REs — multiple REs per project are allowed. */
   assignRE: (actor: Actor, graph: OrgGraph, projectId: string) =>
@@ -432,8 +503,7 @@ export const can = {
   // --- Trainings and facility access ------------------------------------
 
   /** Members request; nobody self-verifies. */
-  requestTraining: (actor: Actor, memberId: string) =>
-    isSelf(actor, memberId),
+  requestTraining: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   /**
    * Verified by the member's Lead chain, or a Co-Lead.
@@ -505,6 +575,28 @@ export const can = {
   /** REs shape the list; that's the five minutes a week the model costs them. */
   manageDeliverables: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /**
+   * Challenging work that has ALREADY been signed off.
+   *
+   * Signing off stays with the RE at the project's own level — that's their
+   * job, it's the five minutes a week the deliverable model costs them, and
+   * `manageDeliverables` still covers it. This is the different, rarer act:
+   * saying a sign-off was wrong. The engineering doesn't meet the requirement,
+   * the part failed on the bench, the work was not actually done.
+   *
+   * That has to come from above the person who signed it, or it's the same
+   * signature marking its own homework — so it routes through
+   * `isREaboveProject` rather than `isREofOrAbove`. The RE who signed off
+   * cannot quietly un-sign it; they ask the person above them, and the record
+   * shows a challenge rather than an edit.
+   *
+   * It is genuinely destructive — it removes a completed deliverable from
+   * somebody's Delivered signal, the one thing in the contribution model that
+   * can't be inflated — so the operation demands a reason in writing.
+   */
+  withdrawSignOff: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREaboveProject(actor, graph, projectId),
 
   /** You can always update the status of something you own. */
   updateDeliverableStatus: (
@@ -628,14 +720,8 @@ export const can = {
    * restricting it to the asker alone strands every ask from someone who got
    * their answer elsewhere and never came back.
    */
-  resolveHelpRequest: (
-    actor: Actor,
-    askerId: string,
-    replierIds: string[]
-  ) =>
-    isSelf(actor, askerId) ||
-    replierIds.includes(actor.id) ||
-    isCoLead(actor),
+  resolveHelpRequest: (actor: Actor, askerId: string, replierIds: string[]) =>
+    isSelf(actor, askerId) || replierIds.includes(actor.id) || isCoLead(actor),
 
   /** Your own ask, or a Co-Lead clearing up. */
   deleteHelpRequest: (actor: Actor, askerId: string) =>

@@ -27,17 +27,12 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ArtifactList } from "@/components/ui/artifact-list";
-import {
-  DeliverableRow,
-  ProgressBar,
-} from "@/components/ui/deliverable-row";
+import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
-import {
-  getProjectBySlug,
-} from "@/lib/data/projects";
+import { getProjectBySlug } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
 import {
   ATTENTION_LABELS,
@@ -76,6 +71,23 @@ export default async function ProjectDetailPage({
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
   const mayAssignRE = can.assignRE(viewer.actor, viewer.graph, project.id);
+  /*
+    Approving, as opposed to running the project.
+
+    Both of these deliberately EXCLUDE the project's own RE, who has
+    `mayManage` and everything that comes with it. Finishing the work and
+    agreeing it's finished are different jobs — see `isREaboveProject`.
+  */
+  const mayComplete = can.completeProject(
+    viewer.actor,
+    viewer.graph,
+    project.id
+  );
+  const mayWithdrawSignOff = can.withdrawSignOff(
+    viewer.actor,
+    viewer.graph,
+    project.id
+  );
   const mayDelete = can.deleteProject(viewer.actor, viewer.graph, project.id);
 
   const mayAddMember = can.addProjectMember(
@@ -98,7 +110,6 @@ export default async function ProjectDetailPage({
     viewer.graph,
     project.id
   );
-
 
   return (
     <div className="space-y-6">
@@ -137,10 +148,7 @@ export default async function ProjectDetailPage({
               ) : null}
 
               {isOnProject ? null : (
-                <FollowToggle
-                  projectId={project.id}
-                  following={isFollowing}
-                />
+                <FollowToggle projectId={project.id} following={isFollowing} />
               )}
             </div>
           }
@@ -156,7 +164,7 @@ export default async function ProjectDetailPage({
               {attentionFlags.map((flag) => (
                 <li
                   key={`${flag.reason}-${flag.detail}`}
-                  className="flex items-start gap-2 text-sm text-warn-fg"
+                  className="text-warn-fg flex items-start gap-2 text-sm"
                 >
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                   <span>
@@ -180,7 +188,7 @@ export default async function ProjectDetailPage({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <SectionLabel>Status</SectionLabel>
-                  <h2 className="mt-2 text-2xl font-bold text-ink">
+                  <h2 className="text-ink mt-2 text-2xl font-bold">
                     {PHASE_LABELS[project.phase]}
                   </h2>
                 </div>
@@ -190,6 +198,8 @@ export default async function ProjectDetailPage({
                     <ProjectEditForm
                       project={project}
                       canDelete={mayDelete}
+                      canComplete={mayComplete}
+                      parentTargetDate={view.parent?.targetDate}
                       incompleteDescendants={view.incompleteDescendants}
                     />
                   ) : null}
@@ -270,7 +280,7 @@ export default async function ProjectDetailPage({
                   deliverables.map(({ deliverable, owner, overdue }) => (
                     <div
                       key={deliverable.id}
-                      className="rounded-tile border border-line px-3.5 py-3"
+                      className="rounded-tile border-line border px-3.5 py-3"
                     >
                       <DeliverableRow
                         deliverable={deliverable}
@@ -282,6 +292,7 @@ export default async function ProjectDetailPage({
                           deliverable={deliverable}
                           isOwner={deliverable.ownerId === viewer.member.id}
                           canSignOff={mayManage}
+                          canWithdrawSignOff={mayWithdrawSignOff}
                           candidates={assignableMembers.map((m) => ({
                             id: m.id,
                             name: m.fullName,
@@ -332,30 +343,32 @@ export default async function ProjectDetailPage({
                   members.map(({ membership, member }) => (
                     <div
                       key={membership.memberId}
-                      className="flex flex-wrap items-start justify-between gap-3 rounded-tile border border-line px-4 py-3"
+                      className="rounded-tile border-line flex flex-wrap items-start justify-between gap-3 border px-4 py-3"
                     >
                       <div className="min-w-0">
                         {member ? (
                           <Link
                             href={`/members/${member.id}`}
-                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                           >
                             {member.fullName}
                           </Link>
                         ) : (
-                          <span className="text-[15px] font-bold text-ink-muted">
+                          <span className="text-ink-muted text-[15px] font-bold">
                             Unknown member
                           </span>
                         )}
                         {membership.responsibility ? (
-                          <p className="mt-0.5 text-sm text-ink-soft">
+                          <p className="text-ink-soft mt-0.5 text-sm">
                             {membership.responsibility}
                           </p>
                         ) : null}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge
-                          tone={membership.role === "re" ? "cardinal" : "neutral"}
+                          tone={
+                            membership.role === "re" ? "cardinal" : "neutral"
+                          }
                         >
                           {PROJECT_ROLE_LABELS[membership.role]}
                         </Badge>
@@ -406,7 +419,7 @@ export default async function ProjectDetailPage({
               <CardBody>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <SectionLabel>People Asking To Join</SectionLabel>
-                  <span className="text-sm text-ink-muted">
+                  <span className="text-ink-muted text-sm">
                     {view.pendingRequests.length} waiting on you
                   </span>
                 </div>
@@ -416,24 +429,24 @@ export default async function ProjectDetailPage({
                     ({ request, requester, daysWaiting }) => (
                       <div
                         key={request.id}
-                        className="rounded-tile border border-line px-4 py-3.5"
+                        className="rounded-tile border-line border px-4 py-3.5"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
                             {requester ? (
                               <Link
                                 href={`/members/${requester.id}`}
-                                className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                                className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                               >
                                 {requester.fullName}
                               </Link>
                             ) : (
-                              <span className="text-[15px] font-bold text-ink-muted">
+                              <span className="text-ink-muted text-[15px] font-bold">
                                 Unknown member
                               </span>
                             )}
                             {requester?.skills?.length ? (
-                              <p className="mt-1 text-sm text-ink-muted">
+                              <p className="text-ink-muted mt-1 text-sm">
                                 {requester.skills.join(" · ")}
                               </p>
                             ) : null}
@@ -446,7 +459,7 @@ export default async function ProjectDetailPage({
                         </div>
 
                         {request.note ? (
-                          <p className="mt-2 text-sm text-ink-soft">
+                          <p className="text-ink-soft mt-2 text-sm">
                             &ldquo;{request.note}&rdquo;
                           </p>
                         ) : null}
@@ -471,9 +484,9 @@ export default async function ProjectDetailPage({
                   )}
                 </div>
 
-                <p className="mt-4 text-sm text-ink-muted">
-                  Answering these is part of being RE — a request left hanging is
-                  a member with nothing to do.
+                <p className="text-ink-muted mt-4 text-sm">
+                  Answering these is part of being RE — a request left hanging
+                  is a member with nothing to do.
                 </p>
               </CardBody>
             </Card>
@@ -489,19 +502,19 @@ export default async function ProjectDetailPage({
                     <Link
                       key={child.id}
                       href={`/projects/${child.slug}`}
-                      className="block rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                      className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="flex items-center gap-2">
-                          <CornerDownRight className="size-4 shrink-0 text-ink-muted" />
-                          <span className="text-[15px] font-bold text-ink">
+                          <CornerDownRight className="text-ink-muted size-4 shrink-0" />
+                          <span className="text-ink text-[15px] font-bold">
                             {child.name}
                           </span>
                         </span>
                         <ProjectBadges project={child} />
                       </div>
                       {childRes.length > 0 ? (
-                        <p className="mt-1.5 pl-6 text-sm text-ink-muted">
+                        <p className="text-ink-muted mt-1.5 pl-6 text-sm">
                           {childRes.length > 1 ? "REs" : "RE"}:{" "}
                           {childRes.map((r) => r.fullName).join(", ")}
                         </p>
@@ -517,7 +530,7 @@ export default async function ProjectDetailPage({
           <Card>
             <CardBody>
               <SectionLabel>Recent Updates On This Project</SectionLabel>
-              <p className="mt-2 text-sm text-ink-soft">
+              <p className="text-ink-soft mt-2 text-sm">
                 Everything anyone has reported about this project specifically.
               </p>
 
@@ -535,14 +548,14 @@ export default async function ProjectDetailPage({
                   {view.notices.map(({ notice, notified }) => (
                     <div
                       key={notice.id}
-                      className="rounded-tile border border-ok-fg/25 bg-ok-bg px-4 py-3"
+                      className="rounded-tile border-ok-fg/25 bg-ok-bg border px-4 py-3"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="flex items-center gap-2 text-[15px] font-bold text-ok-fg">
+                        <p className="text-ok-fg flex items-center gap-2 text-[15px] font-bold">
                           <CheckCircle2 className="size-4 shrink-0" />
                           {notice.body}
                         </p>
-                        <span className="text-xs text-ink-muted">
+                        <span className="text-ink-muted text-xs">
                           {new Date(
                             `${notice.createdAt.slice(0, 10)}T00:00:00Z`
                           ).toLocaleDateString("en-US", {
@@ -553,12 +566,12 @@ export default async function ProjectDetailPage({
                         </span>
                       </div>
                       {notified.length > 0 ? (
-                        <p className="mt-1.5 text-xs text-ink-muted">
+                        <p className="text-ink-muted mt-1.5 text-xs">
                           Sent up the chain to{" "}
                           {notified.map((m) => m.fullName).join(", ")}.
                         </p>
                       ) : (
-                        <p className="mt-1.5 text-xs text-ink-muted">
+                        <p className="text-ink-muted mt-1.5 text-xs">
                           Nobody sits above this project, so there was no one to
                           tell.
                         </p>
@@ -571,61 +584,67 @@ export default async function ProjectDetailPage({
               <div className="mt-4 space-y-3">
                 {updateFeed.length === 0 ? (
                   view.notices.length > 0 ? null : (
-                  <EmptyState
-                    message="No updates written about this project yet."
-                    actionLabel="See your own work"
-                    actionHref="/my-work"
-                  />
+                    <EmptyState
+                      message="No updates written about this project yet."
+                      actionLabel="See your own work"
+                      actionHref="/my-work"
+                    />
                   )
                 ) : (
-                  updateFeed.map(({ entry, author, submittedAt, responder }) => (
-                    <div
-                      key={entry.id}
-                      className="rounded-tile border border-line px-4 py-3.5"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-[15px] font-bold text-ink">
-                          {author?.fullName ?? "Unknown member"}
+                  updateFeed.map(
+                    ({ entry, author, submittedAt, responder }) => (
+                      <div
+                        key={entry.id}
+                        className="rounded-tile border-line border px-4 py-3.5"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-ink text-[15px] font-bold">
+                            {author?.fullName ?? "Unknown member"}
+                          </p>
+                          <span className="text-ink-muted text-xs">
+                            {new Date(submittedAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            · {formatNumber(entry.hours, 1)} hrs
+                          </span>
+                        </div>
+                        <p className="text-ink-soft mt-1.5 text-sm">
+                          {entry.progress}
                         </p>
-                        <span className="text-xs text-ink-muted">
-                          {new Date(submittedAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}{" "}
-                          · {formatNumber(entry.hours, 1)} hrs
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-sm text-ink-soft">
-                        {entry.progress}
-                      </p>
-                      {entry.blockers ? (
-                        <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
-                          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
-                          <span className="font-medium">{entry.blockers}</span>
-                        </p>
-                      ) : null}
-                      {entry.nextSteps ? (
-                        <p className="mt-1.5 text-sm text-ink-muted">
-                          Next: {entry.nextSteps}
-                        </p>
-                      ) : null}
+                        {entry.blockers ? (
+                          <p className="text-ink-soft mt-2 flex items-start gap-1.5 text-sm">
+                            <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
+                            <span className="font-medium">
+                              {entry.blockers}
+                            </span>
+                          </p>
+                        ) : null}
+                        {entry.nextSteps ? (
+                          <p className="text-ink-muted mt-1.5 text-sm">
+                            Next: {entry.nextSteps}
+                          </p>
+                        ) : null}
 
-                      {/*
+                        {/*
                         The RE answers here, on the project, where the context
                         is. A Lead marking the whole check-in read is a
                         different obligation belonging to a different person —
                         that one lives on /updates.
                       */}
-                      <EntryResponse
-                        entryId={entry.id}
-                        projectId={project.id}
-                        authorName={author?.preferredName ?? author?.fullName ?? "them"}
-                        existing={entry.response}
-                        responderName={responder?.fullName}
-                        canRespond={mayManage}
-                      />
-                    </div>
-                  ))
+                        <EntryResponse
+                          entryId={entry.id}
+                          projectId={project.id}
+                          authorName={
+                            author?.preferredName ?? author?.fullName ?? "them"
+                          }
+                          existing={entry.response}
+                          responderName={responder?.fullName}
+                          canRespond={mayManage}
+                        />
+                      </div>
+                    )
+                  )
                 )}
               </div>
             </CardBody>
@@ -639,14 +658,14 @@ export default async function ProjectDetailPage({
               <SectionLabel>Who To Ask</SectionLabel>
               <div className="mt-4 space-y-3">
                 {res.length === 0 ? (
-                  <p className="text-sm text-ink-muted">No RE assigned yet.</p>
+                  <p className="text-ink-muted text-sm">No RE assigned yet.</p>
                 ) : (
                   res.map((re, i) => (
                     <div key={re.id}>
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/members/${re.id}`}
-                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                         >
                           {re.fullName}
                         </Link>
@@ -671,21 +690,21 @@ export default async function ProjectDetailPage({
               <CardBody>
                 <SectionLabel>Getting Involved</SectionLabel>
                 {project.timeCommitment ? (
-                  <p className="mt-3 text-[15px] text-ink-soft">
-                    <span className="font-semibold text-ink">Commitment:</span>{" "}
+                  <p className="text-ink-soft mt-3 text-[15px]">
+                    <span className="text-ink font-semibold">Commitment:</span>{" "}
                     {project.timeCommitment}
                   </p>
                 ) : null}
                 {project.openRoles ? (
-                  <p className="mt-2 text-[15px] text-ink-soft">
-                    <span className="font-semibold text-ink">Looking for:</span>{" "}
+                  <p className="text-ink-soft mt-2 text-[15px]">
+                    <span className="text-ink font-semibold">Looking for:</span>{" "}
                     {project.openRoles}
                   </p>
                 ) : null}
                 {!project.isOpenToJoin ? (
-                  <p className="mt-3 text-sm text-ink-muted">
-                    This project is closed to new members right now — contact the
-                    RE if you&apos;d like to help.
+                  <p className="text-ink-muted mt-3 text-sm">
+                    This project is closed to new members right now — contact
+                    the RE if you&apos;d like to help.
                   </p>
                 ) : null}
               </CardBody>
@@ -702,9 +721,9 @@ export default async function ProjectDetailPage({
                   </Button>
                 ) : null}
               </div>
-              <p className="mt-2 text-sm text-ink-soft">
-                Slides, requirements, CAD and reports — everything you&apos;d read
-                to understand this project.
+              <p className="text-ink-soft mt-2 text-sm">
+                Slides, requirements, CAD and reports — everything you&apos;d
+                read to understand this project.
               </p>
               <div className="mt-4">
                 <ArtifactList rows={artifacts} canAdd={mayManage} />
