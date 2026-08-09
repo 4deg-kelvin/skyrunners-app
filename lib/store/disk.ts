@@ -282,14 +282,40 @@ export function readStore(): Readonly<StoreShape> {
 let queue: Promise<unknown> = Promise.resolve();
 
 export function mutate<T>(fn: (store: StoreShape) => T): Promise<T> {
-  const run = queue.then(async () => {
-    const live = liveResolver?.();
+  /**
+   * Resolve the backend NOW, synchronously, before deferring onto the queue.
+   *
+   * This line has to stay outside the `.then()` below, and the reason is nasty.
+   * `queue` is a module-level promise chain, so the callback runs on a later
+   * tick — outside the React `cache()` scope that holds this request's
+   * snapshot. Calling `liveResolver()` in there returned a FRESH, empty holder,
+   * so `live` was null, and every write silently went to the local disk file
+   * while reads came from Postgres. The change appeared to save and then
+   * vanished on reload, with no error anywhere.
+   *
+   * Capturing here keeps the request's snapshot; the queue then only serialises
+   * the writes, which is all it was ever for.
+   */
+  const live = liveResolver?.();
+  const persister = livePersister;
 
-    if (live && livePersister) {
+  // Same rule as `readStore`: in live mode there is no acceptable fallback.
+  // Writing to a local JSON file and reporting success is worse than failing —
+  // on Vercel that file is thrown away with the request.
+  if (isLiveMode() && (!live || !persister)) {
+    throw new Error(
+      "Live store not loaded for this write. getViewer() must run before any " +
+        "mutation — it is the only place preloadLiveStore() is called. Never " +
+        "fall back to the disk store here; the write would be silently lost."
+    );
+  }
+
+  const run = queue.then(async () => {
+    if (live && persister) {
       // Same mutation, different destination. The operation is unchanged; the
       // live backend diffs what it did and writes only that.
       const result = fn(live);
-      await livePersister(live);
+      await persister(live);
       return result;
     }
 
