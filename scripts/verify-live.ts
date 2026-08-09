@@ -78,8 +78,13 @@ console.log(`loaded: ${snap.members.length} members, ${snap.projects.length} pro
 
 const me = snap.members.find((m: any) => m.email === "anish25@stanford.edu");
 const actor = { id: me.id, globalRole: me.globalRole };
-const { directREs, getMember, getProject } = await import("../lib/mock-data.ts");
-const graph = { getMember, getProject, directREs };
+// All four OrgGraph lookups. `getTeam` is what the Division-Lead-is-a-top-RE
+// rule walks, and omitting it doesn't fail to compile — `scripts` is excluded
+// from tsconfig — it fails at runtime, inside a permission check, as
+// "graph.getTeam is not a function". Add every new lookup here too.
+const { directREs, getMember, getProject, getTeam } =
+  await import("../lib/mock-data.ts");
+const graph = { getMember, getProject, directREs, getTeam };
 
 async function check(name: string, fn: () => Promise<unknown>) {
   try { await fn(); console.log("  ✓ " + name); }
