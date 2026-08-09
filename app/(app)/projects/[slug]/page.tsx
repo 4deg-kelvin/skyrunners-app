@@ -13,6 +13,7 @@ import {
   AskToJoinButton,
   FollowToggle,
   JoinRequestDecision,
+  RemoveMemberButton,
   WithdrawRequestButton,
 } from "@/components/forms/project-actions";
 import { ProjectEditForm } from "@/components/forms/project-edit";
@@ -20,8 +21,6 @@ import {
   AddProjectMemberForm,
   REControls,
 } from "@/components/forms/project-admin";
-import { ActionButton } from "@/components/forms/action-form";
-import { removeProjectMemberAction } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -377,17 +376,19 @@ export default async function ProjectDetailPage({
                           />
                         ) : null}
 
+                        {/*
+                          `RemoveMemberButton` rather than a bare ActionButton.
+                          The component was written for this and never used, so
+                          the page grew its own one-click version — and taking
+                          somebody off a project reassigns their open work and
+                          can't be undone from here. It asks first, by name.
+                        */}
                         {mayAddMember &&
                         project.primaryReId !== membership.memberId ? (
-                          <ActionButton
-                            action={removeProjectMemberAction}
-                            fields={{
-                              projectId: project.id,
-                              memberId: membership.memberId,
-                            }}
-                            label="Remove"
-                            pendingLabel="Removing…"
-                            tone="danger"
+                          <RemoveMemberButton
+                            projectId={project.id}
+                            memberId={membership.memberId}
+                            memberName={member?.fullName ?? "them"}
                           />
                         ) : null}
                       </div>
