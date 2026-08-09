@@ -1,10 +1,13 @@
 # Integrations — email and Discord
 
-**What Anish needs to set up before either can be built.** Neither is built
-yet. Nothing in the app currently sends anything outside the browser:
-notifications are in-app only, which means **an invited member never learns
-they've been invited unless somebody tells them out of band.** That's the gap
-both of these close.
+**What Anish needs to set up.** Both close the same gap: the app only notifies
+in-app, so **an invited member never learns they've been invited unless
+somebody tells them out of band.**
+
+| | State |
+|---|---|
+| **Email invites** | Not built. Needs a sending domain first — see below |
+| **Discord DMs** | **Built and inert.** Set `DISCORD_BOT_TOKEN` and it starts working |
 
 Written 2026-08-09.
 
