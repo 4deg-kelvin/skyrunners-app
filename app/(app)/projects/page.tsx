@@ -1,19 +1,17 @@
 import Link from "next/link";
-import { CornerDownRight, TriangleAlert, Users } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateTeamForm, EditTeamForm } from "@/components/forms/team-admin";
 import { CreateProjectForm } from "@/components/forms/project-admin";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { ProjectBadges } from "@/components/ui/project-badges";
+import { ProjectNode } from "@/components/ui/project-tree";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
   getOrphanedProjects,
   getProjectFormOptions,
   getProjectTree,
-  type ProjectTreeNode,
 } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
 import { can } from "@/lib/permissions";
@@ -112,115 +110,68 @@ export default async function ProjectsPage() {
                 ) : null}
               </div>
 
-              <div className="mt-5 space-y-3">
-                {roots.length === 0 ? (
-                  <EmptyState
-                    message="No projects in this division yet."
-                    actionLabel="See other divisions"
-                    actionHref="/projects"
-                  />
-                ) : (
-                  roots.map((node) => (
-                    <ProjectNode key={node.project.id} node={node} depth={0} />
-                  ))
-                )}
-              </div>
+              {(() => {
+                /*
+                  Live work first, finished work underneath.
+                  A completed project still matters — it's the club's record of
+                  what got built, and years from now that history is the point.
+                  But mixed into the same list it just makes the ongoing work
+                  harder to see, which is the one job this page has.
+                */
+                const live = roots.filter(
+                  (n) => n.project.phase !== "complete"
+                );
+                const finished = roots.filter(
+                  (n) => n.project.phase === "complete"
+                );
+
+                return (
+                  <>
+                    <div className="mt-5 space-y-3">
+                      {live.length === 0 ? (
+                        <EmptyState
+                          message={
+                            finished.length > 0
+                              ? "Nothing active in this division right now."
+                              : "No projects in this division yet."
+                          }
+                          actionLabel="See other divisions"
+                          actionHref="/projects"
+                        />
+                      ) : (
+                        live.map((node) => (
+                          <ProjectNode
+                            key={node.project.id}
+                            node={node}
+                            depth={0}
+                          />
+                        ))
+                      )}
+                    </div>
+
+                    {finished.length > 0 ? (
+                      <div className="mt-6 border-t border-line pt-5">
+                        <SectionLabel tone="muted">
+                          Completed · {finished.length}
+                        </SectionLabel>
+                        <div className="mt-3 space-y-3">
+                          {finished.map((node) => (
+                            <ProjectNode
+                              key={node.project.id}
+                              node={node}
+                              depth={0}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
             </CardBody>
           </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-/**
- * Renders a project and recurses into its children.
- *
- * The tree arrives fully built from `getProjectTree`, so this component does no
- * data lookups — it walks an in-memory structure. That's what keeps a deep tree
- * from turning into a query per row.
- */
-function ProjectNode({
-  node,
-  depth,
-}: {
-  node: ProjectTreeNode;
-  depth: number;
-}) {
-  const { project, res, memberCount, blockedCount, children } = node;
-
-  return (
-    <div>
-      <div
-        className="rounded-tile border border-line transition-colors hover:bg-surface"
-        style={{ marginLeft: depth * 24 }}
-      >
-        <Link href={`/projects/${project.slug}`} className="block px-4 py-3.5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                {depth > 0 ? (
-                  <CornerDownRight className="size-4 shrink-0 text-ink-muted" />
-                ) : null}
-                <p className="text-[15px] font-bold text-ink">{project.name}</p>
-              </div>
-              {project.description ? (
-                <p className="mt-1 text-sm text-ink-soft">
-                  {project.description}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <ProjectBadges project={project} />
-              {/*
-                Someone marking their work blocked is a fact; project health is
-                the RE's judgement and only moves when they change it. Both
-                belong here — otherwise a blocked deliverable is invisible to
-                the person who could clear it.
-              */}
-              {blockedCount > 0 ? (
-                <Badge tone="risk">
-                  {blockedCount} blocked
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
-            {res.length > 0 ? (
-              <span>
-                <span className="font-semibold text-ink-soft">
-                  {res.length > 1 ? "REs" : "RE"}:
-                </span>{" "}
-                {res.map((r) => r.fullName).join(", ")}
-              </span>
-            ) : null}
-            <span className="flex items-center gap-1.5">
-              <Users className="size-3.5" />
-              {memberCount} {memberCount === 1 ? "member" : "members"}
-            </span>
-            {project.timeCommitment ? <span>{project.timeCommitment}</span> : null}
-            {project.openRoles ? (
-              <span className="font-medium text-cardinal-600">
-                Looking for: {project.openRoles}
-              </span>
-            ) : null}
-          </div>
-        </Link>
-      </div>
-
-      {children.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {children.map((child) => (
-            <ProjectNode
-              key={child.project.id}
-              node={child}
-              depth={depth + 1}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

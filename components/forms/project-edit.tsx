@@ -147,7 +147,7 @@ export function ProjectEditForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
         >
           Cancel
         </button>

@@ -164,7 +164,7 @@ export function CreateTeamForm({ divisions }: { divisions: TeamOption[] }) {
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
       >
         Cancel
       </button>
@@ -247,7 +247,7 @@ export function EditTeamForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-3 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="ml-5 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
         >
           Cancel
         </button>

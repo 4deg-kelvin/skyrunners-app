@@ -18,9 +18,15 @@ import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>;
+}) {
+  const { scope: scopeParam } = await searchParams;
+  const scope = scopeParam === "club" ? "club" : "mine";
   const viewer = await getViewer();
-  const view = await getDashboard(viewer.actor, viewer.graph);
+  const view = await getDashboard(viewer.actor, viewer.graph, scope);
   const {
     compliance,
     counts,
@@ -104,15 +110,46 @@ export default async function DashboardPage() {
             <CardBody>
               <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <SectionLabel>Operations</SectionLabel>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <SectionLabel>Operations</SectionLabel>
+                    {/*
+                      Co-Leads only. Scoped stays the default: the dashboard is
+                      built around a 15-minute weekly obligation, and landing on
+                      the whole club makes "what do I owe" unanswerable.
+                    */}
+                    {viewer.actor.globalRole === "co_lead" ? (
+                      <div className="flex items-center gap-1 text-sm">
+                        <Link
+                          href="/dashboard"
+                          className={
+                            scope === "mine"
+                              ? "font-bold text-cardinal-600"
+                              : "font-semibold text-ink-muted hover:text-ink"
+                          }
+                        >
+                          My reports
+                        </Link>
+                        <span className="text-ink-muted">·</span>
+                        <Link
+                          href="/dashboard?scope=club"
+                          className={
+                            scope === "club"
+                              ? "font-bold text-cardinal-600"
+                              : "font-semibold text-ink-muted hover:text-ink"
+                          }
+                        >
+                          Whole club
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
                   <h2 className="mt-2 text-2xl font-bold text-ink">
                     Cycle summary
                   </h2>
                   <p className="mt-2 text-[15px] text-ink-soft">
-                    Compliance, effort and project health for you and the{" "}
-                    {counts.peopleOverseen}{" "}
-                    {counts.peopleOverseen === 1 ? "person" : "people"} you
-                    oversee — not the whole club.
+                    {scope === "club"
+                      ? "Compliance, effort and project health across every active member."
+                      : `Compliance, effort and project health for you and the ${counts.peopleOverseen} ${counts.peopleOverseen === 1 ? "person" : "people"} you oversee — not the whole club.`}
                   </p>
                 </div>
                 <Donut

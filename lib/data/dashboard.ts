@@ -139,7 +139,17 @@ function startOfWeek(today: string): string {
  */
 export async function getDashboard(
   actor: Actor,
-  _graph: OrgGraph
+  _graph: OrgGraph,
+  /**
+   * Co-Leads only: widen the numbers from "people I look after" to the club.
+   *
+   * The default stays scoped, deliberately. The dashboard is built around a
+   * 15-minute weekly obligation, and a Lead opening thirty reports of which
+   * twenty-six aren't theirs can't tell what they owe. But a Co-Lead does
+   * legitimately need the club-wide view sometimes — so it's a toggle they
+   * choose, not the thing they land on.
+   */
+  scope: "mine" | "club" = "mine"
 ): Promise<DashboardView> {
   // Ensure the live snapshot exists before any synchronous read.
   //
@@ -152,6 +162,8 @@ export async function getDashboard(
   // Live, not the seed — a Lead marking a report reviewed must disappear
   // from their own queue on the next render.
   const { progressUpdates, workLogs } = readStore();
+
+  const clubWide = scope === "club" && isCoLead(actor);
 
   // A Co-Lead oversees the club; everyone else oversees their own subtree.
   const overseen = isCoLead(actor)
@@ -192,6 +204,9 @@ export async function getDashboard(
 
   const directReports = everyone.filter((m) => {
     if (m.status !== "active" || m.id === actor.id) return false;
+
+    // Club-wide: every active member counts, whoever they report to.
+    if (clubWide) return true;
 
     // Normally: people who report to you.
     if (m.leadId === actor.id) return true;

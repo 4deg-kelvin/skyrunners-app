@@ -251,6 +251,10 @@ export default async function ProjectDetailPage({
                           deliverable={deliverable}
                           isOwner={deliverable.ownerId === viewer.member.id}
                           canSignOff={mayManage}
+                          candidates={assignableMembers.map((m) => ({
+                            id: m.id,
+                            name: m.fullName,
+                          }))}
                         />
                       </div>
                     </div>
