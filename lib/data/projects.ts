@@ -166,6 +166,14 @@ export interface ProjectDetailView {
    * are not allowed to import `lib/mock-data` — ESLint enforces that boundary.
    */
   assignableMembers: { id: string; fullName: string }[];
+  /**
+   * Teams this project could belong to, for the owning-team picker.
+   *
+   * Both `/projects` and `/find-work` group by division and resolve it by
+   * walking up from the project's team, so a project with no team shows up on
+   * neither. Fixing that has to be possible from the project itself.
+   */
+  teamOptions: { id: string; name: string }[];
 }
 
 export async function getProjectBySlug(
@@ -223,6 +231,10 @@ export async function getProjectBySlug(
       id: m.id,
       fullName: m.fullName,
     })),
+    teamOptions: readStore()
+      .teams.filter((t) => t.isActive)
+      .map((t) => ({ id: t.id, name: t.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

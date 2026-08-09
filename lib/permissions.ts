@@ -414,6 +414,32 @@ export const can = {
     isSelf(actor, memberId) ||
     isLeadOfOrAbove(actor, graph, memberId),
 
+  /**
+   * Removing a deliverable outright — the RE's list, so the RE's call.
+   *
+   * Same authority as creating one. The operation refuses anything already
+   * signed off, so this can't be used to erase someone's delivered work.
+   */
+  deleteDeliverable: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /**
+   * Deleting a check-in: your own, or a Co-Lead clearing up.
+   *
+   * Deliberately NOT a Lead over their reports. A Lead removing a report they
+   * were meant to read would erase both the obligation and the escalation,
+   * which are the only things making review mean anything.
+   */
+  deleteCheckIn: (actor: Actor, authorId: string) =>
+    isSelf(actor, authorId) || isCoLead(actor),
+
+  /** Which team owns a project. Same authority as editing the project. */
+  setProjectTeam: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /** Divisions and sub-teams are the org's shape — Co-Leads only. */
+  manageTeams: (actor: Actor) => isCoLead(actor),
+
   /** Co-Leads set the club's hours expectation and tier thresholds. */
   configureExpectations: (actor: Actor) => isCoLead(actor),
 

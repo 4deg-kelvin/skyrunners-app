@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
+import { ActionButton } from "@/components/forms/action-form";
+import { deleteCheckInAction } from "@/lib/actions";
 import { getMemberProfile } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
@@ -37,6 +39,7 @@ export default async function MemberProfilePage({
   const { member, lead, directReports, projects, contribution, checkIns } =
     view;
   const isOwnProfile = viewer.member.id === member.id;
+  const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
 
   return (
     <div className="space-y-6">
@@ -262,7 +265,7 @@ export default async function MemberProfilePage({
             further up the chain, can catch up on someone without inheriting a
             queue item for them.
           */}
-          {canViewEffort && !isOwnProfile ? (
+          {canViewEffort ? (
             <Card>
               <CardBody>
                 <SectionLabel>Check-ins</SectionLabel>
@@ -288,12 +291,31 @@ export default async function MemberProfilePage({
                               year: "numeric",
                             })}
                           </p>
-                          <p className="text-xs text-ink-muted">
-                            {update.hoursThisPeriod} hrs
-                            {reviewedBy
-                              ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
-                              : " · not yet read"}
-                          </p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-xs text-ink-muted">
+                              {update.hoursThisPeriod} hrs
+                              {reviewedBy
+                                ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
+                                : " · not yet read"}
+                            </p>
+                            {/*
+                              Your own, or a Co-Lead clearing up. Anything a
+                              Lead has already read stays — the operation
+                              refuses it, because they acted on it.
+                            */}
+                            {canDeleteCheckIns && !reviewedBy ? (
+                              <ActionButton
+                                action={deleteCheckInAction}
+                                fields={{
+                                  updateId: update.id,
+                                  authorId: member.id,
+                                }}
+                                label="Delete"
+                                pendingLabel="Deleting…"
+                                tone="danger"
+                              />
+                            ) : null}
+                          </div>
                         </div>
 
                         {sections.map(({ entry, project }) => (

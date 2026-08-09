@@ -78,6 +78,15 @@ export default async function MembersPage() {
                             {ROLE_LABELS[member.globalRole]}
                           </Badge>
                         ) : null}
+                        {/* Alumni and deactivated people stay on the roster so
+                            they can be brought back. Say which they are. */}
+                        {member.status !== "active" ? (
+                          <Badge tone="neutral">
+                            {member.status === "alumni"
+                              ? "Alumni"
+                              : "Deactivated"}
+                          </Badge>
+                        ) : null}
                       </div>
                       <p className="mt-0.5 truncate text-sm text-ink-muted">
                         {member.major}

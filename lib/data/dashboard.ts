@@ -163,18 +163,45 @@ export async function getDashboard(
   // Reports written to the viewer personally — their direct reports only. A
   // Lead two levels up sees the escalation instead, not the raw report, so the
   // obligation stays with exactly one person.
-  const directReports = readStore().members.filter(
-    (m) =>
-      m.status === "active" &&
-      m.id !== actor.id &&
-      // Normally: people who report to you.
-      (m.leadId === actor.id ||
-        // Plus, for a Co-Lead, anyone with nobody above them. Co-Leads are the
-        // top of the chain, so their own check-ins have no Lead to go to —
-        // without this they'd write them into a void, which is worse than not
-        // asking for them. They go sideways to the other Co-Leads instead.
-        (isCoLead(actor) && m.leadId === null))
-  );
+  /**
+   * Is this person on an academic pause right now?
+   *
+   * Matters in two directions. A paused MEMBER owes nothing. A paused LEAD
+   * still has reports whose check-ins need reading — pausing your own
+   * obligations can't quietly pause other people's.
+   */
+  const pausedNow = (memberId: string): boolean => {
+    const schedule = readStore().updateSchedules.find(
+      (u) => u.memberId === memberId
+    );
+    return !!schedule?.pausedUntil && schedule.pausedUntil >= today();
+  };
+
+  const everyone = readStore().members;
+
+  const directReports = everyone.filter((m) => {
+    if (m.status !== "active" || m.id === actor.id) return false;
+
+    // Normally: people who report to you.
+    if (m.leadId === actor.id) return true;
+
+    // Cover for a paused Lead. If someone who reports to you is a Lead and
+    // they're on pause, THEIR reports come to you for the duration — otherwise
+    // one person taking two weeks for midterms silently strands everybody
+    // underneath them, which is the opposite of what the pause is for.
+    if (m.leadId && pausedNow(m.leadId)) {
+      const theirLead = everyone.find((x) => x.id === m.leadId);
+      if (theirLead?.leadId === actor.id) return true;
+      // Nobody above the paused Lead: it lands with the Co-Leads.
+      if (isCoLead(actor) && !theirLead?.leadId) return true;
+    }
+
+    // A Co-Lead also picks up anyone with nobody above them — including the
+    // other Co-Leads, whose own check-ins would otherwise go into a void.
+    if (isCoLead(actor) && m.leadId === null) return true;
+
+    return false;
+  });
 
   const reviewQueue: ReviewQueueItem[] = unreadReportsFor(
     actor.id,

@@ -31,6 +31,7 @@ import type {
   MemberStatus,
   ProgressUpdate,
   Project,
+  Team,
   WorkLog,
 } from "../types.ts";
 
@@ -120,8 +121,12 @@ export function hoursAreLocked(memberId: string, workDate: string): boolean {
       u.memberId === memberId &&
       (u.status === "submitted" || u.status === "reviewed") &&
       !!u.submittedAt &&
-      // Anything dated on or before a submitted check-in has been reported.
-      workDate.slice(0, 10) <= u.submittedAt.slice(0, 10)
+      // STRICTLY before. Hours dated the same day as the check-in stay
+      // editable: you submit in the afternoon and then do three more hours in
+      // the evening, and refusing to record them means the total is wrong in
+      // the direction that discourages people. Only days already closed out by
+      // a submitted check-in are locked.
+      workDate.slice(0, 10) < u.submittedAt.slice(0, 10)
   );
 }
 
@@ -901,6 +906,126 @@ export async function submitCheckIn(input: {
  * somebody imposed. Spacing is nudged in the UI rather than enforced here: two
  * on consecutive days is a worse check-in, not an invalid one.
  */
+/**
+ * Remove a deliverable outright.
+ *
+ * A real delete, not a status. CLAUDE.md's "never hard-delete" rule is about
+ * PEOPLE and PROJECTS, whose history has to survive graduations. A deliverable
+ * typed by mistake has no history worth keeping, and leaving wrong rows around
+ * to preserve a principle makes the progress bar lie.
+ *
+ * Anything already delivered is kept: it's counted in someone's record, and
+ * removing it would silently reduce work they actually did.
+ */
+export async function deleteDeliverable(
+  deliverableId: string
+): Promise<Result<null>> {
+  return guarded((store) => {
+    const deliverable = store.deliverables.find((d) => d.id === deliverableId);
+    if (!deliverable) return fail<null>("That deliverable no longer exists.");
+
+    if (deliverable.status === "done") {
+      return fail<null>(
+        "That one is signed off and counts towards its owner's record. Reopen it first if it shouldn't."
+      );
+    }
+
+    store.deliverables = store.deliverables.filter(
+      (d) => d.id !== deliverableId
+    );
+    return ok(null);
+  });
+}
+
+/**
+ * Delete a check-in, and the per-project entries hanging off it.
+ *
+ * Needed because the club is being set up by hand and test check-ins would
+ * otherwise be permanent. Reviewed ones are kept: a Lead acted on it, and the
+ * reliability record refers to it.
+ */
+export async function deleteCheckIn(updateId: string): Promise<Result<null>> {
+  return guarded((store) => {
+    const update = store.progressUpdates.find((u) => u.id === updateId);
+    if (!update) return fail<null>("That check-in no longer exists.");
+
+    if (update.reviewedAt) {
+      return fail<null>(
+        "Your Lead has already read that one, so it stays on the record."
+      );
+    }
+
+    store.progressUpdates = store.progressUpdates.filter(
+      (u) => u.id !== updateId
+    );
+    return ok(null);
+  });
+}
+
+/**
+ * Point a project at the team that owns it.
+ *
+ * Without this a project belongs to no division, and `/find-work` — the page
+ * the whole app exists for — groups by division, so it silently doesn't appear.
+ * That's the "1 project not linked to a division" warning, previously with no
+ * way to act on it.
+ */
+export async function setProjectTeam(input: {
+  projectId: string;
+  teamId: string | null;
+}): Promise<Result<Project>> {
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<Project>("That project no longer exists.");
+
+    if (input.teamId && !store.teams.some((t) => t.id === input.teamId)) {
+      return fail<Project>("That team no longer exists.");
+    }
+
+    project.teamId = input.teamId ?? undefined;
+    return ok(project);
+  });
+}
+
+/**
+ * Create a division, or a sub-team under one.
+ *
+ * Divisions are the top level of the org tree (`parentId === null`) and every
+ * project hangs off one. There was no way to make one through the app, which
+ * left new projects permanently unfindable.
+ */
+export async function createTeam(input: {
+  name: string;
+  parentId: string | null;
+  leadId?: string;
+}): Promise<Result<Team>> {
+  const name = input.name.trim();
+  if (!name) return fail<Team>("Give it a name.");
+
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return guarded((store) => {
+    if (store.teams.some((t) => t.slug === slug)) {
+      return fail<Team>(`There's already a team called "${name}".`);
+    }
+
+    const team: Team = {
+      id: newId("t"),
+      name,
+      slug,
+      parentId: input.parentId,
+      leadId: input.leadId,
+      isActive: true,
+    };
+
+    store.teams.push(team);
+    return ok(team);
+  });
+}
+
 export async function setUpdateSchedule(input: {
   memberId: string;
   weekdays: number[];
