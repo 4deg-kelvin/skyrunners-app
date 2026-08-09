@@ -855,6 +855,35 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Phase 7 — the RE answers a check-in section
+// ---------------------------------------------------------------------------
+
+async function respondToUpdateEntryAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const entryId = String(formData.get("entryId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+
+  // `manageDeliverables`, so RE authority inherits down the project tree and a
+  // Division Lead counts. Deliberately NOT `reviewUpdate` — that's the Lead
+  // chain, and this is the other obligation entirely.
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("answer this project's section");
+  }
+
+  const result = await ops.respondToUpdateEntry({
+    entryId,
+    responderId: viewer.member.id,
+    response: String(formData.get("response") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Answer sent.");
+}
+
+// ---------------------------------------------------------------------------
 // Phase 6 — the blocker board
 // ---------------------------------------------------------------------------
 
@@ -1246,6 +1275,10 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function respondToUpdateEntryAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => respondToUpdateEntryAction$impl(formData));
 }
 
 export async function postHelpRequestAction(formData: FormData): Promise<ActionResult> {

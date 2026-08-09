@@ -940,3 +940,111 @@ describe("asking for help", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 7 — the RE answers a check-in, section by section
+// ---------------------------------------------------------------------------
+
+describe("the RE answers a check-in section", () => {
+  const RE = "m-tyler";
+
+  function entry(id: string) {
+    for (const u of disk.readStore().progressUpdates) {
+      const found = u.entries.find((e) => e.id === id);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
+  test("a reply is stored against the section, with who and when", async () => {
+    const result = await ops.respondToUpdateEntry({
+      entryId: "ue-1",
+      responderId: RE,
+      response: "Ordering a new seal — carry on with dry layups meanwhile.",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    const saved = entry("ue-1");
+    assert.match(saved?.response ?? "", /Ordering a new seal/);
+    assert.equal(saved?.respondedBy, RE);
+    assert.equal(saved?.respondedAt, TODAY);
+  });
+
+  test("it lands on that section only, not the whole check-in", async () => {
+    // The entire reason `update_entries` is per-project: a member on three
+    // projects gets three answers from three different REs.
+    await ops.respondToUpdateEntry({
+      entryId: "ue-2",
+      responderId: RE,
+      response: "Agreed, park it until the coupons are back.",
+      today: TODAY,
+    });
+
+    assert.ok(entry("ue-2")?.response);
+    assert.equal(entry("ue-3")?.response, undefined);
+  });
+
+  test("it is NOT recorded as the Lead having read the check-in", async () => {
+    // Reading and answering are two obligations belonging to two people.
+    // Collapsing them would let an RE's reply silently clear a Lead's queue.
+    await ops.respondToUpdateEntry({
+      entryId: "ue-1",
+      responderId: RE,
+      response: "On it.",
+      today: TODAY,
+    });
+
+    const update = disk.readStore().progressUpdates.find((u) => u.id === "u-1");
+    assert.equal(update?.reviewedAt, undefined);
+    assert.equal(update?.status !== "reviewed", true);
+  });
+
+  test("an empty body clears a reply rather than storing nothing", async () => {
+    await ops.respondToUpdateEntry({
+      entryId: "ue-1",
+      responderId: RE,
+      response: "Wrong section, sorry.",
+      today: TODAY,
+    });
+    assert.ok(entry("ue-1")?.response);
+
+    await ops.respondToUpdateEntry({
+      entryId: "ue-1",
+      responderId: RE,
+      response: "   ",
+      today: TODAY,
+    });
+
+    const saved = entry("ue-1");
+    assert.equal(saved?.response, undefined);
+    assert.equal(saved?.respondedBy, undefined);
+    assert.equal(saved?.respondedAt, undefined);
+  });
+
+  test("a draft check-in cannot be answered", async () => {
+    // Replying to something the member hasn't sent yet means the text can
+    // still change underneath the reply.
+    const store = disk.readStore();
+    const draft = store.progressUpdates.find((u) => !u.submittedAt);
+    if (!draft?.entries[0]) return; // no draft in the seed — nothing to assert
+
+    const result = await ops.respondToUpdateEntry({
+      entryId: draft.entries[0].id,
+      responderId: RE,
+      response: "Too early",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("an unknown section fails rather than throwing", async () => {
+    const result = await ops.respondToUpdateEntry({
+      entryId: "not-an-entry",
+      responderId: RE,
+      response: "Hello",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+});

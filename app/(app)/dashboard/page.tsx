@@ -7,6 +7,7 @@ import { LogHoursForm } from "@/components/forms/log-hours-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
+import { ContactLink } from "@/components/ui/contact-link";
 import { Donut } from "@/components/ui/donut";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -35,6 +36,9 @@ export default async function DashboardPage({
     escalations,
     flaggedProjects,
     completions,
+    reQueue,
+    goneQuiet,
+    rollUp,
   } = view;
 
   /**
@@ -218,6 +222,183 @@ export default async function DashboardPage({
                         {overdue
                           .map((r) => r.author?.fullName ?? "someone")
                           .join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            The RE half of what you owe, kept separate from the Lead half above.
+
+            Two obligations belonging to two different roles: a Lead reads a
+            person's check-in, an RE answers a project's section and signs off
+            its work. Merging them would tell somebody who is both that they
+            owe "seven things" without saying which hat they're wearing.
+          */}
+          {reQueue.signOffs.length + reQueue.unanswered.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Waiting On You As RE</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  Not your reading queue — this is work on your projects that
+                  can&apos;t move until you answer.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {reQueue.signOffs.map(({ deliverable, owner, ageDays, escalated }) => (
+                    <div
+                      key={deliverable.id}
+                      className={`rounded-tile border px-4 py-3 ${
+                        escalated ? "border-warn-fg/30 bg-warn-bg/40" : "border-line"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-[15px] font-bold text-ink">
+                          {deliverable.title}
+                        </span>
+                        <span className="text-sm text-ink-muted">
+                          {ageDays === 0 ? "today" : `${ageDays}d waiting`}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        {owner?.fullName ?? "Someone"} marked this done — it
+                        doesn&apos;t count until you confirm it.
+                      </p>
+                    </div>
+                  ))}
+
+                  {reQueue.unanswered.map(({ entry, author, ageDays, escalated }) => (
+                    <div
+                      key={entry.id}
+                      className={`rounded-tile border px-4 py-3 ${
+                        escalated ? "border-warn-fg/30 bg-warn-bg/40" : "border-line"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-[15px] font-bold text-ink">
+                          {author?.fullName ?? "Someone"} is waiting on an answer
+                        </span>
+                        <span className="text-sm text-ink-muted">
+                          {ageDays === 0 ? "today" : `${ageDays}d waiting`}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        {entry.blockers || entry.nextSteps}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-4 text-sm text-ink-muted">
+                  Answer these on the project page — the reply lands in its
+                  update feed where everyone can see it.
+                </p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            Who has gone quiet.
+
+            Not a missed check-in — that's already visible and already
+            escalates. This is the person who simply stopped, which nothing
+            reported and which is what the club actually loses people to.
+            Deliberately framed as a prompt, not a flag on anybody's record.
+          */}
+          {goneQuiet.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Gone Quiet</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  No hours logged this week, but still holding open work. Worth
+                  a message — usually it&apos;s midterms, sometimes it&apos;s
+                  being stuck and not saying so.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {goneQuiet.map(({ member, openDeliverables, lastLoggedAt }) => (
+                    <div
+                      key={member.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/members/${member.id}`}
+                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        >
+                          {member.fullName}
+                        </Link>
+                        <p className="mt-0.5 text-sm text-ink-muted">
+                          {openDeliverables} open{" "}
+                          {openDeliverables === 1 ? "deliverable" : "deliverables"}
+                          {lastLoggedAt
+                            ? ` · last logged ${new Date(
+                                `${lastLoggedAt}T00:00:00Z`
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                timeZone: "UTC",
+                              })}`
+                            : " · has never logged hours"}
+                        </p>
+                      </div>
+                      <ContactLink member={member} showLabel={false} />
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            The roll-up, derived rather than composed.
+
+            "Roll-ups from Leads to Co-Leads" was on the phase list as a thing
+            a Lead writes. A report somebody types by hand is a chore that gets
+            skipped in week three, and every number in it already exists — the
+            scarce resource is leadership READING, not leadership typing.
+          */}
+          {rollUp.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Roll-Up</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  Every Lead and how their people are doing this week. Sorted by
+                  who has somebody waiting longest.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {rollUp.map((row) => (
+                    <div
+                      key={row.lead.id}
+                      className="rounded-tile border border-line px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <Link
+                          href={`/members/${row.lead.id}`}
+                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        >
+                          {row.lead.fullName}
+                        </Link>
+                        {row.worstUnreadDays >= 3 ? (
+                          <Badge tone="risk">
+                            oldest unread {row.worstUnreadDays}d
+                          </Badge>
+                        ) : row.unread > 0 ? (
+                          <Badge tone="warn">{row.unread} to read</Badge>
+                        ) : (
+                          <Badge tone="ok">Caught up</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {row.reports} {row.reports === 1 ? "report" : "reports"}{" "}
+                        · {formatNumber(row.hoursThisWeek, 1)} hrs this week
+                        {row.quietCount > 0
+                          ? ` · ${row.quietCount} gone quiet`
+                          : ""}
                       </p>
                     </div>
                   ))}

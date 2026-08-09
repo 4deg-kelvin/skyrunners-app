@@ -192,6 +192,8 @@ export interface ProjectDetailView {
     entry: UpdateEntry;
     author?: Member;
     submittedAt: string;
+    /** Which RE answered this section, if one has. */
+    responder?: Member;
   }[];
   /**
    * Automatic announcements, newest first, with the chain they went up
@@ -281,6 +283,9 @@ export async function getProjectBySlug(
       entry: f.entry,
       author: getMember(f.memberId),
       submittedAt: f.submittedAt,
+      responder: f.entry.respondedBy
+        ? getMember(f.entry.respondedBy)
+        : undefined,
     })),
     notices: projectNotices(project.id).map((notice) => ({
       notice,

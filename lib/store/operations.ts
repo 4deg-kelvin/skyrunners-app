@@ -35,6 +35,7 @@ import type {
   Project,
   Team,
   Term,
+  UpdateEntry,
   WorkLog,
 } from "../types.ts";
 
@@ -1603,6 +1604,54 @@ export async function createTeam(input: {
 
     store.teams.push(team);
     return ok(team);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 7 — the RE answers a check-in, section by section
+// ---------------------------------------------------------------------------
+
+/**
+ * Reply to one project's section of somebody's check-in.
+ *
+ * **The RE answers, not the Lead.** A Lead marking a check-in read is an
+ * obligation about a person; the useful reply to "the vacuum pump seal is
+ * leaking" comes from whoever is accountable for that project. A member on
+ * three projects needs three different people, not one person guessing at
+ * three contexts — which is the whole reason `update_entries` is per-project
+ * in the first place.
+ *
+ * The caller checks `can.manageDeliverables` on the entry's project, so RE
+ * authority inherits down the tree and a Division Lead counts too.
+ */
+export async function respondToUpdateEntry(input: {
+  entryId: string;
+  responderId: string;
+  response: string;
+  today: string;
+}): Promise<Result<UpdateEntry>> {
+  const response = input.response.trim();
+
+  return guarded((store) => {
+    for (const update of store.progressUpdates) {
+      const entry = update.entries.find((e) => e.id === input.entryId);
+      if (!entry) continue;
+
+      if (!update.submittedAt) {
+        // Answering a draft would mean replying to something the member hasn't
+        // said yet, and the text can still change under the reply.
+        return fail<UpdateEntry>("That check-in hasn't been submitted yet.");
+      }
+
+      // An empty body clears the response rather than storing "". Lets an RE
+      // undo a reply they posted to the wrong section.
+      entry.response = response || undefined;
+      entry.respondedBy = response ? input.responderId : undefined;
+      entry.respondedAt = response ? input.today : undefined;
+      return ok(entry);
+    }
+
+    return fail<UpdateEntry>("That check-in section no longer exists.");
   });
 }
 

@@ -181,48 +181,122 @@ Done 2026-08-07, except re-ordering and the deputy-RE prompt.
       freezing everyone's record is visible rather than silent
 - [ ] Re-ordering; deputy-RE prompt
 
-### Phase 5 — Terms calendar and re-enrollment **[App]**
+### Phase 5 — Terms calendar **[App]** — ✅ shipped 2026-08-08
 
 Unglamorous, and what keeps Phase 2 trustworthy past one quarter.
 
-- Co-Lead editor for terms, finals, breaks
-- Obligations generate only on in-session weekdays
-- **Quarterly re-enrollment sweep** — everyone re-confirms their projects at quarter start;
-  unconfirmed memberships auto-close
+- ✅ Co-Lead editor for terms, finals, breaks — on `/settings`, overlaps refused
+- ✅ Obligations generate only in session — `currentUpdateFor` was synthesising a
+  pending check-in over winter break; `inSession()` existed and nothing called it
+- ❌ **Quarterly re-enrollment sweep — dropped, on Anish's call (2026-08-08).**
+  "This is up to the designated team lead to keep track of their members, and the
+  team is small enough for us to manage who is active and not." A 35-person club
+  with a named Lead per member doesn't need an automated sweep, and an
+  auto-close that silently drops somebody's membership is worse than a Lead
+  glancing at a roster. **Do not re-open without asking.**
 
-Without it, rosters fill with zombie members and "who's on what" becomes a lie.
+### Phase 6 — Blocker board **[App]** — ✅ shipped 2026-08-08
 
-### Phase 6 — Blocker board **[App]**
+- ✅ Club-wide board at `/blockers`, fed by three sources: blocked deliverables,
+  blockers written into check-ins, and free-form asks (`help_requests`)
+- ✅ Anyone can answer, not just leadership. Closing is narrower — the asker,
+  whoever replied, or a Co-Lead
+- ✅ Age-sorted, always, and never by project or severity
 
-- Club-wide "I need help" board, fed by blocked deliverables plus ad-hoc posts
-- Anyone can answer, not just leadership
-- Age-sorted so nothing rots quietly
+The first two sources already existed and were invisible: a blocked deliverable
+sat on a project page, a check-in blocker sat in one Lead's queue.
 
-Matters more now that joining goes through an RE: it gives a stuck member a second route to
-being useful that doesn't wait on one person's inbox.
+### Phase 7 — Updates and the review chain **[App]** — mostly shipped
 
-### Phase 7 — Updates and the review chain **[App]**
-
-Highest-risk phase. **Paper-prototype first** — two weeks, eight volunteers, a Google Form,
-zero code.
-
-- Twice a week on member-chosen days, auto-drafted from hours and open deliverables
-- **The RE responds per project section**, not the Lead — the RE has the context
-- Lead gets an exception feed: missed updates, unanswered blockers, flat hours
-- Academic pause with no penalty and no backlog
-- Roll-ups from Leads to Co-Leads
-- Escalating nudges, suppressed out of session
+- ✅ Twice a week on member-chosen days, auto-drafted from hours and deliverables
+- ✅ **The RE responds per project section**, not the Lead — `update_entries`
+  gained `response` / `responded_by` / `responded_at` (migration 0016). Answering
+  is `can.manageDeliverables` on the section's project, deliberately NOT
+  `can.reviewUpdate`, which is the Lead chain
+- ✅ Exception feed, split by role: the Lead half (`reviewQueue`, `escalations`)
+  and the RE half (`reQueue` — unsigned-off work and unanswered sections), plus
+  **Gone Quiet** for people logging nothing while holding open work
+- ✅ Academic pause with no penalty and no backlog
+- ✅ Roll-ups from Leads to Co-Leads — **derived, not composed.** A report
+  somebody types by hand gets skipped in week three and every number already
+  exists
+- ⬜ **Escalating nudges, suppressed out of session** — the only piece left, and
+  it's blocked on infrastructure rather than design. Needs a Resend API key and
+  a Vercel Cron entry, both of which live in `docs/INFRA.md` (Kelvin's). The
+  in-app half already works: `lib/review.ts` computes exactly who is overdue and
+  by how many days, and the dashboard shows it
 
 **Design target: a Lead's weekly obligation fits in 15 minutes.** The scarce resource is
 leadership *reading*, not member writing.
 
 ### Phase 8 — Events, attendance, calendar **[App]**
 
-- Event types with importance weighting
-- Invitations from any Lead to anyone
+**Requirements settled with Anish on 2026-08-08. Read these before designing
+anything — several of them rule out the obvious implementation.**
+
+**The purpose.** The calendar answers *"what is happening right now, and can I
+join it?"* It is **not** a meeting-scheduling tool. Its job is the same as
+`/find-work`: make it possible to plug into the club's work without asking a
+Co-Lead.
+
+**What goes on it**
+
+- Every kind of get-together, **including 1:1s** — and a 1:1 here means two
+  engineers sitting down to engineer, explicitly *not* a performance review.
+- **Ad-hoc engineering sessions are the important case.** If two people are
+  working on the wing spar on Thursday night, that shows up and a third person
+  can turn up. That is the whole point of the feature.
+- General meetings, design reviews, socials, company tours.
+
+**Who can create what**
+
+- Any member can create an engineering session for a project they're on, and
+  name who they're working with.
+- Leadership creates club-wide events.
+- Anyone can propose a 1:1 with anyone.
+
+`can.createEvent`, `can.inviteToEvent` and `can.requestMeeting` already exist.
+
+**Importance 1–5.** Every event carries one, so the view can lead with what
+matters without hiding the rest. A social event can outrank routine work — a
+company tour can be a 5. Importance is **not** a proxy for "is this official".
+`events.importance_weight` already exists.
+
+**Overlaps must both stay visible.** Concurrent events are normal: a design
+review runs inside a general meeting. Both have to be readable at once — no
+stacking one behind the other, no "+2 more" that hides the thing somebody
+needed. *This is the requirement a standard calendar grid quietly drops.*
+Design for it up front rather than retrofitting.
+
+**Breaks.** The club meets over academic breaks. A `Term` with
+`generatesObligations = false` suppresses **check-in obligations only** — it
+must never block events. (Already true: the Phase 5 gating touches
+`currentUpdateFor` and nothing else.)
+
+**Visibility.** Public to all members, per transparency-by-default for activity.
+
+**Sync.** Opt-in only, Google and Apple. Nobody's calendar is written to
+without asking.
+
+**Also decided, different page:** members must be able to log hours to
+**"misc"** when helping on a project they aren't committed to. Follows directly
+from strangers being able to join a session they saw on the calendar. Not built.
+
+**Still open:** whether attendance is tracked at all (`can.recordAttendance`
+exists and nothing records it), and whether it feeds contribution. Default
+answer: **it does not feed contribution** — there is deliberately no composite
+score.
+
+Still on the list from the original plan:
+
 - RSVP plus actual attendance, and fast check-in
 - Drop-in attendance for build sessions — a QR code on the door, not an RSVP flow
 - Opt-in iCal export, Google **and** Apple
+
+**Already in the repo:** the `events` table (id, title, kind,
+importance_weight, starts_at, ends_at, location), mapped in
+`lib/store/mapping.ts`; `lib/data/events.ts → getUpcomingEvents()`, verified
+against live data. No attendance or invite table yet, and no UI beyond a stub.
 
 ### Phase 9 — Trainings and facility access **[App]**
 
