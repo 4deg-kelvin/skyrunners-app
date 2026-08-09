@@ -78,8 +78,13 @@ console.log(`loaded: ${snap.members.length} members, ${snap.projects.length} pro
 
 const me = snap.members.find((m: any) => m.email === "anish25@stanford.edu");
 const actor = { id: me.id, globalRole: me.globalRole };
-const { directREs, getMember, getProject } = await import("../lib/mock-data.ts");
-const graph = { getMember, getProject, directREs };
+// All four OrgGraph lookups. `getTeam` is what the Division-Lead-is-a-top-RE
+// rule walks, and omitting it doesn't fail to compile — `scripts` is excluded
+// from tsconfig — it fails at runtime, inside a permission check, as
+// "graph.getTeam is not a function". Add every new lookup here too.
+const { directREs, getMember, getProject, getTeam } =
+  await import("../lib/mock-data.ts");
+const graph = { getMember, getProject, directREs, getTeam };
 
 async function check(name: string, fn: () => Promise<unknown>) {
   try { await fn(); console.log("  ✓ " + name); }
@@ -102,6 +107,15 @@ await check("/members        getRosterOptions", async () => dataModules.members.
 await check("/members/[id]   getMemberProfile", async () => dataModules.members.getMemberProfile(me.id, true));
 await check("/projects       getProjectTree", async () => dataModules.projects.getProjectTree());
 await check("/projects       getProjectFormOptions", async () => dataModules.projects.getProjectFormOptions());
+await check("/projects       countArchivedDivisions", async () => dataModules.projects.countArchivedDivisions());
+await check("/projects/archive getArchivedDivisions", async () => dataModules.projects.getArchivedDivisions());
+// The one route whose data function takes a slug, so it needs a real project.
+// Skipped rather than failed on an empty club: a red line for "there is no
+// project to open" would train you to ignore the red lines.
+await check("/projects/[slug] getProjectBySlug", async () =>
+  snap.projects[0]
+    ? dataModules.projects.getProjectBySlug(snap.projects[0].slug, me.id)
+    : Promise.resolve(null));
 await check("/dashboard      getDashboard", async () => dataModules.dashboard.getDashboard(actor, graph));
 await check("/updates        getUpdates", async () => dataModules.updates.getUpdates(actor));
 await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
