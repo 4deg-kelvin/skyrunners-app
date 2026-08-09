@@ -75,7 +75,7 @@ const members: CollectionSpec<Member> = {
   key: "members",
   table: "profiles",
   columns:
-    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at",
+    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, discord_verified_at, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at",
   identify: (m) => m.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -87,6 +87,7 @@ const members: CollectionSpec<Member> = {
     major: opt(r.major as string),
     phone: opt(r.phone as string),
     discordUserId: opt(r.discord_user_id as string),
+    discordVerifiedAt: opt(r.discord_verified_at as string),
     globalRole: r.global_role as Member["globalRole"],
     status: r.status as Member["status"],
     // Stays null: "reports to nobody" is meaningful, and both chain walks
@@ -107,6 +108,7 @@ const members: CollectionSpec<Member> = {
     major: nul(m.major),
     phone: nul(m.phone),
     discord_user_id: nul(m.discordUserId),
+    discord_verified_at: nul(m.discordVerifiedAt),
     global_role: m.globalRole,
     status: m.status,
     lead_id: m.leadId,

@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql
 
 
 -- ==========================================================================
@@ -3421,4 +3421,37 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0025_discord_user_id.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0026_discord_verified.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0026 — proof that a member's Discord ID actually reaches them
+--
+-- 0025 added `discord_user_id`. Having one is not the same as being reachable:
+-- a typo'd snowflake, a member who never joined the club's Discord server, or
+-- anyone with "allow DMs from server members" switched off all produce an ID
+-- that looks correct and silently delivers nothing.
+--
+-- That's the worst state to be in — worse than no ID at all — because the app
+-- and the member both believe notifications are working. So an ID only counts
+-- once the bot has successfully sent to it, and this column is the receipt.
+--
+-- Cleared whenever the ID changes (see `updateProfile`), because a new ID is
+-- an unproven one.
+-- ---------------------------------------------------------------------------
+
+alter table profiles
+  add column if not exists discord_verified_at timestamptz;
+
+insert into schema_migrations (version)
+values ('0026_discord_verified')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0026_discord_verified.sql
 -- ==========================================================================

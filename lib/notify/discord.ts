@@ -170,3 +170,76 @@ export const discordMessages = {
     `**${opts.memberName}** is blocked on **${opts.projectName}**.\n` +
     `> ${opts.note}\n${opts.url}`,
 };
+
+/**
+ * Why a DM failed, in words the member can act on.
+ *
+ * Discord's status codes map onto three completely different fixes, and
+ * "couldn't send" leaves somebody guessing which. 50007 in particular is the
+ * one everybody hits and nobody diagnoses: it means the recipient's privacy
+ * settings blocked it, not that anything is broken.
+ */
+export type DiscordProblem =
+  "not-configured" | "no-id" | "unknown-user" | "cannot-dm" | "unreachable";
+
+export const DISCORD_PROBLEM_MESSAGE: Record<DiscordProblem, string> = {
+  "not-configured":
+    "Discord isn't set up for the club yet, so there's nothing to connect to. Nothing for you to do.",
+  "no-id": "Add your Discord ID first, then come back and connect.",
+  "unknown-user":
+    "Discord doesn't recognise that ID. Check you copied your own User ID — turn on Settings → Advanced → Developer Mode, right-click your name, Copy User ID. It's a long number, not your username.",
+  "cannot-dm":
+    "Discord blocked the message. Two usual causes: you haven't joined the club's Discord server yet, or you have “Allow direct messages from server members” switched off for it (Server menu → Privacy Settings). Fix either and try again.",
+  unreachable:
+    "Couldn't reach Discord just now. Try again in a moment — nothing is wrong with your ID.",
+};
+
+/**
+ * Send the member a "you're connected" message and report what happened.
+ *
+ * Separate from `sendDiscordDM`, which is fire-and-forget and swallows
+ * everything. This one is the opposite: the member is standing there waiting
+ * for an answer, so it distinguishes the failures and hands back which.
+ */
+export async function verifyDiscordDM(
+  discordUserId: string | undefined,
+  content: string
+): Promise<{ ok: true } | { ok: false; problem: DiscordProblem }> {
+  const token = botToken();
+  if (!token) return { ok: false, problem: "not-configured" };
+  if (!discordUserId) return { ok: false, problem: "no-id" };
+
+  try {
+    const channel = await call(
+      "/users/@me/channels",
+      { recipient_id: discordUserId },
+      token
+    );
+
+    if (!channel.ok) {
+      // 400 with code 50035 is a malformed snowflake; 404 is nobody there.
+      // Both mean "that isn't a person", which is a different fix from
+      // "that person won't accept messages".
+      const problem: DiscordProblem =
+        channel.status === 404 || channel.status === 400
+          ? "unknown-user"
+          : "cannot-dm";
+      return { ok: false, problem };
+    }
+
+    const { id } = (await channel.json()) as { id: string };
+    const sent = await call(`/channels/${id}/messages`, { content }, token);
+
+    // 403 here is Discord's 50007, "cannot send messages to this user" — the
+    // recipient shares no server with the bot, or has DMs off.
+    if (!sent.ok) return { ok: false, problem: "cannot-dm" };
+
+    return { ok: true };
+  } catch {
+    return { ok: false, problem: "unreachable" };
+  }
+}
+
+/** The message that proves the connection works. */
+export const DISCORD_TEST_MESSAGE =
+  "You're connected. This is the club's HQ bot — you'll get a message here when you're added to a project, when an ask of yours is answered, and (if you're a Lead) when one of your people checks in. Nothing else.";

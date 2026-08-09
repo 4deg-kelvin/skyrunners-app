@@ -290,6 +290,63 @@ export default async function ProjectDetailPage({
             </CardBody>
           </Card>
 
+          {/*
+            What people have actually been doing here.
+
+            REs only. This is the per-project half of the effort split — time
+            spent on THIS work, with the note the person wrote — and never
+            their total, reliability or record, which belong to them and their
+            Lead.
+
+            The descriptions are the point. "3.5 hrs" says somebody was busy;
+            "3.5 hrs — ran the tensile coupons" says what happened, and the
+            field has existed since hours logging shipped while being rendered
+            on exactly one screen: the member's own list of their own entries.
+          */}
+          {mayManage && view.recentHours.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Recent Work</SectionLabel>
+                <p className="text-ink-muted mt-2 text-sm">
+                  Hours logged here in the last three weeks. Appears as soon as
+                  somebody logs — it doesn&apos;t wait for their check-in.
+                </p>
+                <div className="mt-4 space-y-2">
+                  {view.recentHours.map(({ log, member }) => (
+                    <div
+                      key={log.id}
+                      className="rounded-tile border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border px-3.5 py-2.5"
+                    >
+                      <span className="min-w-0 text-sm">
+                        <span className="text-ink font-semibold">
+                          {member?.fullName ?? "Unknown member"}
+                        </span>
+                        {log.description ? (
+                          <span className="text-ink-soft">
+                            {" "}
+                            — {log.description}
+                          </span>
+                        ) : (
+                          <span className="text-ink-muted"> — no note</span>
+                        )}
+                      </span>
+                      <span className="text-ink-muted shrink-0 text-sm tabular-nums">
+                        {formatNumber(log.hours, 1)} hrs ·{" "}
+                        {new Date(
+                          `${log.workDate}T00:00:00Z`
+                        ).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          timeZone: "UTC",
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           {/* Deliverables — the whole task model, one flat list */}
           <Card>
             <CardBody>

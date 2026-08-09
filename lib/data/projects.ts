@@ -42,6 +42,7 @@ import type {
   ProjectMembership,
   ProjectNotice,
   Team,
+  WorkLog,
   UpdateEntry,
 } from "@/lib/types";
 
@@ -240,6 +241,25 @@ export interface ProjectDetailView {
    * calendar is the record.
    */
   events: ProjectEventRow[];
+  /**
+   * Recent hours logged against this project, newest first, with what people
+   * wrote.
+   *
+   * The per-project half of the effort split, and the useful half for an RE:
+   * "3.5 hrs — ran the tensile coupons" tells you what happened, where "3.5
+   * hrs" only tells you somebody was busy. The description field has existed
+   * since hours logging shipped and was rendered on exactly one screen: the
+   * member's own list of their own entries.
+   *
+   * Independent of deliverables and of check-ins. Logging is blocked only by
+   * not being on the project, dating it more than a week back, or a check-in
+   * already having reported that day — signing a deliverable off has no
+   * bearing on it at all.
+   */
+  recentHours: {
+    log: WorkLog;
+    member?: Member;
+  }[];
   /** The whole task model: one flat list, one owner each. */
   deliverables: DeliverableRowData[];
   /** The project's engineering record — mostly links, not uploads. */
@@ -333,6 +353,7 @@ export async function getProjectBySlug(
     parent: project.parentId ? getProject(project.parentId) : undefined,
     timeline: projectTimeline(project),
     events: upcomingEventsFor(project.id, viewerId, viewerIsLeadership),
+    recentHours: recentHoursOn(project.id),
     deliverables: projectDeliverables(project.id).map((d) => ({
       deliverable: d,
       owner: getMember(d.ownerId),
@@ -666,4 +687,24 @@ function upcomingEventsFor(
       isAttending: event.attendeeIds.includes(viewerId),
       canManage: isLeadership || event.createdBy === viewerId,
     }));
+}
+
+/**
+ * The last three weeks of logged work on one project.
+ *
+ * Three weeks rather than everything: an RE wants "what's been happening",
+ * and a project a year old would render a wall nobody reads. The total per
+ * person is on the member rows above for the longer view.
+ */
+function recentHoursOn(projectId: string): { log: WorkLog; member?: Member }[] {
+  const cutoff = new Date(`${today()}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 21);
+  const from = cutoff.toISOString().slice(0, 10);
+
+  return readStore()
+    .workLogs.filter((w) => w.projectId === projectId && w.workDate >= from)
+    .sort(
+      (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
+    )
+    .map((log) => ({ log, member: getMember(log.memberId) }));
 }

@@ -715,7 +715,21 @@ export async function updateProfile(input: {
 
     apply("preferredName", text(edits.preferredName));
     apply("phone", text(edits.phone));
-    apply("discordUserId", text(edits.discordUserId));
+
+    /*
+      A changed ID is an unproven ID.
+
+      Without this, somebody could verify one id, paste a different one, and
+      keep the green tick — which is precisely the false confidence the
+      verification exists to remove.
+    */
+    if (edits.discordUserId !== undefined) {
+      const next = edits.discordUserId.trim() || undefined;
+      if (next !== member.discordUserId) {
+        member.discordVerifiedAt = undefined;
+      }
+      member.discordUserId = next;
+    }
     apply("major", text(edits.major));
     apply("photoUrl", text(edits.photoUrl));
 
@@ -3410,6 +3424,28 @@ export async function removeProjectMember(input: {
     }
 
     return ok({ reassigned: openWork.length });
+  });
+}
+
+/**
+ * Record that the bot reached this member's Discord.
+ *
+ * Called only after a real message went through — see `verifyDiscordAction`.
+ * There is deliberately no way to set this without a delivery having happened,
+ * because a tick that can be granted by asking for it is worth nothing.
+ */
+export async function markDiscordVerified(input: {
+  memberId: string;
+  at: string;
+}): Promise<Result<Member>> {
+  return guarded((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+    if (!member.discordUserId) {
+      return fail<Member>("There's no Discord ID saved to verify.");
+    }
+    member.discordVerifiedAt = input.at;
+    return ok(member);
   });
 }
 

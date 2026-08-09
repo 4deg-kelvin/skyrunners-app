@@ -51,6 +51,15 @@ export interface Member {
    * yields a different person's id.
    */
   discordUserId?: string;
+  /**
+   * When the bot last successfully delivered to `discordUserId`.
+   *
+   * Having an ID is not the same as being reachable — a typo, a member who
+   * never joined the club's server, or DMs switched off all give an ID that
+   * looks right and delivers nothing. That's worse than no ID, because both
+   * sides believe it's working. Cleared whenever the ID changes.
+   */
+  discordVerifiedAt?: string;
   globalRole: GlobalRole;
   status: MemberStatus;
   /** The one person they report to. Null for co-leads. */
