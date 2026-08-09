@@ -195,7 +195,21 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
   const following = cards.filter(
     (c) => c.membership.commitment === "following"
   );
-  const projects = committed;
+  /*
+    Committed AND still running.
+
+    A finished project has nothing to report on. It stayed in the composer
+    because "being on the project creates a section" was written before
+    completion existed as a real state, so somebody with four delivered
+    projects got four empty boxes asking what moved forward on work that
+    isn't moving. That's the fastest way to teach people the form is
+    busywork.
+
+    Filtering on the CURRENT phase rather than remembering anything means a
+    reopened project comes straight back — which is the behaviour that has to
+    hold, since a project can go back to active when a sign-off is withdrawn.
+  */
+  const projects = committed.filter((c) => c.project.phase !== "complete");
 
   const currentUpdate = currentUpdateFor(memberId);
 
@@ -249,6 +263,25 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     if (projects.some((p) => p.project.id === entry.projectId)) continue;
     const project = getProject(entry.projectId);
     if (!project) continue;
+
+    /*
+      …but a project that FINISHED mid-period only comes back if they'd
+      already written something in it.
+
+      Two different rows end up here. One is a row seeded from logged hours,
+      empty, which is the thing the filter above exists to remove — letting it
+      back in through this loop would undo the fix. The other is a sentence
+      somebody typed before the project completed, and discarding that is
+      exactly what this loop was written to prevent.
+
+      Hours alone aren't content: they're a fact the app recorded, not a thing
+      the member said.
+    */
+    const wroteSomething = Boolean(
+      entry.progress.trim() || entry.blockers?.trim() || entry.nextSteps?.trim()
+    );
+    if (project.phase === "complete" && !wroteSomething) continue;
+
     sections.push({
       entry,
       project,

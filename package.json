@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"lib/**/*.test.ts\"",
+    "test": "node --import ./scripts/alias-loader.mjs --experimental-strip-types --test \"lib/**/*.test.ts\"",
     "sweep": "node scripts/dead-controls.mjs",
     "check": "npm run typecheck && npm run lint && npm run sweep && npm test"
   },
