@@ -20,7 +20,7 @@ import {
   getProjectTree,
 } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
-import { can } from "@/lib/permissions";
+import { can, isCoLead } from "@/lib/permissions";
 import type { ProjectTreeNode } from "@/lib/data/projects";
 
 /** Completed projects anywhere in a division's tree, not just at the top. */
@@ -40,7 +40,9 @@ export default async function ProjectsPage() {
     [
       getProjectTree(),
       getOrphanedProjects(),
-      getProjectFormOptions(),
+      // Scoped to what this viewer may actually create — a Lead only sees
+      // divisions they lead, so the dropdown can't offer a failing option.
+      getProjectFormOptions(viewer),
       countArchivedDivisions(),
       // Deadlines and blocked work, folded in here rather than being two
       // separate pages. Computed in one pass and looked up per division.
@@ -48,7 +50,16 @@ export default async function ProjectsPage() {
     ]
   );
 
-  const mayCreate = can.createProject(viewer.actor, viewer.graph);
+  /*
+    Can they file work ANYWHERE?
+
+    `can.createProject` needs a target, and this button has none yet — so the
+    answer is "is there at least one division they could pick", which is
+    exactly what `getProjectFormOptions` already filtered for them. A Lead who
+    leads no team gets no button rather than a dropdown that rejects every
+    option.
+  */
+  const mayCreate = isCoLead(viewer.actor) || formOptions.divisions.length > 0;
   const mayManageTeams = can.manageTeams(viewer.actor);
   const todayIso = new Date().toISOString().slice(0, 10);
   const completedCount = tree.reduce(

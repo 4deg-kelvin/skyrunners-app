@@ -2,7 +2,7 @@ import { Badge } from "./badge";
 import { SectionLabel } from "./section-label";
 import { StatTile } from "./stat-tile";
 import {
-  TIER_DESCRIPTIONS,
+  tierDescriptions,
   TIER_LABELS,
   WEEKLY_HOURS_EXPECTATION,
   type ContributionRecord,
@@ -41,7 +41,7 @@ export function ContributionPanel({
       </div>
 
       <p className="text-ink-soft mt-2 text-sm">
-        {TIER_DESCRIPTIONS[commitment.tier]}
+        {tierDescriptions(commitment.tiers)[commitment.tier]}
       </p>
 
       {/* Delivered leads, because it's the signal that matters most */}
@@ -63,10 +63,19 @@ export function ContributionPanel({
         <StatTile
           label="Hours / week"
           value={formatNumber(commitment.hoursPerWeek, 1)}
+          /*
+            The NEXT rung, never the top one.
+
+            This used to say "10.5 more to reach Core" to somebody at 1.6
+            hrs/week, which is a verdict wearing the clothes of encouragement —
+            and the tier model exists precisely so a below-bar member reads as
+            a rung rather than a failure. The next threshold up is reachable by
+            construction; Core, from the bottom, is not.
+          */
           hint={
-            commitment.hoursToCore > 0
-              ? `${formatNumber(commitment.hoursToCore, 1)} more to reach Core`
-              : `at or above the ${WEEKLY_HOURS_EXPECTATION} hr target`
+            commitment.nextTier
+              ? `${formatNumber(commitment.nextTier.hoursAway, 1)} more to reach ${TIER_LABELS[commitment.nextTier.tier]}`
+              : `at or above the ${commitment.tiers.core} hr target`
           }
         />
         <StatTile

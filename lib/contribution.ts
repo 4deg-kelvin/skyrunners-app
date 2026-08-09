@@ -58,6 +58,14 @@
  *     hrs/week during midterms is a Contributor, not a delinquent. Tiers keep
  *     them in the club; a red X pushes them out of it.
  */
+/**
+ * The club's stated range, as shipped.
+ *
+ * These are the DEFAULTS now, not the rule — a Co-Lead edits the live values in
+ * Settings (`ClubSettings`, migration 0020). Read them from the settings row
+ * rather than importing these, or a page will keep printing 12 after somebody
+ * has moved the bar. Kept because they are the seed and the fallback.
+ */
 export const WEEKLY_HOURS_EXPECTATION = 12;
 export const WEEKLY_HOURS_MINIMUM = 10;
 
@@ -78,33 +86,97 @@ export const TIER_LABELS: Record<CommitmentTier, string> = {
   paused: "On academic pause",
 };
 
-export const TIER_DESCRIPTIONS: Record<CommitmentTier, string> = {
-  core: "12+ hrs/week — meeting the team's full expectation",
-  committed: "8–12 hrs/week — close to the bar",
-  contributing: "4–8 hrs/week — contributing, room to grow",
-  light: "Under 4 hrs/week — just getting started, or stretched thin",
-  paused: "Paused for academics. Nothing counted, nothing owed.",
+/**
+ * The tier floors, in hours per week.
+ *
+ * A Co-Lead edits these from Settings — they're a row in `club_settings`, not
+ * constants, because the club adjusts its expectations faster than anyone
+ * ships a deploy and a published rubric stating a number nobody uses is worse
+ * than no rubric. See `ClubSettings` and migration 0020.
+ *
+ * `DEFAULT_TIERS` is the fallback for a store that predates the row, and the
+ * seed value. It's the same set the numbers were hard-coded to.
+ */
+export interface TierThresholds {
+  core: number;
+  committed: number;
+  contributing: number;
+  /** The low end of the club's stated 10–12 range. */
+  minimum: number;
+}
+
+export const DEFAULT_TIERS: TierThresholds = {
+  core: 12,
+  committed: 8,
+  contributing: 4,
+  minimum: 10,
 };
 
-export const TIER_THRESHOLDS: {
-  tier: CommitmentTier;
-  minHoursPerWeek: number;
-}[] = [
-  { tier: "core", minHoursPerWeek: 12 },
-  { tier: "committed", minHoursPerWeek: 8 },
-  { tier: "contributing", minHoursPerWeek: 4 },
-  { tier: "light", minHoursPerWeek: 0 },
-];
+/**
+ * Descriptions built FROM the thresholds rather than written next to them.
+ *
+ * They used to be a literal `Record` saying "12+ hrs/week". The moment the
+ * numbers moved, `/how-we-lead` would have gone on printing the old ones — the
+ * page whose entire job is telling members what the bar is.
+ */
+export function tierDescriptions(
+  t: TierThresholds = DEFAULT_TIERS
+): Record<CommitmentTier, string> {
+  return {
+    core: `${t.core}+ hrs/week — meeting the team's full expectation`,
+    committed: `${t.committed}–${t.core} hrs/week — close to the bar`,
+    contributing: `${t.contributing}–${t.committed} hrs/week — contributing, room to grow`,
+    light: `Under ${t.contributing} hrs/week — just getting started, or stretched thin`,
+    paused: "Paused for academics. Nothing counted, nothing owed.",
+  };
+}
+
+/** Highest first, which is the order `commitmentTier` depends on. */
+export function tierThresholds(
+  t: TierThresholds = DEFAULT_TIERS
+): { tier: CommitmentTier; minHoursPerWeek: number }[] {
+  return [
+    { tier: "core", minHoursPerWeek: t.core },
+    { tier: "committed", minHoursPerWeek: t.committed },
+    { tier: "contributing", minHoursPerWeek: t.contributing },
+    { tier: "light", minHoursPerWeek: 0 },
+  ];
+}
 
 export function commitmentTier(
   hoursPerWeek: number,
-  isPaused = false
+  isPaused = false,
+  t: TierThresholds = DEFAULT_TIERS
 ): CommitmentTier {
   if (isPaused) return "paused";
-  for (const { tier, minHoursPerWeek } of TIER_THRESHOLDS) {
+  for (const { tier, minHoursPerWeek } of tierThresholds(t)) {
     if (hoursPerWeek >= minHoursPerWeek) return tier;
   }
   return "light";
+}
+
+/**
+ * The next rung up, and how far away it is. Null once they're at the top.
+ *
+ * "10.5 more to reach Core" in front of somebody at 1.6 hrs/week reads as a
+ * verdict, not a rung — the exact thing the tier model exists to avoid. So the
+ * gap is only worth showing for the NEXT tier, which is always within reach by
+ * construction.
+ */
+export function nextTierGap(
+  hoursPerWeek: number,
+  t: TierThresholds = DEFAULT_TIERS
+): { tier: CommitmentTier; hoursAway: number } | null {
+  const rungs = [...tierThresholds(t)].reverse(); // lowest first
+  for (const { tier, minHoursPerWeek } of rungs) {
+    if (hoursPerWeek < minHoursPerWeek) {
+      return {
+        tier,
+        hoursAway: Math.round((minHoursPerWeek - hoursPerWeek) * 10) / 10,
+      };
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +184,13 @@ export function commitmentTier(
 // ---------------------------------------------------------------------------
 
 export interface ContributionInputs {
-  /** In-session weeks only. Finals and breaks are excluded upstream. */
+  /**
+   * In-session weeks since this member joined. Never below 1.
+   *
+   * Breaks and finals are skipped, which makes working out of session a
+   * genuine bonus: those hours are all in `hoursTotal`, and the weeks they
+   * happened in add nothing to the divisor.
+   */
   activeWeeks: number;
   isPaused: boolean;
 
@@ -120,17 +198,35 @@ export interface ContributionInputs {
   deliverablesOpen: number;
   /** Open, past their due date. */
   deliverablesOverdue: number;
-  /** Projects that reached `complete` while this member held a deliverable. */
+  /**
+   * Completed projects this member was COMMITTED to.
+   *
+   * Not "held a signed-off deliverable on", which was the old rule and scored
+   * zero for the RE of a project they carried to the finish. Following doesn't
+   * count and membership is RE-controlled, so it can't be self-inflated.
+   */
   projectsCompleted: number;
 
   hoursTotal: number;
 
+  /**
+   * Check-ins whose moment has PASSED. A pending one that isn't late yet is
+   * not due — counting it dropped reliability before the member had a chance
+   * to write anything.
+   */
   updatesDue: number;
   updatesOnTime: number;
   updatesLate: number;
 
   reRoleCount: number;
   projectsCommitted: number;
+
+  /**
+   * The club's configured tier floors. Carried on the inputs so every caller
+   * of `buildContributionRecord` gets them for free and none of them has to
+   * remember to look the settings row up.
+   */
+  tiers: TierThresholds;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,9 +246,17 @@ export interface Commitment {
   hoursTotal: number;
   hoursPerWeek: number;
   tier: CommitmentTier;
-  /** Hours per week still needed to reach Core. 0 if already there. */
-  hoursToCore: number;
+  /**
+   * The rung immediately above, and how far off it is. Null at the top.
+   *
+   * Replaces a flat `hoursToCore`, which put "10.5 more to reach Core" in
+   * front of somebody at 1.6 hrs/week — a verdict dressed as encouragement.
+   * The next rung is by definition the reachable one.
+   */
+  nextTier: { tier: CommitmentTier; hoursAway: number } | null;
   meetsMinimum: boolean;
+  /** What the tiers currently are, so the UI can describe them honestly. */
+  tiers: TierThresholds;
 }
 
 export interface Reliability {
@@ -180,7 +284,7 @@ export function buildContributionRecord(
 ): ContributionRecord {
   const assigned = i.deliverablesCompleted + i.deliverablesOpen;
   const hoursPerWeek = i.activeWeeks > 0 ? i.hoursTotal / i.activeWeeks : 0;
-  const tier = commitmentTier(hoursPerWeek, i.isPaused);
+  const tier = commitmentTier(hoursPerWeek, i.isPaused, i.tiers);
   const missed = Math.max(0, i.updatesDue - i.updatesOnTime - i.updatesLate);
 
   return {
@@ -195,11 +299,9 @@ export function buildContributionRecord(
       hoursTotal: i.hoursTotal,
       hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
       tier,
-      hoursToCore: Math.max(
-        0,
-        Math.round((WEEKLY_HOURS_EXPECTATION - hoursPerWeek) * 10) / 10
-      ),
-      meetsMinimum: hoursPerWeek >= WEEKLY_HOURS_MINIMUM,
+      nextTier: i.isPaused ? null : nextTierGap(hoursPerWeek, i.tiers),
+      meetsMinimum: hoursPerWeek >= i.tiers.minimum,
+      tiers: i.tiers,
     },
     reliability: {
       onTimeRate: i.updatesDue > 0 ? i.updatesOnTime / i.updatesDue : null,

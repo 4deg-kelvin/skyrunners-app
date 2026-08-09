@@ -16,11 +16,12 @@ import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
 import { TrainingRecord } from "@/components/ui/training-record";
+import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ActionButton } from "@/components/forms/action-form";
 import { ReopenButton } from "@/components/forms/help-request-actions";
 import { deleteCheckInAction } from "@/lib/actions";
 import { getResolvedAsksFor } from "@/lib/data/blockers";
-import { getMemberProfile } from "@/lib/data/members";
+import { getMemberProfile, type MemberProjectRow } from "@/lib/data/members";
 import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
@@ -51,6 +52,17 @@ export default async function MemberProfilePage({
 
   const { member, lead, directReports, projects, contribution, checkIns } =
     view;
+  /*
+    Live work first, finished work behind a toggle at the end.
+
+    A member two years in has more completed projects than live ones, and the
+    live ones are the reason anybody opens this page.
+  */
+  const liveProjects = projects.filter((p) => p.project.phase !== "complete");
+  const finishedProjects = projects.filter(
+    (p) => p.project.phase === "complete"
+  );
+
   const isOwnProfile = viewer.member.id === member.id;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
@@ -151,86 +163,37 @@ export default async function MemberProfilePage({
                     actionHref="/projects"
                   />
                 ) : (
-                  projects.map(
-                    ({
-                      project,
-                      membership,
-                      breadcrumb,
-                      hoursLogged,
-                      deliverables,
-                      daysToTarget,
-                    }) => (
-                      <div
-                        key={project.id}
-                        className="rounded-tile border-line border px-4 py-3.5"
-                      >
-                        <Breadcrumb trail={breadcrumb} className="mb-1.5" />
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <Link
-                            href={`/projects/${project.slug}`}
-                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                          >
-                            {project.name}
-                          </Link>
-                          <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            {membership.role === "re" ? (
-                              <Badge tone="cardinal">RE</Badge>
-                            ) : null}
-                            {membership.commitment === "following" ? (
-                              <Badge tone="neutral">Following</Badge>
-                            ) : null}
-                            <ProjectBadges project={project} />
-                          </div>
-                        </div>
-
-                        {/* What they own here — public, unlike hours */}
-                        {deliverables.length > 0 ? (
-                          <div className="mt-3 space-y-2">
-                            {deliverables.map((d) => (
-                              <DeliverableRow
-                                key={d.id}
-                                deliverable={d}
-                                showOwner={false}
-                                overdue={
-                                  d.status !== "done" &&
-                                  !!d.dueDate &&
-                                  new Date(d.dueDate) < new Date()
-                                }
-                              />
-                            ))}
-                          </div>
-                        ) : membership.responsibility ? (
-                          <p className="text-ink-soft mt-2 text-sm">
-                            <span className="text-ink font-semibold">
-                              Owns:
-                            </span>{" "}
-                            {membership.responsibility}
-                          </p>
-                        ) : null}
-
-                        {/*
-                          Hours are gated on `canViewEffort`; the countdown
-                          isn't. When a project is due is a fact about the
-                          project, and the whole club can already read it on
-                          the project page — hiding it here would be privacy
-                          theatre that costs the page its point.
-                        */}
-                        <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-                          {canViewEffort ? (
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="size-3.5" />
-                              {formatNumber(hoursLogged, 1)} hrs logged
-                            </span>
-                          ) : null}
-                          <DueCountdown
-                            daysLeft={daysToTarget}
-                            done={project.phase === "complete"}
-                          />
-                        </div>
-                      </div>
-                    )
-                  )
+                  liveProjects.map((row) => (
+                    <MemberProjectCard
+                      key={row.project.id}
+                      row={row}
+                      canViewEffort={canViewEffort}
+                    />
+                  ))
                 )}
+
+                {/*
+                  Finished work last, and folded away.
+
+                  Same reasoning as My Work: a member two years in has more
+                  completed projects than live ones, and the live ones are what
+                  anybody opening this page came for. Collapsed rather than
+                  removed — the record IS the point of not hard-deleting
+                  anything, so it stays one click away.
+                */}
+                {finishedProjects.length > 0 ? (
+                  <CompletedProjectsSection count={finishedProjects.length}>
+                    <div className="mt-4 space-y-3">
+                      {finishedProjects.map((row) => (
+                        <MemberProjectCard
+                          key={row.project.id}
+                          row={row}
+                          canViewEffort={canViewEffort}
+                        />
+                      ))}
+                    </div>
+                  </CompletedProjectsSection>
+                ) : null}
               </div>
             </CardBody>
           </Card>
@@ -461,6 +424,98 @@ export default async function MemberProfilePage({
             </CardBody>
           </Card>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One project row on somebody's profile.
+ *
+ * Extracted so the live list and the collapsed completed list render
+ * identically — two copies of this markup would drift, and the one that drifts
+ * is always the one behind the toggle nobody opens.
+ */
+function MemberProjectCard({
+  row,
+  canViewEffort,
+}: {
+  row: MemberProjectRow;
+  /** Hours only. The due countdown is public — see the note inside. */
+  canViewEffort: boolean;
+}) {
+  const {
+    project,
+    membership,
+    breadcrumb,
+    hoursLogged,
+    deliverables,
+    daysToTarget,
+  } = row;
+
+  return (
+    <div
+      key={project.id}
+      className="rounded-tile border-line border px-4 py-3.5"
+    >
+      <Breadcrumb trail={breadcrumb} className="mb-1.5" />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Link
+          href={`/projects/${project.slug}`}
+          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+        >
+          {project.name}
+        </Link>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {membership.role === "re" ? <Badge tone="cardinal">RE</Badge> : null}
+          {membership.commitment === "following" ? (
+            <Badge tone="neutral">Following</Badge>
+          ) : null}
+          <ProjectBadges project={project} />
+        </div>
+      </div>
+
+      {/* What they own here — public, unlike hours */}
+      {deliverables.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {deliverables.map((d) => (
+            <DeliverableRow
+              key={d.id}
+              deliverable={d}
+              showOwner={false}
+              overdue={
+                d.status !== "done" &&
+                !!d.dueDate &&
+                new Date(d.dueDate) < new Date()
+              }
+            />
+          ))}
+        </div>
+      ) : membership.responsibility ? (
+        <p className="text-ink-soft mt-2 text-sm">
+          <span className="text-ink font-semibold">Owns:</span>{" "}
+          {membership.responsibility}
+        </p>
+      ) : null}
+
+      {/*
+        Hours are gated on `canViewEffort`; the countdown
+        isn't. When a project is due is a fact about the
+        project, and the whole club can already read it on
+        the project page — hiding it here would be privacy
+        theatre that costs the page its point.
+      */}
+      <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
+        {canViewEffort ? (
+          <span className="flex items-center gap-1.5">
+            <Clock className="size-3.5" />
+            {formatNumber(hoursLogged, 1)} hrs logged
+          </span>
+        ) : null}
+        <DueCountdown
+          daysLeft={daysToTarget}
+          done={project.phase === "complete"}
+        />
       </div>
     </div>
   );

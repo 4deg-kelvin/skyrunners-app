@@ -168,6 +168,24 @@ export function isREofOrAbove(
 }
 
 /**
+ * Does the actor lead this team, or one above it in the org tree?
+ *
+ * The team-only half of `leadsTeamAbove`, which walks the project tree first.
+ * Used where the target is a division rather than a project — filing new work,
+ * where there is no project to walk up from yet.
+ */
+export function leadsTeamAtOrAbove(
+  actor: Actor,
+  graph: OrgGraph,
+  teamId: string
+): boolean {
+  for (const id of teamChain(graph, teamId)) {
+    if (graph.getTeam(id)?.leadId === actor.id) return true;
+  }
+  return false;
+}
+
+/**
  * Q2b — RE authority arriving from STRICTLY ABOVE this project.
  *
  * ---------------------------------------------------------------------------
@@ -332,10 +350,39 @@ export const can = {
    * deliberately permissive: any Lead, or any RE creating a sub-project
    * under something they already own.
    */
-  createProject: (actor: Actor, graph: OrgGraph, parentProjectId?: string) =>
-    isCoLead(actor) ||
-    actor.globalRole === "lead" ||
-    (!!parentProjectId && isREofOrAbove(actor, graph, parentProjectId)),
+  createProject: (
+    actor: Actor,
+    graph: OrgGraph,
+    target: { parentProjectId?: string; teamId?: string } = {}
+  ) => {
+    if (isCoLead(actor)) return true;
+
+    // Under something they already own: RE authority, inheriting down.
+    if (target.parentProjectId) {
+      return isREofOrAbove(actor, graph, target.parentProjectId);
+    }
+
+    /*
+      Otherwise it lands in a division, and a Lead may only file work into a
+      unit they actually lead.
+
+      This used to be a bare `globalRole === "lead"` — the only unscoped rule in
+      the file, so a sub-team lead in Airframe could start a top-level project
+      in Avionics. That contradicts every other rule here, which all ask WHERE,
+      and it's the shape of the silo problem the app exists to remove: work
+      appearing in a division whose lead didn't know about it and isn't
+      accountable for it.
+
+      Walks UP the org tree, so a Division Lead covers their sub-teams and a
+      sub-team lead covers only their own. Nothing sideways.
+    */
+    if (target.teamId) return leadsTeamAtOrAbove(actor, graph, target.teamId);
+
+    // No target named. This is the "should the button exist at all" question,
+    // and it can't be answered here — `OrgGraph` looks teams up by id and has
+    // no way to enumerate them. The page asks `creatableDivisions` instead.
+    return false;
+  },
 
   /** Edit details, phase, dates, artifacts, requirements, tasks. */
   manageProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
@@ -676,6 +723,16 @@ export const can = {
 
   /** Divisions and sub-teams are the org's shape — Co-Leads only. */
   manageTeams: (actor: Actor) => isCoLead(actor),
+
+  /**
+   * Moving the commitment tier floors.
+   *
+   * Co-Lead only, for the same reason as `manageTeams`: this is the definition
+   * of the bar every member is measured against, and it's printed publicly at
+   * `/how-we-lead`. Editable at all because the club adjusts its expectations
+   * faster than anyone ships a deploy — see `ClubSettings`.
+   */
+  manageEngagementWeights: (actor: Actor) => isCoLead(actor),
 
   /**
    * Delete somebody's record outright.

@@ -570,21 +570,83 @@ describe("contribution visibility", () => {
   });
 });
 
-describe("project creation is deliberately easy for leadership", () => {
-  test("any lead can create a top-level project", () => {
-    assert.equal(can.createProject(actor("lead1"), graph), true);
+describe("project creation is easy for leadership, but scoped to their division", () => {
+  test("a Co-Lead can create anywhere", () => {
+    assert.equal(
+      can.createProject(actor("coLead"), graph, { teamId: "divA" }),
+      true
+    );
+    assert.equal(
+      can.createProject(actor("coLead"), graph, { teamId: "divB" }),
+      true
+    );
+  });
+
+  test("a Division Lead can create in their own division", () => {
+    assert.equal(
+      can.createProject(actor("divLead"), graph, { teamId: "divA" }),
+      true
+    );
+  });
+
+  test("…and in a sub-team beneath it", () => {
+    // subA sits under divA, so authority reaches down the org tree.
+    assert.equal(
+      can.createProject(actor("divLead"), graph, { teamId: "subA" }),
+      true
+    );
+  });
+
+  test("but NOT in somebody else's division", () => {
+    /*
+      The rule this replaced was a bare `globalRole === "lead"` check — the only
+      unscoped rule in the file. It let a sub-team lead in one division start
+      top-level work in another, which is the silo problem wearing a different
+      hat: work appearing in a division whose lead didn't know about it.
+    */
+    assert.equal(
+      can.createProject(actor("divLead"), graph, { teamId: "divB" }),
+      false
+    );
+  });
+
+  test("a sub-team lead is scoped to their own team, not the division above", () => {
+    assert.equal(
+      can.createProject(actor("subLead"), graph, { teamId: "subA" }),
+      true
+    );
+    assert.equal(
+      can.createProject(actor("subLead"), graph, { teamId: "divA" }),
+      false
+    );
   });
 
   test("a plain member cannot", () => {
-    assert.equal(can.createProject(actor("worker"), graph), false);
+    assert.equal(
+      can.createProject(actor("worker"), graph, { teamId: "divA" }),
+      false
+    );
   });
 
   test("an RE can create a sub-project under something they own", () => {
-    assert.equal(can.createProject(actor("reLeaf"), graph, "leaf"), true);
+    assert.equal(
+      can.createProject(actor("reLeaf"), graph, { parentProjectId: "leaf" }),
+      true
+    );
   });
 
   test("an RE cannot create a sub-project under someone else's tree", () => {
-    assert.equal(can.createProject(actor("reLeaf"), graph, "other"), false);
+    assert.equal(
+      can.createProject(actor("reLeaf"), graph, { parentProjectId: "other" }),
+      false
+    );
+  });
+
+  test("no target at all is false, including for a Lead", () => {
+    // The page asks "is there a division you could pick" instead — `OrgGraph`
+    // looks teams up by id and can't enumerate them.
+    assert.equal(can.createProject(actor("lead1"), graph), false);
+    assert.equal(can.createProject(actor("divLead"), graph), false);
   });
 });
 

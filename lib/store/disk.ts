@@ -38,6 +38,7 @@ import type {
   ProgressUpdate,
   ProjectMembership,
   CatalogueItem,
+  ClubSettings,
   HelpRequest,
   MemberCertification,
   ProjectNotice,
@@ -122,6 +123,13 @@ export interface StoreShape {
   trainingSections: TrainingSection[];
   catalogueItems: CatalogueItem[];
   certifications: MemberCertification[];
+  /**
+   * Club-wide configuration. Exactly one row — see `ClubSettings`.
+   *
+   * An array rather than a bare object so it goes through `COLLECTIONS` like
+   * everything else and the Postgres diff needs no special case.
+   */
+  clubSettings: ClubSettings[];
 }
 
 /**
@@ -132,7 +140,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 8;
+const STORE_VERSION = 9;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -172,6 +180,17 @@ function seed(): StoreShape {
     catalogueItems: seedCatalogueItems,
     // Nobody holds anything until they say so and a Lead verifies it.
     certifications: [],
+    // The defaults the tiers were hard-coded to, so seeding changes nothing
+    // anybody sees until a Co-Lead edits them.
+    clubSettings: [
+      {
+        id: "1",
+        coreHours: 12,
+        committedHours: 8,
+        contributingHours: 4,
+        minimumHours: 10,
+      },
+    ],
   });
 }
 

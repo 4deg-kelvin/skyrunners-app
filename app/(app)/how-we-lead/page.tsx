@@ -4,12 +4,11 @@ import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
   LEADERSHIP_RUBRIC,
-  TIER_DESCRIPTIONS,
   TIER_LABELS,
-  TIER_THRESHOLDS,
-  WEEKLY_HOURS_EXPECTATION,
-  WEEKLY_HOURS_MINIMUM,
+  tierDescriptions,
+  tierThresholds,
 } from "@/lib/contribution";
+import { getClubTiers } from "@/lib/data/settings";
 import { TIER_TONES } from "@/lib/labels";
 
 /**
@@ -20,7 +19,19 @@ import { TIER_TONES } from "@/lib/labels";
  * review with a concealed scale — and it always leaks eventually, at which point
  * the trust cost is retroactive.
  */
-export default function HowWeLeadPage() {
+export default async function HowWeLeadPage() {
+  /*
+    Read, never hard-coded.
+
+    This page is the published rubric — it exists so nothing about how members
+    are assessed is hidden from them. The numbers used to be constants printed
+    here, so the first time a Co-Lead moved the bar this page would have gone
+    on stating the old one. A rubric that doesn't match what leadership
+    actually uses is worse than no rubric.
+  */
+  const tiers = await getClubTiers();
+  const descriptions = tierDescriptions(tiers);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -33,18 +44,17 @@ export default function HowWeLeadPage() {
         <CardBody>
           <SectionLabel>The Commitment</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
-            {WEEKLY_HOURS_MINIMUM}–{WEEKLY_HOURS_EXPECTATION} hours a week
+            {tiers.minimum}–{tiers.core} hours a week
           </h2>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             SkyRunners builds real aircraft, and that takes real time. The
-            expectation is {WEEKLY_HOURS_MINIMUM}–{WEEKLY_HOURS_EXPECTATION}{" "}
-            hours a week, and plenty of people go further. We say this up front
-            so you can decide whether it fits your quarter — not discover it in
-            week six.
+            expectation is {tiers.minimum}–{tiers.core} hours a week, and plenty
+            of people go further. We say this up front so you can decide whether
+            it fits your quarter — not discover it in week six.
           </p>
 
           <div className="mt-6 space-y-2.5">
-            {TIER_THRESHOLDS.map(({ tier, minHoursPerWeek }) => (
+            {tierThresholds(tiers).map(({ tier, minHoursPerWeek }) => (
               <div
                 key={tier}
                 className="rounded-tile border-line flex flex-wrap items-center gap-3 border px-4 py-3"
@@ -54,7 +64,7 @@ export default function HowWeLeadPage() {
                   {minHoursPerWeek}+ hrs/week
                 </span>
                 <span className="text-ink-soft text-sm">
-                  {TIER_DESCRIPTIONS[tier]}
+                  {descriptions[tier]}
                 </span>
               </div>
             ))}

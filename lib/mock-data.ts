@@ -27,7 +27,11 @@ import {
   type UpdateSchedule,
   type WorkLog,
 } from "./types.ts";
-import type { ContributionInputs } from "./contribution.ts";
+import {
+  DEFAULT_TIERS,
+  type ContributionInputs,
+  type TierThresholds,
+} from "./contribution.ts";
 import { readStore } from "./store/disk.ts";
 import { isLiveMode } from "./env.ts";
 
@@ -2968,29 +2972,96 @@ export function currentUpdateFor(memberId: string): ProgressUpdate {
  * so hours-per-week isn't diluted by three weeks of winter break when nobody was
  * expected to work.
  */
+/**
+ * In-session weeks between a member joining and today. Never below 1.
+ *
+ * ---------------------------------------------------------------------------
+ * This used to be the literal number 10
+ * ---------------------------------------------------------------------------
+ *
+ * `activeWeeks = 10` was a default that every single caller took. So hours per
+ * week was always `total ÷ 10`, whoever you were and however long you'd been
+ * here: somebody who joined last Tuesday and logged 16 hours read as 1.6
+ * hrs/week, and the entire roster looked inactive for the first two months of
+ * any quarter. The one number members are shown about their own effort was
+ * wrong for everyone except a person who had been in the club exactly ten
+ * weeks.
+ *
+ * Weeks the club wasn't running are skipped, which is what makes the rate mean
+ * anything across a break. **And that is deliberately a reward for working out
+ * of session:** `hoursTotal` counts every hour logged, whenever it was logged,
+ * while a break week adds nothing to the denominator. Somebody who builds over
+ * spring break sees their rate go UP. Somebody who doesn't is not penalised,
+ * because those weeks were never counted against them either.
+ *
+ * The floor of 1 stops a member who joined this morning dividing by zero and
+ * reading as infinitely committed.
+ */
+export function activeWeeksFor(memberId: string): number {
+  const member = getMember(memberId);
+  if (!member) return 1;
+
+  const start = Date.parse(`${member.joinedAt.slice(0, 10)}T00:00:00Z`);
+  const end = Date.parse(`${today()}T00:00:00Z`);
+  if (!Number.isFinite(start) || end <= start) return 1;
+
+  let weeks = 0;
+  for (let t = start; t <= end; t += 7 * 86_400_000) {
+    // Midweek, so a week counts if the club was running for most of it rather
+    // than only on the exact day the member happened to join.
+    const midweek = new Date(t + 3 * 86_400_000).toISOString().slice(0, 10);
+    if (inSession(midweek)) weeks++;
+  }
+  return Math.max(1, weeks);
+}
+
 export function contributionInputsFor(
   memberId: string,
-  activeWeeks = 10
+  activeWeeks?: number
 ): ContributionInputs {
   const mine = myDeliverables(memberId);
   const committed = live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
   );
 
+  /*
+    Completed projects they were COMMITTED to — not only ones where they
+    happened to own a signed-off deliverable.
+
+    The old rule counted a finished project only if this member held a `done`
+    deliverable on it, which meant the RE of a project they carried to the
+    finish scored zero the moment the work was tracked as somebody else's
+    deliverables. That is the person most responsible for it finishing.
+
+    Following doesn't count, and membership is RE-controlled — nobody adds
+    themselves — so this can't be self-inflated. Somebody who was carried still
+    shows 0 delivered deliverables and near-zero hours, which is exactly what
+    the other three signals are for. Adding an "and they did enough" clause
+    would put a judgement inside a count that is meant to be a fact.
+  */
+  const committedProjectIds = new Set(committed.map((pm) => pm.projectId));
   const completedProjectIds = new Set(
-    mine
-      .filter((d) => d.status === "done")
-      .map((d) => d.projectId)
-      .filter((pid) => getProject(pid)?.phase === "complete")
+    [...committedProjectIds].filter(
+      (pid) => getProject(pid)?.phase === "complete"
+    )
   );
 
-  const myUpdates = live().progressUpdates.filter(
-    (u) => u.memberId === memberId
-  );
+  /*
+    Only check-ins whose moment has passed count as "due".
+
+    `myUpdates.length` counted every row including a `pending` one that isn't
+    late yet — so reliability dropped the instant an obligation was generated,
+    before the member had any chance to write it, and `missed` (due − onTime −
+    late) silently counted it as missed. Someone who had never missed anything
+    could open the page and see less than 100%.
+  */
+  const myUpdates = live()
+    .progressUpdates.filter((u) => u.memberId === memberId)
+    .filter((u) => u.status !== "pending");
   const schedule = scheduleFor(memberId);
 
   return {
-    activeWeeks,
+    activeWeeks: activeWeeks ?? activeWeeksFor(memberId),
     isPaused: !!schedule?.pausedUntil && schedule.pausedUntil > today(),
     deliverablesCompleted: mine.filter((d) => d.status === "done").length,
     deliverablesOpen: mine.filter((d) => d.status !== "done").length,
@@ -3009,6 +3080,25 @@ export function contributionInputsFor(
     reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId))
       .length,
     projectsCommitted: committed.length,
+    tiers: clubTiers(),
+  };
+}
+
+/**
+ * The club's configured tier floors, or the shipped defaults.
+ *
+ * Falls back rather than throwing: a store written before migration 0020 has
+ * no row, and the four signals are not worth a 500 over a config value that
+ * has a perfectly good default.
+ */
+export function clubTiers(): TierThresholds {
+  const row = live().clubSettings?.[0];
+  if (!row) return DEFAULT_TIERS;
+  return {
+    core: row.coreHours,
+    committed: row.committedHours,
+    contributing: row.contributingHours,
+    minimum: row.minimumHours,
   };
 }
 

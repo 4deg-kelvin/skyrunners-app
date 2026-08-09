@@ -49,6 +49,12 @@ function daysWaitingOn(since: string): number {
 }
 import type { BreadcrumbNode } from "./my-work";
 import { preloadLiveStore } from "@/lib/store/request";
+import {
+  isCoLead,
+  leadsTeamAtOrAbove,
+  type Actor,
+  type OrgGraph,
+} from "@/lib/permissions";
 
 export interface ProjectTreeNode {
   project: Project;
@@ -321,7 +327,10 @@ export async function getProjectBySlug(
  *
  * Here rather than in the page because pages may not import `lib/mock-data`.
  */
-export async function getProjectFormOptions(): Promise<{
+export async function getProjectFormOptions(actor?: {
+  actor: Actor;
+  graph: OrgGraph;
+}): Promise<{
   parents: { id: string; name: string }[];
   divisions: { id: string; name: string }[];
   people: { id: string; name: string }[];
@@ -351,7 +360,26 @@ export async function getProjectFormOptions(): Promise<{
           p.phase !== "complete" && divisionForProject(p.id)?.isActive !== false
       )
       .map((p) => ({ id: p.id, name: p.name })),
-    divisions: divisions().map((d) => ({ id: d.id, name: d.name })),
+    /*
+      Only divisions this person may actually file work into.
+
+      `can.createProject` is division-scoped for Leads, so offering every
+      division would put options in the dropdown that fail on submit — a dead
+      control with extra steps. Co-Leads get all of them; a Division Lead gets
+      theirs; a sub-team lead gets the division above their team, since that's
+      where `teamChain` says their authority reaches.
+
+      Undefined actor means "don't filter" — the page always passes one, and
+      the permission check on the action is the real gate either way.
+    */
+    divisions: divisions()
+      .filter(
+        (d) =>
+          !actor ||
+          isCoLead(actor.actor) ||
+          leadsTeamAtOrAbove(actor.actor, actor.graph, d.id)
+      )
+      .map((d) => ({ id: d.id, name: d.name })),
     people: activeMembers().map((m) => ({ id: m.id, name: m.fullName })),
   };
 }

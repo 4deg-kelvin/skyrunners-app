@@ -454,16 +454,29 @@ async function createProjectAction$impl(
 ): Promise<ActionResult> {
   const viewer = await getViewer();
   const parentId = String(formData.get("parentId") ?? "") || null;
+  const teamId = String(formData.get("teamId") ?? "") || undefined;
 
-  if (!can.createProject(viewer.actor, viewer.graph, parentId ?? undefined)) {
-    return denied("create projects here");
+  /*
+    Both halves of the target, because they gate differently: under a parent
+    project it's RE authority, into a division it's leading that division. The
+    form sends exactly one of them.
+  */
+  if (
+    !can.createProject(viewer.actor, viewer.graph, {
+      parentProjectId: parentId ?? undefined,
+      teamId,
+    })
+  ) {
+    return denied(
+      "create projects there — a Lead can only start work in a division they lead"
+    );
   }
 
   const result = await ops.createProject({
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
     parentId,
-    teamId: String(formData.get("teamId") ?? "") || undefined,
+    teamId,
     // Default the RE to the creator. Leadership creating a project almost
     // always owns it initially, and a project with no RE is the one state the
     // model can't represent.
@@ -1800,6 +1813,36 @@ export async function createEventAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => createEventAction$impl(formData));
+}
+
+async function updateClubTiersAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  // Co-Lead only. This is the definition of the bar the entire club is
+  // measured against, so it sits with the other things that reshape the org.
+  if (!can.manageEngagementWeights(viewer.actor)) {
+    return denied("change the club's commitment expectations");
+  }
+
+  const num = (name: string) => Number(formData.get(name));
+  const result = await ops.updateClubTiers({
+    core: num("core"),
+    committed: num("committed"),
+    contributing: num("contributing"),
+    minimum: num("minimum"),
+    actorId: viewer.member.id,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Expectations updated — /how-we-lead now says so.");
+}
+
+export async function updateClubTiersAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => updateClubTiersAction$impl(formData));
 }
 
 export async function updateEventAction(

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
+import { TierAdminForm } from "@/components/forms/tier-admin";
 import {
   AddCatalogueItemForm,
   AddSectionForm,
@@ -13,10 +14,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
-import { getSettings } from "@/lib/data/settings";
+import { getClubTiers, getSettings } from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
+import { TIER_LABELS } from "@/lib/contribution";
 import { can } from "@/lib/permissions";
 
 export const metadata = {
@@ -37,15 +39,17 @@ function termRange(startsOn: string, endsOn: string): string {
 
 export default async function SettingsPage() {
   const viewer = await getViewer();
-  const [view, catalogue] = await Promise.all([
+  const [view, catalogue, tiers] = await Promise.all([
     getSettings(viewer.member.id),
     getCatalogue(),
+    getClubTiers(),
   ]);
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
   const mayEdit = can.setOwnSchedule(viewer.actor, viewer.member.id);
   const mayEditCalendar = can.manageTerms(viewer.actor);
   const mayEditCatalogue = can.manageTrainingCatalogue(viewer.actor);
+  const mayEditTiers = can.manageEngagementWeights(viewer.actor);
   const isPaused = !!schedule.pausedUntil;
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -150,6 +154,39 @@ export default async function SettingsPage() {
           <div className="mt-5">
             <PauseControls pausedUntil={schedule.pausedUntil} />
           </div>
+        </CardBody>
+      </Card>
+
+      {/*
+        The commitment expectations.
+
+        Visible to everyone, editable by Co-Leads. Members see it here for the
+        same reason /how-we-lead exists at all: a bar that decides how you're
+        described, kept where you can't read it, is a performance review with a
+        concealed scale.
+      */}
+      <Card>
+        <CardBody>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionLabel>Commitment Expectations</SectionLabel>
+            {mayEditTiers ? <TierAdminForm tiers={tiers} /> : null}
+          </div>
+
+          <h3 className="text-ink mt-3 text-[17px] font-bold">
+            {tiers.minimum}–{tiers.core} hours a week
+          </h3>
+          <p className="text-ink-soft mt-2 text-[15px]">
+            {TIER_LABELS.core} is {tiers.core}+, {TIER_LABELS.committed} is{" "}
+            {tiers.committed}+, {TIER_LABELS.contributing} is{" "}
+            {tiers.contributing}+. Hours are averaged over the in-session weeks
+            since you joined — breaks and finals are skipped, so working over a
+            break only helps.
+          </p>
+          <p className="text-ink-muted mt-2 text-sm">
+            {mayEditTiers
+              ? "Changing these updates /how-we-lead and every contribution panel immediately. It renames tiers; it doesn't recalculate anybody's hours."
+              : "Co-Leads set these. The full rubric is published at /how-we-lead."}
+          </p>
         </CardBody>
       </Card>
 

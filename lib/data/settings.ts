@@ -4,7 +4,14 @@
  * PHASE 1b: these become one select and one update against `update_schedules`.
  */
 
-import { getMember, scheduleFor, today, termFor } from "@/lib/mock-data";
+import {
+  clubTiers,
+  getMember,
+  scheduleFor,
+  today,
+  termFor,
+} from "@/lib/mock-data";
+import type { TierThresholds } from "@/lib/contribution";
 import { readStore } from "@/lib/store/disk";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
@@ -77,4 +84,18 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
     calendarRunsOut:
       terms.length > 0 && terms[terms.length - 1].endsOn < today(),
   };
+}
+
+/**
+ * The club's commitment tier floors.
+ *
+ * Its own function rather than a field on `getSettings`, because the two
+ * readers are different pages with nothing else in common: the Settings editor
+ * and the published rubric at `/how-we-lead`. Folding it into the settings view
+ * model would make `/how-we-lead` load a member's check-in schedule to print a
+ * table of hours.
+ */
+export async function getClubTiers(): Promise<TierThresholds> {
+  await preloadLiveStore();
+  return clubTiers();
 }

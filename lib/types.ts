@@ -758,3 +758,33 @@ export interface ProjectAttentionFlag {
   /** Higher is more urgent. */
   severity: 1 | 2 | 3;
 }
+
+// ---------------------------------------------------------------------------
+// Club-wide configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * The commitment tier thresholds, editable by a Co-Lead.
+ *
+ * These were four constants in `lib/contribution.ts`, printed verbatim by the
+ * published rubric at `/how-we-lead`. So the bar the whole club is measured
+ * against needed a deploy to change — and the first time somebody adjusted the
+ * expectation in a meeting without one, the rubric would be stating a number
+ * nobody was actually using.
+ *
+ * Same rule as the trainings catalogue: **the club changes its expectations
+ * faster than anyone ships code.** Hours are per week.
+ *
+ * Exactly one row exists (`id = 1`, enforced by a check constraint). It is
+ * club-wide configuration, not a record of anything.
+ */
+export interface ClubSettings {
+  id: string;
+  coreHours: number;
+  committedHours: number;
+  contributingHours: number;
+  /** The floor the club calls "meeting the minimum" — the low end of 10–12. */
+  minimumHours: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}

@@ -34,6 +34,7 @@ import type {
   HelpRequest,
   JoinRequest,
   Member,
+  ClubSettings,
   MemberCertification,
   MemberStatus,
   ProgressUpdate,
@@ -3154,5 +3155,70 @@ export async function removeProjectMember(input: {
     }
 
     return ok({ reassigned: openWork.length });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Club-wide configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Move the commitment tier floors.
+ *
+ * Guarded here rather than only by the DB constraint, because the constraint's
+ * error message is `violates check constraint "tiers_in_order"` and the person
+ * reading it is a Co-Lead who typed 8 into the wrong box.
+ *
+ * The ordering rule isn't fussiness: `commitmentTier` walks the rungs highest
+ * first and returns the first one you clear. Out of order, everybody lands in
+ * whichever tier happens to sit at the top of the list, silently, and the
+ * published rubric prints a ladder that goes downwards.
+ */
+export async function updateClubTiers(input: {
+  core: number;
+  committed: number;
+  contributing: number;
+  minimum: number;
+  actorId: string;
+}): Promise<Result<ClubSettings>> {
+  const { core, committed, contributing, minimum } = input;
+
+  for (const [name, value] of Object.entries({
+    core,
+    committed,
+    contributing,
+    minimum,
+  })) {
+    if (!Number.isFinite(value) || value < 0 || value > 168) {
+      return fail<ClubSettings>(
+        `${name} has to be a number of hours between 0 and 168.`
+      );
+    }
+  }
+
+  if (!(core > committed && committed > contributing)) {
+    return fail<ClubSettings>(
+      "The tiers have to go up: Core above Committed above Contributing. As written, everybody would land in whichever one sits highest."
+    );
+  }
+  if (minimum > core || minimum < contributing) {
+    return fail<ClubSettings>(
+      "The minimum has to sit inside the range — between Contributing and Core."
+    );
+  }
+
+  return guarded((store) => {
+    const row = store.clubSettings[0];
+    const next: ClubSettings = {
+      id: row?.id ?? "1",
+      coreHours: core,
+      committedHours: committed,
+      contributingHours: contributing,
+      minimumHours: minimum,
+      updatedAt: new Date().toISOString(),
+      updatedBy: input.actorId,
+    };
+    store.clubSettings = [next];
+    return ok(next);
   });
 }

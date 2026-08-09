@@ -14,6 +14,7 @@
 
 import type {
   CatalogueItem,
+  ClubSettings,
   ClubEvent,
   Deliverable,
   HelpReply,
@@ -657,6 +658,36 @@ const certifications: CollectionSpec<MemberCertification> = {
  * Order matters: inserts run top to bottom, deletes bottom to top, so a row is
  * never written before what it references or deleted while still referenced.
  */
+/**
+ * One row, always. `identify` returns a constant for that reason — the diff
+ * must see an edit as an UPDATE to the same row, never as a second club.
+ */
+const clubSettings: CollectionSpec<ClubSettings> = {
+  key: "clubSettings",
+  table: "club_settings",
+  columns:
+    "id, core_hours, committed_hours, contributing_hours, minimum_hours, updated_at, updated_by",
+  identify: () => "1",
+  fromRow: (r) => ({
+    id: String(r.id ?? "1"),
+    coreHours: Number(r.core_hours ?? 12),
+    committedHours: Number(r.committed_hours ?? 8),
+    contributingHours: Number(r.contributing_hours ?? 4),
+    minimumHours: Number(r.minimum_hours ?? 10),
+    updatedAt: opt(r.updated_at as string),
+    updatedBy: opt(r.updated_by as string),
+  }),
+  toRow: (c) => ({
+    id: 1,
+    core_hours: c.coreHours,
+    committed_hours: c.committedHours,
+    contributing_hours: c.contributingHours,
+    minimum_hours: c.minimumHours,
+    updated_at: c.updatedAt ?? new Date().toISOString(),
+    updated_by: nul(c.updatedBy),
+  }),
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -675,6 +706,7 @@ export const COLLECTIONS = [
   trainingSections,
   catalogueItems,
   certifications,
+  clubSettings,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

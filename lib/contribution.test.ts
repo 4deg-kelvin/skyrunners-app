@@ -17,10 +17,14 @@ import {
   TIER_LABELS,
   WEEKLY_HOURS_EXPECTATION,
   WEEKLY_HOURS_MINIMUM,
+  DEFAULT_TIERS,
+  nextTierGap,
+  tierDescriptions,
   type ContributionInputs,
 } from "./contribution.ts";
 
 const blank: ContributionInputs = {
+  tiers: DEFAULT_TIERS,
   activeWeeks: 10,
   isPaused: false,
   deliverablesCompleted: 0,
@@ -65,18 +69,68 @@ describe("commitment tiers", () => {
   });
 });
 
-describe("hoursToCore gives members a rung to climb", () => {
-  test("shows the gap when below the bar", () => {
+describe("the gap shown is to the NEXT rung, not the top one", () => {
+  test("somebody at 7/wk is measured against Committed, not Core", () => {
     const r = buildContributionRecord(persona({ hoursTotal: 70 })); // 7/wk
     assert.equal(r.commitment.hoursPerWeek, 7);
-    assert.equal(r.commitment.hoursToCore, 5);
+    assert.equal(r.commitment.nextTier?.tier, "committed");
+    assert.equal(r.commitment.nextTier?.hoursAway, 1);
     assert.equal(r.commitment.meetsMinimum, false);
   });
 
-  test("is zero once at or above the bar", () => {
+  test("somebody far below the bar gets a reachable rung", () => {
+    /*
+      The bug this replaced. At 1.6 hrs/week the panel said "10.5 more to reach
+      Core", which is a verdict dressed as encouragement — and the whole point
+      of naming tiers instead of scoring people is that a below-bar member sees
+      a rung rather than a failure.
+    */
+    const r = buildContributionRecord(persona({ hoursTotal: 16 })); // 1.6/wk
+    assert.equal(r.commitment.nextTier?.tier, "contributing");
+    assert.equal(r.commitment.nextTier?.hoursAway, 2.4);
+  });
+
+  test("null once at the top", () => {
     const r = buildContributionRecord(persona({ hoursTotal: 140 })); // 14/wk
-    assert.equal(r.commitment.hoursToCore, 0);
+    assert.equal(r.commitment.nextTier, null);
     assert.equal(r.commitment.meetsMinimum, true);
+  });
+
+  test("a paused member is shown no gap at all", () => {
+    // Nothing is owed during a pause, so a "you need N more hours" line would
+    // be the app contradicting its own promise.
+    const r = buildContributionRecord(
+      persona({ hoursTotal: 16, isPaused: true })
+    );
+    assert.equal(r.commitment.tier, "paused");
+    assert.equal(r.commitment.nextTier, null);
+  });
+});
+
+describe("the tiers are configuration, not constants", () => {
+  const lowered = { core: 8, committed: 6, contributing: 3, minimum: 6 };
+
+  test("a lowered bar changes which tier somebody lands in", () => {
+    const at7 = persona({ hoursTotal: 70 }); // 7/wk
+    assert.equal(buildContributionRecord(at7).commitment.tier, "contributing");
+    assert.equal(
+      buildContributionRecord({ ...at7, tiers: lowered }).commitment.tier,
+      "committed"
+    );
+  });
+
+  test("the published descriptions follow the numbers", () => {
+    // /how-we-lead prints these. If they were still hard-coded strings, the
+    // rubric would state a bar nobody is actually measured against.
+    assert.match(tierDescriptions(DEFAULT_TIERS).core, /12\+ hrs\/week/);
+    assert.match(tierDescriptions(lowered).core, /8\+ hrs\/week/);
+    assert.match(tierDescriptions(lowered).contributing, /3–6 hrs\/week/);
+  });
+
+  test("the gap is measured against the configured rungs", () => {
+    assert.equal(nextTierGap(4, DEFAULT_TIERS)?.tier, "committed");
+    assert.equal(nextTierGap(4, lowered)?.tier, "committed");
+    assert.equal(nextTierGap(7, lowered)?.tier, "core");
   });
 });
 
