@@ -93,6 +93,7 @@ export default async function AppLayout({
           viewer.member.globalRole !== "member" || leadershipRoles.isRE
         }
         clubName={identity.name}
+        photoUrl={viewer.member.photoUrl}
         isDemo={viewer.isDemo}
         alertCount={alertCount}
       />

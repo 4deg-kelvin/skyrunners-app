@@ -11,7 +11,8 @@ import {
   User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 
 export function AccountMenu({
@@ -19,10 +20,20 @@ export function AccountMenu({
   userName,
   isDemo,
   showLeadingGuide = false,
+  photoUrl,
 }: {
   memberId: string;
   userName: string;
   isDemo: boolean;
+  /**
+   * Their actual face, when they've set one.
+   *
+   * This drew initials unconditionally — the one place in the app that showed
+   * YOU your own identity was the one place that ignored the photo you'd
+   * uploaded. `Avatar` already handles the fallback, the Google
+   * referrer-policy quirk, and a broken image URL.
+   */
+  photoUrl?: string;
   /**
    * Whether to offer the leadership guide.
    *
@@ -74,9 +85,11 @@ export function AccountMenu({
         aria-haspopup="menu"
         className="border-line hover:bg-surface flex items-center gap-2.5 rounded-full border py-1.5 pr-3 pl-1.5 transition-colors"
       >
-        <span className="bg-neutral-bg text-ink-soft flex size-8 items-center justify-center rounded-full text-xs font-bold">
-          {initials(userName)}
-        </span>
+        <Avatar
+          name={userName}
+          photoUrl={photoUrl}
+          className="size-8 text-xs"
+        />
         <span className="text-ink hidden text-[15px] font-medium sm:inline">
           {userName}
         </span>

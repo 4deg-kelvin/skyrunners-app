@@ -43,7 +43,19 @@ import { preloadLiveStore } from "@/lib/store/request";
 /** People who can be somebody's Lead — leadership plus anyone with reports. */
 export interface RosterOptions {
   /** Candidates for the "reports to" dropdown. */
-  leadOptions: { id: string; fullName: string }[];
+  /**
+   * Candidates for "reports to", grouped and sorted.
+   *
+   * `group` drives an `<optgroup>` so the picker reads as an org chart rather
+   * than a list of names in whatever order the database returned them. That
+   * order was insertion order, which meant the answer somebody wanted was in a
+   * random position and the list gave no clue who any of these people were.
+   */
+  leadOptions: {
+    id: string;
+    fullName: string;
+    group: "Co-Leads" | "Team Leads" | "Others who lead someone";
+  }[];
   /** Everyone active, for invite defaults and project assignment. */
   everyone: { id: string; fullName: string }[];
 }
@@ -80,6 +92,13 @@ export interface RosterRow {
  * and computed here rather than in the page because pages may not import
  * `lib/mock-data` — ESLint enforces that boundary.
  */
+/** Most senior first. Drives both the sort and the `<optgroup>` order. */
+const GROUP_ORDER = [
+  "Co-Leads",
+  "Team Leads",
+  "Others who lead someone",
+] as const;
+
 export async function getRosterOptions(): Promise<RosterOptions> {
   // Ensure the live snapshot exists before any synchronous read.
   //
@@ -100,7 +119,25 @@ export async function getRosterOptions(): Promise<RosterOptions> {
           m.globalRole !== "member" ||
           active.some((other) => other.leadId === m.id)
       )
-      .map((m) => ({ id: m.id, fullName: m.fullName })),
+      .map((m) => ({
+        id: m.id,
+        fullName: m.fullName,
+        group:
+          m.globalRole === "co_lead"
+            ? ("Co-Leads" as const)
+            : m.globalRole === "lead"
+              ? ("Team Leads" as const)
+              : ("Others who lead someone" as const),
+      }))
+      // Rank first, then alphabetically. Same order as the roster itself, and
+      // for the same reason: the question is "who does this person report
+      // to?", which is answered by seniority long before it's answered by
+      // whose name starts with A.
+      .sort(
+        (a, b) =>
+          GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) ||
+          a.fullName.localeCompare(b.fullName)
+      ),
     everyone: active.map((m) => ({ id: m.id, fullName: m.fullName })),
   };
 }

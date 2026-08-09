@@ -24,6 +24,7 @@ export function TopNav({
   isDemo,
   showLeadingGuide,
   clubName,
+  photoUrl,
   alertCount = 0,
 }: {
   memberId: string;
@@ -40,6 +41,8 @@ export function TopNav({
    * doesn't reach the one piece of text on every single page isn't a rename.
    */
   clubName: string;
+  /** The signed-in member's photo, for the account button. */
+  photoUrl?: string;
   /** Real count of things needing attention — drives the nav dot. */
   alertCount?: number;
 }) {
@@ -98,6 +101,7 @@ export function TopNav({
           userName={userName}
           isDemo={isDemo}
           showLeadingGuide={showLeadingGuide}
+          photoUrl={photoUrl}
         />
       </div>
 

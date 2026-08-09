@@ -16,7 +16,18 @@ import type { GlobalRole, MemberStatus } from "@/lib/types";
 export interface PersonOption {
   id: string;
   fullName: string;
+  /** Set only on lead candidates, where the picker groups by seniority. */
+  group?: LeadGroup;
 }
+
+export type LeadGroup = (typeof LEAD_GROUPS)[number];
+
+/** Most senior first — the order the "reports to" picker renders groups in. */
+export const LEAD_GROUPS = [
+  "Co-Leads",
+  "Team Leads",
+  "Others who lead someone",
+] as const;
 
 /**
  * Invite someone onto the roster.
@@ -261,13 +272,29 @@ export function MemberAdminControls({
               className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
             >
               <option value="">Nobody (top of the chain)</option>
-              {leadOptions
-                .filter((l) => l.id !== memberId)
-                .map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.fullName}
-                  </option>
-                ))}
+              {/*
+                Grouped, so the list reads as the org chart it describes.
+
+                A flat list of names in database order gave no clue who any of
+                these people were, and put the likely answer in a random
+                position. `PersonOption` carries the group; the data layer has
+                already sorted, so rendering is just a walk.
+              */}
+              {LEAD_GROUPS.map((group) => {
+                const inGroup = leadOptions.filter(
+                  (l) => l.group === group && l.id !== memberId
+                );
+                if (inGroup.length === 0) return null;
+                return (
+                  <optgroup key={group} label={group}>
+                    {inGroup.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.fullName}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
             </select>
           </label>
         </ActionForm>
