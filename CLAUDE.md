@@ -51,7 +51,8 @@ beginner. Revisit only if real analytics/ML work appears.
 
 ```bash
 npm run dev            # local dev server (demo mode unless .env.local has keys)
-npm run check          # typecheck + lint + tests — run before every push
+npm run check          # typecheck + lint + dead-control sweep + tests
+npm run sweep          # just the sweep: exports nothing renders or calls
 npm run build:check    # verify it compiles WITHOUT killing a running dev server
 npm run db:check       # are the Supabase migrations actually applied?
 npm run db:bundle      # regenerate supabase/APPLY_ALL.sql (all migrations, one paste)
@@ -79,17 +80,19 @@ server alone.
 
 ## Current state
 
-**Phases 0–4 are built and working on local data.** Members find work, ask to join, log
-hours and mark work done; REs assign, sign off and manage their roster; Leads get a scoped
-review queue with escalation, and can mark check-ins read.
+**Phases 0–8 are built and live on Supabase**, migrations `0001`–`0019` applied. Members
+find work, ask to join, log hours and mark work done; REs assign, sign off and manage
+their roster; Leads get a scoped review queue with escalation; there's a calendar, a
+trainings/facility-access catalogue, an academic-term editor, division archiving, and a
+help-wanted board on Find Work.
 
-**The one blocker is that no migrations have been applied to Supabase.** The project and
-key exist; the tables do not. Run `npm run db:check` to confirm, then paste
-`supabase/APPLY_ALL.sql` into the Supabase SQL editor. Full instructions in
-`docs/STATUS.md`.
+`docs/HANDOFF.md` is the entry point for a fresh session — current state, the ten bugs
+that cost the most time, and what's next. **Read it before debugging anything.**
 
-Writes persist to `.data/store.json` via `lib/store/` — deliberately temporary, and it
-cannot run on Vercel. `lib/store/operations.ts` is the file that becomes Postgres calls.
+Two modes still coexist: demo mode persists writes to `.data/store.json` via
+`lib/store/`, live mode goes to Postgres through the same `mutate()` choke point.
+`lib/store/operations.ts` holds every write and checks no permissions; `lib/actions/`
+is the only layer that does.
 
 ### Two modes — this is the most important thing to understand
 
@@ -166,6 +169,15 @@ the project tree, Lead authority flows **up** the reporting chain, and team-lead
 flows **down** the org tree and then down the project tree. That asymmetry is where bugs
 hide, which is why there are 50+ tests on it.
 
+**Approving is a narrower right than doing.** `isREaboveProject` is
+`isREofOrAbove` minus the project's own RE, and exactly two rules use it:
+`can.completeProject` and `can.withdrawSignOff`. The assigned RE finishes the
+work; the RE above them, or the Division Lead, agrees it's finished. Being the
+project's own RE disqualifies you even if you'd qualify another way — a Division
+Lead who assigns work to themselves is wearing both hats. Co-Leads always can,
+which is what stops the top of the tree deadlocking. Reopening deliberately runs
+on `manageProject`: saying something isn't done is always safe.
+
 **A Division Lead is a top RE.** `leadsTeamAbove` folds into `isREofOrAbove`, so leading a
 division gives RE powers — deliverables, sign-off, join requests, appointing REs — on
 every project inside it, at any depth, including sub-projects that carry no `teamId` of
@@ -238,7 +250,7 @@ a Lead overseeing several of their projects, and an RE couldn't tell whether a b
 theirs to clear. Anything rendering an update must iterate `entries` and label each with
 its project.
 
-## The ten things most likely to trip you up
+## The twelve things most likely to trip you up
 
 1. **Two independent hierarchies.** Org tree (`teams.parent_id`, who reports to whom) and
    project tree (`projects.parent_id`, what work exists) are separate. A member's Lead is
@@ -289,6 +301,17 @@ its project.
    done. Completing one also writes a `ProjectNotice` addressed up the project tree —
    **not** a synthesised check-in, which would make a member's reliability record claim
    they reported in on a day they didn't.
+
+11. **A sub-project can't be due after its parent.** Same function, checked in both
+   directions — moving a child later, or pulling a parent in over children already
+   dated — and **only when the date actually moves**, so one pre-existing violation
+   can't freeze every other edit on the project. An undated parent constrains nothing.
+
+12. **An upsert can never reach a `for update` RLS policy.** `persistDiff` splits
+   inserts from updates for exactly this reason; see `docs/HANDOFF.md` §9 before
+   touching `lib/store/supabase.ts`. And RLS does not raise on a *missing* policy —
+   the statement matches nothing and returns success — so every write there calls
+   `.select()` and treats zero affected rows as an error.
 
 ## Conventions
 
