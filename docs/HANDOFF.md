@@ -25,7 +25,7 @@ in parallel. As of now: **all 13 pass**.
 
 ---
 
-## The seven bugs that cost the most time
+## The eight bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -128,6 +128,42 @@ rather than guessed.
 
 **Rule of thumb:** anything that must survive from `getViewer()` to a write
 cannot rely on `cache()`. Test it outside a render or you won't see it.
+
+### 8. Controls that existed and were never rendered
+
+Not one bug — a *class* of them, and the most productive thing to go looking
+for. An action would be written, tested, exported, and then either wired to
+nothing or mounted only on a page nobody reaches it from. It never throws, never
+logs, and looks finished in the diff.
+
+A sweep on 2026-08-08 checked **every export of `lib/actions/` against a UI that
+actually calls it**, then every exported component against a page that mounts
+it. Seven findings, all fixed:
+
+| What | How it failed |
+|---|---|
+| The RE's join-request queue on a project page | Two plain `Button`s wired to nothing. Pressing either did nothing at all. The working control existed and was mounted only on `/my-work` |
+| `FollowToggle` | Built in Phase 2, imported nowhere. The project page even read `isFollowing` to show a badge for a state nothing could produce |
+| `withdrawJoinRequest` | An operation with no action and no button. A request sent by mistake was permanent: it sat in the RE's queue, escalated at 5 days, and showed the sender a badge they couldn't clear |
+| `deleteHoursAction` | Wired, but no screen listed a single work-log entry, so there was nothing to hang it on. A mistyped `80` for `8.0` was forever |
+| Division Lead | Shown on `/projects`, settable nowhere. Neither team form had the field |
+| …and worse: `updateTeam` did `team.leadId = input.leadId` | So every **rename** posted an empty value and silently cleared the lead. Pure data loss, invisible at the call site |
+| `can.manageDivisions` | A duplicate of `can.manageTeams`, referenced only by its own tests |
+
+**How to run the sweep again** — it's cheap and it keeps finding things:
+
+```bash
+for a in $(grep -o 'export async function [a-zA-Z]*' lib/actions/index.ts \
+           | sed 's/export async function //'); do
+  echo "$a :: $(grep -rl "\b$a\b" app components | tr '\n' ' ')"
+done
+```
+
+A name with nothing after it is dead. But note the two hardest cases above
+passed that grep: the join-request buttons were *rendered but inert*, and
+`deleteHoursAction` was *imported by a component with nothing to act on*. So
+after the grep, read the render path — "is it imported" and "can a person reach
+it" are different questions.
 
 ---
 

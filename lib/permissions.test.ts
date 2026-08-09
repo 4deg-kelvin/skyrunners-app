@@ -178,9 +178,12 @@ describe("co-lead is unconditional", () => {
   });
 
   test("co-lead can manage divisions, nobody else can", () => {
-    assert.equal(can.manageDivisions(actor("coLead")), true);
-    assert.equal(can.manageDivisions(actor("lead1")), false);
-    assert.equal(can.manageDivisions(actor("worker")), false);
+    // `manageTeams`, not the old `manageDivisions` — that was a second name for
+    // this same rule, called by nothing but this test. A divison IS a team with
+    // no parent, and the real UI has always gated on this one.
+    assert.equal(can.manageTeams(actor("coLead")), true);
+    assert.equal(can.manageTeams(actor("lead1")), false);
+    assert.equal(can.manageTeams(actor("worker")), false);
   });
 });
 

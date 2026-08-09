@@ -1481,8 +1481,23 @@ export function directREs(projectId: string) {
   return getProject(projectId)?.reIds ?? [];
 }
 
+/**
+ * Live divisions only.
+ *
+ * Every caller — the projects tree, the division picker, the dashboard count —
+ * wants the club as it is now. An archived division appearing in a picker would
+ * let somebody file new work into a division that isn't shown anywhere.
+ * `archivedDivisions()` is the deliberate way to ask for the other set.
+ */
 export function divisions() {
-  return live().teams.filter((t) => t.parentId === null);
+  return live().teams.filter((t) => t.parentId === null && t.isActive);
+}
+
+/** Retired divisions, most recently archived first. The club's own record. */
+export function archivedDivisions() {
+  return live()
+    .teams.filter((t) => t.parentId === null && !t.isActive)
+    .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? ""));
 }
 
 export function childTeams(parentId: string) {
@@ -1882,6 +1897,25 @@ export function divisionForProject(projectId: string): Team | undefined {
   return team;
 }
 
+/**
+ * A member's own work log, newest first, back as far as hours can be edited.
+ *
+ * Bounded by the backdating window on purpose: beyond it nothing can be deleted
+ * anyway, so a longer list would be a wall of rows with no available action.
+ * The point of showing it is correcting a mistake, not browsing a history.
+ */
+export function recentWorkLogs(memberId: string, days = 14) {
+  const cutoff = new Date(`${today()}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+  const from = cutoff.toISOString().slice(0, 10);
+
+  return live()
+    .workLogs.filter((w) => w.memberId === memberId && w.workDate >= from)
+    .sort(
+      (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
+    );
+}
+
 export function hoursOnProject(memberId: string, projectId: string) {
   return live().workLogs
     .filter((w) => w.memberId === memberId && w.projectId === projectId)
@@ -1903,6 +1937,13 @@ export function lastEntryForProject(memberId: string, projectId: string) {
 }
 
 /** All entries about a project, from anyone — the project's activity feed. */
+/** Automatic announcements on a project, newest first. See `ProjectNotice`. */
+export function projectNotices(projectId: string) {
+  return live()
+    .projectNotices.filter((n) => n.projectId === projectId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export function projectUpdateFeed(projectId: string) {
   return live().progressUpdates
     .filter((u) => u.submittedAt)

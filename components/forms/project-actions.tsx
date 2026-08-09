@@ -9,6 +9,7 @@ import {
   removeProjectMemberAction,
   requestToJoinAction,
   setFollowingAction,
+  withdrawJoinRequestAction,
 } from "@/lib/actions";
 
 /**
@@ -68,6 +69,55 @@ export function AskToJoinButton({
         gets flagged for a Co-Lead if nobody answers in five days.
       </p>
     </ActionForm>
+  );
+}
+
+/**
+ * Take back a request you sent.
+ *
+ * `withdrawJoinRequest` sat in the operations layer with no action and no
+ * button from Phase 2 onward, so a request sent to the wrong project was
+ * permanent: it stayed in an RE's queue, escalated at five days, and showed the
+ * sender a "Request pending" badge with no way out. The queue is supposed to
+ * make asks visible, not un-cancellable.
+ */
+export function WithdrawRequestButton({
+  requestId,
+  projectName,
+}: {
+  requestId: string;
+  projectName: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="text-sm font-semibold text-ink-muted hover:text-ink"
+      >
+        Withdraw
+      </button>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span className="text-sm text-ink-soft">Withdraw from {projectName}?</span>
+      <ActionButton
+        action={withdrawJoinRequestAction}
+        fields={{ requestId }}
+        label="Yes, withdraw"
+        pendingLabel="Withdrawing…"
+        tone="danger"
+      />
+      <button
+        onClick={() => setConfirming(false)}
+        className="text-sm font-semibold text-ink-muted hover:text-ink"
+      >
+        Keep it
+      </button>
+    </span>
   );
 }
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CornerDownRight, TriangleAlert } from "lucide-react";
+import { CheckCircle2, CornerDownRight, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ProjectTeamForm } from "@/components/forms/team-admin";
@@ -9,7 +9,12 @@ import {
   AddDeliverableForm,
   DeliverableActions,
 } from "@/components/forms/deliverable-actions";
-import { AskToJoinButton } from "@/components/forms/project-actions";
+import {
+  AskToJoinButton,
+  FollowToggle,
+  JoinRequestDecision,
+  WithdrawRequestButton,
+} from "@/components/forms/project-actions";
 import { ProjectEditForm } from "@/components/forms/project-edit";
 import {
   AddProjectMemberForm,
@@ -103,19 +108,41 @@ export default async function ProjectDetailPage({
           label="Project"
           title={project.name}
           description={project.description}
+          /*
+            Following was built in Phase 2 and never rendered anywhere, so the
+            self-service half of "membership is RE-controlled" didn't exist —
+            you could ask to join and wait, and that was it. The page even read
+            `isFollowing` to show a badge for a state nothing could produce.
+
+            It sits next to whichever join control applies, because the two are
+            the pair: ask to be committed, or just watch.
+          */
           action={
-            isOnProject ? (
-              <Badge tone="ok">You&apos;re on this project</Badge>
-            ) : view.myPendingRequest ? (
-              <Badge tone="warn">Request pending</Badge>
-            ) : mayRequest ? (
-              <AskToJoinButton
-                projectId={project.id}
-                projectName={project.name}
-              />
-            ) : isFollowing ? (
-              <Badge tone="neutral">Following</Badge>
-            ) : undefined
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {isOnProject ? (
+                <Badge tone="ok">You&apos;re on this project</Badge>
+              ) : view.myPendingRequest ? (
+                <>
+                  <Badge tone="warn">Request pending</Badge>
+                  <WithdrawRequestButton
+                    requestId={view.myPendingRequest.id}
+                    projectName={project.name}
+                  />
+                </>
+              ) : mayRequest ? (
+                <AskToJoinButton
+                  projectId={project.id}
+                  projectName={project.name}
+                />
+              ) : null}
+
+              {isOnProject ? null : (
+                <FollowToggle
+                  projectId={project.id}
+                  following={isFollowing}
+                />
+              )}
+            </div>
           }
         />
       </div>
@@ -160,7 +187,11 @@ export default async function ProjectDetailPage({
                 <div className="flex flex-wrap items-center gap-2">
                   <ProjectBadges project={project} />
                   {mayManage ? (
-                    <ProjectEditForm project={project} canDelete={mayDelete} />
+                    <ProjectEditForm
+                      project={project}
+                      canDelete={mayDelete}
+                      incompleteDescendants={view.incompleteDescendants}
+                    />
                   ) : null}
                 </div>
               </div>
@@ -418,12 +449,21 @@ export default async function ProjectDetailPage({
                           </p>
                         ) : null}
 
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button className="px-3 py-2">Add to project</Button>
-                          <Button variant="secondary" className="px-3 py-2">
-                            Not right now
-                          </Button>
-                        </div>
+                        {/*
+                          These were two plain `Button`s wired to nothing.
+
+                          The RE's own project page is where they'd naturally
+                          answer a request, and pressing either did exactly
+                          nothing — no error, no change, no clue. The working
+                          controls existed the whole time and were only mounted
+                          on /my-work, so the queue looked answerable from the
+                          place it's advertised and wasn't.
+                        */}
+                        <JoinRequestDecision
+                          requestId={request.id}
+                          projectId={project.id}
+                          requesterName={requester?.fullName ?? "They"}
+                        />
                       </div>
                     )
                   )}
@@ -479,13 +519,62 @@ export default async function ProjectDetailPage({
                 Everything anyone has reported about this project specifically.
               </p>
 
+              {/*
+                Milestones the app announced, above the human entries.
+
+                Deliberately NOT synthesised check-ins. Building these as
+                progress updates would have been less code and would have made
+                a member's reliability record claim they reported in on a day
+                they didn't — see `ProjectNotice`. So they're their own rows,
+                pinned above the feed and visibly automatic.
+              */}
+              {view.notices.length > 0 ? (
+                <div className="mt-4 space-y-2.5">
+                  {view.notices.map(({ notice, notified }) => (
+                    <div
+                      key={notice.id}
+                      className="rounded-tile border border-ok-fg/25 bg-ok-bg px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="flex items-center gap-2 text-[15px] font-bold text-ok-fg">
+                          <CheckCircle2 className="size-4 shrink-0" />
+                          {notice.body}
+                        </p>
+                        <span className="text-xs text-ink-muted">
+                          {new Date(
+                            `${notice.createdAt.slice(0, 10)}T00:00:00Z`
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            timeZone: "UTC",
+                          })}
+                        </span>
+                      </div>
+                      {notified.length > 0 ? (
+                        <p className="mt-1.5 text-xs text-ink-muted">
+                          Sent up the chain to{" "}
+                          {notified.map((m) => m.fullName).join(", ")}.
+                        </p>
+                      ) : (
+                        <p className="mt-1.5 text-xs text-ink-muted">
+                          Nobody sits above this project, so there was no one to
+                          tell.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="mt-4 space-y-3">
                 {updateFeed.length === 0 ? (
+                  view.notices.length > 0 ? null : (
                   <EmptyState
                     message="No updates written about this project yet."
                     actionLabel="See your own work"
                     actionHref="/my-work"
                   />
+                  )
                 ) : (
                   updateFeed.map(({ entry, author, submittedAt }) => (
                     <div

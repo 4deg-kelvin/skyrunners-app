@@ -381,6 +381,16 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/**
+ * Slugs that are real pages under `/projects/`.
+ *
+ * Next resolves a static segment ahead of `[slug]`, so a project called
+ * "Archive" would get the URL `/projects/archive` and render the archive page
+ * instead of itself — permanently unreachable, with nothing anywhere saying
+ * why. Cheaper to rename at creation than to debug later.
+ */
+const RESERVED_PROJECT_SLUGS = new Set(["archive", "new"]);
+
 /** Invite someone by Stanford email. They become real on first sign-in. */
 export async function inviteMember(input: {
   email: string;
@@ -667,8 +677,9 @@ export async function createProject(input: {
 
   const { projects } = readStore();
   let slug = slugify(name);
-  if (projects.some((p) => p.slug === slug)) {
-    // Slugs are the URL, so a collision would make one project unreachable.
+  if (projects.some((p) => p.slug === slug) || RESERVED_PROJECT_SLUGS.has(slug)) {
+    // Slugs are the URL, so a collision would make one project unreachable —
+    // whether it collides with another project or with a real page.
     slug = `${slug}-${projects.length + 1}`;
   }
 
@@ -1050,10 +1061,102 @@ export async function updateDeliverable(input: {
 }
 
 /**
+ * Every project beneath this one, at any depth.
+ *
+ * Iterative rather than recursive, and cycle-guarded: `parentId` is a plain
+ * column with nothing stopping a project being reparented under its own child,
+ * and a naive walk would hang the request rather than fail it.
+ */
+function descendantProjects(store: StoreShape, projectId: string): Project[] {
+  const found: Project[] = [];
+  const seen = new Set<string>([projectId]);
+  let frontier = [projectId];
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const parentId of frontier) {
+      for (const child of store.projects) {
+        if (child.parentId !== parentId || seen.has(child.id)) continue;
+        seen.add(child.id);
+        found.push(child);
+        next.push(child.id);
+      }
+    }
+    frontier = next;
+  }
+  return found;
+}
+
+/** Every project above this one, nearest parent first. Cycle-guarded. */
+function ancestorProjects(store: StoreShape, projectId: string): Project[] {
+  const trail: Project[] = [];
+  const seen = new Set<string>([projectId]);
+  let currentId = store.projects.find((p) => p.id === projectId)?.parentId;
+
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId);
+    const parent = store.projects.find((p) => p.id === currentId);
+    if (!parent) break;
+    trail.push(parent);
+    currentId = parent.parentId;
+  }
+  return trail;
+}
+
+/**
+ * Who hears that a project finished, nearest first.
+ *
+ * "Up the chain of command" for a project means the project tree, not the
+ * reporting tree: the people accountable for the work above this are the REs of
+ * its ancestors, then whoever leads the division it sits in, then the Co-Leads.
+ * A member's own Lead is the right audience for a check-in and the wrong one
+ * here — they may have nothing to do with this project.
+ *
+ * The person who pressed the button is dropped: telling somebody what they
+ * just did is noise, and it's the fastest way to make an announcement feel
+ * automatic in the bad sense.
+ */
+function completionAudience(
+  store: StoreShape,
+  project: Project,
+  actorId: string
+): string[] {
+  const ordered: string[] = [];
+
+  for (const ancestor of ancestorProjects(store, project.id)) {
+    // Primary first — they're the go-to contact, and array order in `reIds`
+    // is explicitly not meaningful.
+    ordered.push(ancestor.primaryReId, ...ancestor.reIds);
+  }
+
+  // Then up the org tree from whichever team owns this, to the division lead.
+  const seenTeams = new Set<string>();
+  let teamId = project.teamId;
+  while (teamId && !seenTeams.has(teamId)) {
+    seenTeams.add(teamId);
+    const team: Team | undefined = store.teams.find((t) => t.id === teamId);
+    if (!team) break;
+    if (team.leadId) ordered.push(team.leadId);
+    teamId = team.parentId ?? undefined;
+  }
+
+  for (const member of store.members) {
+    if (member.globalRole === "co_lead" && member.status === "active") {
+      ordered.push(member.id);
+    }
+  }
+
+  return [...new Set(ordered)].filter((id) => id && id !== actorId);
+}
+
+/**
  * Edit a project's headline fields — name, what it is, and what stage it's at.
  *
  * `phase` is where in the lifecycle it sits (concept to flight test); `health`
  * is how it's going. Two different questions, deliberately two fields.
+ *
+ * Two rules attach to the one phase that means something different from the
+ * rest — see `assertCompletable` and the notice below.
  */
 export async function updateProject(input: {
   projectId: string;
@@ -1063,6 +1166,9 @@ export async function updateProject(input: {
   health: Project["health"];
   targetDate?: string;
   openRoles?: string;
+  /** Who is making the change. Needed to attribute the completion notice. */
+  actorId?: string;
+  today?: string;
 }): Promise<Result<Project>> {
   const name = input.name.trim();
   if (!name) return fail<Project>("Give the project a name.");
@@ -1071,12 +1177,77 @@ export async function updateProject(input: {
     const project = store.projects.find((p) => p.id === input.projectId);
     if (!project) return fail<Project>("That project no longer exists.");
 
+    const wasComplete = project.phase === "complete";
+    const nowComplete = input.phase === "complete";
+
+    if (nowComplete && !wasComplete) {
+      /*
+        A parent cannot finish ahead of its children.
+
+        "Complete" is not just a label — it moves the project into the finished
+        section on /projects, out of /find-work, and into the club's record of
+        what got built. A parent marked complete over a sub-project still at
+        concept quietly retires work that nobody has done, and the sub-project
+        goes with it: it's nested under a card people have stopped reading.
+
+        Refused rather than cascaded. Marking the children complete on the
+        parent's behalf would sign off work their own REs never agreed was
+        finished, which is the same self-certification the two-step deliverable
+        sign-off exists to prevent.
+      */
+      const unfinished = descendantProjects(store, project.id).filter(
+        (p) => p.phase !== "complete"
+      );
+
+      if (unfinished.length > 0) {
+        const names = unfinished
+          .slice(0, 3)
+          .map((p) => p.name)
+          .join(", ");
+        const rest =
+          unfinished.length > 3 ? ` and ${unfinished.length - 3} more` : "";
+        return fail<Project>(
+          `${unfinished.length} sub-project${unfinished.length === 1 ? "" : "s"} ${unfinished.length === 1 ? "isn't" : "aren't"} complete yet: ${names}${rest}. Finish or move ${unfinished.length === 1 ? "it" : "those"} first — a parent marked complete hides them.`
+        );
+      }
+    }
+
     project.name = name;
     project.description = input.description?.trim() || undefined;
     project.phase = input.phase;
     project.health = input.health;
     project.targetDate = input.targetDate || undefined;
     project.openRoles = input.openRoles?.trim() || undefined;
+
+    // Crossing into or out of `complete` is the only edit worth announcing.
+    // Saving the same phase again must not produce a second notice, which is
+    // why this compares before and after rather than reading the new value.
+    if (nowComplete !== wasComplete && input.actorId) {
+      const actor = store.members.find((m) => m.id === input.actorId);
+      const audience = completionAudience(store, project, input.actorId);
+      const when = input.today ?? new Date().toISOString().slice(0, 10);
+      const who = actor?.preferredName || actor?.fullName || "Someone";
+      const doneCount = store.deliverables.filter(
+        (d) => d.projectId === project.id && d.status === "done"
+      ).length;
+
+      store.projectNotices.push({
+        id: newId("notice"),
+        projectId: project.id,
+        kind: nowComplete ? "completed" : "reopened",
+        body: nowComplete
+          ? `${project.name} is complete. ${who} marked it finished${
+              doneCount > 0
+                ? ` with ${doneCount} deliverable${doneCount === 1 ? "" : "s"} signed off`
+                : ""
+            }.`
+          : `${project.name} was reopened by ${who} — it's back in the active list.`,
+        createdById: input.actorId,
+        createdAt: when,
+        notifiedMemberIds: audience,
+      });
+    }
+
     return ok(project);
   });
 }
@@ -1138,17 +1309,29 @@ export async function deleteProject(
     store.projectArtifacts = store.projectArtifacts.filter(
       (a) => a.projectId !== projectId
     );
+    store.projectNotices = store.projectNotices.filter(
+      (n) => n.projectId !== projectId
+    );
     store.projects = store.projects.filter((p) => p.id !== projectId);
     return ok(null);
   });
 }
 
-/** Rename a division or sub-team, or move it under a different parent. */
+/**
+ * Rename a division or sub-team, or move it under a different parent.
+ *
+ * `leadId` distinguishes three states, and it has to: `undefined` means "the
+ * caller didn't mention it", `null` means "clear it". This used to be
+ * `leadId?: string`, and the edit form had no lead field — so every rename
+ * posted an empty value and silently unset the Division Lead. The name on
+ * /projects would just stop being there, with nothing connecting it to the
+ * rename that caused it.
+ */
 export async function updateTeam(input: {
   teamId: string;
   name: string;
   parentId: string | null;
-  leadId?: string;
+  leadId?: string | null;
 }): Promise<Result<Team>> {
   const name = input.name.trim();
   if (!name) return fail<Team>("Give it a name.");
@@ -1161,14 +1344,142 @@ export async function updateTeam(input: {
       return fail<Team>("A team can't sit under itself.");
     }
 
+    // Walking up from the proposed parent catches the longer loops a direct
+    // self-check misses — A under B under A leaves both unreachable, and every
+    // tree walk in the app would then depend on its own cycle guard.
+    let cursor = input.parentId;
+    const seen = new Set<string>();
+    while (cursor && !seen.has(cursor)) {
+      if (cursor === team.id) {
+        return fail<Team>(
+          "That would put this team inside one of its own sub-teams."
+        );
+      }
+      seen.add(cursor);
+      cursor = store.teams.find((t) => t.id === cursor)?.parentId ?? null;
+    }
+
     team.name = name;
     team.parentId = input.parentId;
-    team.leadId = input.leadId;
+    if (input.leadId !== undefined) team.leadId = input.leadId ?? undefined;
     return ok(team);
   });
 }
 
-/** Delete a division, once nothing depends on it. */
+/**
+ * Retire a division without erasing what it did.
+ *
+ * `deleteTeam` below is refused while any project or sub-team points at the
+ * division, which sounds safe and isn't: the only way to retire one was to
+ * first strip away everything recording what it built. A club that reorganises
+ * every year would delete its own history to keep a page tidy.
+ *
+ * Archiving is the opposite trade. Everything stays attached — projects keep
+ * their team, members keep their primary team, the lead stays named — and the
+ * division simply stops appearing in the tree and in pickers. `/projects/archive`
+ * reads it back.
+ *
+ * The one guard that survives: **live work cannot be archived.** Completed
+ * projects come along, because they are the history. Anything still running
+ * would vanish from `/projects` and `/find-work` while people are still on it,
+ * which is precisely the disappearing-work problem the app exists to remove.
+ *
+ * Sub-teams archive with the parent. A sub-team of an archived division has
+ * nowhere to be shown, so leaving it active would be a row that claims to exist
+ * on a page that can't render it.
+ */
+export async function archiveTeam(input: {
+  teamId: string;
+  archivedBy: string;
+  note?: string;
+  today: string;
+}): Promise<Result<Team>> {
+  return guarded((store) => {
+    const team = store.teams.find((t) => t.id === input.teamId);
+    if (!team) return fail<Team>("That division no longer exists.");
+    if (!team.isActive) return fail<Team>("That division is already archived.");
+
+    // Everything that would go with it: the team plus its whole sub-tree.
+    const subtree = [team.id];
+    const seen = new Set(subtree);
+    for (let i = 0; i < subtree.length; i++) {
+      for (const child of store.teams) {
+        if (child.parentId === subtree[i] && !seen.has(child.id)) {
+          seen.add(child.id);
+          subtree.push(child.id);
+        }
+      }
+    }
+
+    const live = store.projects.filter(
+      (p) => p.teamId && seen.has(p.teamId) && p.phase !== "complete"
+    );
+    if (live.length > 0) {
+      const names = live
+        .slice(0, 3)
+        .map((p) => p.name)
+        .join(", ");
+      const rest = live.length > 3 ? ` and ${live.length - 3} more` : "";
+      return fail<Team>(
+        `${live.length} project${live.length === 1 ? " is" : "s are"} still running here: ${names}${rest}. Move ${live.length === 1 ? "it" : "them"} to another division or mark ${live.length === 1 ? "it" : "them"} complete — archiving would hide live work.`
+      );
+    }
+
+    const note = input.note?.trim() || undefined;
+    for (const id of seen) {
+      const t = store.teams.find((x) => x.id === id);
+      if (!t || !t.isActive) continue;
+      t.isActive = false;
+      t.archivedAt = input.today;
+      t.archivedBy = input.archivedBy;
+      t.archiveNote = note;
+    }
+
+    return ok(team);
+  });
+}
+
+/**
+ * Bring an archived division back.
+ *
+ * Only the division itself, not its sub-teams: restoring a whole tree that was
+ * archived in one action would resurrect sub-teams somebody had already retired
+ * separately before the division went. Each is restored deliberately.
+ *
+ * A sub-team can't be restored while its parent is still archived — it would be
+ * active with nowhere to appear.
+ */
+export async function restoreTeam(teamId: string): Promise<Result<Team>> {
+  return guarded((store) => {
+    const team = store.teams.find((t) => t.id === teamId);
+    if (!team) return fail<Team>("That division no longer exists.");
+    if (team.isActive) return fail<Team>("That division is already active.");
+
+    if (team.parentId) {
+      const parent = store.teams.find((t) => t.id === team.parentId);
+      if (parent && !parent.isActive) {
+        return fail<Team>(
+          `${parent.name} is still archived. Restore it first, or this sub-team has nowhere to appear.`
+        );
+      }
+    }
+
+    team.isActive = true;
+    team.archivedAt = undefined;
+    team.archivedBy = undefined;
+    team.archiveNote = undefined;
+    return ok(team);
+  });
+}
+
+/**
+ * Delete a division outright.
+ *
+ * Still here, and still refused while anything points at it — that combination
+ * is what makes it safe. It's the path for a division created by mistake five
+ * minutes ago, which has no history worth keeping. Anything with a past gets
+ * `archiveTeam` instead.
+ */
 export async function deleteTeam(teamId: string): Promise<Result<null>> {
   return guarded((store) => {
     const team = store.teams.find((t) => t.id === teamId);

@@ -34,6 +34,7 @@ export default async function DashboardPage({
     reviewQueue,
     escalations,
     flaggedProjects,
+    completions,
   } = view;
 
   /**
@@ -63,6 +64,7 @@ export default async function DashboardPage({
               defaultProjectId={view.myProjects[0]?.id}
               today={view.today}
               maxBackdateDays={view.maxBackdateDays}
+              recent={view.recentHours}
             />
           ) : undefined
         }
@@ -216,6 +218,61 @@ export default async function DashboardPage({
                         {overdue
                           .map((r) => r.author?.fullName ?? "someone")
                           .join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            Where "notify up the chain" arrives.
+
+            A notice written only into the project's own feed reaches nobody —
+            the people it's for have no reason to open that page. This is the
+            other half of the announcement, and it's the good news panel: the
+            rest of this column is what's going wrong.
+
+            Non-empty only, same as the escalations above it. A standing
+            "0 completed" tile teaches you to skip the column.
+          */}
+          {completions.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Finished Recently</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  Projects below you that were marked complete. You were told
+                  because you&apos;re above them in the chain.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {completions.map(({ notice, project, ageDays }) => (
+                    <div
+                      key={notice.id}
+                      className="rounded-tile border border-ok-fg/25 bg-ok-bg px-4 py-3.5"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        {project ? (
+                          <Link
+                            href={`/projects/${project.slug}`}
+                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          >
+                            {project.name}
+                          </Link>
+                        ) : (
+                          <span className="text-[15px] font-bold text-ink-muted">
+                            A project that has since been removed
+                          </span>
+                        )}
+                        <span className="text-sm text-ink-muted">
+                          {ageDays === 0
+                            ? "today"
+                            : `${ageDays} ${ageDays === 1 ? "day" : "days"} ago`}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-ink-soft">
+                        {notice.body}
                       </p>
                     </div>
                   ))}

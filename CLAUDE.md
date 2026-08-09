@@ -202,7 +202,7 @@ a Lead overseeing several of their projects, and an RE couldn't tell whether a b
 theirs to clear. Anything rendering an update must iterate `entries` and label each with
 its project.
 
-## The eight things most likely to trip you up
+## The nine things most likely to trip you up
 
 1. **Two independent hierarchies.** Org tree (`teams.parent_id`, who reports to whom) and
    project tree (`projects.parent_id`, what work exists) are separate. A member's Lead is
@@ -223,7 +223,13 @@ its project.
    with `divisionForProject` / the `v_project_division` view. Grouping by `teamId`
    directly silently hides projects from the discoverability page.
 
-6. **Never hard-delete people or projects.** Deactivate. History must survive graduations.
+6. **Never hard-delete people, projects or divisions.** Deactivate or archive. History
+   must survive graduations. Divisions use `teams.is_active` plus `archived_at` /
+   `archived_by` / `archive_note`, and are read back at `/projects/archive`. Archiving is
+   refused while any project under the division is still running, because hiding live work
+   is the failure the app exists to remove; **completed** projects come along, since they
+   are the history. `divisions()` returns only active ones — ask for
+   `archivedDivisions()` deliberately.
 
 7. **Don't use Prisma.** It connects with elevated privileges and silently bypasses the
    RLS policies protecting reads. Use the Supabase client, or Drizzle.
@@ -232,6 +238,13 @@ its project.
    primitive needs `"use client"`, or a Server Component passing a handler gets
    "Functions cannot be passed directly to Client Components" — an error whose message
    points nowhere near the cause.
+
+9. **A parent project can't be marked complete while any descendant isn't.** Enforced in
+   `updateProject`, recursively and cycle-guarded. Refused rather than cascaded: completing
+   the children on the parent's behalf would sign off work their own REs never agreed was
+   done. Completing one also writes a `ProjectNotice` addressed up the project tree —
+   **not** a synthesised check-in, which would make a member's reliability record claim
+   they reported in on a day they didn't.
 
 ## Conventions
 
