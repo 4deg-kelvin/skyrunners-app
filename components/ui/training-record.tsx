@@ -192,6 +192,26 @@ function Row({
           </span>
         ) : null}
 
+        {/*
+          Why it was sent back.
+
+          `rejectCertification` has always stored the verifier's note, and
+          nothing ever rendered it — so a member saw "Not cleared" and a button
+          to ask again, with no idea what to fix. A rejection with no reason is
+          the thing that makes people stop asking, which is the same rule the
+          deliverable send-back already follows.
+
+          Shown to the member and to anybody who can verify, because the next
+          Lead looking at this needs to know it was already turned down once
+          and why.
+        */}
+        {record?.status === "rejected" && record.note ? (
+          <p className="text-ink-soft w-full text-sm">
+            <span className="text-risk-fg font-semibold">Sent back:</span>{" "}
+            {record.note}
+          </p>
+        ) : null}
+
         {/* Only you can claim a training. */}
         {isOwnProfile &&
         (!record ||

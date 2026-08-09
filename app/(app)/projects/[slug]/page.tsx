@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, CornerDownRight, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  CornerDownRight,
+  TriangleAlert,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ProjectTeamForm } from "@/components/forms/team-admin";
@@ -379,7 +384,7 @@ export default async function ProjectDetailPage({
                     actionHref="/projects"
                   />
                 ) : (
-                  members.map(({ membership, member }) => (
+                  members.map(({ membership, member, hoursOnProject }) => (
                     <div
                       key={membership.memberId}
                       className="rounded-tile border-line flex flex-wrap items-start justify-between gap-3 border px-4 py-3"
@@ -400,6 +405,24 @@ export default async function ProjectDetailPage({
                         {membership.responsibility ? (
                           <p className="text-ink-soft mt-0.5 text-sm">
                             {membership.responsibility}
+                          </p>
+                        ) : null}
+                        {/*
+                          Hours on THIS project, for the REs of it.
+
+                          The per-project half of the privacy split, and the
+                          only effort figure an RE is allowed — never the
+                          person's total, reliability or record, which belong
+                          to them and their Lead.
+
+                          Counts from the moment they log, not from their next
+                          check-in: a check-in reports hours that already
+                          exist, it doesn't create them.
+                        */}
+                        {mayManage && hoursOnProject > 0 ? (
+                          <p className="text-ink-muted mt-0.5 flex items-center gap-1.5 text-sm">
+                            <Clock className="size-3.5" />
+                            {formatNumber(hoursOnProject, 1)} hrs logged here
                           </p>
                         ) : null}
                       </div>

@@ -16,6 +16,7 @@ import {
   divisionForProject,
   getMember,
   getProject,
+  hoursOnProject,
   isOverdue,
   pendingRequestsFor,
   projectAttentionFlags,
@@ -172,6 +173,22 @@ export async function getOrphanedProjects(): Promise<Project[]> {
 export interface ProjectMemberRow {
   membership: ProjectMembership;
   member?: Member;
+  /**
+   * What this person has logged ON THIS PROJECT.
+   *
+   * `can.viewMemberHoursOnProject` has existed since the privacy model was
+   * written and was referenced by nothing but its own tests — so the one thing
+   * an RE is explicitly allowed to see about somebody's effort was computable,
+   * permitted, and displayed nowhere.
+   *
+   * This is the per-project half of the split: an RE sees time spent on their
+   * own work, and never the person's total, reliability or record. Those
+   * belong to the member and their Lead.
+   *
+   * Live off `work_logs`, so it moves the moment somebody logs — it does NOT
+   * wait for a check-in. A check-in reports hours that were already there.
+   */
+  hoursOnProject: number;
 }
 
 export interface DeliverableRowData {
@@ -310,6 +327,7 @@ export async function getProjectBySlug(
     members: projectMembers(project.id).map((pm) => ({
       membership: pm,
       member: pm.member,
+      hoursOnProject: hoursOnProject(pm.memberId, project.id),
     })),
     children: childProjects(project.id).map(buildNode),
     parent: project.parentId ? getProject(project.parentId) : undefined,
