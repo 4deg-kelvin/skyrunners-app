@@ -258,13 +258,31 @@ export const WEEKDAY_NAMES = [
 export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /**
- * Days offered for update deadlines.
+ * Days offered for update deadlines. All seven.
  *
- * Weekdays only. A Saturday deadline reads as "the club expects weekend work",
- * which isn't the message, and it means a missed Friday becomes a weekend
- * obligation.
+ * This used to be weekdays only, on the reasoning that a Saturday deadline
+ * reads as "the club expects weekend work". That got it backwards for the
+ * people it was meant to protect: a student whose week is packed with classes
+ * and who actually builds on Sunday afternoon was being told to report on a day
+ * they hadn't worked. The deadline follows the work; it doesn't create it.
+ *
+ * Monday first, weekend last — the order the week is planned in, and it keeps
+ * Saturday and Sunday reading as a pair rather than splitting them across the
+ * row the way a Sunday-first calendar would.
  */
-export const SELECTABLE_UPDATE_DAYS = [1, 2, 3, 4, 5] as const;
+export const SELECTABLE_UPDATE_DAYS = [1, 2, 3, 4, 5, 6, 0] as const;
+
+/**
+ * Sort comparator putting days in week order rather than numeric order.
+ *
+ * Sunday is 0, so a plain `a - b` puts it first — "You'll submit on Sunday and
+ * Saturday" for a weekend pair, which reads backwards. Storage stays numeric
+ * (that's what the DB column holds); this is for anything a person reads.
+ */
+export function byWeekOrder(a: number, b: number): number {
+  const order = SELECTABLE_UPDATE_DAYS as readonly number[];
+  return order.indexOf(a) - order.indexOf(b);
+}
 
 // ---------------------------------------------------------------------------
 // Project attention flags

@@ -517,3 +517,64 @@ describe("editing a division", () => {
     assert.equal(result.ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Check-in days
+// ---------------------------------------------------------------------------
+
+describe("check-in days can be any day of the week", () => {
+  const MEMBER = "m-tyler";
+
+  /** The seed gives everyone two per week, so pairs are what's accepted. */
+  async function pick(...weekdays: number[]) {
+    return ops.setUpdateSchedule({ memberId: MEMBER, weekdays });
+  }
+
+  function saved() {
+    return disk.readStore().updateSchedules.find((s) => s.memberId === MEMBER)
+      ?.weekdays;
+  }
+
+  test("Saturday and Sunday are accepted", async () => {
+    // The reason this changed: a student whose week is full of classes and who
+    // builds on Sunday afternoon was being told to report on a day they hadn't
+    // worked. The deadline follows the work.
+    assert.equal((await pick(6, 0)).ok, true);
+    assert.deepEqual(saved(), [0, 6]);
+  });
+
+  test("a weekday paired with a weekend day works", async () => {
+    assert.equal((await pick(3, 6)).ok, true);
+    assert.deepEqual(saved(), [3, 6]);
+  });
+
+  test("plain weekdays still work", async () => {
+    assert.equal((await pick(1, 4)).ok, true);
+    assert.deepEqual(saved(), [1, 4]);
+  });
+
+  test("every day 0–6 is valid", async () => {
+    for (let day = 0; day <= 6; day++) {
+      const other = (day + 3) % 7;
+      const result = await pick(day, other);
+      assert.equal(result.ok, true, `day ${day}`);
+    }
+  });
+
+  test("7 and -1 are still refused", async () => {
+    // 0–6, not 1–7. An off-by-one here would silently store a day that no
+    // calendar has and no obligation would ever generate for.
+    assert.equal((await pick(1, 7)).ok, false);
+    assert.equal((await pick(-1, 3)).ok, false);
+  });
+
+  test("a fraction is refused", async () => {
+    assert.equal((await pick(1, 2.5)).ok, false);
+  });
+
+  test("duplicates collapse rather than counting twice", async () => {
+    // Picking Monday twice is one day, not two, and must not pass the
+    // "exactly N days" check by accident.
+    assert.equal((await pick(1, 1)).ok, false);
+  });
+});
