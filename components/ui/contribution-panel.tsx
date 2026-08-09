@@ -4,7 +4,6 @@ import { StatTile } from "./stat-tile";
 import {
   tierDescriptions,
   TIER_LABELS,
-  WEEKLY_HOURS_EXPECTATION,
   type ContributionRecord,
 } from "@/lib/contribution";
 import { TIER_TONES } from "@/lib/labels";

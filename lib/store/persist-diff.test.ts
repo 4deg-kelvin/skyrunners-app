@@ -27,7 +27,6 @@
 
 import assert from "node:assert/strict";
 import { test, describe, beforeEach } from "node:test";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { persistDiff } from "./supabase.ts";

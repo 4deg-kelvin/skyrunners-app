@@ -62,7 +62,7 @@ export default async function DashboardPage({
       <PageHeader
         label="Lead Portal"
         title="Dashboard"
-        description={`Stay on top of team health, update windows, and project status for ${club.name}.`}
+        description="What you owe as a Lead: check-ins waiting on you, work waiting on a sign-off, and anyone who has gone quiet. Scoped to your people — about fifteen minutes a week."
         action={
           mayLogHours ? (
             <LogHoursForm
@@ -156,8 +156,8 @@ export default async function DashboardPage({
                   </h2>
                   <p className="text-ink-soft mt-2 text-[15px]">
                     {scope === "club"
-                      ? "Compliance, effort and project health across every active member."
-                      : `Compliance, effort and project health for you and the ${counts.peopleOverseen} ${counts.peopleOverseen === 1 ? "person" : "people"} you oversee — not the whole club.`}
+                      ? "Who has checked in, how the effort is spread, and which projects need a hand — across the whole club."
+                      : `Who has checked in, how the effort is spread, and which projects need a hand — for you and the ${counts.peopleOverseen} ${counts.peopleOverseen === 1 ? "person" : "people"} you oversee, not the whole club.`}
                   </p>
                 </div>
                 <Donut

@@ -82,9 +82,21 @@ export function Gantt({
 }) {
   if (chart.bars.length === 0) return null;
 
-  const nameWidth = compact ? "6rem" : "10rem";
+  /*
+    Compact STACKS the name above its bar; wide puts it in a column beside it.
+
+    Not a style preference. In the 320px project sidebar a side-by-side name
+    column has to be about 96px, which truncates "Layup Process Qualification"
+    to "Layup Proces..." — every row reads the same and the chart stops being
+    scannable, which is the only thing it was for. Stacking gives the name the
+    full width and the bar the full width, at the cost of one line per row.
+
+    Stacked means the track starts at 0, so the axis and today line need no
+    inset. That single value drives both layouts.
+  */
+  const nameWidth = compact ? "0rem" : "10rem";
   /** Where the track starts. Everything aligned to a bar uses this. */
-  const trackInset = `calc(${nameWidth} + ${COLUMN_GAP})`;
+  const trackInset = compact ? "0px" : `calc(${nameWidth} + ${COLUMN_GAP})`;
 
   return (
     <div className="w-full">
@@ -129,16 +141,21 @@ export function Gantt({
           </div>
         ) : null}
 
-        <div className="space-y-1">
+        <div className={compact ? "space-y-2" : "space-y-1"}>
           {chart.bars.map((bar) => (
-            <div key={bar.id} className="flex items-center gap-2">
-              {/* Fixed width, never responsive — the axis and the today line
-                  are inset by exactly this value. */}
+            <div
+              key={bar.id}
+              className={compact ? "" : "flex items-center gap-2"}
+            >
+              {/* Fixed width when beside the bar, never responsive — the axis
+                  and the today line are inset by exactly this value. */}
               <div
-                className={`shrink-0 truncate ${compact ? "text-[11px]" : "text-[13px]"}`}
+                className={`truncate ${
+                  compact ? "mb-0.5 text-[11px]" : "shrink-0 text-[13px]"
+                }`}
                 style={{
-                  width: nameWidth,
-                  paddingLeft: `${bar.depth * (compact ? 7 : 10)}px`,
+                  width: compact ? undefined : nameWidth,
+                  paddingLeft: `${bar.depth * 10}px`,
                 }}
                 title={bar.name}
               >
@@ -155,8 +172,8 @@ export function Gantt({
               </div>
 
               <div
-                className={`bg-surface relative min-w-0 flex-1 rounded-full ${
-                  compact ? "h-3.5" : "h-5"
+                className={`bg-surface relative rounded-full ${
+                  compact ? "h-3.5 w-full" : "h-5 min-w-0 flex-1"
                 }`}
               >
                 {bar.kind !== "project" || bar.widthPct === 0 ? (
