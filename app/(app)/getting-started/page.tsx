@@ -7,14 +7,17 @@ import {
   Eye,
   HardHat,
   PenLine,
+  MessagesSquare,
   Search,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getClubTiers } from "@/lib/data/settings";
 import { getViewer } from "@/lib/data/viewer";
+import { discordIsConfigured } from "@/lib/notify/discord";
 import { TIER_LABELS } from "@/lib/contribution";
 
 export const metadata = {
@@ -56,6 +59,7 @@ export default async function GettingStartedPage() {
   const tiers = await getClubTiers();
   const firstName =
     viewer.member.preferredName ?? viewer.member.fullName.split(" ")[0];
+  const connected = Boolean(viewer.member.discordVerifiedAt);
 
   return (
     <div className="space-y-6">
@@ -64,6 +68,101 @@ export default async function GettingStartedPage() {
         title={`Welcome, ${firstName}`}
         description="Five minutes, once. The first two sections are the only ones you have to remember — everything after that you can find when you need it."
       />
+
+      {/* ------------------------------------------------------------------
+          0. Discord. A setup chore, not a concept — which is why it sits
+          ABOVE "first thing" without taking that label. Hours are still the
+          first thing to understand; this is the two minutes of admin that has
+          to happen before any of it can reach you.
+      ------------------------------------------------------------------- */}
+      {discordIsConfigured() ? (
+        // Anchor on a wrapper: `Card` takes no id, and adding one to a shared
+        // primitive for a single link target isn't worth widening its API.
+        <div id="discord">
+          <Card
+            className={
+              connected ? undefined : "border-warn-fg/40 bg-warn-bg/40"
+            }
+          >
+            <CardBody>
+              <SectionLabel>Required · two minutes</SectionLabel>
+              <h2 className="text-ink mt-2 flex flex-wrap items-center gap-2.5 text-2xl font-bold">
+                <MessagesSquare
+                  className="text-cardinal-600 size-6"
+                  strokeWidth={2.5}
+                />
+                Connect Discord
+                {connected ? (
+                  <Badge tone="ok">Done</Badge>
+                ) : (
+                  <Badge tone="warn">Not done</Badge>
+                )}
+              </h2>
+
+              <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
+                All club communication runs through Discord. The app messages
+                you there when you&apos;re added to a project, when an ask of
+                yours is answered, and — if you end up leading people — when one
+                of them checks in. Nothing else, and never a group ping.
+              </p>
+
+              {connected ? (
+                <p className="text-ok-fg mt-3 text-[15px] font-semibold">
+                  You&apos;re connected. Nothing more to do here.
+                </p>
+              ) : (
+                <ol className="mt-4 space-y-2.5">
+                  <Step n={1}>
+                    <span className="text-ink font-semibold">
+                      Install Discord and join the club server
+                    </span>{" "}
+                    if you haven&apos;t. Ask any Co-Lead for the invite link.
+                    The bot can&apos;t message somebody who isn&apos;t in the
+                    server.
+                  </Step>
+                  <Step n={2}>
+                    In Discord, turn on{" "}
+                    <span className="text-ink font-semibold">
+                      Settings → Advanced → Developer Mode
+                    </span>
+                    .
+                  </Step>
+                  <Step n={3}>
+                    Right-click your own name anywhere and choose{" "}
+                    <span className="text-ink font-semibold">Copy User ID</span>
+                    . It&apos;s a long number — not your username.
+                  </Step>
+                  <Step n={4}>
+                    Paste it into{" "}
+                    <Link
+                      href="/settings"
+                      className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+                    >
+                      Settings → My Profile
+                    </Link>
+                    , save, then press{" "}
+                    <span className="text-ink font-semibold">
+                      Send a test message
+                    </span>
+                    . If it arrives, you&apos;re done.
+                  </Step>
+                </ol>
+              )}
+
+              {connected ? null : (
+                <div className="mt-4">
+                  <Link
+                    href="/settings"
+                    className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
+                  >
+                    Go connect it
+                  </Link>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+      ) : null}
 
       {/* ------------------------------------------------------------------
           1. Hours. First because it's the smallest habit and the one the rest
@@ -339,5 +438,17 @@ function Guide({
         </Link>
       </div>
     </div>
+  );
+}
+
+/** One numbered setup step. */
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="bg-cardinal-600 mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white">
+        {n}
+      </span>
+      <span className="text-ink-soft min-w-0 text-[15px]">{children}</span>
+    </li>
   );
 }

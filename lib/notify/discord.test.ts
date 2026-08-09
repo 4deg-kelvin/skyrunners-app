@@ -16,6 +16,8 @@ import {
   discordIsConfigured,
   discordMessages,
   sendDiscordDM,
+  verifyDiscordDM,
+  DISCORD_PROBLEM_MESSAGE,
 } from "./discord.ts";
 
 const realFetch = globalThis.fetch;
@@ -153,5 +155,87 @@ describe("the messages make sense on a lock screen", () => {
     });
     assert.match(one, /1 project\b/);
     assert.ok(!one.includes("1 projects"));
+  });
+});
+
+describe("verification distinguishes whose problem it is", () => {
+  test("no token at all", async () => {
+    const r = await verifyDiscordDM("461208577118896129", "hi");
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.problem, "not-configured");
+  });
+
+  test("a 401 is the CLUB's bad token, not the member's settings", async () => {
+    /*
+      The one that would waste an hour. A revoked or mistyped bot token reads
+      as "Discord blocked the message" if it isn't separated out, and the
+      member goes hunting through their own privacy settings for a fault that
+      is entirely on our side.
+    */
+    process.env.DISCORD_BOT_TOKEN = "test-token";
+    globalThis.fetch = (async () =>
+      new Response("{}", { status: 401 })) as typeof fetch;
+
+    const r = await verifyDiscordDM("461208577118896129", "hi");
+    assert.equal(r.ok, false);
+    if (!r.ok) {
+      assert.equal(r.problem, "bad-token");
+      assert.match(
+        DISCORD_PROBLEM_MESSAGE[r.problem],
+        /our problem, not yours/
+      );
+    }
+  });
+
+  test("a 404 means that ID isn't a person", async () => {
+    process.env.DISCORD_BOT_TOKEN = "test-token";
+    globalThis.fetch = (async () =>
+      new Response("{}", { status: 404 })) as typeof fetch;
+
+    const r = await verifyDiscordDM("461208577118896129", "hi");
+    if (!r.ok) {
+      assert.equal(r.problem, "unknown-user");
+      // The fix is copying the right ID, so the message says how.
+      assert.match(DISCORD_PROBLEM_MESSAGE[r.problem], /Developer Mode/);
+    }
+  });
+
+  test("a 403 on the message is their privacy settings", async () => {
+    process.env.DISCORD_BOT_TOKEN = "test-token";
+    globalThis.fetch = (async (url: string | URL | Request) =>
+      String(url).endsWith("/users/@me/channels")
+        ? new Response(JSON.stringify({ id: "chan-1" }))
+        : new Response("{}", { status: 403 })) as unknown as typeof fetch;
+
+    const r = await verifyDiscordDM("461208577118896129", "hi");
+    if (!r.ok) {
+      assert.equal(r.problem, "cannot-dm");
+      assert.match(DISCORD_PROBLEM_MESSAGE[r.problem], /server/i);
+    }
+  });
+
+  test("success reports success", async () => {
+    process.env.DISCORD_BOT_TOKEN = "test-token";
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ id: "chan-1" }))) as typeof fetch;
+
+    assert.deepEqual(await verifyDiscordDM("461208577118896129", "hi"), {
+      ok: true,
+    });
+  });
+
+  test("every problem has a message", () => {
+    // A missing entry renders `undefined` in the error banner, which is the
+    // worst possible thing to show somebody who just failed at something.
+    for (const key of [
+      "not-configured",
+      "no-id",
+      "unknown-user",
+      "cannot-dm",
+      "bad-token",
+      "unreachable",
+    ] as const) {
+      assert.ok(DISCORD_PROBLEM_MESSAGE[key]?.length > 20, key);
+    }
   });
 });

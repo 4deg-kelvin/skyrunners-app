@@ -49,7 +49,13 @@ import type { Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
 import { after } from "next/server";
-import { sendDiscordDM, discordMessages } from "@/lib/notify/discord";
+import {
+  sendDiscordDM,
+  discordMessages,
+  verifyDiscordDM,
+  DISCORD_PROBLEM_MESSAGE,
+  DISCORD_TEST_MESSAGE,
+} from "@/lib/notify/discord";
 
 /**
  * Fire a Discord DM without making the caller wait for it, or care if it fails.
@@ -2015,6 +2021,48 @@ async function updateClubIdentityAction$impl(
  * the class lives on <html>, rendered by the root layout, so the whole tree has
  * to re-render for the new value to take.
  */
+/**
+ * Prove the member's Discord ID actually reaches them.
+ *
+ * Sends a real message and only records success if Discord accepted it. There
+ * is deliberately no way to get the tick by asking for it: an unverified ID
+ * that LOOKS connected is worse than none, because the app and the member both
+ * then believe notifications are working when they aren't.
+ *
+ * Unlike every other Discord call in this file, this one is NOT fire-and-forget
+ * — the member is standing there waiting for an answer, so it waits, and it
+ * distinguishes the three failures that need three different fixes.
+ */
+async function verifyDiscordAction$impl(): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  const result = await verifyDiscordDM(
+    viewer.member.discordUserId,
+    DISCORD_TEST_MESSAGE
+  );
+
+  if (!result.ok) {
+    return { ok: false, error: DISCORD_PROBLEM_MESSAGE[result.problem] };
+  }
+
+  const saved = await ops.markDiscordVerified({
+    memberId: viewer.member.id,
+    at: new Date().toISOString(),
+  });
+
+  if (saved.ok) refresh();
+  return toResult(saved, "Connected — check Discord for the test message.");
+}
+
+export async function verifyDiscordAction(
+  // Unused — it takes no input. The parameter is here so it matches the
+  // signature `ActionButton` expects, rather than the button needing a
+  // special case for the one action with nothing to send.
+  _formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => verifyDiscordAction$impl());
+}
+
 export async function setThemeAction(
   formData: FormData
 ): Promise<ActionResult> {

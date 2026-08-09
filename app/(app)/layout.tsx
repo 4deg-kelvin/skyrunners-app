@@ -4,6 +4,8 @@ import { getViewer } from "@/lib/data/viewer";
 import { getMyWork } from "@/lib/data/my-work";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { getClubIdentity } from "@/lib/data/settings";
+import { DiscordBanner } from "@/components/ui/discord-banner";
+import { discordIsConfigured } from "@/lib/notify/discord";
 import type { Metadata } from "next";
 
 /**
@@ -85,6 +87,14 @@ export default async function AppLayout({
   return (
     <>
       {viewer.isDemo ? <DemoBanner /> : null}
+      {/*
+        Only when there IS a bot to connect to. Nagging people about an
+        integration the club hasn't set up teaches everybody to ignore banners,
+        and this one has to still work in a month.
+      */}
+      {discordIsConfigured() && !viewer.member.discordVerifiedAt ? (
+        <DiscordBanner hasId={Boolean(viewer.member.discordUserId)} />
+      ) : null}
       <TopNav
         memberId={viewer.member.id}
         userName={viewer.member.fullName}

@@ -180,12 +180,19 @@ export const discordMessages = {
  * settings blocked it, not that anything is broken.
  */
 export type DiscordProblem =
-  "not-configured" | "no-id" | "unknown-user" | "cannot-dm" | "unreachable";
+  | "not-configured"
+  | "no-id"
+  | "unknown-user"
+  | "cannot-dm"
+  | "bad-token"
+  | "unreachable";
 
 export const DISCORD_PROBLEM_MESSAGE: Record<DiscordProblem, string> = {
   "not-configured":
     "Discord isn't set up for the club yet, so there's nothing to connect to. Nothing for you to do.",
   "no-id": "Add your Discord ID first, then come back and connect.",
+  "bad-token":
+    "The club's Discord bot isn't working — this is our problem, not yours. Tell a Co-Lead; your ID is saved and you can try again once it's fixed.",
   "unknown-user":
     "Discord doesn't recognise that ID. Check you copied your own User ID — turn on Settings → Advanced → Developer Mode, right-click your name, Copy User ID. It's a long number, not your username.",
   "cannot-dm":
@@ -220,10 +227,19 @@ export async function verifyDiscordDM(
       // 400 with code 50035 is a malformed snowflake; 404 is nobody there.
       // Both mean "that isn't a person", which is a different fix from
       // "that person won't accept messages".
+      /*
+        401 is the club's token being wrong or revoked — NOT the member's
+        problem, and telling them to check their privacy settings sends them
+        chasing something they can't fix. Distinguished because the first
+        person to hit it will be whoever is testing the setup, and a misleading
+        message there costs an hour.
+      */
       const problem: DiscordProblem =
-        channel.status === 404 || channel.status === 400
-          ? "unknown-user"
-          : "cannot-dm";
+        channel.status === 401
+          ? "bad-token"
+          : channel.status === 404 || channel.status === 400
+            ? "unknown-user"
+            : "cannot-dm";
       return { ok: false, problem };
     }
 
