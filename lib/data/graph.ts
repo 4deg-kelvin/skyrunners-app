@@ -21,12 +21,12 @@
  * Why it loads everything at once
  * ---------------------------------------------------------------------------
  *
- * `OrgGraph`'s three methods are SYNCHRONOUS by design, and they're called in
+ * `OrgGraph`'s four methods are SYNCHRONOUS by design, and they're called in
  * loops — `leadChain` walks up a reporting chain one `getMember` at a time,
  * `isREofOrAbove` walks up a project tree. Backing them with queries would turn a
  * single permission check into dozens of round trips.
  *
- * So: three queries, up front, in parallel, closed over in Maps. The club is
+ * So: four queries, up front, in parallel, closed over in Maps. The club is
  * ~40 members and ~20 projects; fetching all of it is a few kilobytes and one
  * round trip, against fifty for the alternative. Revisit at maybe 10× this size,
  * where the `v_project_re_authority` / `v_lead_chain` views become worth it.
@@ -34,7 +34,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Member, Project } from "../types.ts";
+import type { Member, Project, Team } from "../types.ts";
 import type { OrgGraph } from "../permissions.ts";
 
 /**
@@ -51,6 +51,16 @@ export const PROJECT_COLUMNS =
 export const PROJECT_MEMBER_COLUMNS = "project_id, member_id";
 
 /**
+ * Teams, for the Division-Lead-is-a-top-RE rule in `leadsTeamAbove`.
+ *
+ * `is_active` is read but NOT filtered on. An archived division's projects keep
+ * pointing at it, and the person who led it must still be able to act on that
+ * history — correcting a record, reopening something. Archiving hides a
+ * division from the tree; it doesn't revoke anybody's authority.
+ */
+export const TEAM_COLUMNS = "id, name, slug, parent_id, lead_id, is_active";
+
+/**
  * Every table/column pair this file reads, in one place.
  *
  * `schema.test.ts` checks these against the actual `create table` statements in
@@ -65,6 +75,7 @@ export const QUERIED_COLUMNS: ReadonlyArray<{
   { table: "profiles", columns: PROFILE_COLUMNS },
   { table: "projects", columns: PROJECT_COLUMNS },
   { table: "project_members", columns: PROJECT_MEMBER_COLUMNS },
+  { table: "teams", columns: TEAM_COLUMNS },
   // Filtered on, not selected — but just as capable of being renamed.
   { table: "project_members", columns: "role, left_at" },
 ];
@@ -112,6 +123,15 @@ interface ProjectRow {
 interface ReRow {
   project_id: string;
   member_id: string;
+}
+
+interface TeamRow {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  lead_id: string | null;
+  is_active: boolean;
 }
 
 /** `null` is Postgres's "absent"; `undefined` is the app's. Translate, don't leak. */
@@ -172,7 +192,17 @@ export function toProject(row: ProjectRow, reIds: string[]): Project {
 export function buildOrgGraphFromRows(
   profileRows: ProfileRow[],
   projectRows: ProjectRow[],
-  reRows: ReRow[]
+  reRows: ReRow[],
+  /**
+   * Required, not defaulted to `[]`.
+   *
+   * A default would make forgetting it compile — and the failure is invisible:
+   * no teams means no team leads, so every Division Lead silently loses RE
+   * authority over their own division and the symptom ("why can't I sign this
+   * off?") points nowhere near the cause. Same shape as the mock-data fallback
+   * in docs/HANDOFF.md §2. Pass `[]` deliberately if you mean it.
+   */
+  teamRows: TeamRow[]
 ): OrgGraph {
   const reIdsByProject = new Map<string, string[]>();
   for (const row of reRows) {
@@ -198,15 +228,28 @@ export function buildOrgGraphFromRows(
     projects.set(row.id, toProject(row, reIds));
   }
 
+  const teams = new Map<string, Team>();
+  for (const row of teamRows) {
+    teams.set(row.id, {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      parentId: row.parent_id,
+      leadId: optional(row.lead_id),
+      isActive: row.is_active,
+    });
+  }
+
   return {
     getMember: (id) => members.get(id),
     getProject: (id) => projects.get(id),
     directREs: (projectId) => projects.get(projectId)?.reIds ?? [],
+    getTeam: (id) => teams.get(id),
   };
 }
 
 /**
- * Fetch and build. Three queries, issued together.
+ * Fetch and build. Four queries, issued together.
  *
  * RLS CAVEAT, and it matters: this reads through the caller's own client, so
  * anything RLS hides is simply absent from the graph — and an absent row reads
@@ -219,7 +262,7 @@ export function buildOrgGraphFromRows(
 export async function loadLiveOrgGraph(
   supabase: SupabaseClient
 ): Promise<OrgGraph> {
-  const [profiles, projects, res] = await Promise.all([
+  const [profiles, projects, res, teams] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLUMNS),
     supabase.from("projects").select(PROJECT_COLUMNS),
     supabase
@@ -230,11 +273,12 @@ export async function loadLiveOrgGraph(
       // set. Without this filter, someone who left last year still counts as an
       // RE and can still act on the project.
       .is("left_at", null),
+    supabase.from("teams").select(TEAM_COLUMNS),
   ]);
 
   // Fail loudly. A half-loaded graph silently strips people of authority, which
   // is far harder to diagnose than an error page.
-  const failure = profiles.error ?? projects.error ?? res.error;
+  const failure = profiles.error ?? projects.error ?? res.error ?? teams.error;
   if (failure) {
     throw new Error(`Could not load the org graph: ${failure.message}`);
   }
@@ -242,6 +286,7 @@ export async function loadLiveOrgGraph(
   return buildOrgGraphFromRows(
     (profiles.data ?? []) as ProfileRow[],
     (projects.data ?? []) as ProjectRow[],
-    (res.data ?? []) as ReRow[]
+    (res.data ?? []) as ReRow[],
+    (teams.data ?? []) as TeamRow[]
   );
 }

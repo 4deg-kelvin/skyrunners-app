@@ -212,7 +212,7 @@ describe("completing a project announces it up the chain", () => {
     assert.equal(disk.readStore().progressUpdates.length, before);
   });
 
-  test("the audience is the REs above it, the division lead, the Co-Leads", async () => {
+  test("the audience is the REs above it and the leads that own it", async () => {
     await setPhase("p-layup", "complete", "m-sofia");
     const [notice] = noticesOn("p-layup");
 
@@ -220,7 +220,66 @@ describe("completing a project announces it up the chain", () => {
     // (RE m-priya), owned by team-composites inside div-evtol (lead m-priya).
     assert.ok(notice.notifiedMemberIds.includes("m-tyler"), "parent RE");
     assert.ok(notice.notifiedMemberIds.includes("m-priya"), "division lead");
-    assert.ok(notice.notifiedMemberIds.includes("m-anish"), "Co-Lead");
+  });
+
+  test("it stops at the Division Lead — Co-Leads are not told", async () => {
+    await setPhase("p-layup", "complete", "m-sofia");
+    const [notice] = noticesOn("p-layup");
+
+    // A Co-Lead manages the organisation, not the work. A ping for every set of
+    // deliverables that finishes anywhere in the club is exactly the traffic
+    // that teaches somebody to stop reading their dashboard.
+    assert.ok(
+      !notice.notifiedMemberIds.includes("m-anish"),
+      "the Co-Lead must not be on a completion notice"
+    );
+  });
+
+  test("the Division Lead is LAST, after the REs beneath them", async () => {
+    await setPhase("p-layup", "complete", "m-sofia");
+    const [notice] = noticesOn("p-layup");
+
+    // Nearest first, terminating at the division — the division is the unit
+    // that owns delivery, so its lead is the final stop.
+    assert.equal(
+      notice.notifiedMemberIds[notice.notifiedMemberIds.length - 1],
+      "m-priya"
+    );
+  });
+
+  test("when the Division Lead is the one completing it, it goes to the Co-Leads", async () => {
+    // Otherwise the chain terminates on the person who pressed the button and
+    // the announcement reaches nobody. m-priya leads div-evtol.
+    await setPhase("p-layup", "complete", "m-priya");
+    const [notice] = noticesOn("p-layup");
+
+    assert.ok(!notice.notifiedMemberIds.includes("m-priya"));
+    assert.equal(
+      notice.notifiedMemberIds[notice.notifiedMemberIds.length - 1],
+      "m-anish"
+    );
+  });
+
+  test("a division with no lead falls through to the Co-Leads", async () => {
+    // Otherwise the announcement evaporates. A gap in the org chart should
+    // surface as the notice landing one level higher, not as silence.
+    const store = disk.readStore();
+    for (const t of store.teams) {
+      if (["div-evtol", "team-structures", "team-composites"].includes(t.id)) {
+        t.leadId = undefined;
+      }
+    }
+    // Strip the ancestor REs too, so only the fallback can produce a recipient.
+    for (const p of store.projects) {
+      if (["p-wing-spar", "p-airframe-v2"].includes(p.id)) {
+        p.primaryReId = "m-sofia";
+        p.reIds = ["m-sofia"];
+      }
+    }
+
+    await setPhase("p-layup", "complete", "m-sofia");
+    const [notice] = noticesOn("p-layup");
+    assert.deepEqual(notice.notifiedMemberIds, ["m-anish"]);
   });
 
   test("the person who did it isn't told about their own action", async () => {

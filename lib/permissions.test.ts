@@ -21,7 +21,7 @@ import {
   type Actor,
   type OrgGraph,
 } from "./permissions.ts";
-import type { Member, Project } from "./types.ts";
+import type { Member, Project, Team } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // A small fixture world
@@ -39,13 +39,15 @@ import type { Member, Project } from "./types.ts";
 function project(
   id: string,
   parentId: string | null,
-  reIds: string[]
+  reIds: string[],
+  teamId?: string
 ): Project {
   return {
     id,
     name: id,
     slug: id,
     parentId,
+    teamId,
     primaryReId: reIds[0] ?? "",
     reIds,
     phase: "concept",
@@ -53,6 +55,10 @@ function project(
     datesOverridden: false,
     isOpenToJoin: true,
   };
+}
+
+function team(id: string, parentId: string | null, leadId?: string): Team {
+  return { id, name: id, slug: id, parentId, leadId, isActive: true };
 }
 
 function member(
@@ -72,10 +78,37 @@ function member(
 }
 
 const projects: Project[] = [
-  project("root", null, ["reRoot"]),
+  project("root", null, ["reRoot"], "divA"),
   project("mid", "root", ["reMid"]),
   project("leaf", "mid", ["reLeaf"]),
-  project("other", null, ["reOther"]),
+  project("other", null, ["reOther"], "divB"),
+
+  /*
+    A deliberately DEEP branch, five levels, with an RE only at the top.
+
+    The main tree is three deep, which is enough to prove inheritance happens
+    and not enough to prove it doesn't stop. "Is an RE four projects down still
+    covered?" is a real question about a real club structure, so it gets a real
+    fixture rather than an argument from reading `projectChain`.
+  */
+  project("d1", null, ["reD1"], "subA"),
+  project("d2", "d1", []),
+  project("d3", "d2", []),
+  project("d4", "d3", []),
+  project("d5", "d4", ["reD5"]),
+];
+
+/*
+  Org tree, separate from the project tree:
+
+    divA (divLead)          owns `root` and everything under it
+      └ subA (subLead)      owns `d1` and everything under it
+    divB (otherDivLead)     owns `other`
+*/
+const teams: Team[] = [
+  team("divA", null, "divLead"),
+  team("subA", "divA", "subLead"),
+  team("divB", null, "otherDivLead"),
 ];
 
 const members: Member[] = [
@@ -88,12 +121,18 @@ const members: Member[] = [
   member("reMid", "coLead", "lead"),
   member("reLeaf", "coLead"),
   member("reOther", "coLead"),
+  member("reD1", "coLead"),
+  member("reD5", "coLead"),
+  member("divLead", "coLead", "lead"),
+  member("subLead", "divLead", "lead"),
+  member("otherDivLead", "coLead", "lead"),
 ];
 
 const graph: OrgGraph = {
   getMember: (id) => members.find((m) => m.id === id),
   getProject: (id) => projects.find((p) => p.id === id),
   directREs: (id) => projects.find((p) => p.id === id)?.reIds ?? [],
+  getTeam: (id) => teams.find((t) => t.id === id),
 };
 
 const actor = (id: string): Actor => {
@@ -146,6 +185,119 @@ describe("RE authority inherits DOWN the project tree", () => {
 
   test("a plain member has no RE authority", () => {
     assert.equal(isREofOrAbove(actor("worker"), graph, "leaf"), false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Depth. There is no limit, and these say so at a depth nobody would reach
+  // by accident — d1 → d2 → d3 → d4 → d5, with the RE only at the top.
+  // -------------------------------------------------------------------------
+
+  test("an RE four levels up still owns the bottom of the tree", () => {
+    assert.deepEqual(projectChain(graph, "d5"), ["d5", "d4", "d3", "d2", "d1"]);
+    assert.equal(isREofOrAbove(actor("reD1"), graph, "d5"), true);
+  });
+
+  test("every level in between is covered too", () => {
+    for (const id of ["d2", "d3", "d4", "d5"]) {
+      assert.equal(isREofOrAbove(actor("reD1"), graph, id), true, id);
+    }
+  });
+
+  test("and it still doesn't leak upward from the bottom", () => {
+    // Four levels of inheritance downward must not become one upward.
+    for (const id of ["d1", "d2", "d3", "d4"]) {
+      assert.equal(isREofOrAbove(actor("reD5"), graph, id), false, id);
+    }
+    assert.equal(isREofOrAbove(actor("reD5"), graph, "d5"), true);
+  });
+
+  test("an RE deep in one tree has nothing in another", () => {
+    assert.equal(isREofOrAbove(actor("reD5"), graph, "leaf"), false);
+    assert.equal(isREofOrAbove(actor("reD1"), graph, "other"), false);
+  });
+});
+
+describe("a Division Lead is a top RE over their division", () => {
+  test("they have RE authority on a project their division owns", () => {
+    // divLead is not an RE of anything. Before this rule they owned the
+    // division on the org chart and could do nothing inside it.
+    assert.equal(isREofOrAbove(actor("divLead"), graph, "root"), true);
+  });
+
+  test("it reaches sub-projects that carry no team of their own", () => {
+    // `mid` and `leaf` have no teamId — sub-projects inherit their parent's
+    // team in practice, and the walk goes up the PROJECT tree to find it.
+    assert.equal(isREofOrAbove(actor("divLead"), graph, "mid"), true);
+    assert.equal(isREofOrAbove(actor("divLead"), graph, "leaf"), true);
+  });
+
+  test("and all the way down a five-deep tree under a sub-team", () => {
+    assert.equal(isREofOrAbove(actor("divLead"), graph, "d5"), true);
+  });
+
+  test("a sub-team lead covers their own team's work", () => {
+    assert.equal(isREofOrAbove(actor("subLead"), graph, "d1"), true);
+    assert.equal(isREofOrAbove(actor("subLead"), graph, "d5"), true);
+  });
+
+  test("but a sub-team lead does NOT reach the rest of the division", () => {
+    // subA sits under divA; authority flows down, never sideways or up.
+    assert.equal(isREofOrAbove(actor("subLead"), graph, "root"), false);
+    assert.equal(isREofOrAbove(actor("subLead"), graph, "leaf"), false);
+  });
+
+  test("leading one division grants nothing in another", () => {
+    assert.equal(isREofOrAbove(actor("otherDivLead"), graph, "root"), false);
+    assert.equal(isREofOrAbove(actor("divLead"), graph, "other"), false);
+  });
+
+  test("the real powers follow, not just the predicate", () => {
+    // The point of putting this in `isREofOrAbove` rather than in each rule:
+    // every project permission inherits it at once.
+    assert.equal(can.manageDeliverables(actor("divLead"), graph, "leaf"), true);
+    assert.equal(can.assignRE(actor("divLead"), graph, "leaf"), true);
+    assert.equal(can.reviewJoinRequest(actor("divLead"), graph, "leaf"), true);
+    assert.equal(can.manageProject(actor("divLead"), graph, "leaf"), true);
+
+    // …and the same list stays shut for a lead from elsewhere.
+    assert.equal(
+      can.manageDeliverables(actor("otherDivLead"), graph, "leaf"),
+      false
+    );
+    assert.equal(can.assignRE(actor("otherDivLead"), graph, "leaf"), false);
+  });
+
+  test("a division lead still cannot read a personal report", () => {
+    /*
+      "Top RE" means top RE, not Co-Lead. The private half of a check-in is the
+      Lead chain's, and an RE deliberately can't read it — that's what keeps
+      reviewing one named person's obligation. `worker` reports to lead2, not
+      to divLead, so the answer has to stay no.
+    */
+    assert.equal(can.viewMemberEffort(actor("divLead"), graph, "worker"), false);
+    assert.equal(can.reviewUpdate(actor("divLead"), graph, "worker"), false);
+  });
+
+  test("a team with no lead grants nobody anything", () => {
+    const leaderless: OrgGraph = {
+      ...graph,
+      getTeam: (id) => (id === "divA" ? team("divA", null) : undefined),
+    };
+    assert.equal(isREofOrAbove(actor("divLead"), leaderless, "root"), false);
+  });
+
+  test("a cycle in the org tree terminates instead of hanging", () => {
+    // `teams.parent_id` has no constraint against this, same as projects.
+    const cyclic: OrgGraph = {
+      ...graph,
+      getTeam: (id) =>
+        id === "divA"
+          ? team("divA", "subA")
+          : id === "subA"
+            ? team("subA", "divA")
+            : undefined,
+    };
+    assert.equal(isREofOrAbove(actor("divLead"), cyclic, "root"), false);
   });
 });
 

@@ -184,8 +184,9 @@ export function ProjectEditForm({
         {phase === "complete" && project.phase !== "complete" ? (
           <p className="mb-2.5 mt-3 text-xs text-ink-muted">
             Completing this posts a note in its updates feed and tells everyone
-            above it — the REs of parent projects, the division lead, and the
-            Co-Leads.
+            above it — the REs of any parent projects, then the team leads, and
+            finally the Division Lead. It stops there; Co-Leads aren&apos;t
+            pinged for every finished project.
           </p>
         ) : null}
 

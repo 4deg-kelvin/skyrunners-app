@@ -11,26 +11,33 @@
  * ----------------------------------------------------------------------------
  *
  *   1. Are you a Co-Lead?                        -> you can do anything
- *   2. Are you an RE of this project,
- *      or of any project ABOVE it?               -> you own this project subtree
+ *   2. Are you an RE of this project, or of any
+ *      project ABOVE it — or do you LEAD a team
+ *      that owns any of them?                    -> you own this project subtree
  *   3. Are you this member's Lead,
  *      directly or anywhere up their chain?      -> you oversee this person
  *   4. Is it your own data?                      -> you can always manage it
  *
  * If none of the four are true, the answer is no.
  *
- * Two ideas make this work, and both are *inheritance*:
+ * Three ideas make this work, and all three are *inheritance*:
  *
  *   - RE authority flows DOWN the project tree. RE of "eVTOL Airframe" can act
- *     on every sub-project beneath it, however deep.
+ *     on every sub-project beneath it, however deep. There is no depth limit
+ *     and there never was — `projectChain` walks to the root.
  *   - Lead authority flows UP the reporting chain. Your Lead's Lead oversees
  *     you too.
+ *   - **A Division Lead is a top RE.** Team-lead authority flows DOWN the org
+ *     tree and then down the project tree: leading a division gives you RE
+ *     powers on every project inside it, and leading a sub-team gives you them
+ *     on that sub-team's projects. Q2 is where this lands, deliberately — one
+ *     function, so every project rule inherits it at once.
  *
  * Everything else in this file is those four questions applied to specific
  * actions.
  */
 
-import type { GlobalRole, Member, Project } from "./types.ts";
+import type { GlobalRole, Member, Project, Team } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // The actor: everything we need to know about who is asking
@@ -50,6 +57,16 @@ export interface OrgGraph {
   getProject(id: string): Project | undefined;
   /** REs of this project only — not inherited. */
   directREs(projectId: string): string[];
+  /**
+   * A team or division by id.
+   *
+   * Here because a Division Lead is a top RE over everything in their division
+   * (see `leadsTeamAbove`), and answering that needs the org tree. Synchronous
+   * like the other three, and for the same reason: it's called in a loop while
+   * walking up from a project's team, so a query per call would turn one
+   * permission check into several round trips.
+   */
+  getTeam(id: string): Team | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,17 +93,78 @@ export function projectChain(graph: OrgGraph, projectId: string): string[] {
 }
 
 /**
+ * Every team at or above this one, nearest first. Cycle-guarded, like the rest.
+ */
+export function teamChain(graph: OrgGraph, teamId: string): string[] {
+  const chain: string[] = [];
+  const seen = new Set<string>();
+  let current: string | null | undefined = teamId;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    chain.push(current);
+    current = graph.getTeam(current)?.parentId ?? null;
+  }
+  return chain;
+}
+
+/**
+ * Does the actor lead a team that owns this project, or one above it?
+ *
+ * **A Division Lead is a top RE.** They're accountable for everything their
+ * division builds, so they must be able to do what an RE can do — add
+ * deliverables, sign work off, answer join requests, appoint REs — on any
+ * project inside it. Before this they could do none of that unless they
+ * happened to also be an RE or the person's Lead: they owned the division on
+ * the org chart and had no authority inside it, which is the "leaders can't see
+ * who's contributing" problem wearing a different hat.
+ *
+ * Scoped by two walks, both upward, and the pair is the point:
+ *
+ *   - up the PROJECT tree, so a lead whose team owns a parent project also
+ *     covers its sub-projects — those inherit their parent's team by default
+ *     and would otherwise slip out of the division's reach;
+ *   - up the ORG tree from each of those projects' teams, so a sub-team lead
+ *     covers their own team and the Division Lead covers everything beneath.
+ *
+ * It grants nothing sideways: leading Airframe gives you no say in Avionics,
+ * because Avionics is in neither chain.
+ */
+export function leadsTeamAbove(
+  actor: Actor,
+  graph: OrgGraph,
+  projectId: string
+): boolean {
+  for (const id of projectChain(graph, projectId)) {
+    const teamId = graph.getProject(id)?.teamId;
+    if (!teamId) continue;
+    for (const owningTeamId of teamChain(graph, teamId)) {
+      if (graph.getTeam(owningTeamId)?.leadId === actor.id) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Q2 — RE authority, inherited down the project tree.
- * True if the actor is an RE of this project or any ancestor of it.
+ *
+ * True if the actor is an RE of this project or any ancestor of it, **or** if
+ * they lead a team that owns any of them. Both are the same authority arriving
+ * by different routes, so they belong in one function: every `can.*` rule about
+ * a project routes through here, which is what makes "a Division Lead is a top
+ * RE" one rule rather than twenty places to remember.
+ *
+ * Depth is unbounded and always has been — `projectChain` walks to the root. An
+ * RE four levels up really does own everything below them.
  */
 export function isREofOrAbove(
   actor: Actor,
   graph: OrgGraph,
   projectId: string
 ): boolean {
-  return projectChain(graph, projectId).some((id) =>
-    graph.directREs(id).includes(actor.id)
-  );
+  const chain = projectChain(graph, projectId);
+  if (chain.some((id) => graph.directREs(id).includes(actor.id))) return true;
+  return leadsTeamAbove(actor, graph, projectId);
 }
 
 /** Walk from a member up their reporting chain, collecting their Leads. */
