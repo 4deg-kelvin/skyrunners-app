@@ -566,8 +566,9 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
           <SectionLabel tone="muted">
             {res.length > 1 ? "REs" : "RE"}
           </SectionLabel>
+          {/* Name AND number: nothing else on this row says who the RE is. */}
           {res.map((re) => (
-            <ContactLink key={re.id} member={re} showLabel={false} />
+            <ContactLink key={re.id} member={re} />
           ))}
         </div>
       ) : null}

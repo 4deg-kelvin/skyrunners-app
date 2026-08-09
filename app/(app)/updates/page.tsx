@@ -13,7 +13,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { formatNumber } from "@/lib/utils";
 
-export const metadata = { title: "Check-ins · SkyRunners HQ" };
+export const metadata = { title: "Check-ins" };
 
 function formatDue(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {

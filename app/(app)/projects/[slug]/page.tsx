@@ -23,6 +23,7 @@ import {
   CreateProjectForm,
   REControls,
 } from "@/components/forms/project-admin";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -805,24 +806,40 @@ export default async function ProjectDetailPage({
                 {res.length === 0 ? (
                   <p className="text-ink-muted text-sm">No RE assigned yet.</p>
                 ) : (
+                  /*
+                    A face next to the name.
+
+                    This card answers "who do I ask about this?", and the answer
+                    is more useful when you'd recognise them in the lab. Same
+                    reason the roster has avatars — the club is 35 people who
+                    mostly know each other by sight before they know each other
+                    by name.
+                  */
                   res.map((re, i) => (
-                    <div key={re.id}>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/members/${re.id}`}
-                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                        >
-                          {re.fullName}
-                        </Link>
-                        {i === 0 && res.length > 1 ? (
-                          <Badge tone="cardinal">Primary</Badge>
-                        ) : null}
-                      </div>
-                      <ContactLink
-                        member={re}
-                        showLabel={false}
-                        className="mt-1"
+                    <div key={re.id} className="flex items-start gap-2.5">
+                      <Avatar
+                        name={re.fullName}
+                        photoUrl={re.photoUrl}
+                        className="size-9 shrink-0 text-xs"
                       />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/members/${re.id}`}
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                          >
+                            {re.fullName}
+                          </Link>
+                          {i === 0 && res.length > 1 ? (
+                            <Badge tone="cardinal">Primary</Badge>
+                          ) : null}
+                        </div>
+                        <ContactLink
+                          member={re}
+                          showLabel={false}
+                          className="mt-0.5"
+                        />
+                      </div>
                     </div>
                   ))
                 )}

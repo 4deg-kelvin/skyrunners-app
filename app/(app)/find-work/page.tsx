@@ -18,7 +18,7 @@ import { getFindWork, type WorkSignal } from "@/lib/data/find-work";
 import { getViewer } from "@/lib/data/viewer";
 
 export const metadata = {
-  title: "Find work · SkyRunners HQ",
+  title: "Find work",
 };
 
 const SIGNAL_LABELS: Record<WorkSignal, string> = {

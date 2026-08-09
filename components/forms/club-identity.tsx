@@ -77,8 +77,9 @@ export function ClubIdentityForm({
       </label>
 
       <p className="text-ink-muted mt-2 mb-2.5 text-xs">
-        Shown on the dashboard. The name in the top-left corner is part of the
-        app itself and doesn&apos;t change.
+        Used everywhere the club is named — the header, every browser tab, and
+        the dashboard. The sign-in page keeps the built-in name, since it
+        renders before anybody is signed in to read settings for.
       </p>
 
       <button

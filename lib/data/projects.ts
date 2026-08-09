@@ -557,14 +557,25 @@ function projectTimeline(project: Project): GanttChart | null {
         name: d.title,
         end: d.dueDate,
         depth: depth + 1,
+        /*
+          Past its date is RED, not amber.
+
+          A deliverable has one date and one owner — there is no "slightly
+          late". It's either done, or the date has gone and somebody needs to
+          either do it or move it. Amber said "keep an eye on this" about a
+          thing that has already failed, and next to a red blocked diamond it
+          read as the lesser problem when it's the same problem.
+
+          Blocked and overdue share the colour deliberately: both mean "this
+          needs a person today", and splitting them into two shades of urgent
+          makes neither register.
+        */
         tone:
           d.status === "done"
             ? "done"
-            : d.status === "blocked"
+            : d.status === "blocked" || isOverdue(d)
               ? "risk"
-              : isOverdue(d)
-                ? "warn"
-                : "neutral",
+              : "neutral",
         kind: "deliverable",
       });
     }

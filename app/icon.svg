@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="SkyRunners HQ">
+  <!--
+    The favicon, and the club's mark.
+
+    Next.js App Router picks `app/icon.svg` up automatically and emits the
+    <link rel="icon"> — there is nothing to wire up.
+
+    Design constraints, in order:
+
+    1. It has to read at 16px. That rules out a side-view aircraft, which at
+       favicon size is an indistinct sliver — the shape people recognise as a
+       drone is the TOP-DOWN quad: four rotors, an X frame. Four dots in a
+       square is legible at any size, and nothing else in a browser tab looks
+       like it.
+    2. It has to survive a dark tab bar and a light one. Hence the filled
+       cardinal tile rather than a bare outline: the mark carries its own
+       background, so contrast never depends on the browser's theme.
+    3. Cardinal #8c1515, the same single accent the whole app uses.
+
+    Deliberately not a monogram. "SR" at 16px is two grey smudges, and every
+    student org's favicon is its initials.
+  -->
+  <rect width="32" height="32" rx="7" fill="#8c1515" />
+
+  <g stroke="#ffffff" stroke-linecap="round" fill="none">
+    <!-- X frame. Drawn under the rotors so the joins stay clean. -->
+    <g stroke-width="2.2">
+      <path d="M10.5 10.5 L21.5 21.5" />
+      <path d="M21.5 10.5 L10.5 21.5" />
+    </g>
+
+    <!-- Four rotors -->
+    <g stroke-width="1.9">
+      <circle cx="9" cy="9" r="3.6" />
+      <circle cx="23" cy="9" r="3.6" />
+      <circle cx="9" cy="23" r="3.6" />
+      <circle cx="23" cy="23" r="3.6" />
+    </g>
+  </g>
+
+  <!-- Body. Solid, so the centre holds together when the strokes blur. -->
+  <circle cx="16" cy="16" r="3.1" fill="#ffffff" />
+</svg>

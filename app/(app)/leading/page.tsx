@@ -13,7 +13,7 @@ import { HELP_REQUEST_STALE_DAYS } from "@/lib/types";
 import { REVIEW_GRACE_DAYS } from "@/lib/review";
 
 export const metadata = {
-  title: "Leading here · SkyRunners HQ",
+  title: "Leading here",
 };
 
 /**

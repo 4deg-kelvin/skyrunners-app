@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plane } from "lucide-react";
+import { DroneMark } from "@/components/ui/logo";
 
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -23,7 +23,7 @@ export default async function LoginPage({
       <div className="w-full">
         <div className="mb-6 flex items-center justify-center gap-2.5">
           <span className="bg-cardinal-600 flex size-9 items-center justify-center rounded-full text-white">
-            <Plane className="size-4.5" strokeWidth={2.5} />
+            <DroneMark className="size-5.5" />
           </span>
           <span className="text-cardinal-600 text-xl font-bold tracking-tight">
             SkyRunners HQ

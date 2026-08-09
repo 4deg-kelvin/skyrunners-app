@@ -27,7 +27,7 @@ import { TIER_LABELS } from "@/lib/contribution";
 import { can } from "@/lib/permissions";
 
 export const metadata = {
-  title: "Settings · SkyRunners HQ",
+  title: "Settings",
 };
 
 /** "Sep 21 – Dec 4, 2026" — parsed as UTC so the day never shifts by timezone. */

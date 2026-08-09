@@ -36,7 +36,17 @@ export function ContactLink({
 }: {
   member: Pick<Member, "fullName" | "email" | "phone">;
   subject?: string;
-  /** False renders just the name, for tight card footers. */
+  /**
+   * False drops the NAME, never the number.
+   *
+   * It used to drop the number instead, leaving a bare name that happened to
+   * be a link — so on Find Work and the help board you had to click a person's
+   * name to discover it was a phone number at all, and you couldn't read it off
+   * the screen to type into a phone. Since the whole reason this component
+   * leads with phone is that a text gets answered and an email doesn't, hiding
+   * the digits removed the point of it. Call sites that already show the name
+   * above pass false and get just the number.
+   */
   showLabel?: boolean;
   className?: string;
 }) {
@@ -54,7 +64,7 @@ export function ContactLink({
         className={style}
       >
         <Phone className="size-3.5 shrink-0" />
-        {showLabel ? `${member.fullName} · ${member.phone}` : member.fullName}
+        {showLabel ? `${member.fullName} · ${member.phone}` : member.phone}
       </a>
     );
   }
@@ -69,7 +79,7 @@ export function ContactLink({
       className={style}
     >
       <Mail className="size-3.5 shrink-0" />
-      {showLabel ? `${member.fullName} · ${member.email}` : member.fullName}
+      {showLabel ? `${member.fullName} · ${member.email}` : member.email}
     </a>
   );
 }

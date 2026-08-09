@@ -19,7 +19,7 @@ import { can } from "@/lib/permissions";
 import { EVENT_KIND_LABELS } from "@/lib/labels";
 
 export const metadata = {
-  title: "Calendar · SkyRunners HQ",
+  title: "Calendar",
 };
 
 function dayLabel(iso: string, today: string): string {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plane } from "lucide-react";
+import { DroneMark } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import { AccountMenu } from "./account-menu";
 
@@ -23,6 +23,7 @@ export function TopNav({
   isLeadership,
   isDemo,
   showLeadingGuide,
+  clubName,
   alertCount = 0,
 }: {
   memberId: string;
@@ -31,6 +32,14 @@ export function TopNav({
   isDemo: boolean;
   /** Leads, Co-Leads, and anyone who is an RE of something. */
   showLeadingGuide: boolean;
+  /**
+   * What the club calls itself, from `club_settings`.
+   *
+   * Hard-coded here until somebody renamed the club in Settings, saw the
+   * card update, and the header carry on saying something else. A rename that
+   * doesn't reach the one piece of text on every single page isn't a rename.
+   */
+  clubName: string;
   /** Real count of things needing attention — drives the nav dot. */
   alertCount?: number;
 }) {
@@ -46,10 +55,10 @@ export function TopNav({
         {/* Wordmark — goes to the member's own home, same as "/" */}
         <Link href="/my-work" className="flex items-center gap-2.5">
           <span className="bg-cardinal-600 flex size-8 items-center justify-center rounded-full text-white">
-            <Plane className="size-4" strokeWidth={2.5} />
+            <DroneMark className="size-5" />
           </span>
           <span className="text-cardinal-600 text-lg font-bold tracking-tight">
-            SkyRunners HQ
+            {clubName}
           </span>
         </Link>
 

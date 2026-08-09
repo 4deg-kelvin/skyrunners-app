@@ -3,6 +3,8 @@ import { DemoBanner } from "@/components/layout/demo-banner";
 import { getViewer } from "@/lib/data/viewer";
 import { getMyWork } from "@/lib/data/my-work";
 import { getLeadershipRoles } from "@/lib/data/members";
+import { getClubIdentity } from "@/lib/data/settings";
+import type { Metadata } from "next";
 
 /**
  * The signed-in shell: nav, demo banner, page container.
@@ -51,6 +53,21 @@ export default async function AppLayout({
     leadershipRoles = { isRE: false, divisionsLed: [] };
   }
 
+  /*
+    The club's own name, for the header and every tab title.
+
+    Read HERE rather than in the root layout, which is html/body/fonts only and
+    must not resolve the viewer — see CLAUDE.md. Metadata from a nested layout
+    applies to everything beneath it, so this is the right seam anyway.
+  */
+  let identity = { name: "SkyRunners HQ", description: "" };
+  try {
+    identity = await getClubIdentity();
+  } catch {
+    // Same reasoning as the guards below: this layout wraps every
+    // authenticated page and cannot be allowed to fail one.
+  }
+
   let alertCount = 0;
   try {
     const myWork = await getMyWork(viewer.member.id);
@@ -75,6 +92,7 @@ export default async function AppLayout({
         showLeadingGuide={
           viewer.member.globalRole !== "member" || leadershipRoles.isRE
         }
+        clubName={identity.name}
         isDemo={viewer.isDemo}
         alertCount={alertCount}
       />
@@ -83,4 +101,27 @@ export default async function AppLayout({
       </main>
     </>
   );
+}
+
+/**
+ * Tab titles follow the club's name.
+ *
+ * A `template` rather than each page spelling it out: pages now export just
+ * "Calendar" or "Find work", and this appends whatever the club is called. The
+ * alternative was fifteen files each hard-coding a name that a Co-Lead can
+ * change from Settings, which is how "Stanford UAV" ends up with "SkyRunners
+ * HQ" in every browser tab.
+ *
+ * On the `(app)` layout rather than the root one, which is html/body/fonts
+ * only and must not resolve the viewer.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const { name } = await getClubIdentity();
+    return { title: { default: name, template: `%s · ${name}` } };
+  } catch {
+    return {
+      title: { default: "SkyRunners HQ", template: "%s · SkyRunners HQ" },
+    };
+  }
 }

@@ -18,7 +18,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { TIER_LABELS } from "@/lib/contribution";
 
 export const metadata = {
-  title: "New here? · SkyRunners HQ",
+  title: "New here?",
 };
 
 /**
