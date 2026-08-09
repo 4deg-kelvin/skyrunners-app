@@ -298,16 +298,34 @@ importance_weight, starts_at, ends_at, location), mapped in
 `lib/store/mapping.ts`; `lib/data/events.ts → getUpcomingEvents()`, verified
 against live data. No attendance or invite table yet, and no UI beyond a stub.
 
-### Phase 9 — Trainings and facility access **[App]**
+### Phase 9 — Trainings and facility access **[App]** — ✅ shipped 2026-08-09
 
-Self-contained; move earlier if safety compliance gets urgent. Needs Anish's real machine
-and lab list.
+- ✅ `/trainings`, with the club's real catalogue seeded (migration 0017)
+- ✅ **The catalogue is DATA, not an enum.** A Co-Lead adds a machine or a whole
+  new site from the UI and it appears for everyone immediately, unearned. This
+  was the key requirement: *"more trainings will always be added later, so it
+  should be easy for any Co-Lead to add more."* There is no union type of
+  training names anywhere in the codebase and there must never be one
+- ✅ Two kinds of record, neither implying the other: **site access** (a door)
+  and **machine training** (clearance on one machine inside it). "Lab 64 — 24
+  hour" is its own access, not a property of ordinary Lab 64 access
+- ✅ Request → verify. Nobody self-verifies — enforced in `can.verifyTraining`
+  AND again in the operation, because it's a safety record
+- ✅ Expiry cancels the clearance and tells the Lead in-app, per Anish. No item
+  in the club's list has an expiry today, so the path is built and dormant
+- ✅ Certificate link, verifier snapshot, public visibility
+- ✅ "Who can run the laser cutter" on every row — the half that pays for the
+  page, and the same thesis as `/find-work`
 
-- Training catalog with expiry
-- Member requests → Lead or Co-Lead verifies
-- Certificate upload, viewable in one click
-- Facility access: Robotics Room, Lab 64 24-hour, PRL
-- **Progression ladder** — "one training away from Lab 64 access"
+Decided against, on Anish's call (2026-08-09):
+
+- ❌ **Projects requiring a training**, and `/find-work` surfacing "you need X
+  for this". *"The RE should check first if a person is capable of joining
+  their project."* Encoding it would add a constraint to every join path to
+  replace one conversation
+- ❌ A **progression ladder** ("one training away from Lab 64 access"). Site
+  access and machine training are independent by design, so there is no ladder
+  to climb — that bullet was written before the two-kinds model existed
 
 ### Phase 10 — Leadership contribution view **[App]**
 
@@ -316,26 +334,28 @@ and lab list.
 - Co-Lead editor for the hours expectation and tier thresholds
 - **Still no leaderboard**
 
-### Phase 11 — Milestones **[App]**
+### ~~Phase 11 — Milestones~~ — ❌ dropped 2026-08-09, replaced by `/deadlines`
 
-- Name, target date, owner, status. Deliverables roll up into them
-- Slip warnings when a dated deliverable pushes past a milestone
+**The milestones ARE the deadlines.** A project's target date and its
+deliverables' due dates are already maintained, already accurate, and already
+what people plan against. A parallel milestone entity would have been a second
+list to keep current, and the second list is always the one that goes stale.
 
-Explicitly **not** a critical-path Gantt. On a volunteer team availability swings with
-midterms, the dates are wrong the day after entry, and a wrong schedule is worse than none
-because people plan against it. 80% of the value for 5% of the work.
+`/deadlines` gives the useful 90% for none of the upkeep: every project target
+and deliverable due date, grouped by division, **computed and never stored**.
+Change a date and the page follows. It also answers the one question no project
+page can — *are three divisions all landing something the same week?*
 
-### Phase 12 — Purchase requests and budget **[App]**
+Still explicitly **not** a critical-path Gantt, for the original reason: on a
+volunteer team availability swings with midterms, dates are wrong the day after
+entry, and a wrong schedule is worse than none because people plan against it.
 
-**Deliberately late** — the club has working systems for this, so nothing breaks while it
-lives elsewhere.
+### ~~Phase 12 — Purchase requests and budget~~ — ❌ dropped
 
-Worth building eventually: it's the operational bottleneck that blocks work most often, and
-having it here would make the app the single source of truth. But it involves approvals and
-money, which raises the stakes.
-
-- Request → approved → ordered → received, with reimbursement status
-- Per-division budget rollup
+Out of scope. The club has working systems for this and nothing breaks while it
+lives elsewhere. It involves approvals and money, which raises the stakes for a
+solo beginner maintaining the app, and the value is convenience rather than
+solving one of the three problems this app exists for.
 
 ### Later
 

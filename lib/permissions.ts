@@ -442,6 +442,16 @@ export const can = {
   grantAccess: (actor: Actor, graph: OrgGraph, memberId: string) =>
     isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
 
+  /**
+   * Edit the catalogue itself — add a site, add a machine, retire one.
+   *
+   * Co-Lead only, same as divisions: it's the shape everything else hangs off.
+   * Deliberately a LOW bar to use, though — the requirement is that adding a
+   * training is a Co-Lead typing a name, not a developer shipping a deploy, so
+   * nothing above this should make it feel like an administrative act.
+   */
+  manageTrainingCatalogue: (actor: Actor) => isCoLead(actor),
+
   // --- Events ------------------------------------------------------------
 
   createEvent: (actor: Actor) => actor.globalRole !== "member",

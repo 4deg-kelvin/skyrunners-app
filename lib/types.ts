@@ -531,55 +531,104 @@ export interface ProgressUpdate {
 // Trainings and facility access
 // ---------------------------------------------------------------------------
 
-export type TrainingCategory =
-  | "machine_shop"
-  | "lab_equipment"
-  | "safety"
-  | "software"
-  | "online_course"
-  | "flight";
+/**
+ * ============================================================================
+ * The catalogue is DATA, not a type. This is the whole design.
+ * ============================================================================
+ *
+ * There used to be a `TrainingCategory` union here — `machine_shop | safety |
+ * software | …` — and it was the wrong shape for the actual requirement:
+ *
+ *   "More trainings will always be added later, so it should be easy for any
+ *    Co-Lead to add more trainings which should automatically populate for
+ *    everyone as they show up."  — Anish, 2026-08-08
+ *
+ * A union type means adding "Waterjet" is a code change, a migration, a
+ * deploy, and a developer. As rows, it's a Co-Lead typing a name. **Do not
+ * reintroduce an enum of training names**, however tempting the type safety
+ * looks — the club will add machines faster than anyone will ship deploys for
+ * them, and the moment the two drift the page stops matching the shop.
+ *
+ * The only enum here is `kind`, which has exactly two values that are
+ * genuinely different behaviours (a door versus a machine), not a list that
+ * grows.
+ */
 
-export interface TrainingType {
+/** A site, or `Misc` for the things that belong to no site. */
+export interface TrainingSection {
   id: string;
   name: string;
-  category: TrainingCategory;
-  validityMonths?: number;
+  /** Manual ordering — the shop's layout isn't alphabetical. */
+  sortOrder: number;
 }
 
 /**
- * Members submit a request; their direct Lead or a Co-Lead verifies it.
- * `requested` is the entry point of that flow.
+ * Two genuinely different things, deliberately in one table.
+ *
+ *   `site_access` — can you get in the door. A keycard.
+ *   `machine`     — are you cleared on a specific machine, inside a site.
+ *
+ * **Neither implies the other**, in either direction: Lab 64 access doesn't
+ * clear you on the laser cutter, and being cleared on the laser cutter doesn't
+ * open the door at 2am (that's "Lab 64 — 24 hour", its own separate access).
+ * They share a table because the request → verify flow, the expiry rules and
+ * the certificate field are identical, and two tables would mean writing all
+ * of that twice.
  */
-export type TrainingStatus =
+export type CatalogueItemKind = "site_access" | "machine";
+
+export interface CatalogueItem {
+  id: string;
+  sectionId: string;
+  name: string;
+  kind: CatalogueItemKind;
+  /**
+   * How long it stays valid. Undefined means forever, which is the case for
+   * everything in the club's list today.
+   *
+   * When it IS set, expiry doesn't just grey the row out — the certification
+   * is cancelled and the member's Lead is told, because an expired clearance
+   * that still reads as valid is the one failure mode that gets somebody hurt.
+   */
+  validityMonths?: number;
+  sortOrder: number;
+  /** Retired rather than deleted, so existing records keep their meaning. */
+  isActive: boolean;
+}
+
+/**
+ * One member's standing on one catalogue item.
+ *
+ * `requested` is the entry point: a member says they've done the training.
+ * **Nobody self-verifies** — `can.verifyTraining` is their Lead chain or a
+ * Co-Lead, and the operation refuses the member's own id regardless.
+ */
+export type CertificationStatus =
   | "requested"
   | "verified"
   | "expired"
   | "rejected";
 
-export interface MemberTraining {
+export interface MemberCertification {
   id: string;
   memberId: string;
-  trainingTypeId: string;
+  itemId: string;
+  status: CertificationStatus;
+  /** When the member says they did it. */
   completedAt: string;
+  /** Computed from `validityMonths` at verification. Absent means no expiry. */
   expiresAt?: string;
   certificateUrl?: string;
-  status: TrainingStatus;
+  /**
+   * Who verified, and when. Snapshotted, same reasoning as
+   * `lead_id_at_submission`: people change roles and "who signed this off"
+   * has to stay answerable after they've graduated.
+   */
   verifiedById?: string;
-}
-
-export interface AccessType {
-  id: string;
-  name: string;
-  location?: string;
-}
-
-export interface MemberAccess {
-  id: string;
-  memberId: string;
-  accessTypeId: string;
-  grantedAt?: string;
-  expiresAt?: string;
-  status: "requested" | "active" | "expired" | "revoked";
+  verifiedAt?: string;
+  /** Why it was rejected, or any note the verifier left. */
+  note?: string;
+  requestedAt: string;
 }
 
 // ---------------------------------------------------------------------------

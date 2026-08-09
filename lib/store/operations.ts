@@ -23,6 +23,8 @@
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
 import type {
+  CatalogueItem,
+  CatalogueItemKind,
   Deliverable,
   DeliverableStatus,
   GlobalRole,
@@ -30,11 +32,13 @@ import type {
   HelpRequest,
   JoinRequest,
   Member,
+  MemberCertification,
   MemberStatus,
   ProgressUpdate,
   Project,
   Team,
   Term,
+  TrainingSection,
   UpdateEntry,
   WorkLog,
 } from "../types.ts";
@@ -1604,6 +1608,340 @@ export async function createTeam(input: {
 
     store.teams.push(team);
     return ok(team);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Trainings and facility access
+// ---------------------------------------------------------------------------
+
+/** Add `months` to an ISO date, clamped to the end of the target month. */
+function addMonths(iso: string, months: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  // 31 Jan + 1 month has no 31 Feb. Clamp rather than roll into March, which
+  // would quietly hand somebody three extra days of clearance.
+  const lastDay = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * A member says they've completed a training, or need site access.
+ *
+ * Creates the row in `requested`. **Nobody self-verifies** — that's enforced
+ * in `verifyCertification` below as well as in `can.verifyTraining`, because
+ * this is a safety record and one check is not enough.
+ */
+export async function requestCertification(input: {
+  memberId: string;
+  itemId: string;
+  completedAt: string;
+  certificateUrl?: string;
+  today: string;
+}): Promise<Result<MemberCertification>> {
+  if (input.completedAt > input.today) {
+    return fail<MemberCertification>("That date is in the future.");
+  }
+
+  return guarded((store) => {
+    const item = store.catalogueItems.find((i) => i.id === input.itemId);
+    if (!item) return fail<MemberCertification>("That training no longer exists.");
+    if (!item.isActive) {
+      return fail<MemberCertification>(
+        `${item.name} has been retired — you don't need it any more.`
+      );
+    }
+
+    const existing = store.certifications.find(
+      (c) => c.memberId === input.memberId && c.itemId === input.itemId
+    );
+
+    if (existing) {
+      if (existing.status === "verified") {
+        return fail<MemberCertification>(`You're already cleared on ${item.name}.`);
+      }
+      if (existing.status === "requested") {
+        return fail<MemberCertification>(
+          `You've already asked — ${item.name} is waiting on your Lead.`
+        );
+      }
+
+      // Expired or rejected: reuse the row rather than adding a second one.
+      // A unique index on (member_id, item_id) enforces the same thing in SQL,
+      // and re-requesting after a rejection is the normal path — you did the
+      // training properly the second time.
+      existing.status = "requested";
+      existing.completedAt = input.completedAt;
+      existing.certificateUrl = input.certificateUrl?.trim() || undefined;
+      existing.requestedAt = input.today;
+      existing.verifiedById = undefined;
+      existing.verifiedAt = undefined;
+      existing.expiresAt = undefined;
+      existing.note = undefined;
+      return ok(existing);
+    }
+
+    const record: MemberCertification = {
+      id: newId("cert"),
+      memberId: input.memberId,
+      itemId: input.itemId,
+      status: "requested",
+      completedAt: input.completedAt,
+      certificateUrl: input.certificateUrl?.trim() || undefined,
+      requestedAt: input.today,
+    };
+
+    store.certifications.push(record);
+    return ok(record);
+  });
+}
+
+/**
+ * A Lead or Co-Lead confirms it.
+ *
+ * `expiresAt` is computed here from the item's `validityMonths`, not accepted
+ * from the caller: the expiry of a safety clearance is a property of the
+ * training, not something the verifier types in.
+ */
+export async function verifyCertification(input: {
+  certificationId: string;
+  verifierId: string;
+  today: string;
+}): Promise<Result<MemberCertification>> {
+  return guarded((store) => {
+    const record = store.certifications.find(
+      (c) => c.id === input.certificationId
+    );
+    if (!record) return fail<MemberCertification>("That request no longer exists.");
+
+    // The second of the two checks. `can.verifyTraining` is the first, and it
+    // already excludes self — but this is the record that decides whether
+    // somebody is allowed near a machine, so it does not rely on one layer.
+    if (record.memberId === input.verifierId) {
+      return fail<MemberCertification>(
+        "You can't verify your own training — ask your Lead."
+      );
+    }
+
+    const item = store.catalogueItems.find((i) => i.id === record.itemId);
+
+    record.status = "verified";
+    record.verifiedById = input.verifierId;
+    record.verifiedAt = input.today;
+    record.note = undefined;
+    record.expiresAt = item?.validityMonths
+      ? addMonths(record.completedAt, item.validityMonths)
+      : undefined;
+
+    return ok(record);
+  });
+}
+
+/** Turn one down, with a reason. */
+export async function rejectCertification(input: {
+  certificationId: string;
+  verifierId: string;
+  note?: string;
+}): Promise<Result<MemberCertification>> {
+  return guarded((store) => {
+    const record = store.certifications.find(
+      (c) => c.id === input.certificationId
+    );
+    if (!record) return fail<MemberCertification>("That request no longer exists.");
+    if (record.memberId === input.verifierId) {
+      return fail<MemberCertification>("You can't decide your own request.");
+    }
+
+    record.status = "rejected";
+    record.verifiedById = input.verifierId;
+    record.note = input.note?.trim() || undefined;
+    record.expiresAt = undefined;
+    return ok(record);
+  });
+}
+
+/**
+ * Withdraw a clearance somebody shouldn't have any more.
+ *
+ * Separate from rejecting: this is for a verified record going away — the
+ * machine changed, the training lapsed in practice, somebody was cleared in
+ * error. It becomes `expired` rather than being deleted, so the history of who
+ * was cleared when survives.
+ */
+export async function revokeCertification(input: {
+  certificationId: string;
+  verifierId: string;
+  note?: string;
+  today: string;
+}): Promise<Result<MemberCertification>> {
+  return guarded((store) => {
+    const record = store.certifications.find(
+      (c) => c.id === input.certificationId
+    );
+    if (!record) return fail<MemberCertification>("That record no longer exists.");
+
+    record.status = "expired";
+    record.expiresAt = input.today;
+    record.note = input.note?.trim() || undefined;
+    record.verifiedById = input.verifierId;
+    return ok(record);
+  });
+}
+
+/**
+ * Expire everything past its date.
+ *
+ * Anish's rule: *"no trainings have an expiration yet, but if there is, the
+ * training should be cancelled and the lead notified."* So expiry isn't a
+ * display filter — the record is genuinely cancelled, because a lapsed
+ * clearance that still reads as valid is the one failure here that gets
+ * somebody hurt.
+ *
+ * The "lead notified" half is in-app, per the standing decision that only join
+ * requests and escalations send email: an expired clearance surfaces in the
+ * Lead's dashboard exception feed. Returns the affected records so a caller
+ * can say what changed.
+ *
+ * Idempotent — safe to run on every page load, which is how it runs today
+ * rather than on a cron nobody has set up yet.
+ */
+export async function expireLapsedCertifications(
+  today: string
+): Promise<Result<MemberCertification[]>> {
+  return guarded((store) => {
+    const lapsed = store.certifications.filter(
+      (c) => c.status === "verified" && c.expiresAt && c.expiresAt < today
+    );
+    for (const record of lapsed) record.status = "expired";
+    return ok(lapsed);
+  });
+}
+
+// --- the catalogue itself, Co-Lead editable --------------------------------
+
+export async function createTrainingSection(input: {
+  name: string;
+}): Promise<Result<TrainingSection>> {
+  const name = input.name.trim();
+  if (!name) return fail<TrainingSection>("Give the site a name.");
+
+  return guarded((store) => {
+    if (
+      store.trainingSections.some(
+        (s) => s.name.toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      return fail<TrainingSection>(`There's already a section called "${name}".`);
+    }
+
+    const section: TrainingSection = {
+      id: newId("section"),
+      name,
+      // Before "Misc", which sits at 99 and should stay last.
+      sortOrder:
+        Math.max(
+          0,
+          ...store.trainingSections.filter((s) => s.sortOrder < 99).map((s) => s.sortOrder)
+        ) + 1,
+    };
+
+    store.trainingSections.push(section);
+    return ok(section);
+  });
+}
+
+export async function createCatalogueItem(input: {
+  sectionId: string;
+  name: string;
+  kind: CatalogueItemKind;
+  validityMonths?: number;
+}): Promise<Result<CatalogueItem>> {
+  const name = input.name.trim();
+  if (!name) return fail<CatalogueItem>("Give it a name.");
+  if (
+    input.validityMonths !== undefined &&
+    (!Number.isInteger(input.validityMonths) || input.validityMonths < 1)
+  ) {
+    return fail<CatalogueItem>("Validity has to be a whole number of months.");
+  }
+
+  return guarded((store) => {
+    const section = store.trainingSections.find((s) => s.id === input.sectionId);
+    if (!section) return fail<CatalogueItem>("That section no longer exists.");
+
+    if (
+      store.catalogueItems.some(
+        (i) =>
+          i.sectionId === input.sectionId &&
+          i.name.toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      return fail<CatalogueItem>(
+        `${section.name} already has "${name}".`
+      );
+    }
+
+    const siblings = store.catalogueItems.filter(
+      (i) => i.sectionId === input.sectionId && i.kind === input.kind
+    );
+
+    const created: CatalogueItem = {
+      id: newId("item"),
+      sectionId: input.sectionId,
+      name,
+      kind: input.kind,
+      validityMonths: input.validityMonths,
+      // Machines start at 10 so site access always sorts above them.
+      sortOrder:
+        Math.max(input.kind === "machine" ? 9 : -1, ...siblings.map((i) => i.sortOrder)) + 1,
+      isActive: true,
+    };
+
+    store.catalogueItems.push(created);
+    return ok(created);
+  });
+}
+
+export async function updateCatalogueItem(input: {
+  itemId: string;
+  name: string;
+  validityMonths?: number;
+}): Promise<Result<CatalogueItem>> {
+  const name = input.name.trim();
+  if (!name) return fail<CatalogueItem>("Give it a name.");
+
+  return guarded((store) => {
+    const item = store.catalogueItems.find((i) => i.id === input.itemId);
+    if (!item) return fail<CatalogueItem>("That entry no longer exists.");
+
+    item.name = name;
+    item.validityMonths = input.validityMonths;
+    return ok(item);
+  });
+}
+
+/**
+ * Retire a catalogue entry rather than deleting it.
+ *
+ * A machine that leaves the shop still has people who were cleared on it, and
+ * deleting the row would erase the record of who those were. Retired entries
+ * stop being requestable and drop off the list; existing certifications keep
+ * pointing at something with a name.
+ */
+export async function setCatalogueItemActive(input: {
+  itemId: string;
+  isActive: boolean;
+}): Promise<Result<CatalogueItem>> {
+  return guarded((store) => {
+    const item = store.catalogueItems.find((i) => i.id === input.itemId);
+    if (!item) return fail<CatalogueItem>("That entry no longer exists.");
+    item.isActive = input.isActive;
+    return ok(item);
   });
 }
 

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
@@ -14,12 +15,17 @@ import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
 import { ActionButton } from "@/components/forms/action-form";
+import { VerifyControls } from "@/components/forms/training-actions";
 import { deleteCheckInAction } from "@/lib/actions";
 import { getMemberProfile } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
-import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
+import {
+  CERTIFICATION_STATUS_TONES,
+  ROLE_LABELS,
+  ROLE_TONES,
+} from "@/lib/labels";
 import { can } from "@/lib/permissions";
-import { formatNumber, initials } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 export default async function MemberProfilePage({
   params,
@@ -36,10 +42,24 @@ export default async function MemberProfilePage({
 
   if (!view) notFound();
 
-  const { member, lead, directReports, projects, contribution, checkIns } =
-    view;
+  const {
+    member,
+    lead,
+    directReports,
+    projects,
+    contribution,
+    checkIns,
+    certifications,
+  } = view;
   const isOwnProfile = viewer.member.id === member.id;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
+  // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
+  // that too, because this is a safety record and one check isn't enough.
+  const canVerifyTrainings = can.verifyTraining(
+    viewer.actor,
+    viewer.graph,
+    member.id
+  );
 
   return (
     <div className="space-y-6">
@@ -67,18 +87,11 @@ export default async function MemberProfilePage({
             <SectionLabel>Details</SectionLabel>
 
             <div className="mt-5 flex items-center gap-4">
-              <span className="flex size-[72px] shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-2xl font-bold text-cardinal-600">
-                {member.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={member.photoUrl}
-                    alt=""
-                    className="size-full rounded-full object-cover"
-                  />
-                ) : (
-                  initials(member.fullName)
-                )}
-              </span>
+              <Avatar
+                name={member.fullName}
+                photoUrl={member.photoUrl}
+                className="size-[72px] text-2xl"
+              />
               <ContactLink member={member} />
             </div>
 
@@ -356,13 +369,86 @@ export default async function MemberProfilePage({
             </Card>
           ) : null}
 
+          {/*
+            Trainings, and the verify controls if the viewer is up this
+            person's Lead chain. Public to read — knowing who can run a machine
+            is how you find the person to ask.
+          */}
           <Card>
             <CardBody>
-              <SectionLabel>Trainings &amp; Facility Access</SectionLabel>
-              <p className="mt-3 text-[15px] text-ink-soft">
-                Machine shop and lab certifications, expiry dates, certificate
-                files, and keycard access arrive in Phase 7.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionLabel>Trainings &amp; Facility Access</SectionLabel>
+                {isOwnProfile ? (
+                  <Link
+                    href="/trainings"
+                    className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                  >
+                    Add a training
+                  </Link>
+                ) : null}
+              </div>
+
+              {certifications.held.length === 0 &&
+              certifications.pending.length === 0 ? (
+                <p className="mt-3 text-[15px] text-ink-soft">
+                  {isOwnProfile
+                    ? "Nothing recorded yet. Add what you're already cleared on — your Lead confirms it."
+                    : `${member.fullName} hasn't recorded any trainings yet.`}
+                </p>
+              ) : null}
+
+              {certifications.pending.length > 0 ? (
+                <div className="mt-4">
+                  <SectionLabel tone="muted">Awaiting verification</SectionLabel>
+                  <div className="mt-2 space-y-2">
+                    {certifications.pending.map(({ record, itemName }) => (
+                      <div
+                        key={record.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-warn-fg/25 bg-warn-bg/40 px-4 py-2.5"
+                      >
+                        <span className="text-sm font-semibold text-ink">
+                          {itemName}
+                        </span>
+                        {canVerifyTrainings ? (
+                          <VerifyControls
+                            certificationId={record.id}
+                            memberId={member.id}
+                            memberName={member.fullName}
+                          />
+                        ) : (
+                          <Badge tone="warn">Waiting on their Lead</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {certifications.held.length > 0 ? (
+                <div className="mt-4">
+                  <SectionLabel tone="muted">Cleared</SectionLabel>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {certifications.held.map(({ record, itemName }) => (
+                      <Badge
+                        key={record.id}
+                        tone={CERTIFICATION_STATUS_TONES[record.status]}
+                      >
+                        {itemName}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {certifications.lapsed.length > 0 ? (
+                <div className="mt-4">
+                  <SectionLabel tone="muted">Lapsed</SectionLabel>
+                  <p className="mt-1 text-sm text-risk-fg">
+                    Not cleared until redone:{" "}
+                    {certifications.lapsed.map((c) => c.itemName).join(", ")}
+                  </p>
+                </div>
+              ) : null}
             </CardBody>
           </Card>
         </div>

@@ -86,6 +86,52 @@ export function useHideCompleted(): boolean {
  * mystery toggle — with it, "Hide 12 completed" says exactly what pressing it
  * does, and its absence says there's nothing to hide.
  */
+/**
+ * A self-contained "Completed · N" block with its own show/hide.
+ *
+ * For pages with exactly one completed list — My Work — where the context
+ * provider and a separate header control would be three moving parts for one
+ * switch. `/projects` still uses the provider, because the switch there has to
+ * reach nested sub-projects across several division cards.
+ *
+ * Collapsed by default, and not remembered. Different from the projects page
+ * on purpose: this list is your own finished work, you look at it
+ * deliberately, and a preference that persisted would mean opening My Work one
+ * day to a wall of things you already did.
+ */
+export function CompletedProjectsSection({
+  count,
+  children,
+}: {
+  count: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-muted transition-colors hover:text-ink"
+      >
+        {open ? (
+          <EyeOff className="size-3.5" strokeWidth={2.5} />
+        ) : (
+          <Eye className="size-3.5" strokeWidth={2.5} />
+        )}
+        Completed · {count}
+        <span className="font-normal normal-case tracking-normal text-ink-muted">
+          {open ? "(hide)" : "(show)"}
+        </span>
+      </button>
+
+      {open ? children : null}
+    </div>
+  );
+}
+
 export function HideCompletedToggle({ count }: { count: number }) {
   const { hidden, setHidden } = useContext(HideCompletedContext);
 

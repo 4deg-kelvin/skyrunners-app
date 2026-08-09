@@ -16,6 +16,8 @@ import {
   updateSchedules as seedUpdateSchedules,
   projectMemberships as seedMemberships,
   workLogs as seedWorkLogs,
+  seedTrainingSections,
+  seedCatalogueItems,
 } from "../mock-data.ts";
 import type {
   ClubEvent,
@@ -28,8 +30,11 @@ import type {
   JoinRequest,
   ProgressUpdate,
   ProjectMembership,
+  CatalogueItem,
   HelpRequest,
+  MemberCertification,
   ProjectNotice,
+  TrainingSection,
   UpdateSchedule,
   WorkLog,
 } from "../types.ts";
@@ -101,6 +106,15 @@ export interface StoreShape {
   projectNotices: ProjectNotice[];
   /** Free-form asks on the blocker board — see `HelpRequest`. */
   helpRequests: HelpRequest[];
+  /**
+   * The trainings catalogue and who holds what.
+   *
+   * Catalogue rows are DATA on purpose — a Co-Lead adds a machine from the UI
+   * and it appears for everyone. Never turn these back into an enum.
+   */
+  trainingSections: TrainingSection[];
+  catalogueItems: CatalogueItem[];
+  certifications: MemberCertification[];
 }
 
 /**
@@ -111,7 +125,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 7;
+const STORE_VERSION = 8;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -147,6 +161,10 @@ function seed(): StoreShape {
     projectNotices: [],
     // Likewise — an ask only exists because a member posted one.
     helpRequests: [],
+    trainingSections: seedTrainingSections,
+    catalogueItems: seedCatalogueItems,
+    // Nobody holds anything until they say so and a Lead verifies it.
+    certifications: [],
   });
 }
 

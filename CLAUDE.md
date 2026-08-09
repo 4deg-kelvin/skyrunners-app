@@ -113,6 +113,15 @@ app/
   auth/             callback route + no-profile / inactive pages
   (app)/            route group: everything requiring a session
     layout.tsx      nav, demo banner, getViewer()
+    my-work/        what you own and owe. `/` redirects here
+    find-work/      the point of the app — where to help
+    blockers/       everything stuck, oldest first, anyone can answer
+    projects/       the tree, plus /archive for retired divisions
+    members/        roster and profiles
+    trainings/      what you're cleared on, and who else is
+    deadlines/      every due date per division (replaced Phase 11)
+    calendar/       events (Phase 8, still a stub)
+    dashboard/      leadership only, scoped to who you oversee
 ```
 
 The `(app)` group exists because if the root layout resolved the viewer, `/login` would
@@ -222,7 +231,7 @@ a Lead overseeing several of their projects, and an RE couldn't tell whether a b
 theirs to clear. Anything rendering an update must iterate `entries` and label each with
 its project.
 
-## The nine things most likely to trip you up
+## The ten things most likely to trip you up
 
 1. **Two independent hierarchies.** Org tree (`teams.parent_id`, who reports to whom) and
    project tree (`projects.parent_id`, what work exists) are separate. A member's Lead is
@@ -259,7 +268,15 @@ its project.
    "Functions cannot be passed directly to Client Components" — an error whose message
    points nowhere near the cause.
 
-9. **A parent project can't be marked complete while any descendant isn't.** Enforced in
+9. **The trainings catalogue is DATA, never an enum.** Sites and machines are rows in
+   `training_sections` / `catalogue_items`, so a Co-Lead adds one from the UI and it
+   appears for everyone with no deploy. There was a `TrainingCategory` union here once;
+   it was deleted for exactly this reason. The club adds machines faster than anyone
+   ships deploys, and the moment the two drift the page stops matching the shop floor.
+   The *only* enum in that feature is `kind` — `site_access` vs `machine`, two genuinely
+   different behaviours, and **neither implies the other**.
+
+10. **A parent project can't be marked complete while any descendant isn't.** Enforced in
    `updateProject`, recursively and cycle-guarded. Refused rather than cascaded: completing
    the children on the parent's behalf would sign off work their own REs never agreed was
    done. Completing one also writes a `ProjectNotice` addressed up the project tree —
