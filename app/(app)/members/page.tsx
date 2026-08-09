@@ -99,13 +99,29 @@ export default async function MembersPage() {
                       className="size-11 text-sm"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <Link
-                          href={`/members/${member.id}`}
-                          className="text-ink hover:text-cardinal-600 truncate text-[15px] font-bold"
-                        >
-                          {member.fullName}
-                        </Link>
+                      {/*
+                        The name owns its own line, and the badges own theirs.
+
+                        They used to share a non-wrapping flex row: the name was
+                        `truncate` (so it could shrink) and every badge is
+                        `whitespace-nowrap` (so none of them could). Add a
+                        division called "Stanford UAV Operational Support" and
+                        the badges claimed the whole row, the name truncated to
+                        nothing, and the ONLY link to somebody's profile
+                        silently disappeared from the roster.
+
+                        Splitting the rows makes that impossible rather than
+                        unlikely — no amount of badge text can push the name out
+                        now, whatever anybody names a division.
+                      */}
+                      <Link
+                        href={`/members/${member.id}`}
+                        className="text-ink hover:text-cardinal-600 block truncate text-[15px] font-bold"
+                      >
+                        {member.fullName}
+                      </Link>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {member.globalRole !== "member" ? (
                           <Badge tone={ROLE_TONES[member.globalRole]}>
                             {ROLE_LABELS[member.globalRole]}
@@ -114,19 +130,26 @@ export default async function MembersPage() {
                         {/*
                           WHAT they lead, not just that they do.
 
-                          "Lead" alone doesn't say whether somebody runs a
-                          whole division — which makes them a top RE over every
-                          project inside it — or one sub-team. This page is
-                          where people answer "who do I ask about this?", so it
-                          has to name the unit.
+                          "Lead" alone doesn't say whether somebody runs a whole
+                          division — which makes them a top RE over every project
+                          inside it — or one sub-team. This page is where people
+                          answer "who do I ask about this?", so it names the unit.
+
+                          Capped and title-attributed: division names are free
+                          text and somebody will eventually write a sentence.
                         */}
                         {leads.map((unit) => (
                           <Badge
                             key={unit.id}
                             tone={unit.isDivision ? "cardinal" : "neutral"}
+                            className="max-w-[13rem] overflow-hidden text-ellipsis"
                           >
-                            {unit.name}
-                            {unit.isDivision ? " Lead" : " sub-team"}
+                            <span
+                              className="truncate"
+                              title={`${unit.name} — ${unit.isDivision ? "division lead" : "sub-team lead"}`}
+                            >
+                              {unit.name}
+                            </span>
                           </Badge>
                         ))}
                         {/* Alumni and deactivated people stay on the roster so
