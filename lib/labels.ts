@@ -329,4 +329,5 @@ export const ATTENTION_LABELS: Record<AttentionReason, string> = {
   deliverables_overdue: "Deliverables overdue",
   no_deputy_re: "No deputy RE",
   health_flagged: "Flagged by its RE",
+  past_target: "Past its target date",
 };

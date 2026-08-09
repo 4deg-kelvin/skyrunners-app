@@ -585,6 +585,21 @@ export const can = {
   /** Divisions and sub-teams are the org's shape — Co-Leads only. */
   manageTeams: (actor: Actor) => isCoLead(actor),
 
+  /**
+   * Delete somebody's record outright.
+   *
+   * Co-Lead only, and never yourself. This is NOT the tool for somebody
+   * leaving the club — that's `setMemberStatus`, which keeps their history.
+   * This is for a broken row: the duplicate profile created when an invite
+   * email doesn't match the address Google returns, which can never be signed
+   * in to and clutters every picker.
+   *
+   * The operation re-checks self-deletion, refuses the last Co-Lead, and
+   * refuses anyone holding real history unless forced.
+   */
+  deleteMember: (actor: Actor, memberId: string) =>
+    isCoLead(actor) && !isSelf(actor, memberId),
+
   /** Co-Leads set the club's hours expectation and tier thresholds. */
   configureExpectations: (actor: Actor) => isCoLead(actor),
 

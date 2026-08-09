@@ -1621,6 +1621,140 @@ export async function createTeam(input: {
   });
 }
 
+/**
+ * Remove somebody's record entirely.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this exists at all, given "never hard-delete people"
+ * ---------------------------------------------------------------------------
+ *
+ * That rule is about a REAL member whose contribution history has to survive
+ * graduation, and it stands. This is for the other thing: a broken profile
+ * row. The commonest is a duplicate — somebody is invited as
+ * `jhale@stanford.edu`, signs in as `juliahale@stanford.edu`, and the trigger
+ * in 0005 finds no match and creates a second, inactive row. Now there are two
+ * records for one person, one of which can never be used and clutters every
+ * picker in the app.
+ *
+ * Deactivating is the wrong tool there: it keeps the bad row on the roster
+ * forever, marked as if a real person left.
+ *
+ * ---------------------------------------------------------------------------
+ * The guards
+ * ---------------------------------------------------------------------------
+ *
+ * Same shape as `deleteProject`: refuse anything with real history unless a
+ * Co-Lead explicitly overrides, and never allow the two lock-outs.
+ */
+export async function deleteMember(input: {
+  memberId: string;
+  /** Never yourself. Passed so the operation can check independently. */
+  actorId: string;
+  /**
+   * Co-Lead override for the history guard.
+   *
+   * Deliberately does NOT bypass the lock-out guards below — those aren't
+   * about caution, they're about the app remaining usable afterwards.
+   */
+  force?: boolean;
+}): Promise<Result<null>> {
+  return guarded((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<null>("That member no longer exists.");
+
+    if (member.id === input.actorId) {
+      return fail<null>("You can't delete your own account.");
+    }
+
+    if (member.globalRole === "co_lead") {
+      const others = store.members.filter(
+        (m) =>
+          m.globalRole === "co_lead" &&
+          m.status === "active" &&
+          m.id !== member.id
+      );
+      if (others.length === 0) {
+        return fail<null>(
+          "That's the last Co-Lead. Promote somebody else first, or nobody can manage the club."
+        );
+      }
+    }
+
+    // History that belongs to a person, not to a broken row.
+    const delivered = store.deliverables.filter(
+      (d) => d.ownerId === member.id && d.status === "done"
+    ).length;
+    const checkIns = store.progressUpdates.filter(
+      (u) => u.memberId === member.id && u.submittedAt
+    ).length;
+
+    if ((delivered > 0 || checkIns > 0) && !input.force) {
+      const parts: string[] = [];
+      if (delivered > 0) {
+        parts.push(`${delivered} signed-off deliverable${delivered === 1 ? "" : "s"}`);
+      }
+      if (checkIns > 0) {
+        parts.push(`${checkIns} submitted check-in${checkIns === 1 ? "" : "s"}`);
+      }
+      return fail<null>(
+        `${member.fullName} has ${parts.join(" and ")} on record. Deactivate instead — that keeps the history. A Co-Lead can force a delete if this is a duplicate profile.`
+      );
+    }
+
+    /*
+      Anyone reporting to them is reparented to THEIR lead, not orphaned.
+
+      A member with `leadId` pointing at a deleted row has nobody reading their
+      check-ins and no escalation path, and nothing in the app would report it
+      — the exact silent failure the review chain exists to prevent.
+    */
+    for (const other of store.members) {
+      if (other.leadId === member.id) other.leadId = member.leadId;
+    }
+
+    // Projects they were the primary RE of would be left pointing at nothing,
+    // which is the one state the project model can't represent. Refuse rather
+    // than guess a replacement.
+    const owned = store.projects.filter((p) => p.primaryReId === member.id);
+    if (owned.length > 0) {
+      return fail<null>(
+        `${member.fullName} is the primary RE of ${owned.map((p) => p.name).join(", ")}. Hand those over first — a project with no RE is the one state the model can't hold.`
+      );
+    }
+
+    store.projectMemberships = store.projectMemberships.filter(
+      (m) => m.memberId !== member.id
+    );
+    store.workLogs = store.workLogs.filter((w) => w.memberId !== member.id);
+    store.joinRequests = store.joinRequests.filter(
+      (r) => r.memberId !== member.id
+    );
+    store.progressUpdates = store.progressUpdates.filter(
+      (u) => u.memberId !== member.id
+    );
+    store.updateSchedules = store.updateSchedules.filter(
+      (u) => u.memberId !== member.id
+    );
+    store.certifications = store.certifications.filter(
+      (c) => c.memberId !== member.id
+    );
+    store.helpRequests = store.helpRequests.filter(
+      (h) => h.memberId !== member.id
+    );
+    store.deliverables = store.deliverables.filter(
+      (d) => d.ownerId !== member.id
+    );
+    // Division leadership is a pointer, not a record — clear it rather than
+    // leaving a division led by a row that no longer exists.
+    for (const team of store.teams) {
+      if (team.leadId === member.id) team.leadId = undefined;
+    }
+
+    store.members = store.members.filter((m) => m.id !== member.id);
+    return ok(null);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Phase 8 — the calendar
 // ---------------------------------------------------------------------------

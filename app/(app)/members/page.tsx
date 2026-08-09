@@ -6,6 +6,7 @@ import {
   MemberAdminControls,
 } from "@/components/forms/member-admin";
 import { Badge } from "@/components/ui/badge";
+import { AccessIssues } from "@/components/ui/access-issues";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -21,6 +22,23 @@ export default async function MembersPage() {
     getViewer(),
   ]);
   const mayInvite = can.inviteMember(viewer.actor);
+
+  /*
+    Two ways to be locked out, and the roster showed them identically.
+
+    `lastActiveAt` is the discriminator: set means they've signed in at least
+    once, so an inactive row is one click from working. Undefined means the row
+    has never been used — nearly always because the invite email isn't the
+    address Google returns, in which case inviting them again just creates a
+    second row that also never links.
+  */
+  const lockedOut = roster.filter(({ member }) => member.status !== "active");
+  const waitingForActivation = lockedOut
+    .filter(({ member }) => member.lastActiveAt)
+    .map(({ member }) => member);
+  const neverSignedIn = roster
+    .filter(({ member }) => !member.lastActiveAt && member.status !== "alumni")
+    .map(({ member }) => member);
   const mayAppointLeadership = isCoLead(viewer.actor);
 
   return (
@@ -39,6 +57,18 @@ export default async function MembersPage() {
           ) : undefined
         }
       />
+
+      {/*
+        Shown only to whoever can actually fix it, and only when there IS
+        something to fix. A standing "0 access issues" panel is how a page
+        teaches you to skip a section.
+      */}
+      {mayInvite ? (
+        <AccessIssues
+          waitingForActivation={waitingForActivation}
+          neverSignedIn={neverSignedIn}
+        />
+      ) : null}
 
       <Card>
         <CardBody>
@@ -147,6 +177,7 @@ export default async function MembersPage() {
                             viewer.graph,
                             member.id
                           )}
+                          canDelete={can.deleteMember(viewer.actor, member.id)}
                         />
                       </div>
                     </div>

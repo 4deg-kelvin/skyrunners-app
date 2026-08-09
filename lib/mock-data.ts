@@ -631,6 +631,23 @@ export const members: Member[] = [
   },
 ];
 
+/**
+ * Everybody in the sample club has signed in.
+ *
+ * Set in a loop rather than on 35 literals, and it matters for one screen:
+ * `lastActiveAt` being undefined is the app's signal for "this row has never
+ * been signed in to", which the Access panel on /members reads as a probable
+ * wrong-email invite. Leaving the seed blank made every sample member look
+ * like a broken account.
+ *
+ * The date is deliberately not `today()` — these are module-scope literals,
+ * and calling it here would make the seed change depending on when the process
+ * started, which is the kind of thing that makes a test pass on Tuesday.
+ */
+for (const seeded of members) {
+  seeded.lastActiveAt = "2026-08-05T09:00:00Z";
+}
+
 export const CURRENT_USER_ID = "m-anish";
 
 // ---------------------------------------------------------------------------
@@ -1775,6 +1792,33 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
         reason: "blocker_stale",
         detail: `${stale.length} blocked deliverable${stale.length === 1 ? "" : "s"} waiting on an answer.`,
         severity: 2,
+      });
+    }
+
+    /*
+      Past its target date and not finished.
+
+      Deliberately does NOT touch `project.health` — that's the RE's judgement
+      and silently overwriting it would make the field meaningless. Instead the
+      contradiction is surfaced so the RE closes it themselves: either the date
+      slipped and should move, or the project really is at risk and health
+      should say so.
+    */
+    if (
+      project.phase !== "complete" &&
+      project.targetDate &&
+      project.targetDate < today()
+    ) {
+      const late = Math.abs(daysBetween(project.targetDate, today()));
+      flags.push({
+        projectId: project.id,
+        reason: "past_target",
+        detail:
+          `Target was ${project.targetDate} — ${Math.round(late)} day${Math.round(late) === 1 ? "" : "s"} ago` +
+          (project.health === "on_track"
+            ? ", but health still says on track. Move the date or change the health."
+            : "."),
+        severity: project.health === "on_track" ? 3 : 2,
       });
     }
 

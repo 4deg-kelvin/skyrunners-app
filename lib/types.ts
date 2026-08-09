@@ -49,6 +49,23 @@ export interface Member {
   primaryTeamId?: string;
   skills?: string[];
   joinedAt: string;
+  /**
+   * When they last signed in. Written by the trigger in migration 0005.
+   *
+   * **Undefined means they have never signed in at all**, and that distinction
+   * is the whole reason this reaches the app. Two very different situations
+   * look identical on the roster without it:
+   *
+   *   - Invited, never arrived — usually the email doesn't match the one
+   *     Google gives back, so the invite and the person never meet.
+   *   - Signed in and waiting to be activated — the trigger creates an
+   *     inactive profile for anyone with no invite, so they're sitting at
+   *     `/auth/inactive` needing one click from a Lead.
+   *
+   * "I can't add this person" is nearly always the first; the fix is to check
+   * the address, not to invite them again.
+   */
+  lastActiveAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -735,7 +752,18 @@ export type AttentionReason =
   | "blocker_stale"
   | "deliverables_overdue"
   | "no_deputy_re"
-  | "health_flagged";
+  | "health_flagged"
+  /**
+   * Past its target date and still not complete.
+   *
+   * Raised because health is the RE's own judgement and only moves when they
+   * move it — so a project could read "3 days overdue" next to a green "On
+   * track", which is the app saying two contradictory things at once. The
+   * badge states the fact; this flag asks the RE to reconcile it by moving the
+   * date or changing the health. Annotating a contradiction without offering a
+   * way to close it is just a tidier lie.
+   */
+  | "past_target";
 
 export interface ProjectAttentionFlag {
   projectId: string;
