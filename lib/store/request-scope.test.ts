@@ -34,30 +34,62 @@ const cachedHolder = cache((): Holder => ({ snapshot: null }));
 
 /** The same shape as the real one in `request.ts`. */
 function holder(): Holder {
-  const existing = store.getStore();
-  if (existing) return existing;
-  const fresh = cachedHolder();
-  store.enterWith(fresh);
-  return fresh;
+  return store.getStore() ?? cachedHolder();
+}
+
+/** The same wrapper `lib/actions/index.ts` puts around every action. */
+function withRequestStore<T>(fn: () => Promise<T>): Promise<T> {
+  return store.run({ snapshot: null }, fn);
 }
 
 describe("request-scoped store holder", () => {
   test("a write sees what the preload before it loaded", async () => {
-    // Exactly the Server Action sequence: getViewer() loads, then an operation
-    // reads, then mutate() writes — three separate calls, no render.
-    await new Promise<void>((resolve) => {
-      holder().snapshot = "loaded";
+    // Exactly the Server Action sequence, with the awaits a real one has:
+    // getViewer() loads the snapshot, an operation reads it, then mutate()
+    // writes. Three calls, several ticks apart, no React render anywhere.
+    await withRequestStore(async () => {
+      async function preload() {
+        await Promise.resolve();
+        holder().snapshot = "loaded";
+      }
 
-      // `await` puts the rest on a later tick, like a real action.
-      setImmediate(() => {
-        assert.equal(
-          holder().snapshot,
-          "loaded",
-          "the write got a different holder than the preload — this is the bug"
-        );
-        resolve();
-      });
+      await preload();
+
+      // The read an operation does before writing (createProject checks the
+      // slug here). This threw the read-side error and took the page down.
+      assert.equal(holder().snapshot, "loaded", "the read lost the snapshot");
+
+      await new Promise((r) => setTimeout(r, 5));
+
+      assert.equal(
+        holder().snapshot,
+        "loaded",
+        "the write got a different holder than the preload — this is the bug"
+      );
     });
+  });
+
+  test("a scope opened by a callee does NOT survive back to its caller", async () => {
+    // Why `withRequestStore` wraps the action instead of preloadLiveStore()
+    // opening the scope from the inside with enterWith(). That version passed
+    // review, shipped, and still failed: after `await preload()` the caller
+    // resumes in the context captured at its own await, before the scope
+    // existed. Pinned so nobody tries the tidier-looking version again.
+    const inner = new AsyncLocalStorage<Holder>();
+
+    async function calleeEntersScope() {
+      await Promise.resolve();
+      inner.enterWith({ snapshot: "loaded" });
+    }
+
+    await calleeEntersScope();
+
+    assert.equal(
+      inner.getStore()?.snapshot ?? null,
+      null,
+      "enterWith propagated back to the caller — if this ever passes, the " +
+        "simpler approach became viable and this test can go"
+    );
   });
 
   test("two concurrent requests never see each other's data", async () => {
@@ -66,7 +98,7 @@ describe("request-scoped store holder", () => {
     const observed: (string | null)[] = [];
 
     async function request(label: string, delayMs: number) {
-      await store.run({ snapshot: null }, async () => {
+      await withRequestStore(async () => {
         holder().snapshot = label;
         await new Promise((r) => setTimeout(r, delayMs));
         observed.push(holder().snapshot);

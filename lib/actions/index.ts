@@ -40,6 +40,7 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
+import { withRequestStore } from "@/lib/store/request";
 
 export interface ActionResult {
   ok: boolean;
@@ -77,7 +78,7 @@ function refresh() {
 // Phase 3 — hours
 // ---------------------------------------------------------------------------
 
-export async function logHoursAction(formData: FormData): Promise<ActionResult> {
+async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
   const viewer = await getViewer();
   const projectId = String(formData.get("projectId") ?? "");
   const workDate = String(formData.get("workDate") ?? today());
@@ -113,7 +114,7 @@ export async function logHoursAction(formData: FormData): Promise<ActionResult> 
   return toResult(result, `Logged ${hours} hrs.`);
 }
 
-export async function deleteHoursAction(formData: FormData): Promise<ActionResult> {
+async function deleteHoursAction$impl(formData: FormData): Promise<ActionResult> {
   const viewer = await getViewer();
   const logId = String(formData.get("logId") ?? "");
 
@@ -126,7 +127,7 @@ export async function deleteHoursAction(formData: FormData): Promise<ActionResul
 // Phase 4 — deliverables
 // ---------------------------------------------------------------------------
 
-export async function createDeliverableAction(
+async function createDeliverableAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -151,7 +152,7 @@ export async function createDeliverableAction(
 }
 
 /** The owner says it's finished. Does not complete it — an RE must confirm. */
-export async function submitDeliverableAction(
+async function submitDeliverableAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -162,7 +163,7 @@ export async function submitDeliverableAction(
   return toResult(result, "Sent to your RE for sign-off.");
 }
 
-export async function confirmDeliverableAction(
+async function confirmDeliverableAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -181,7 +182,7 @@ export async function confirmDeliverableAction(
   return toResult(result, "Signed off.");
 }
 
-export async function reopenDeliverableAction(
+async function reopenDeliverableAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -198,7 +199,7 @@ export async function reopenDeliverableAction(
   return toResult(result, "Sent back with your note.");
 }
 
-export async function setDeliverableStatusAction(
+async function setDeliverableStatusAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -227,7 +228,7 @@ export async function setDeliverableStatusAction(
 // People — the leadership controls
 // ---------------------------------------------------------------------------
 
-export async function inviteMemberAction(
+async function inviteMemberAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -272,7 +273,7 @@ export async function inviteMemberAction(
  * safe: role, status, reporting line and email simply aren't reachable, so a
  * crafted POST can't promote anybody.
  */
-export async function updateProfileAction(
+async function updateProfileAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -304,7 +305,7 @@ export async function updateProfileAction(
   return toResult(result, "Profile updated.");
 }
 
-export async function setGlobalRoleAction(
+async function setGlobalRoleAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -329,7 +330,7 @@ const ROLE_WORD: Record<string, string> = {
   co_lead: "Co-Lead",
 };
 
-export async function setMemberLeadAction(
+async function setMemberLeadAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -345,7 +346,7 @@ export async function setMemberLeadAction(
   return toResult(result, "Reporting line updated.");
 }
 
-export async function setMemberStatusAction(
+async function setMemberStatusAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -368,7 +369,7 @@ export async function setMemberStatusAction(
 // Projects
 // ---------------------------------------------------------------------------
 
-export async function createProjectAction(
+async function createProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -396,7 +397,7 @@ export async function createProjectAction(
   return toResult(result, "Project created.");
 }
 
-export async function addProjectMemberAction(
+async function addProjectMemberAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -423,7 +424,7 @@ export async function addProjectMemberAction(
   return toResult(result, asRE ? "Added as an RE." : "Added to the project.");
 }
 
-export async function setProjectREAction(
+async function setProjectREAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -470,7 +471,7 @@ export async function setProjectREAction(
  * They're a factual record, not a claim — letting the client post them would
  * make the number editable in a way logging hours deliberately isn't.
  */
-export async function submitCheckInAction(
+async function submitCheckInAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -500,7 +501,30 @@ export async function submitCheckInAction(
   return toResult(result, "Check-in sent to your Lead.");
 }
 
-export async function setPauseAction(formData: FormData): Promise<ActionResult> {
+async function setUpdateScheduleAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  if (!can.setOwnSchedule(viewer.actor, viewer.member.id)) {
+    return denied("change this schedule");
+  }
+
+  const weekdays = String(formData.get("weekdays") ?? "")
+    .split(",")
+    .map((d) => Number(d.trim()))
+    .filter((d) => Number.isFinite(d));
+
+  const result = await ops.setUpdateSchedule({
+    memberId: viewer.member.id,
+    weekdays,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Check-in days saved.");
+}
+
+async function setPauseAction$impl(formData: FormData): Promise<ActionResult> {
   const viewer = await getViewer();
   const weeks = Number(formData.get("weeks") ?? 0);
 
@@ -532,7 +556,7 @@ export async function setPauseAction(formData: FormData): Promise<ActionResult> 
 // Check-in review
 // ---------------------------------------------------------------------------
 
-export async function markUpdateReviewedAction(
+async function markUpdateReviewedAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -560,7 +584,7 @@ export async function markUpdateReviewedAction(
 // Phase 2 — membership
 // ---------------------------------------------------------------------------
 
-export async function requestToJoinAction(
+async function requestToJoinAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -584,7 +608,7 @@ export async function requestToJoinAction(
   return toResult(result, "Asked to join — the RE will see it.");
 }
 
-export async function decideJoinRequestAction(
+async function decideJoinRequestAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -609,7 +633,7 @@ export async function decideJoinRequestAction(
   return toResult(result, accept ? "Added to the project." : "Declined.");
 }
 
-export async function setFollowingAction(
+async function setFollowingAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -630,7 +654,7 @@ export async function setFollowingAction(
   return toResult(result, following ? "Following." : "Unfollowed.");
 }
 
-export async function removeProjectMemberAction(
+async function removeProjectMemberAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -653,4 +677,121 @@ export async function removeProjectMemberAction(
     };
   }
   return toResult(result, "Removed from the project.");
+}
+
+// ---------------------------------------------------------------------------
+// The exported actions
+// ---------------------------------------------------------------------------
+
+/**
+ * Every action above is wrapped here, and this is not optional.
+ *
+ * A Server Action does not run inside a React render, so `cache()` — which is
+ * what holds the per-request database snapshot — hands back a fresh, empty
+ * object on every call there. `getViewer()` would load the whole database into
+ * one throwaway holder and the write a moment later would find nothing, which
+ * is exactly what "Live store not loaded" meant. Pages were fine because pages
+ * render.
+ *
+ * `withRequestStore` opens a real scope around the whole action, so everything
+ * inside it — the viewer, the permission graph, the reads an operation does
+ * before writing, and the write itself — sees one snapshot.
+ *
+ * Wrapping in one block rather than per-function is deliberate: a new action
+ * that forgets it is visible here as a missing line, instead of being a bug
+ * that only shows up when someone clicks the button in production.
+ */
+
+export async function logHoursAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => logHoursAction$impl(formData));
+}
+
+export async function deleteHoursAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteHoursAction$impl(formData));
+}
+
+export async function createDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createDeliverableAction$impl(formData));
+}
+
+export async function submitDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => submitDeliverableAction$impl(formData));
+}
+
+export async function confirmDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => confirmDeliverableAction$impl(formData));
+}
+
+export async function reopenDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => reopenDeliverableAction$impl(formData));
+}
+
+export async function setDeliverableStatusAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setDeliverableStatusAction$impl(formData));
+}
+
+export async function inviteMemberAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => inviteMemberAction$impl(formData));
+}
+
+export async function updateProfileAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateProfileAction$impl(formData));
+}
+
+export async function setGlobalRoleAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setGlobalRoleAction$impl(formData));
+}
+
+export async function setMemberLeadAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setMemberLeadAction$impl(formData));
+}
+
+export async function setMemberStatusAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setMemberStatusAction$impl(formData));
+}
+
+export async function createProjectAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createProjectAction$impl(formData));
+}
+
+export async function addProjectMemberAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => addProjectMemberAction$impl(formData));
+}
+
+export async function setProjectREAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setProjectREAction$impl(formData));
+}
+
+export async function submitCheckInAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => submitCheckInAction$impl(formData));
+}
+
+export async function setPauseAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setPauseAction$impl(formData));
+}
+
+export async function setUpdateScheduleAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setUpdateScheduleAction$impl(formData));
+}
+
+export async function markUpdateReviewedAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => markUpdateReviewedAction$impl(formData));
+}
+
+export async function requestToJoinAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => requestToJoinAction$impl(formData));
+}
+
+export async function decideJoinRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => decideJoinRequestAction$impl(formData));
+}
+
+export async function setFollowingAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setFollowingAction$impl(formData));
+}
+
+export async function removeProjectMemberAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => removeProjectMemberAction$impl(formData));
 }

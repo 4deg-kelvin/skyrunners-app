@@ -96,7 +96,9 @@ export default async function SettingsPage() {
           <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
             Pause your check-ins for a couple of weeks. Nothing counts against
             you, no reminder emails go out, and there&apos;s no backlog waiting
-            when you come back.
+            when you come back. Give your Lead a heads-up too — pausing tells
+            them you&apos;re busy, but a quick word tells them what to cover
+            while you&apos;re out.
           </p>
 
           <div className="mt-5 rounded-tile bg-surface px-4 py-3.5">

@@ -52,12 +52,29 @@ const store = new AsyncLocalStorage<Holder>();
 const cachedHolder = cache((): Holder => ({ snapshot: null, original: null }));
 
 function holder(): Holder {
-  const existing = store.getStore();
-  if (existing) return existing;
+  return store.getStore() ?? cachedHolder();
+}
 
-  const fresh = cachedHolder();
-  store.enterWith(fresh);
-  return fresh;
+/**
+ * Give a Server Action its own request scope.
+ *
+ * EVERY action must be wrapped in this, and `lib/actions/index.ts` does it in
+ * one place at the bottom of the file so it can't be forgotten per-action.
+ *
+ * Why a wrapper rather than something automatic: the scope has to be opened
+ * around the WHOLE action, by the action itself. An earlier attempt had
+ * `preloadLiveStore()` open it from the inside with `enterWith`, which looked
+ * tidier and did not work — after `await preloadLiveStore()` the caller resumes
+ * in the async context captured at its own `await`, which predates the scope.
+ * The store vanished between loading it and using it, which is precisely the
+ * bug this is fixing. A callee cannot reliably hand a scope back to its caller;
+ * only an enclosing `run()` can.
+ *
+ * If you add an action and forget this, it fails loudly on the first read or
+ * write with "Live store not loaded" — not silently, and not with bad data.
+ */
+export function withRequestStore<T>(fn: () => Promise<T>): Promise<T> {
+  return store.run({ snapshot: null, original: null }, fn);
 }
 
 /**

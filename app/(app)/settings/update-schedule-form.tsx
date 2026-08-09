@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { ActionForm } from "@/components/forms/action-form";
 import { SELECTABLE_UPDATE_DAYS, WEEKDAY_NAMES, WEEKDAY_SHORT } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { setUpdateScheduleAction } from "@/lib/actions";
 
 /**
  * Pick which weekdays you submit updates on.
@@ -24,10 +25,8 @@ export function UpdateScheduleForm({
   disabled?: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>(initialWeekdays);
-  const [saved, setSaved] = useState(false);
 
   function toggle(day: number) {
-    setSaved(false);
     setSelected((current) => {
       if (current.includes(day)) {
         return current.filter((d) => d !== day);
@@ -92,18 +91,15 @@ export function UpdateScheduleForm({
         </p>
       ) : null}
 
-      <div className="mt-5 flex items-center gap-3">
-        <Button
+      <div className="mt-5">
+        <ActionForm
+          action={setUpdateScheduleAction}
+          submitLabel="Save schedule"
+          submittingLabel="Saving…"
           disabled={disabled || !complete}
-          onClick={() => setSaved(true)}
         >
-          Save schedule
-        </Button>
-        {saved ? (
-          <span className="text-sm font-medium text-ok-fg">
-            Saved locally — writes to the database in Phase 1b.
-          </span>
-        ) : null}
+          <input type="hidden" name="weekdays" value={selected.join(",")} />
+        </ActionForm>
       </div>
     </div>
   );

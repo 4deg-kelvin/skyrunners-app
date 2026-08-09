@@ -164,7 +164,16 @@ export async function getDashboard(
   // Lead two levels up sees the escalation instead, not the raw report, so the
   // obligation stays with exactly one person.
   const directReports = readStore().members.filter(
-    (m) => m.leadId === actor.id && m.status === "active"
+    (m) =>
+      m.status === "active" &&
+      m.id !== actor.id &&
+      // Normally: people who report to you.
+      (m.leadId === actor.id ||
+        // Plus, for a Co-Lead, anyone with nobody above them. Co-Leads are the
+        // top of the chain, so their own check-ins have no Lead to go to —
+        // without this they'd write them into a void, which is worse than not
+        // asking for them. They go sideways to the other Co-Leads instead.
+        (isCoLead(actor) && m.leadId === null))
   );
 
   const reviewQueue: ReviewQueueItem[] = unreadReportsFor(

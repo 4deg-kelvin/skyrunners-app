@@ -256,8 +256,10 @@ export default async function FindWorkPage() {
           </div>
 
           <p className="mt-5 text-sm text-ink-muted">
-            Ask-to-join writes to the database in Phase 1b. Until then, the RE
-            email links work.
+            Asking to join lands in the RE&apos;s queue and shows here as
+            pending, so it never disappears. If it sits for five days it
+            escalates. Their contact details are on every card if you&apos;d
+            rather just talk to them.
           </p>
         </CardBody>
       </Card>
