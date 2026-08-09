@@ -21,7 +21,7 @@
  * enforcement layer, and they are the only callers.
  */
 
-import { mutate, readStore } from "./disk.ts";
+import { mutate, readStore, type StoreShape } from "./disk.ts";
 import type {
   Deliverable,
   DeliverableStatus,
@@ -55,6 +55,30 @@ function fail<T>(error: string): Result<T> {
 
 function ok<T>(value: T): Result<T> {
   return { ok: true, value };
+}
+
+/**
+ * Run a write, turning a failed SAVE into a normal `Result` rather than a throw.
+ *
+ * The rule checks inside each operation already return `fail(...)`, and the UI
+ * shows those inline. But the save itself happens afterwards, in `mutate()` —
+ * and if Postgres rejects the row (a constraint, an RLS policy, a column that
+ * doesn't exist), that rejection used to travel straight past the action layer
+ * and hit Next's error boundary. The user got "This page didn't load" with the
+ * actual reason visible only in a server log they can't reach.
+ *
+ * A refused write and a broken write are different things and should read
+ * differently, so the message says which one this is and quotes the database.
+ */
+async function guarded<T>(
+  fn: (store: StoreShape) => Result<T>
+): Promise<Result<T>> {
+  try {
+    return await mutate(fn);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return fail<T>(`Couldn't save that — the database refused it: ${detail}`);
+  }
 }
 
 /**
@@ -143,8 +167,10 @@ export async function logHours(input: {
     description: description?.trim() || undefined,
   };
 
-  await mutate((store) => store.workLogs.push(log));
-  return ok(log);
+  return guarded((store) => {
+    store.workLogs.push(log);
+    return ok(log);
+  });
 }
 
 export async function deleteWorkLog(
@@ -164,10 +190,10 @@ export async function deleteWorkLog(
   }
   void today;
 
-  await mutate((store) => {
+  return guarded((store) => {
     store.workLogs = store.workLogs.filter((w) => w.id !== logId);
+    return ok(null);
   });
-  return ok(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +228,7 @@ export async function createDeliverable(input: {
     sortOrder,
   };
 
-  await mutate((store) => {
+  return guarded((store) => {
     store.deliverables.push(deliverable);
 
     // Auto-add the owner to the project if they aren't on it.
@@ -230,9 +256,8 @@ export async function createDeliverable(input: {
         existing.commitment = "committed";
       }
     }
+    return ok(deliverable);
   });
-
-  return ok(deliverable);
 }
 
 /**
@@ -323,7 +348,7 @@ async function updateOne(
   deliverableId: string,
   fn: (d: Deliverable) => Result<Deliverable>
 ): Promise<Result<Deliverable>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const found = store.deliverables.find((d) => d.id === deliverableId);
     if (!found) return fail<Deliverable>("That deliverable no longer exists.");
     return fn(found);
@@ -382,7 +407,7 @@ export async function inviteMember(input: {
     skills: [],
   };
 
-  await mutate((store) => {
+  return guarded((store) => {
     store.members.push(member);
     // Everyone gets a check-in schedule, or they'd have no obligation and no
     // way to create one from Settings.
@@ -392,9 +417,8 @@ export async function inviteMember(input: {
       updatesPerWeek: 2,
       dueTime: "23:59",
     });
+    return ok(member);
   });
-
-  return ok(member);
 }
 
 /**
@@ -440,7 +464,7 @@ export async function updateProfile(input: {
     return fail("A photo link needs to start with http:// or https://");
   }
 
-  return mutate((store) => {
+  return guarded((store) => {
     const member = store.members.find((m) => m.id === input.memberId);
     if (!member) return fail<Member>("That member no longer exists.");
 
@@ -488,7 +512,7 @@ export async function setGlobalRole(input: {
   memberId: string;
   role: GlobalRole;
 }): Promise<Result<Member>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const member = store.members.find((m) => m.id === input.memberId);
     if (!member) return fail<Member>("That member no longer exists.");
     if (member.globalRole === input.role) return ok(member);
@@ -527,7 +551,7 @@ export async function setMemberLead(input: {
     return fail("Nobody reports to themselves.");
   }
 
-  return mutate((store) => {
+  return guarded((store) => {
     const member = store.members.find((m) => m.id === input.memberId);
     if (!member) return fail<Member>("That member no longer exists.");
 
@@ -562,7 +586,7 @@ export async function setMemberStatus(input: {
   memberId: string;
   status: MemberStatus;
 }): Promise<Result<Member>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const member = store.members.find((m) => m.id === input.memberId);
     if (!member) return fail<Member>("That member no longer exists.");
 
@@ -648,7 +672,7 @@ export async function createProject(input: {
     isOpenToJoin: true,
   };
 
-  await mutate((store) => {
+  return guarded((store) => {
     store.projects.push(project);
     store.projectMemberships.push({
       projectId: project.id,
@@ -658,9 +682,8 @@ export async function createProject(input: {
       commitment: "committed",
       addedBy: input.createdBy,
     });
+    return ok(project);
   });
-
-  return ok(project);
 }
 
 /** Add someone to a project, as a contributor or an RE. */
@@ -672,7 +695,7 @@ export async function addProjectMember(input: {
   addedBy: string;
   today: string;
 }): Promise<Result<null>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const project = store.projects.find((p) => p.id === input.projectId);
     if (!project) return fail<null>("That project no longer exists.");
     if (!store.members.some((m) => m.id === input.memberId)) {
@@ -715,7 +738,7 @@ export async function setProjectRE(input: {
   memberId: string;
   isRE: boolean;
 }): Promise<Result<null>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const project = store.projects.find((p) => p.id === input.projectId);
     if (!project) return fail<null>("That project no longer exists.");
 
@@ -755,7 +778,7 @@ export async function setPrimaryRE(input: {
   projectId: string;
   memberId: string;
 }): Promise<Result<null>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const project = store.projects.find((p) => p.id === input.projectId);
     if (!project) return fail<null>("That project no longer exists.");
 
@@ -808,7 +831,7 @@ export async function submitCheckIn(input: {
     );
   }
 
-  return mutate((store) => {
+  return guarded((store) => {
     // Their open obligation, oldest first: pending or late, never one already
     // submitted.
     const open = store.progressUpdates
@@ -881,7 +904,7 @@ export async function setCheckInPause(input: {
     return fail("Pick a date in the future.");
   }
 
-  return mutate((store) => {
+  return guarded((store) => {
     const schedule = store.updateSchedules.find(
       (s) => s.memberId === input.memberId
     );
@@ -927,7 +950,7 @@ export async function markUpdateReviewed(input: {
   reviewedBy: string;
   today: string;
 }): Promise<Result<ProgressUpdate>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const update = store.progressUpdates.find((u) => u.id === input.updateId);
     if (!update) return fail<ProgressUpdate>("That check-in no longer exists.");
 
@@ -994,8 +1017,10 @@ export async function requestToJoin(input: {
     requestedAt: input.today,
   };
 
-  await mutate((store) => store.joinRequests.push(request));
-  return ok(request);
+  return guarded((store) => {
+    store.joinRequests.push(request);
+    return ok(request);
+  });
 }
 
 /** The RE decides. Accepting adds them; declining must say something. */
@@ -1006,7 +1031,7 @@ export async function decideJoinRequest(input: {
   responseNote?: string;
   today: string;
 }): Promise<Result<JoinRequest>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const request = store.joinRequests.find((r) => r.id === input.requestId);
     if (!request) return fail<JoinRequest>("That request no longer exists.");
     if (request.status !== "pending") {
@@ -1047,7 +1072,7 @@ export async function withdrawJoinRequest(
   requestId: string,
   memberId: string
 ): Promise<Result<null>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const request = store.joinRequests.find((r) => r.id === requestId);
     if (!request) return fail<null>("That request no longer exists.");
     if (request.memberId !== memberId) return fail<null>("That isn't your request.");
@@ -1069,7 +1094,7 @@ export async function setFollowing(input: {
   following: boolean;
   today: string;
 }): Promise<Result<null>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const existing = store.projectMemberships.find(
       (m) => m.projectId === input.projectId && m.memberId === input.memberId
     );
@@ -1105,7 +1130,7 @@ export async function removeProjectMember(input: {
   projectId: string;
   memberId: string;
 }): Promise<Result<{ reassigned: number }>> {
-  return mutate((store) => {
+  return guarded((store) => {
     const openWork = store.deliverables.filter(
       (d) =>
         d.projectId === input.projectId &&

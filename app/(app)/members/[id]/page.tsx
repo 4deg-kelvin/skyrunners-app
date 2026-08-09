@@ -34,7 +34,8 @@ export default async function MemberProfilePage({
 
   if (!view) notFound();
 
-  const { member, lead, directReports, projects, contribution } = view;
+  const { member, lead, directReports, projects, contribution, checkIns } =
+    view;
   const isOwnProfile = viewer.member.id === member.id;
 
   return (
@@ -252,6 +253,77 @@ export default async function MemberProfilePage({
               )}
             </CardBody>
           </Card>
+
+          {/*
+            Their check-in history.
+            Reading is separate from being accountable for reading: the review
+            QUEUE on the dashboard stays scoped to direct reports, because that's
+            the obligation that escalates. This is here so a Co-Lead, or any Lead
+            further up the chain, can catch up on someone without inheriting a
+            queue item for them.
+          */}
+          {canViewEffort && !isOwnProfile ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Check-ins</SectionLabel>
+                {checkIns.length === 0 ? (
+                  <p className="mt-3 text-[15px] text-ink-soft">
+                    {member.preferredName ?? member.fullName} hasn&apos;t
+                    submitted a check-in yet.
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-4">
+                    {checkIns.slice(0, 8).map(({ update, sections, reviewedBy }) => (
+                      <li
+                        key={update.id}
+                        className="rounded-tile border border-line bg-surface p-3.5"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-sm font-bold text-ink">
+                            {new Date(
+                              update.submittedAt ?? update.dueAt
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                          <p className="text-xs text-ink-muted">
+                            {update.hoursThisPeriod} hrs
+                            {reviewedBy
+                              ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
+                              : " · not yet read"}
+                          </p>
+                        </div>
+
+                        {sections.map(({ entry, project }) => (
+                          <div key={entry.id} className="mt-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                              {project?.name ?? "Unknown project"}
+                            </p>
+                            <p className="mt-1 text-[15px] text-ink-soft">
+                              {entry.progress}
+                            </p>
+                            {entry.blockers ? (
+                              <p className="mt-1 text-[15px] text-cardinal-700">
+                                Blocked: {entry.blockers}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+
+                        {update.generalNote ? (
+                          <p className="mt-3 border-t border-line pt-3 text-[15px] text-ink-soft">
+                            {update.generalNote}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardBody>
+            </Card>
+          ) : null}
 
           <Card>
             <CardBody>
