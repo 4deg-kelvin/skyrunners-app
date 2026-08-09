@@ -25,7 +25,7 @@ in parallel. As of now: **all 13 pass**.
 
 ---
 
-## The six bugs that cost the most time
+## The seven bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -101,6 +101,33 @@ that line — `npm run verify:live` is what catches you if you forget.
 The general shape of this one: *it worked on the pages I happened to click.*
 Two of eleven pages sequenced their calls differently, and that was enough to
 make the bug look like a data problem rather than an ordering one.
+
+### 7. `cache()` is render-scoped, so every write failed
+
+Reads worked everywhere. Writes failed everywhere. That split IS the diagnosis.
+
+The per-request snapshot lived in React's `cache()`. React memoizes a cached
+function for the duration of a **render**, and a Server Action doesn't run
+inside one — so in an action `cache()` returned a fresh object every call.
+`getViewer()` loaded the database into one throwaway holder; the write a moment
+later asked a second, empty one.
+
+It surfaced as two unrelated-looking failures. Operations that write directly
+(role change, reassign lead, deactivate) threw from `mutate()` and showed the
+message inline. `createProject` reads the store first to check the slug, so it
+threw the *read* error from outside `guarded()` and took the whole page down.
+
+The holder is now anchored to the async execution context (`AsyncLocalStorage`
++ `enterWith`), which renders and actions both have. `enterWith` is the part
+worth remembering: it lets a callee establish a scope the caller keeps seeing,
+so the ~25 actions didn't each need wrapping.
+
+**If you touch `lib/store/request.ts`, run `lib/store/request-scope.test.ts`.**
+Its first test fails against the old holder — that's how this was confirmed
+rather than guessed.
+
+**Rule of thumb:** anything that must survive from `getViewer()` to a write
+cannot rely on `cache()`. Test it outside a render or you won't see it.
 
 ---
 
