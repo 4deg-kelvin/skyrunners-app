@@ -20,7 +20,8 @@ PW=<db-password> npm run verify:live   # does every page work on real data?
 ```
 
 `verify:live` is the one that matters. It loads the whole database and calls the
-`lib/data/*` function behind every route. As of now: **all 11 pass**.
+`lib/data/*` function behind every route, plus the two pages that call several
+in parallel. As of now: **all 13 pass**.
 
 ---
 
