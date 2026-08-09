@@ -21,6 +21,7 @@ import type {
   Project,
   ProjectArtifact,
   ProjectMembership,
+  ProjectNotice,
   Team,
   Term,
   UpdateSchedule,
@@ -109,7 +110,8 @@ const members: CollectionSpec<Member> = {
 const teams: CollectionSpec<Team> = {
   key: "teams",
   table: "teams",
-  columns: "id, name, slug, description, parent_id, lead_id, is_active",
+  columns:
+    "id, name, slug, description, parent_id, lead_id, is_active, archived_at, archived_by, archive_note",
   identify: (t) => t.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -121,6 +123,9 @@ const teams: CollectionSpec<Team> = {
     parentId: (r.parent_id as string) ?? null,
     leadId: opt(r.lead_id as string),
     isActive: r.is_active as boolean,
+    archivedAt: opt(r.archived_at as string),
+    archivedBy: opt(r.archived_by as string),
+    archiveNote: opt(r.archive_note as string),
   }),
   toRow: (t) => ({
     id: t.id,
@@ -133,6 +138,9 @@ const teams: CollectionSpec<Team> = {
     kind: t.parentId === null ? "division" : "team",
     lead_id: nul(t.leadId),
     is_active: t.isActive,
+    archived_at: nul(t.archivedAt),
+    archived_by: nul(t.archivedBy),
+    archive_note: nul(t.archiveNote),
   }),
   dependsOn: ["members"],
 };
@@ -451,6 +459,41 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
 };
 
 /**
+ * `notified_member_ids` is a `uuid[]` rather than a join table.
+ *
+ * It's write-once, read-whole, and never queried by recipient across notices —
+ * every read is "who was told about THIS", which an array answers in the row
+ * you already have. A join table would add a second collection and a second
+ * diff for a list that is never edited after it's written.
+ */
+const projectNotices: CollectionSpec<ProjectNotice> = {
+  key: "projectNotices",
+  table: "project_notices",
+  columns:
+    "id, project_id, kind, body, created_by, created_at, notified_member_ids",
+  identify: (n) => n.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    projectId: r.project_id as string,
+    kind: r.kind as ProjectNotice["kind"],
+    body: r.body as string,
+    createdById: (r.created_by as string) ?? "",
+    createdAt: r.created_at as string,
+    notifiedMemberIds: (r.notified_member_ids as string[]) ?? [],
+  }),
+  toRow: (n) => ({
+    id: n.id,
+    project_id: n.projectId,
+    kind: n.kind,
+    body: n.body,
+    created_by: n.createdById || null,
+    created_at: n.createdAt,
+    notified_member_ids: n.notifiedMemberIds,
+  }),
+  dependsOn: ["members", "projects"],
+};
+
+/**
  * Order matters: inserts run top to bottom, deletes bottom to top, so a row is
  * never written before what it references or deleted while still referenced.
  */
@@ -467,6 +510,7 @@ export const COLLECTIONS = [
   events,
   projectArtifacts,
   progressUpdates,
+  projectNotices,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

@@ -28,6 +28,7 @@ import type {
   JoinRequest,
   ProgressUpdate,
   ProjectMembership,
+  ProjectNotice,
   UpdateSchedule,
   WorkLog,
 } from "../types.ts";
@@ -95,6 +96,8 @@ export interface StoreShape {
   terms: Term[];
   events: ClubEvent[];
   projectArtifacts: ProjectArtifact[];
+  /** Milestones the app announced in a project's feed — see `ProjectNotice`. */
+  projectNotices: ProjectNotice[];
 }
 
 /**
@@ -105,7 +108,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 5;
+const STORE_VERSION = 6;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -136,6 +139,9 @@ function seed(): StoreShape {
     terms: seedTerms,
     events: seedEvents,
     projectArtifacts: seedArtifacts,
+    // Nothing to seed: a notice only exists because somebody completed a
+    // project inside the app.
+    projectNotices: [],
   });
 }
 

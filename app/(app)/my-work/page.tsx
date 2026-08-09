@@ -5,7 +5,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { LogHoursForm } from "@/components/forms/log-hours-form";
 import { CheckInForm } from "@/components/forms/check-in-form";
-import { JoinRequestDecision } from "@/components/forms/project-actions";
+import {
+  JoinRequestDecision,
+  WithdrawRequestButton,
+} from "@/components/forms/project-actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { ButtonLink } from "@/components/ui/button";
@@ -65,6 +68,7 @@ export default async function MyWorkPage() {
               defaultProjectId={committed[0]?.project.id}
               today={today}
               maxBackdateDays={maxBackdateDays}
+              recent={view.recentHours}
             />
           ) : undefined
         }
@@ -186,11 +190,22 @@ export default async function MyWorkPage() {
                       })}
                     </p>
                   </div>
-                  {isStale ? (
-                    <Badge tone="risk">No reply yet — nudge the RE</Badge>
-                  ) : (
-                    <Badge tone="warn">Pending</Badge>
-                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {isStale ? (
+                      <Badge tone="risk">No reply yet — nudge the RE</Badge>
+                    ) : (
+                      <Badge tone="warn">Pending</Badge>
+                    )}
+                    {/*
+                      A request you can't take back isn't a tracked ask, it's a
+                      commitment you made by clicking once. The operation for
+                      this shipped in Phase 2 with no action and no button.
+                    */}
+                    <WithdrawRequestButton
+                      requestId={request.id}
+                      projectName={project?.name ?? "this project"}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

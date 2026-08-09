@@ -7,10 +7,11 @@
  * walk, so it would be several.
  */
 
-import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
+import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
   contributionInputsFor,
   getMember,
+  getProject,
   hoursOnProject,
   isOverdue,
   joinRequestsAwaitingMe,
@@ -22,6 +23,7 @@ import {
   projectBreadcrumb,
   projectProgress,
   projectREs,
+  recentWorkLogs,
   scheduleFor,
   today,
 } from "@/lib/mock-data";
@@ -37,6 +39,7 @@ import type {
   ProjectMembership,
   ProgressUpdate,
   UpdateEntry,
+  WorkLog,
 } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
@@ -99,6 +102,21 @@ export interface MyWorkView {
   myDeliverables: { deliverable: Deliverable; project: Project }[];
   /** Their own record — always visible to them. */
   contribution: ContributionRecord;
+  /**
+   * The hours they've logged recently, newest first.
+   *
+   * Logging hours was write-only: `deleteWorkLog` and `deleteHoursAction`
+   * existed, but nothing in the app ever listed a single entry, so there was no
+   * button to hang the delete on and a mistyped `80` instead of `8.0` was
+   * permanent. `locked` says which ones a submitted check-in has already
+   * reported — the operation refuses those, and the row explains itself rather
+   * than offering a button that fails.
+   */
+  recentHours: {
+    log: WorkLog;
+    project?: Project;
+    locked: boolean;
+  }[];
   /** Requests they've sent, so an ask is never invisible. */
   myRequests: {
     request: JoinRequest;
@@ -187,5 +205,10 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     contribution: buildContributionRecord(contributionInputsFor(memberId)),
     myRequests: myJoinRequests(memberId),
     requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
+    recentHours: recentWorkLogs(memberId).map((log) => ({
+      log,
+      project: log.projectId ? getProject(log.projectId) : undefined,
+      locked: hoursAreLocked(memberId, log.workDate),
+    })),
   };
 }

@@ -6,6 +6,9 @@ import { ChevronDown, ChevronRight, CornerDownRight } from "lucide-react";
 
 import { Badge } from "./badge";
 import { ProjectBadges } from "./project-badges";
+import { EmptyState } from "./empty-state";
+import { SectionLabel } from "./section-label";
+import { useHideCompleted } from "./completed-filter";
 import type { ProjectTreeNode } from "@/lib/data/projects";
 
 /**
@@ -24,8 +27,23 @@ export function ProjectNode({
   node: ProjectTreeNode;
   depth: number;
 }) {
-  const { project, res, memberCount, blockedCount, progress, children } = node;
+  const { project, res, memberCount, blockedCount, progress } = node;
   const [expanded, setExpanded] = useState(false);
+  const hideCompleted = useHideCompleted();
+
+  /*
+    The switch has to reach down here, not just the top-level sections.
+    A completed sub-project nested three deep is exactly the kind of finished
+    work somebody turning the filter on is trying to get out of the way — and
+    the counts beside the expander have to agree with what expanding shows, or
+    "Show 2 sub-projects" opens onto one.
+
+    A parent can only be complete when all its children are (enforced in
+    `updateProject`), so this never hides a live project under a finished one.
+  */
+  const children = hideCompleted
+    ? node.children.filter((c) => c.project.phase !== "complete")
+    : node.children;
 
   return (
     <div>
@@ -122,5 +140,56 @@ export function ProjectNode({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One division's projects: live work first, finished work underneath.
+ *
+ * A completed project still matters — it's the club's record of what got built,
+ * and years from now that history is the point. But mixed into the same list it
+ * makes the ongoing work harder to see, which is the one job this page has.
+ *
+ * A client component so the hide-completed switch reaches it. The split itself
+ * is cheap and pure, so doing it here rather than on the server costs nothing
+ * and keeps the toggle instant.
+ */
+export function DivisionProjectList({ roots }: { roots: ProjectTreeNode[] }) {
+  const hideCompleted = useHideCompleted();
+
+  const live = roots.filter((n) => n.project.phase !== "complete");
+  const finished = roots.filter((n) => n.project.phase === "complete");
+
+  return (
+    <>
+      <div className="mt-5 space-y-3">
+        {live.length === 0 ? (
+          <EmptyState
+            message={
+              finished.length > 0
+                ? "Nothing active in this division right now."
+                : "No projects in this division yet."
+            }
+            actionLabel="See other divisions"
+            actionHref="/projects"
+          />
+        ) : (
+          live.map((node) => (
+            <ProjectNode key={node.project.id} node={node} depth={0} />
+          ))
+        )}
+      </div>
+
+      {finished.length > 0 && !hideCompleted ? (
+        <div className="mt-6 border-t border-line pt-5">
+          <SectionLabel tone="muted">Completed · {finished.length}</SectionLabel>
+          <div className="mt-3 space-y-3">
+            {finished.map((node) => (
+              <ProjectNode key={node.project.id} node={node} depth={0} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

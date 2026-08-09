@@ -127,8 +127,13 @@ export function isSelf(actor: Actor, memberId: string): boolean {
 export const can = {
   // --- Org structure ---------------------------------------------------
 
-  /** Only Co-Leads add or remove Divisions. */
-  manageDivisions: (actor: Actor) => isCoLead(actor),
+  /*
+    `manageDivisions` used to sit here, identical to `manageTeams` below and
+    called by nothing but its own test. Two names for one rule is how they
+    drift: change the real one and the dead one keeps asserting the old
+    behaviour, so the suite stays green while the app doesn't. Use
+    `manageTeams` — divisions ARE teams with no parent.
+  */
 
   /** A unit's Lead manages the units beneath it; Co-Leads manage anything. */
   manageTeam: (actor: Actor, graph: OrgGraph, teamLeadId?: string) =>

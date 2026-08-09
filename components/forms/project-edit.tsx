@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, TriangleAlert } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import { deleteProjectAction, updateProjectAction } from "@/lib/actions";
@@ -25,12 +25,27 @@ const HEALTHS: ProjectHealth[] = ["on_track", "at_risk", "blocked"];
 export function ProjectEditForm({
   project,
   canDelete,
+  incompleteDescendants,
 }: {
   project: Project;
   canDelete: boolean;
+  /**
+   * Sub-projects at any depth that aren't complete.
+   *
+   * `updateProject` refuses a completion while this is non-empty. Showing it
+   * here as the stage dropdown changes turns a rejection into a rule — you find
+   * out what's in the way before you press save, and which projects they are.
+   */
+  incompleteDescendants: { id: string; name: string; slug: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [phase, setPhase] = useState(project.phase);
+
+  const blockedFromCompleting =
+    phase === "complete" &&
+    project.phase !== "complete" &&
+    incompleteDescendants.length > 0;
 
   if (!open) {
     return (
@@ -84,7 +99,8 @@ export function ProjectEditForm({
             </span>
             <select
               name="phase"
-              defaultValue={project.phase}
+              value={phase}
+              onChange={(e) => setPhase(e.target.value as Project["phase"])}
               className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
             >
               {PHASE_ORDER.map((p) => (
@@ -137,6 +153,41 @@ export function ProjectEditForm({
             />
           </label>
         </div>
+
+        {/*
+          Said before the submit, not after it.
+          The operation refuses this anyway — that's the real guard, since a
+          Server Action is a POST endpoint the moment it exists. This is so the
+          RE knows WHY and which sub-projects to chase, instead of pressing save
+          and being told no.
+        */}
+        {blockedFromCompleting ? (
+          <div className="mb-2.5 mt-3 rounded-tile border border-warn-fg/25 bg-warn-bg p-3">
+            <p className="flex items-start gap-2 text-sm text-warn-fg">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <span className="font-semibold">
+                  {incompleteDescendants.length} sub-project
+                  {incompleteDescendants.length === 1 ? " isn't" : "s aren't"}{" "}
+                  complete:
+                </span>{" "}
+                {incompleteDescendants.map((d) => d.name).join(", ")}. Marking
+                this complete would hide{" "}
+                {incompleteDescendants.length === 1 ? "it" : "them"} under a
+                finished project, so it&apos;s refused — finish or move{" "}
+                {incompleteDescendants.length === 1 ? "it" : "those"} first.
+              </span>
+            </p>
+          </div>
+        ) : null}
+
+        {phase === "complete" && project.phase !== "complete" ? (
+          <p className="mb-2.5 mt-3 text-xs text-ink-muted">
+            Completing this posts a note in its updates feed and tells everyone
+            above it — the REs of parent projects, the division lead, and the
+            Co-Leads.
+          </p>
+        ) : null}
 
         <p className="mb-2.5 mt-3 text-xs text-ink-muted">
           Stage is where this sits in the lifecycle. How it&apos;s going is

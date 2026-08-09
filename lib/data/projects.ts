@@ -9,8 +9,10 @@
 
 import {
   activeMembers,
+  archivedDivisions,
   artifactsFor,
   childProjects,
+  childTeams,
   divisionForProject,
   getMember,
   getProject,
@@ -20,6 +22,7 @@ import {
   projectBreadcrumb,
   projectDeliverables,
   projectMembers,
+  projectNotices,
   projectProgress,
   projectREs,
   projectUpdateFeed,
@@ -35,6 +38,7 @@ import type {
   ProjectArtifact,
   ProjectAttentionFlag,
   ProjectMembership,
+  ProjectNotice,
   Team,
   UpdateEntry,
 } from "@/lib/types";
@@ -69,6 +73,34 @@ export interface DivisionProjects {
   division: Team;
   lead?: Member;
   roots: ProjectTreeNode[];
+}
+
+/**
+ * Every project under this one, at any depth.
+ *
+ * Cycle-guarded: `parentId` is a plain column, and a project reparented under
+ * its own child would spin here rather than fail. Mirrors the guard in
+ * `operations.ts`, which is what actually refuses the completion — this copy
+ * exists so the page can warn first.
+ */
+function descendantsOf(projectId: string): Project[] {
+  const found: Project[] = [];
+  const seen = new Set<string>([projectId]);
+  let frontier = [projectId];
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const parentId of frontier) {
+      for (const child of childProjects(parentId)) {
+        if (seen.has(child.id)) continue;
+        seen.add(child.id);
+        found.push(child);
+        next.push(child.id);
+      }
+    }
+    frontier = next;
+  }
+  return found;
 }
 
 function buildNode(project: Project): ProjectTreeNode {
@@ -161,6 +193,23 @@ export interface ProjectDetailView {
     author?: Member;
     submittedAt: string;
   }[];
+  /**
+   * Automatic announcements, newest first, with the chain they went up
+   * resolved to names. Rendered in the same feed as `updateFeed`.
+   */
+  notices: {
+    notice: ProjectNotice;
+    actor?: Member;
+    notified: Member[];
+  }[];
+  /**
+   * Sub-projects at any depth that aren't complete yet.
+   *
+   * The operation refuses a completion while this is non-empty. Surfacing it
+   * here lets the edit form say so BEFORE the submit, rather than only in the
+   * error afterwards — the difference between a rule and a rejection.
+   */
+  incompleteDescendants: { id: string; name: string; slug: string }[];
   /** Requests waiting on the RE, with requester attached. */
   pendingRequests: {
     request: JoinRequest;
@@ -233,6 +282,18 @@ export async function getProjectBySlug(
       author: getMember(f.memberId),
       submittedAt: f.submittedAt,
     })),
+    notices: projectNotices(project.id).map((notice) => ({
+      notice,
+      actor: getMember(notice.createdById),
+      // Resolved here, not in the page: a lookup per recipient inside a render
+      // loop is one query per row once this is Postgres.
+      notified: notice.notifiedMemberIds
+        .map((id) => getMember(id))
+        .filter((m): m is Member => Boolean(m)),
+    })),
+    incompleteDescendants: descendantsOf(project.id)
+      .filter((p) => p.phase !== "complete")
+      .map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
     pendingRequests: requests.map((r) => ({
       request: r,
       requester: getMember(r.memberId),
@@ -262,10 +323,109 @@ export async function getProjectFormOptions(): Promise<{
 }> {
   await preloadLiveStore();
   return {
-    parents: readStore().projects.map((p) => ({ id: p.id, name: p.name })),
+    /*
+      Two kinds of project can't be a parent for new work.
+
+      **In an archived division.** `createProject` gives a sub-project its
+      parent's `teamId`, so picking one would file brand-new work into a
+      retired division — where it renders on neither /projects nor /find-work,
+      since both group by ACTIVE division. The project would exist, be
+      assigned, and be invisible: the disappearing-work failure this app was
+      built to remove, arriving through the door archiving just opened.
+
+      **Already complete.** A live child under a finished parent is exactly the
+      state `updateProject` refuses to create from the other direction. Offering
+      it here would let the form build in one click what the rule forbids, and
+      the parent could then never be edited again without reopening it. If work
+      really does resume, reopening the parent is the honest move — and it
+      announces itself.
+    */
+    parents: readStore()
+      .projects.filter(
+        (p) =>
+          p.phase !== "complete" && divisionForProject(p.id)?.isActive !== false
+      )
+      .map((p) => ({ id: p.id, name: p.name })),
     divisions: divisions().map((d) => ({ id: d.id, name: d.name })),
     people: activeMembers().map((m) => ({ id: m.id, name: m.fullName })),
   };
+}
+
+/** How many divisions sit in the archive. Drives the link on /projects. */
+export async function countArchivedDivisions(): Promise<number> {
+  await preloadLiveStore();
+  return archivedDivisions().length;
+}
+
+export interface ArchivedDivision {
+  division: Team;
+  lead?: Member;
+  archivedBy?: Member;
+  /** Sub-teams that went with it, so the shape of what was retired is legible. */
+  subTeams: Team[];
+  /**
+   * What it built. Every project that still points at this division or one of
+   * its sub-teams — which is the entire reason archiving exists rather than
+   * deleting.
+   */
+  projects: {
+    project: Project;
+    res: Member[];
+    /** Signed-off deliverables. The honest measure of what got finished. */
+    delivered: number;
+  }[];
+  /** Everyone whose primary team was here. Alumni included, deliberately. */
+  memberCount: number;
+}
+
+/**
+ * The archive: divisions that were retired, and what they did.
+ *
+ * Readable by every member, not just Co-Leads. This is the club's record of
+ * what it has built, and the transparency rule applies to activity — the thing
+ * gated on leadership is restoring one, which happens in the action.
+ */
+export async function getArchivedDivisions(): Promise<ArchivedDivision[]> {
+  await preloadLiveStore();
+  const store = readStore();
+
+  return archivedDivisions().map((division) => {
+    // The sub-tree, so a project owned by a sub-team still shows up here
+    // rather than looking like it belonged to nothing.
+    const teamIds = new Set<string>([division.id]);
+    const subTeams: Team[] = [];
+    const frontier = [division.id];
+    for (let i = 0; i < frontier.length; i++) {
+      for (const child of childTeams(frontier[i])) {
+        if (teamIds.has(child.id)) continue;
+        teamIds.add(child.id);
+        subTeams.push(child);
+        frontier.push(child.id);
+      }
+    }
+
+    return {
+      division,
+      lead: division.leadId ? getMember(division.leadId) : undefined,
+      archivedBy: division.archivedBy
+        ? getMember(division.archivedBy)
+        : undefined,
+      subTeams,
+      projects: store.projects
+        .filter((p) => p.teamId && teamIds.has(p.teamId))
+        .map((project) => ({
+          project,
+          res: projectREs(project.id),
+          delivered: projectDeliverables(project.id).filter(
+            (d) => d.status === "done"
+          ).length,
+        }))
+        .sort((a, b) => a.project.name.localeCompare(b.project.name)),
+      memberCount: store.members.filter(
+        (m) => m.primaryTeamId && teamIds.has(m.primaryTeamId)
+      ).length,
+    };
+  });
 }
 
 /** Every project slug — used to pre-render detail pages at build time. */

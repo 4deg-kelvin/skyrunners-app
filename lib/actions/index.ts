@@ -787,9 +787,19 @@ async function updateProjectAction$impl(
     health: String(formData.get("health") ?? "on_track") as Project["health"],
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     openRoles: String(formData.get("openRoles") ?? "") || undefined,
+    // From the session, never the form: the notice names who completed the
+    // project, and that attribution has to be unforgeable.
+    actorId: viewer.member.id,
+    today: today(),
   });
 
   if (result.ok) refresh();
+
+  // Say what the announcement did, rather than letting it happen invisibly.
+  // Someone who marks a project complete should know it went somewhere.
+  if (result.ok && result.value.phase === "complete") {
+    return { ok: true, message: "Marked complete. Everyone above it was told." };
+  }
   return toResult(result, "Project updated.");
 }
 
@@ -821,7 +831,13 @@ async function updateTeamAction$impl(formData: FormData): Promise<ActionResult> 
     teamId: String(formData.get("teamId") ?? ""),
     name: String(formData.get("name") ?? ""),
     parentId: String(formData.get("parentId") ?? "") || null,
-    leadId: String(formData.get("leadId") ?? "") || undefined,
+    // `has` rather than `get`: a form that omits the field must leave the lead
+    // alone, and an empty value in a form that HAS the field must clear it.
+    // Collapsing those two cases is what silently wiped Division Leads on
+    // rename — the edit form never had the field at all.
+    leadId: formData.has("leadId")
+      ? String(formData.get("leadId") ?? "") || null
+      : undefined,
   });
 
   if (result.ok) refresh();
@@ -835,6 +851,57 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
   const result = await ops.deleteTeam(String(formData.get("teamId") ?? ""));
   if (result.ok) refresh();
   return toResult(result, "Division deleted.");
+}
+
+async function archiveTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTeams(viewer.actor)) return denied("archive divisions");
+
+  const result = await ops.archiveTeam({
+    teamId: String(formData.get("teamId") ?? ""),
+    archivedBy: viewer.member.id,
+    note: String(formData.get("note") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    "Archived. Its projects and history are on the archive page."
+  );
+}
+
+async function restoreTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTeams(viewer.actor)) return denied("restore divisions");
+
+  const result = await ops.restoreTeam(String(formData.get("teamId") ?? ""));
+  if (result.ok) refresh();
+  return toResult(result, "Back on the projects page.");
+}
+
+/**
+ * Take back a join request you sent.
+ *
+ * `withdrawJoinRequest` has existed in the operations layer since Phase 2 with
+ * nothing calling it, so a request sent by mistake sat in an RE's queue
+ * permanently — and showed the sender a "Request pending" badge they had no way
+ * to clear. Ownership is checked in the operation as well; the id comes from
+ * the client, so it can't be the only check.
+ */
+async function withdrawJoinRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const result = await ops.withdrawJoinRequest(requestId, viewer.member.id);
+  if (result.ok) refresh();
+  return toResult(result, "Request withdrawn.");
 }
 
 // ---------------------------------------------------------------------------
@@ -988,4 +1055,18 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function archiveTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => archiveTeamAction$impl(formData));
+}
+
+export async function restoreTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => restoreTeamAction$impl(formData));
+}
+
+export async function withdrawJoinRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => withdrawJoinRequestAction$impl(formData));
 }

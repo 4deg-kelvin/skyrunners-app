@@ -33,14 +33,37 @@ import {
   getMember,
   getProject,
   memberProjects,
+  recentWorkLogs,
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
-import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
+import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
 import { escalationsFor, unreadReportsFor, type LeadEscalation } from "@/lib/review";
-import type { Member, Project, ProgressUpdate, UpdateEntry } from "@/lib/types";
+import type {
+  Member,
+  Project,
+  ProgressUpdate,
+  ProjectNotice,
+  UpdateEntry,
+  WorkLog,
+} from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
+
+/**
+ * How long a completion stays news on the dashboard.
+ *
+ * Two weeks, matching the check-in rhythm: long enough that a Lead who was away
+ * still sees it, short enough that the panel never becomes a standing feed
+ * nobody reads. It isn't lost afterwards — the project's own page keeps it.
+ */
+const COMPLETION_NOTICE_DAYS = 14;
+
+function daysSince(iso: string): number {
+  const from = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  const to = Date.parse(`${today()}T00:00:00Z`);
+  return Math.max(0, Math.round((to - from) / 86_400_000));
+}
 
 export interface ReviewQueueItem {
   update: ProgressUpdate;
@@ -86,6 +109,23 @@ export interface DashboardView {
   flaggedProjects: FlaggedProject[];
   /** The viewer's own committed projects, so they can log hours from here. */
   myProjects: { id: string; name: string }[];
+  /** Their own recent hours, so a mistyped entry can be removed from here too. */
+  recentHours: { log: WorkLog; project?: Project; locked: boolean }[];
+  /**
+   * Projects completed recently that named the viewer in the chain.
+   *
+   * This is where "notify up the chain of command" lands. Without somewhere to
+   * arrive, a notice is only a line on a page the recipient has no reason to
+   * open — the announcement would exist and reach nobody. Scoped to notices
+   * addressed to this person, so it's a small list of things that concern them
+   * rather than a club-wide activity feed.
+   */
+  completions: {
+    notice: ProjectNotice;
+    project?: Project;
+    actor?: Member;
+    ageDays: number;
+  }[];
   today: string;
   maxBackdateDays: number;
 }
@@ -294,6 +334,28 @@ export async function getDashboard(
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
+    recentHours: recentWorkLogs(actor.id).map((log) => ({
+      log,
+      project: log.projectId ? getProject(log.projectId) : undefined,
+      locked: hoursAreLocked(actor.id, log.workDate),
+    })),
+    // Addressed to this person, newest first, and only the last fortnight.
+    // Older than that it's history rather than news, and the project pages and
+    // the completed sections on /projects are where history belongs.
+    completions: readStore()
+      .projectNotices.filter(
+        (n) =>
+          n.kind === "completed" &&
+          n.notifiedMemberIds.includes(actor.id) &&
+          daysSince(n.createdAt) <= COMPLETION_NOTICE_DAYS
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((notice) => ({
+        notice,
+        project: getProject(notice.projectId),
+        actor: getMember(notice.createdById),
+        ageDays: daysSince(notice.createdAt),
+      })),
     today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,

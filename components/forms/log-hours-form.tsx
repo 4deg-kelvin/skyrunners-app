@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Lock, Plus, X } from "lucide-react";
 
-import { ActionForm } from "./action-form";
-import { logHoursAction } from "@/lib/actions";
+import { ActionButton, ActionForm } from "./action-form";
+import { deleteHoursAction, logHoursAction } from "@/lib/actions";
+import type { WorkLog } from "@/lib/types";
 
 /**
  * Quick-add for hours. Phase 3's whole point.
@@ -29,11 +30,20 @@ export function LogHoursForm({
   defaultProjectId,
   today,
   maxBackdateDays,
+  recent = [],
 }: {
   projects: { id: string; name: string }[];
   defaultProjectId?: string;
   today: string;
   maxBackdateDays: number;
+  /**
+   * What they've already logged, newest first.
+   *
+   * Logging used to be write-only — no screen in the app listed a single entry,
+   * so `deleteHoursAction` had nothing to attach to and a mistyped 80 instead
+   * of 8.0 was permanent. Correcting a number belongs beside entering it.
+   */
+  recent?: { log: WorkLog; project?: { name: string }; locked: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -151,6 +161,55 @@ export function LogHoursForm({
           />
         </label>
       </ActionForm>
+
+      {recent.length > 0 ? (
+        <div className="mt-4 border-t border-line pt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Logged recently
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {recent.map(({ log, project, locked }) => (
+              <li
+                key={log.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="min-w-0 text-ink-soft">
+                  <span className="font-semibold text-ink">
+                    {new Date(`${log.workDate}T00:00:00Z`).toLocaleDateString(
+                      "en-US",
+                      { month: "short", day: "numeric", timeZone: "UTC" }
+                    )}
+                  </span>{" "}
+                  · {log.hours} hrs
+                  {project ? ` · ${project.name}` : ""}
+                  {log.description ? ` · ${log.description}` : ""}
+                </span>
+
+                {/*
+                  A locked row says so instead of offering a button that would
+                  be refused. The hours are part of a check-in already sent —
+                  editing them afterwards would change a report somebody has
+                  read.
+                */}
+                {locked ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                    <Lock className="size-3" />
+                    In a sent check-in
+                  </span>
+                ) : (
+                  <ActionButton
+                    action={deleteHoursAction}
+                    fields={{ logId: log.id }}
+                    label="Remove"
+                    pendingLabel="Removing…"
+                    tone="danger"
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
