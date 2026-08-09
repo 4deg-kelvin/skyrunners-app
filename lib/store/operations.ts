@@ -13,12 +13,31 @@
  * Every function:
  *   - takes plain data, never a FormData or a React thing
  *   - validates, and returns a typed failure rather than throwing
- *   - is pure with respect to permissions: the CALLER checks `can.*`
+ *   - leaves ROLE and GRAPH questions to the caller
  *
- * That last point is deliberate. Permission checks need the org graph, which is
- * request-scoped; embedding them here would either duplicate the graph or make
- * every operation take one. The Server Actions in `lib/actions/*` are the
- * enforcement layer, and they are the only callers.
+ * ---------------------------------------------------------------------------
+ * The one honest exception, so nobody trusts a rule that isn't true
+ * ---------------------------------------------------------------------------
+ *
+ * "Operations check no permissions" is nearly right and was stated flatly here
+ * for a long time, which is worse than stating it precisely. The real division:
+ *
+ *   ROLE and GRAPH questions — "is this person a Co-Lead", "do they lead a team
+ *   above this project", "are they in this member's Lead chain" — need the
+ *   request-scoped org graph. They live in `lib/permissions.ts` and are checked
+ *   by the Server Actions in `lib/actions/*`, which are the only callers of
+ *   this file. Embedding them here would mean duplicating the graph or
+ *   threading it through twenty signatures.
+ *
+ *   OWNERSHIP questions — "is this YOUR work log", "is this YOUR join request"
+ *   — need the row, which only this layer has. Four operations check them
+ *   here, against an actor id the action derived from the session:
+ *   `deleteWorkLog`, `withdrawJoinRequest`, `submitDeliverable`, and
+ *   `setEventAttendance`. They are the last line rather than the only one, and
+ *   they fail with a sentence the member can act on.
+ *
+ * If you add an operation that takes an `actorId`, it is almost certainly in
+ * the second group — and the id must come from the session, never the form.
  */
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";

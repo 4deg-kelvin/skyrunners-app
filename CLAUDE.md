@@ -336,7 +336,10 @@ its project.
 ## Conventions
 
 - Display strings and badge tones go in `lib/labels.ts`, never inline in a page
-- Reads via Supabase client + RLS; writes via Server Actions calling `lib/permissions.ts`
+- Reads via Supabase client + RLS; writes via Server Actions calling `lib/permissions.ts`.
+  **Role and graph** questions live in `permissions.ts`; **ownership** questions
+  ("is this your row") live in `operations.ts`, which is the only layer holding
+  the row — four operations do this, and the header there names them
 - Nested queries use recursive CTEs — views already written in `0001_core_schema.sql`
 - Generated Supabase types are snake_case; `lib/types.ts` is camelCase. **Map between
   them inside `lib/data/*`** — don't let snake_case leak into components

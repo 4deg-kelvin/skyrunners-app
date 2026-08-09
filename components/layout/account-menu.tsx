@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { ChevronDown, LifeBuoy, LogOut, Settings, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn, initials } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -76,6 +76,27 @@ export function AccountMenu({
           role="menu"
           className="rounded-card border-line bg-card absolute right-0 z-50 mt-2 w-60 overflow-hidden border shadow-sm"
         >
+          {/*
+            First, and visually separated.
+
+            The club loses people to disorganisation, and a new member who
+            can't tell what the app wants from them in the first five minutes
+            is exactly the person who drifts. It's here rather than in the nav
+            because the nav has six items and that ceiling is deliberate — this
+            is read once and then never again.
+          */}
+          <Link
+            href="/getting-started"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] font-semibold transition-colors"
+          >
+            <LifeBuoy className="text-cardinal-600 size-4" />
+            New here? Start here
+          </Link>
+
+          <div className="bg-line-soft h-px" />
+
           <Link
             href={`/members/${memberId}`}
             role="menuitem"
