@@ -35,6 +35,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
 import {
   today,
+  getEvent,
   getProject,
   helpRequestById,
   hoursOnProjectThisWeek,
@@ -91,22 +92,34 @@ async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
   if (!can.logOwnHours(viewer.actor, viewer.member.id)) {
     return denied("log hours");
   }
-  if (!projectId) return { ok: false, error: "Pick a project." };
 
-  // You can only log against projects you're actually on. Otherwise the hours
-  // would appear on an RE's project from someone they've never added, which
-  // makes the per-project totals meaningless.
-  const mine = memberProjects(viewer.member.id);
-  if (!mine.some((m) => m.projectId === projectId)) {
-    return {
-      ok: false,
-      error: "You're not on that project. Ask to join it first.",
-    };
+  /*
+    An empty project is "misc", and that's now a real option rather than a
+    validation failure.
+
+    It follows directly from the calendar: somebody sees an open build session,
+    turns up, and helps on a project they aren't committed to. They worked
+    those hours. Refusing the log because they're not on the roster made the
+    honest answer impossible and the dishonest one — logging it against a
+    project they ARE on — the only way through.
+
+    The per-project guard below still stands for hours claimed AGAINST a
+    project, which is what keeps those totals meaningful.
+  */
+  if (projectId) {
+    const mine = memberProjects(viewer.member.id);
+    if (!mine.some((m) => m.projectId === projectId)) {
+      return {
+        ok: false,
+        error:
+          "You're not on that project. Log it as misc, or ask to join first.",
+      };
+    }
   }
 
   const result = await ops.logHours({
     memberId: viewer.member.id,
-    projectId,
+    projectId: projectId || undefined,
     workDate,
     hours,
     description,
@@ -855,6 +868,141 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Phase 8 — the calendar
+// ---------------------------------------------------------------------------
+
+const EVENT_KINDS = [
+  "design_review",
+  "company_tour",
+  "company_visit",
+  "build_session",
+  "general_meeting",
+  "training",
+  "social",
+  "competition",
+  "one_on_one",
+] as const;
+
+function eventKindFrom(formData: FormData): (typeof EVENT_KINDS)[number] {
+  const raw = String(formData.get("kind") ?? "");
+  return (EVENT_KINDS as readonly string[]).includes(raw)
+    ? (raw as (typeof EVENT_KINDS)[number])
+    : "build_session";
+}
+
+async function createEventAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "") || undefined;
+
+  /*
+    A member may schedule a session for a project they're COMMITTED to. Not
+    following — watching a project doesn't make you one of the people running
+    a build night, and an open session that anybody could invent on any project
+    turns the calendar into a noticeboard.
+  */
+  const isOnProject = projectId
+    ? memberProjects(viewer.member.id).some(
+        (m) => m.projectId === projectId && m.commitment === "committed"
+      )
+    : false;
+
+  if (!can.createEvent(viewer.actor, isOnProject)) {
+    return projectId
+      ? { ok: false, error: "You're not on that project, so you can't run a session for it." }
+      : denied("create club-wide events");
+  }
+
+  const attendeeIds = formData.getAll("attendeeIds").map(String).filter(Boolean);
+  const importanceRaw = String(formData.get("importanceWeight") ?? "").trim();
+
+  const result = await ops.createEvent({
+    title: String(formData.get("title") ?? ""),
+    kind: eventKindFrom(formData),
+    startsAt: String(formData.get("startsAt") ?? ""),
+    endsAt: String(formData.get("endsAt") ?? "") || undefined,
+    location: String(formData.get("location") ?? ""),
+    projectId,
+    createdBy: viewer.member.id,
+    attendeeIds,
+    notes: String(formData.get("notes") ?? ""),
+    importanceWeight: importanceRaw ? Number(importanceRaw) : undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "On the calendar.");
+}
+
+async function updateEventAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const eventId = String(formData.get("eventId") ?? "");
+
+  const existing = getEvent(eventId);
+  if (!existing) return { ok: false, error: "That event no longer exists." };
+  if (!can.manageEvent(viewer.actor, existing.createdBy)) {
+    return denied("change this event");
+  }
+
+  const importanceRaw = String(formData.get("importanceWeight") ?? "").trim();
+  const result = await ops.updateEvent({
+    eventId,
+    title: String(formData.get("title") ?? ""),
+    kind: eventKindFrom(formData),
+    startsAt: String(formData.get("startsAt") ?? ""),
+    endsAt: String(formData.get("endsAt") ?? "") || undefined,
+    location: String(formData.get("location") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    importanceWeight: importanceRaw ? Number(importanceRaw) : undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+async function deleteEventAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const eventId = String(formData.get("eventId") ?? "");
+
+  const existing = getEvent(eventId);
+  if (!existing) return { ok: false, error: "That event no longer exists." };
+  if (!can.manageEvent(viewer.actor, existing.createdBy)) {
+    return denied("cancel this event");
+  }
+
+  const result = await ops.deleteEvent(eventId);
+  if (result.ok) refresh();
+  return toResult(result, "Cancelled.");
+}
+
+/**
+ * Turn up to something, or stop.
+ *
+ * No permission gate beyond being signed in: joining an open session is the
+ * behaviour the calendar exists to enable, and the operation refuses closed
+ * events on its own.
+ */
+async function setEventAttendanceAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const attending = String(formData.get("attending") ?? "") === "yes";
+
+  const result = await ops.setEventAttendance({
+    eventId: String(formData.get("eventId") ?? ""),
+    memberId: viewer.member.id,
+    attending,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, attending ? "See you there." : "Taken off the list.");
+}
+
+// ---------------------------------------------------------------------------
 // Trainings and facility access
 // ---------------------------------------------------------------------------
 
@@ -894,11 +1042,20 @@ async function verifyCertificationAction$impl(
   const result = await ops.verifyCertification({
     certificationId,
     verifierId: viewer.member.id,
+    // Only a Co-Lead may sign off their own, because nobody is above them and
+    // the alternative is a record they can never complete. See the note on
+    // `can.verifyTraining`.
+    allowSelf: isCoLead(viewer.actor),
     today: today(),
   });
 
   if (result.ok) refresh();
-  return toResult(result, "Verified.");
+  return toResult(
+    result,
+    result.ok && memberId === viewer.member.id
+      ? "Verified — recorded as self-verified, since nobody sits above a Co-Lead."
+      : "Verified."
+  );
 }
 
 async function rejectCertificationAction$impl(
@@ -1445,6 +1602,22 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function createEventAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createEventAction$impl(formData));
+}
+
+export async function updateEventAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateEventAction$impl(formData));
+}
+
+export async function deleteEventAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteEventAction$impl(formData));
+}
+
+export async function setEventAttendanceAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setEventAttendanceAction$impl(formData));
 }
 
 export async function requestCertificationAction(formData: FormData): Promise<ActionResult> {

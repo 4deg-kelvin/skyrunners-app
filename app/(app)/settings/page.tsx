@@ -4,13 +4,19 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
+import {
+  AddCatalogueItemForm,
+  AddSectionForm,
+  EditCatalogueItemForm,
+} from "@/components/forms/training-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
 import { getSettings } from "@/lib/data/settings";
+import { getCatalogue } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
-import { TERM_KIND_LABELS } from "@/lib/labels";
+import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 
 export const metadata = {
@@ -31,11 +37,15 @@ function termRange(startsOn: string, endsOn: string): string {
 
 export default async function SettingsPage() {
   const viewer = await getViewer();
-  const view = await getSettings(viewer.member.id);
+  const [view, catalogue] = await Promise.all([
+    getSettings(viewer.member.id),
+    getCatalogue(),
+  ]);
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
   const mayEdit = can.setOwnSchedule(viewer.actor, viewer.member.id);
   const mayEditCalendar = can.manageTerms(viewer.actor);
+  const mayEditCatalogue = can.manageTrainingCatalogue(viewer.actor);
   const isPaused = !!schedule.pausedUntil;
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -239,6 +249,85 @@ export default async function SettingsPage() {
           ) : null}
         </CardBody>
       </Card>
+
+      {/*
+        The trainings catalogue — club-wide, so it lives here rather than on
+        anybody's profile.
+
+        This was on the member profile at first and read exactly as wrong as it
+        was: a Lead verifying somebody's laser training could, from the same
+        row, retire the laser for the whole club. Two different scopes. A
+        person's record is on their profile; the shop's contents are here, next
+        to the academic calendar, which is the other thing a Co-Lead configures
+        once and rarely revisits.
+      */}
+      {mayEditCatalogue ? (
+        <Card>
+          <CardBody>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <SectionLabel>Trainings Catalogue</SectionLabel>
+                <p className="mt-2 text-[15px] text-ink-soft">
+                  Every site and machine the club is trained on. Adding one is
+                  typing a name — it appears on everyone&apos;s profile straight
+                  away, unearned.
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <AddSectionForm />
+                <AddCatalogueItemForm sections={catalogue.sectionOptions} />
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {catalogue.sections.map(({ section, items }) => (
+                <div key={section.id}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink">
+                    {section.name}
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {items.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`rounded-tile border border-line px-3 py-2 ${
+                          item.isActive ? "" : "opacity-60"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-ink">
+                              {item.name}
+                            </span>
+                            <Badge tone="neutral">
+                              {CATALOGUE_KIND_LABELS[item.kind]}
+                            </Badge>
+                            {item.validityMonths ? (
+                              <Badge tone="warn">
+                                Expires after {item.validityMonths} months
+                              </Badge>
+                            ) : null}
+                            {!item.isActive ? (
+                              <Badge tone="neutral">Retired</Badge>
+                            ) : null}
+                          </span>
+                          <EditCatalogueItemForm item={item} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-4 text-sm text-ink-muted">
+              Set an expiry only if the clearance really lapses. When one does,
+              it&apos;s cancelled and the member&apos;s Lead is told — there is
+              no grace period, because a lapsed clearance that still reads as
+              valid is the failure that hurts somebody.
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
     </div>
   );
 }

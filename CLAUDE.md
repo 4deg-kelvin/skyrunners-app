@@ -114,15 +114,22 @@ app/
   (app)/            route group: everything requiring a session
     layout.tsx      nav, demo banner, getViewer()
     my-work/        what you own and owe. `/` redirects here
-    find-work/      the point of the app — where to help
-    blockers/       everything stuck, oldest first, anyone can answer
-    projects/       the tree, plus /archive for retired divisions
-    members/        roster and profiles
-    trainings/      what you're cleared on, and who else is
-    deadlines/      every due date per division (replaced Phase 11)
-    calendar/       events (Phase 8, still a stub)
+    find-work/      where to help — projects, plus open "I'm stuck" asks
+    projects/       the tree; deadlines and blocked work fold in per division
+    projects/archive/  retired divisions and what they built
+    members/        roster and profiles — trainings live on the profile
+    calendar/       sessions, meetings, 1:1s and deadlines
+    settings/       your own, plus the Co-Lead academic calendar + catalogue
     dashboard/      leadership only, scoped to who you oversee
 ```
+
+**Six nav items, and that's a ceiling worth keeping.** It briefly hit eight —
+`/blockers`, `/deadlines` and `/trainings` were each a real feature given a
+destination they didn't earn. None was wrong; all three were the wrong SIZE. A
+deadline is a property of a project, a blocker is already flagged on the
+project row, and "what am I cleared on" is a fact about a person. Each now
+lives where the thing it describes lives. Before adding a nav item, check
+whether it's a page or a section.
 
 The `(app)` group exists because if the root layout resolved the viewer, `/login` would
 render inside a layout that redirects unauthenticated visitors to `/login` — an infinite

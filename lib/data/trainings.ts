@@ -217,6 +217,32 @@ export async function getTrainingQueue(
 }
 
 /**
+ * The catalogue itself, for the Co-Lead editor in Settings.
+ *
+ * Deliberately separate from `getTrainings`, which is one person's record.
+ * Two different questions with two different audiences — and mixing them is
+ * what put a club-wide "retire this machine" button on a row inside somebody's
+ * personal training list.
+ *
+ * Retired items are INCLUDED here and nowhere else: this is the only screen
+ * that can bring one back.
+ */
+export async function getCatalogue(): Promise<{
+  sections: { section: TrainingSection; items: CatalogueItem[] }[];
+  sectionOptions: { id: string; name: string }[];
+}> {
+  await preloadLiveStore();
+
+  return {
+    sections: trainingSections().map((section) => ({
+      section,
+      items: catalogueItemsFor(section.id),
+    })),
+    sectionOptions: trainingSections().map((s) => ({ id: s.id, name: s.name })),
+  };
+}
+
+/**
  * "Who can run the laser cutter?" answered directly.
  *
  * A flat index of every active clearance, for the lookup view. Deliberately

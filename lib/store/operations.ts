@@ -22,9 +22,11 @@
  */
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
+import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
   CatalogueItem,
   CatalogueItemKind,
+  ClubEvent,
   Deliverable,
   DeliverableStatus,
   GlobalRole,
@@ -148,7 +150,15 @@ export function hoursAreLocked(memberId: string, workDate: string): boolean {
 
 export async function logHours(input: {
   memberId: string;
-  projectId: string;
+  /**
+   * Omit for "misc" — helping on something you aren't committed to.
+   *
+   * Follows directly from the calendar: somebody sees an open build session,
+   * turns up, and works three hours on a project they're not on the roster
+   * for. Those hours are real. Refusing them made the honest answer impossible
+   * and left logging against the wrong project as the only way through.
+   */
+  projectId?: string;
   workDate: string;
   hours: number;
   description?: string;
@@ -1612,6 +1622,166 @@ export async function createTeam(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 8 — the calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * Put something on the calendar.
+ *
+ * The permission question ("a project you're on" vs "leadership for club-wide"
+ * vs "anyone can propose a 1:1") is the caller's — it needs the org graph.
+ * What's enforced here is that the event is coherent: it has a title, it
+ * starts before it ends, and its project exists.
+ *
+ * Deliberately no conflict check. Overlapping events are NORMAL — a design
+ * review runs inside a general meeting — and refusing them would break the one
+ * requirement the calendar has to get right.
+ */
+export async function createEvent(input: {
+  title: string;
+  kind: ClubEvent["kind"];
+  startsAt: string;
+  endsAt?: string;
+  location?: string;
+  projectId?: string;
+  createdBy: string;
+  attendeeIds?: string[];
+  isOpen?: boolean;
+  notes?: string;
+  importanceWeight?: number;
+}): Promise<Result<ClubEvent>> {
+  const title = input.title.trim();
+  if (!title) return fail<ClubEvent>("Give it a name.");
+  if (!input.startsAt) return fail<ClubEvent>("When does it start?");
+  if (input.endsAt && input.endsAt < input.startsAt) {
+    return fail<ClubEvent>("It ends before it starts.");
+  }
+
+  const importance =
+    input.importanceWeight ?? DEFAULT_EVENT_IMPORTANCE[input.kind] ?? 3;
+  if (!Number.isInteger(importance) || importance < 1 || importance > 5) {
+    return fail<ClubEvent>("Importance runs 1 to 5.");
+  }
+
+  return guarded((store) => {
+    if (input.projectId && !store.projects.some((p) => p.id === input.projectId)) {
+      return fail<ClubEvent>("That project no longer exists.");
+    }
+
+    const event: ClubEvent = {
+      id: newId("event"),
+      title,
+      kind: input.kind,
+      importanceWeight: importance,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt || undefined,
+      location: input.location?.trim() || undefined,
+      projectId: input.projectId || undefined,
+      createdBy: input.createdBy,
+      // The organiser is always on it. Nothing else in the app would add them,
+      // and a session whose creator isn't listed reads as somebody else's.
+      attendeeIds: [
+        ...new Set([input.createdBy, ...(input.attendeeIds ?? [])]),
+      ].filter(Boolean),
+      isOpen: input.isOpen ?? input.kind !== "one_on_one",
+      notes: input.notes?.trim() || undefined,
+    };
+
+    store.events.push(event);
+    return ok(event);
+  });
+}
+
+export async function updateEvent(input: {
+  eventId: string;
+  title: string;
+  kind: ClubEvent["kind"];
+  startsAt: string;
+  endsAt?: string;
+  location?: string;
+  notes?: string;
+  importanceWeight?: number;
+}): Promise<Result<ClubEvent>> {
+  const title = input.title.trim();
+  if (!title) return fail<ClubEvent>("Give it a name.");
+  if (input.endsAt && input.endsAt < input.startsAt) {
+    return fail<ClubEvent>("It ends before it starts.");
+  }
+
+  return guarded((store) => {
+    const event = store.events.find((e) => e.id === input.eventId);
+    if (!event) return fail<ClubEvent>("That event no longer exists.");
+
+    const importance =
+      input.importanceWeight ?? DEFAULT_EVENT_IMPORTANCE[input.kind] ?? 3;
+    if (!Number.isInteger(importance) || importance < 1 || importance > 5) {
+      return fail<ClubEvent>("Importance runs 1 to 5.");
+    }
+
+    event.title = title;
+    event.kind = input.kind;
+    event.startsAt = input.startsAt;
+    event.endsAt = input.endsAt || undefined;
+    event.location = input.location?.trim() || undefined;
+    event.notes = input.notes?.trim() || undefined;
+    event.importanceWeight = importance;
+    return ok(event);
+  });
+}
+
+export async function deleteEvent(eventId: string): Promise<Result<null>> {
+  return guarded((store) => {
+    if (!store.events.some((e) => e.id === eventId)) {
+      return fail<null>("That event no longer exists.");
+    }
+    store.events = store.events.filter((e) => e.id !== eventId);
+    return ok(null);
+  });
+}
+
+/**
+ * Say you're coming, or that you're not.
+ *
+ * Not an RSVP in the tracked sense — nothing chases you, nothing reports on
+ * who accepted. It's so the people already on a session can see who else is
+ * turning up, which is the whole reason a third person joining is useful.
+ *
+ * Closed events (a 1:1) can't be joined: the two people in it are the event.
+ */
+export async function setEventAttendance(input: {
+  eventId: string;
+  memberId: string;
+  attending: boolean;
+}): Promise<Result<ClubEvent>> {
+  return guarded((store) => {
+    const event = store.events.find((e) => e.id === input.eventId);
+    if (!event) return fail<ClubEvent>("That event no longer exists.");
+
+    if (input.attending) {
+      if (!event.isOpen) {
+        return fail<ClubEvent>("That one isn't open to drop in on.");
+      }
+      if (!event.attendeeIds.includes(input.memberId)) {
+        event.attendeeIds = [...event.attendeeIds, input.memberId];
+      }
+    } else {
+      if (event.createdBy === input.memberId) {
+        // Otherwise a session ends up with nobody running it and stays on the
+        // calendar looking like it's still happening.
+        return fail<ClubEvent>(
+          "You organised this — cancel it instead of stepping out."
+        );
+      }
+      event.attendeeIds = event.attendeeIds.filter(
+        (id) => id !== input.memberId
+      );
+    }
+
+    return ok(event);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Trainings and facility access
 // ---------------------------------------------------------------------------
 
@@ -1711,6 +1881,14 @@ export async function requestCertification(input: {
 export async function verifyCertification(input: {
   certificationId: string;
   verifierId: string;
+  /**
+   * Whether the verifier is a Co-Lead, and may therefore sign off their own.
+   *
+   * Set by the action from `isCoLead`, because operations deliberately can't
+   * see the org graph. Defaults to false, so a caller that forgets it gets the
+   * strict rule rather than the permissive one.
+   */
+  allowSelf?: boolean;
   today: string;
 }): Promise<Result<MemberCertification>> {
   return guarded((store) => {
@@ -1719,10 +1897,18 @@ export async function verifyCertification(input: {
     );
     if (!record) return fail<MemberCertification>("That request no longer exists.");
 
-    // The second of the two checks. `can.verifyTraining` is the first, and it
-    // already excludes self — but this is the record that decides whether
-    // somebody is allowed near a machine, so it does not rely on one layer.
-    if (record.memberId === input.verifierId) {
+    /*
+      The second of the two checks — `can.verifyTraining` is the first. This is
+      the record that decides whether somebody is allowed near a machine, so it
+      doesn't rely on one layer.
+
+      The Co-Lead exception exists because a Co-Lead has nobody above them: a
+      blanket "nobody self-verifies" meant their own record could never be
+      completed, which is a dead end that quietly teaches them to stop
+      recording trainings. Marked as self-verified in the UI rather than
+      hidden, so the weaker guarantee is visible instead of implied.
+    */
+    if (record.memberId === input.verifierId && !input.allowSelf) {
       return fail<MemberCertification>(
         "You can't verify your own training — ask your Lead."
       );

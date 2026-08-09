@@ -435,7 +435,20 @@ export const can = {
   requestTraining: (actor: Actor, memberId: string) =>
     isSelf(actor, memberId),
 
-  /** Verified by the member's direct Lead (or above), or a Co-Lead. */
+  /**
+   * Verified by the member's Lead chain, or a Co-Lead.
+   *
+   * **A Co-Lead may verify their own**, and that exception is load-bearing
+   * rather than a loophole. "Nobody self-verifies" assumes somebody is above
+   * you; a Co-Lead is the top of the chain, so a blanket rule meant their
+   * record could never be completed at all — a permanent dead end, and one
+   * that quietly pushes them to stop recording trainings rather than to find
+   * a second Co-Lead. A record nobody keeps is worse than one marked
+   * self-verified, which is what the UI shows so it stays honest.
+   *
+   * Everyone else still needs someone above them, checked here AND again in
+   * the operation.
+   */
   verifyTraining: (actor: Actor, graph: OrgGraph, memberId: string) =>
     isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
 
@@ -454,7 +467,30 @@ export const can = {
 
   // --- Events ------------------------------------------------------------
 
-  createEvent: (actor: Actor) => actor.globalRole !== "member",
+  /**
+   * Put something on the calendar.
+   *
+   * Two different acts behind one name:
+   *
+   *   - A **club-wide event** (a general meeting, a company tour) is
+   *     leadership's, because it implicitly asks everyone to show up.
+   *   - An **engineering session on a project you're on** is anybody's. That
+   *     is the case the calendar exists for: two people on the wing spar
+   *     Thursday night, visible so a third can turn up. Requiring leadership
+   *     to schedule that would put a Co-Lead back in the middle of exactly the
+   *     thing this app removes them from.
+   *
+   * `isOnProject` is computed by the caller rather than looked up here —
+   * `OrgGraph` has no membership lookup, and adding one for a single rule
+   * would put a fifth synchronous method on a hot interface. Same shape as
+   * `viewLeadershipDashboard(actor, hasReports)`.
+   */
+  createEvent: (actor: Actor, isOnProject = false) =>
+    actor.globalRole !== "member" || isOnProject,
+
+  /** Your own, or leadership tidying the club calendar. */
+  manageEvent: (actor: Actor, createdBy?: string) =>
+    actor.globalRole !== "member" || (!!createdBy && createdBy === actor.id),
 
   /** Deliberately not scope-limited: leadership can invite anyone, anywhere. */
   inviteToEvent: (actor: Actor) => actor.globalRole !== "member",

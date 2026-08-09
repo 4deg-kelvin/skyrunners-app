@@ -14,17 +14,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
+import { TrainingRecord } from "@/components/ui/training-record";
 import { ActionButton } from "@/components/forms/action-form";
-import { VerifyControls } from "@/components/forms/training-actions";
 import { deleteCheckInAction } from "@/lib/actions";
 import { getMemberProfile } from "@/lib/data/members";
+import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import {
-  CERTIFICATION_STATUS_TONES,
   ROLE_LABELS,
   ROLE_TONES,
 } from "@/lib/labels";
-import { can } from "@/lib/permissions";
+import { can, isCoLead } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
 export default async function MemberProfilePage({
@@ -38,7 +38,10 @@ export default async function MemberProfilePage({
   // Decide visibility BEFORE fetching, so restricted numbers are never loaded
   // into a page that isn't allowed to show them.
   const canViewEffort = can.viewMemberEffort(viewer.actor, viewer.graph, id);
-  const view = await getMemberProfile(id, canViewEffort);
+  const [view, trainings] = await Promise.all([
+    getMemberProfile(id, canViewEffort),
+    getTrainings(id),
+  ]);
 
   if (!view) notFound();
 
@@ -49,7 +52,6 @@ export default async function MemberProfilePage({
     projects,
     contribution,
     checkIns,
-    certifications,
   } = view;
   const isOwnProfile = viewer.member.id === member.id;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
@@ -370,87 +372,24 @@ export default async function MemberProfilePage({
           ) : null}
 
           {/*
-            Trainings, and the verify controls if the viewer is up this
-            person's Lead chain. Public to read — knowing who can run a machine
-            is how you find the person to ask.
+            Their trainings. Public to read — knowing who can run a machine is
+            how you find the person to ask.
+
+            Everything here is per-person. Editing the club's CATALOGUE lives
+            in Settings, because retiring a machine affects everyone and has no
+            business on a row inside one member's record.
           */}
           <Card>
             <CardBody>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <SectionLabel>Trainings &amp; Facility Access</SectionLabel>
-                {isOwnProfile ? (
-                  <Link
-                    href="/trainings"
-                    className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
-                  >
-                    Add a training
-                  </Link>
-                ) : null}
-              </div>
-
-              {certifications.held.length === 0 &&
-              certifications.pending.length === 0 ? (
-                <p className="mt-3 text-[15px] text-ink-soft">
-                  {isOwnProfile
-                    ? "Nothing recorded yet. Add what you're already cleared on — your Lead confirms it."
-                    : `${member.fullName} hasn't recorded any trainings yet.`}
-                </p>
-              ) : null}
-
-              {certifications.pending.length > 0 ? (
-                <div className="mt-4">
-                  <SectionLabel tone="muted">Awaiting verification</SectionLabel>
-                  <div className="mt-2 space-y-2">
-                    {certifications.pending.map(({ record, itemName }) => (
-                      <div
-                        key={record.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-warn-fg/25 bg-warn-bg/40 px-4 py-2.5"
-                      >
-                        <span className="text-sm font-semibold text-ink">
-                          {itemName}
-                        </span>
-                        {canVerifyTrainings ? (
-                          <VerifyControls
-                            certificationId={record.id}
-                            memberId={member.id}
-                            memberName={member.fullName}
-                          />
-                        ) : (
-                          <Badge tone="warn">Waiting on their Lead</Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {certifications.held.length > 0 ? (
-                <div className="mt-4">
-                  <SectionLabel tone="muted">Cleared</SectionLabel>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {certifications.held.map(({ record, itemName }) => (
-                      <Badge
-                        key={record.id}
-                        tone={CERTIFICATION_STATUS_TONES[record.status]}
-                      >
-                        {itemName}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {certifications.lapsed.length > 0 ? (
-                <div className="mt-4">
-                  <SectionLabel tone="muted">Lapsed</SectionLabel>
-                  <p className="mt-1 text-sm text-risk-fg">
-                    Not cleared until redone:{" "}
-                    {certifications.lapsed.map((c) => c.itemName).join(", ")}
-                  </p>
-                </div>
-              ) : null}
+              <TrainingRecord
+                view={trainings}
+                isOwnProfile={isOwnProfile}
+                canVerify={canVerifyTrainings}
+                viewerIsCoLead={isCoLead(viewer.actor)}
+              />
             </CardBody>
           </Card>
+
         </div>
       </div>
     </div>

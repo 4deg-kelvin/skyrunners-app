@@ -229,10 +229,24 @@ sat on a project page, a check-in blocker sat in one Lead's queue.
 **Design target: a Lead's weekly obligation fits in 15 minutes.** The scarce resource is
 leadership *reading*, not member writing.
 
-### Phase 8 — Events, attendance, calendar **[App]**
+### Phase 8 — Events, attendance, calendar **[App]** — ✅ shipped 2026-08-09
 
-**Requirements settled with Anish on 2026-08-08. Read these before designing
-anything — several of them rule out the obvious implementation.**
+**What shipped:** a **day-grouped list, not a month grid** — that's the choice
+that keeps overlapping events both readable, and it's the one thing a grid
+would have quietly broken. Engineering sessions any committed member can
+create; club-wide events for leadership; 1:1s for anyone, as a private busy
+block with no agenda field. Importance 1–5 defaulting by kind. Deadlines
+interleaved in the same stream so there's one place to look. Runs over breaks.
+Hours can be logged to **misc** for helping on something you aren't committed
+to, which follows directly from strangers being able to join a session.
+
+**Not built, deliberately:** attendance beyond "who's coming" — no RSVP
+round-trip, no check-in, no QR code — and nothing feeding contribution, since
+there is still no composite score. Opt-in iCal export is still open.
+
+**Requirements as settled with Anish on 2026-08-08**, kept because several of
+them ruled out the obvious implementation and the reasoning matters to whoever
+changes this next.
 
 **The purpose.** The calendar answers *"what is happening right now, and can I
 join it?"* It is **not** a meeting-scheduling tool. Its job is the same as
