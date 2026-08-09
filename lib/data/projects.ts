@@ -44,6 +44,7 @@ function daysWaitingOn(since: string): number {
   return Math.max(0, Math.round(ms / 86_400_000));
 }
 import type { BreadcrumbNode } from "./my-work";
+import { preloadLiveStore } from "@/lib/store/request";
 
 export interface ProjectTreeNode {
   project: Project;
@@ -82,6 +83,14 @@ function buildNode(project: Project): ProjectTreeNode {
  * and be invisible on the page whose whole job is discoverability.
  */
 export async function getProjectTree(): Promise<DivisionProjects[]> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const roots = readStore().projects.filter((p) => p.parentId === null);
 
   return divisions().map((division) => ({
@@ -95,6 +104,14 @@ export async function getProjectTree(): Promise<DivisionProjects[]> {
 
 /** Projects whose division can't be resolved — a data-integrity warning. */
 export async function getOrphanedProjects(): Promise<Project[]> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   return readStore().projects.filter(
     (p) => p.parentId === null && !divisionForProject(p.id)
   );
@@ -155,6 +172,14 @@ export async function getProjectBySlug(
   slug: string,
   viewerId: string
 ): Promise<ProjectDetailView | null> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const project = readStore().projects.find((p) => p.slug === slug);
   if (!project) return null;
 
@@ -211,6 +236,7 @@ export async function getProjectFormOptions(): Promise<{
   divisions: { id: string; name: string }[];
   people: { id: string; name: string }[];
 }> {
+  await preloadLiveStore();
   return {
     parents: readStore().projects.map((p) => ({ id: p.id, name: p.name })),
     divisions: divisions().map((d) => ({ id: d.id, name: d.name })),
@@ -220,5 +246,13 @@ export async function getProjectFormOptions(): Promise<{
 
 /** Every project slug — used to pre-render detail pages at build time. */
 export async function getAllProjectSlugs(): Promise<string[]> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   return readStore().projects.map((p) => p.slug);
 }

@@ -32,6 +32,7 @@ import type {
   ProjectMembership,
 } from "@/lib/types";
 import type { BreadcrumbNode } from "./my-work";
+import { preloadLiveStore } from "@/lib/store/request";
 
 /** People who can be somebody's Lead — leadership plus anyone with reports. */
 export interface RosterOptions {
@@ -64,6 +65,14 @@ export interface RosterRow {
  * `lib/mock-data` — ESLint enforces that boundary.
  */
 export async function getRosterOptions(): Promise<RosterOptions> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const active = activeMembers();
   return {
     // Anyone who already leads someone stays eligible even if their global role
@@ -81,6 +90,14 @@ export async function getRosterOptions(): Promise<RosterOptions> {
 }
 
 export async function getRoster(): Promise<RosterRow[]> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   return activeMembers().map((member) => {
     const mine = memberProjects(member.id);
     const deliverables = myDeliverables(member.id);
@@ -133,6 +150,14 @@ export async function getMemberProfile(
   memberId: string,
   canViewEffort: boolean
 ): Promise<MemberProfileView | null> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const member = getMember(memberId);
   if (!member) return null;
 
@@ -169,5 +194,13 @@ export async function getMemberProfile(
 
 /** Every member id — used to pre-render profile pages at build time. */
 export async function getAllMemberIds(): Promise<string[]> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   return readStore().members.map((m) => m.id);
 }

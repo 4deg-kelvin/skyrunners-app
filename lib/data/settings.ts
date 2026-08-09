@@ -6,6 +6,7 @@
 
 import { getMember, scheduleFor, today, termFor } from "@/lib/mock-data";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
+import { preloadLiveStore } from "@/lib/store/request";
 
 export interface SettingsView {
   member: Member;
@@ -26,6 +27,14 @@ export interface SettingsView {
 }
 
 export async function getSettings(memberId: string): Promise<SettingsView> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const member = getMember(memberId);
   if (!member) throw new Error(`Member not found: ${memberId}`);
 

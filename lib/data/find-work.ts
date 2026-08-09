@@ -31,7 +31,6 @@ import {
   projectMembers,
   projectProgress,
   projectREs,
-  projects,
 } from "@/lib/mock-data";
 import type {
   Deliverable,
@@ -39,6 +38,7 @@ import type {
   Project,
   Team,
 } from "@/lib/types";
+import { preloadLiveStore } from "@/lib/store/request";
 
 export type WorkSignal =
   | "needs_help"
@@ -117,9 +117,17 @@ export async function getFindWork(
   viewerId: string,
   viewerSkills: string[] = []
 ): Promise<FindWorkView> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const lowerSkills = viewerSkills.map((s) => s.toLowerCase());
 
-  const openWork: OpenWorkCard[] = projects
+  const openWork: OpenWorkCard[] = readStore().projects
     .filter((p) => p.phase !== "complete")
     .map((project) => {
       const members = projectMembers(project.id).filter(
@@ -186,7 +194,7 @@ export async function getFindWork(
 
   const skillAreas = Array.from(
     new Set(
-      projects
+      readStore().projects
         .flatMap((p) => (p.openRoles ?? "").split(","))
         .map((s) => s.trim())
         .filter(Boolean)
@@ -207,8 +215,16 @@ export async function getFindWork(
 
 /** Every artifact across the club, newest first — powers a "recent work" feed. */
 export async function getRecentArtifacts(limit = 8) {
-  return projects
-    .flatMap((p) =>
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
+  return readStore()
+    .projects.flatMap((p) =>
       artifactsFor(p.id).map((a) => ({
         artifact: a,
         project: p,

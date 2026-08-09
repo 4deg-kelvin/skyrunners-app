@@ -40,6 +40,7 @@ import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
 import { escalationsFor, unreadReportsFor, type LeadEscalation } from "@/lib/review";
 import type { Member, Project, ProgressUpdate, UpdateEntry } from "@/lib/types";
+import { preloadLiveStore } from "@/lib/store/request";
 
 export interface ReviewQueueItem {
   update: ProgressUpdate;
@@ -140,6 +141,14 @@ export async function getDashboard(
   actor: Actor,
   _graph: OrgGraph
 ): Promise<DashboardView> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   // Live, not the seed — a Lead marking a report reviewed must disappear
   // from their own queue on the next render.
   const { progressUpdates, workLogs } = readStore();
