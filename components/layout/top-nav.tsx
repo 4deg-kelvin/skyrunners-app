@@ -22,12 +22,15 @@ export function TopNav({
   userName,
   isLeadership,
   isDemo,
+  showLeadingGuide,
   alertCount = 0,
 }: {
   memberId: string;
   userName: string;
   isLeadership: boolean;
   isDemo: boolean;
+  /** Leads, Co-Leads, and anyone who is an RE of something. */
+  showLeadingGuide: boolean;
   /** Real count of things needing attention — drives the nav dot. */
   alertCount?: number;
 }) {
@@ -81,7 +84,12 @@ export function TopNav({
           })}
         </nav>
 
-        <AccountMenu memberId={memberId} userName={userName} isDemo={isDemo} />
+        <AccountMenu
+          memberId={memberId}
+          userName={userName}
+          isDemo={isDemo}
+          showLeadingGuide={showLeadingGuide}
+        />
       </div>
 
       {/* Mobile nav — hours get logged in the lab, on phones */}

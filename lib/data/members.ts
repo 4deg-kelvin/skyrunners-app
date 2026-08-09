@@ -342,3 +342,27 @@ function teamsLedBy(
         a.name.localeCompare(b.name)
     );
 }
+
+/**
+ * What kinds of authority this person actually holds.
+ *
+ * `globalRole` answers "are they leadership" and nothing else — it can't tell
+ * you whether a plain member is an RE of three projects, or whether a "lead"
+ * runs a division or one sub-team. Both distinctions change what the leadership
+ * guide should say to them, and whether they should be offered it at all.
+ */
+export async function getLeadershipRoles(memberId: string): Promise<{
+  isRE: boolean;
+  /** Names of divisions they lead — top-level teams only. */
+  divisionsLed: string[];
+}> {
+  await preloadLiveStore();
+  const store = readStore();
+
+  return {
+    isRE: store.projects.some((p) => p.reIds.includes(memberId)),
+    divisionsLed: teamsLedBy(memberId)
+      .filter((t) => t.isDivision)
+      .map((t) => t.name),
+  };
+}

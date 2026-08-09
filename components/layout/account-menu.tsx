@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LifeBuoy, LogOut, Settings, User } from "lucide-react";
+import {
+  ChevronDown,
+  LifeBuoy,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn, initials } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -11,10 +18,20 @@ export function AccountMenu({
   memberId,
   userName,
   isDemo,
+  showLeadingGuide = false,
 }: {
   memberId: string;
   userName: string;
   isDemo: boolean;
+  /**
+   * Whether to offer the leadership guide.
+   *
+   * True for Leads, Co-Leads AND plain members who are an RE of something —
+   * the RE role carries real authority and is the one most likely to surprise
+   * whoever holds it. Gating on `globalRole` alone would hide it from exactly
+   * those people.
+   */
+  showLeadingGuide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -94,6 +111,18 @@ export function AccountMenu({
             <LifeBuoy className="text-cardinal-600 size-4" />
             New here? Start here
           </Link>
+
+          {showLeadingGuide ? (
+            <Link
+              href="/leading"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] font-semibold transition-colors"
+            >
+              <ShieldCheck className="text-cardinal-600 size-4" />
+              What I can do as a lead
+            </Link>
+          ) : null}
 
           <div className="bg-line-soft h-px" />
 

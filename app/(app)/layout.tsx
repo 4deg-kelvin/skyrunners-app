@@ -2,6 +2,7 @@ import { TopNav } from "@/components/layout/top-nav";
 import { DemoBanner } from "@/components/layout/demo-banner";
 import { getViewer } from "@/lib/data/viewer";
 import { getMyWork } from "@/lib/data/my-work";
+import { getLeadershipRoles } from "@/lib/data/members";
 
 /**
  * The signed-in shell: nav, demo banner, page container.
@@ -35,6 +36,21 @@ export default async function AppLayout({
    * layout — so an exception here becomes a bare, unstyled 500 on every single
    * route. A nav badge must never be able to take down the app.
    */
+  /*
+    Whether to offer the leadership guide.
+
+    Wrapped for the same reason as `alertCount` below: this layout wraps every
+    authenticated page and `error.tsx` cannot catch what its own layout throws,
+    so a failure here is a bare 500 on every route. A menu item is never worth
+    that.
+  */
+  let leadershipRoles = { isRE: false, divisionsLed: [] as string[] };
+  try {
+    leadershipRoles = await getLeadershipRoles(viewer.member.id);
+  } catch {
+    leadershipRoles = { isRE: false, divisionsLed: [] };
+  }
+
   let alertCount = 0;
   try {
     const myWork = await getMyWork(viewer.member.id);
@@ -56,6 +72,9 @@ export default async function AppLayout({
         memberId={viewer.member.id}
         userName={viewer.member.fullName}
         isLeadership={viewer.member.globalRole !== "member"}
+        showLeadingGuide={
+          viewer.member.globalRole !== "member" || leadershipRoles.isRE
+        }
         isDemo={viewer.isDemo}
         alertCount={alertCount}
       />
