@@ -4,6 +4,8 @@ import { Sparkles, TriangleAlert, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { AskToJoinButton } from "@/components/forms/project-actions";
+import { AskForHelpForm } from "@/components/forms/help-request-actions";
+import { HelpWanted } from "@/components/ui/help-wanted";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,6 +13,7 @@ import { ProgressBar } from "@/components/ui/deliverable-row";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
+import { getAskProjectOptions, getOpenAsks } from "@/lib/data/blockers";
 import { getFindWork, type WorkSignal } from "@/lib/data/find-work";
 import { getViewer } from "@/lib/data/viewer";
 
@@ -47,7 +50,13 @@ const VISIBLE_SIGNALS: WorkSignal[] = [
 
 export default async function FindWorkPage() {
   const viewer = await getViewer();
-  const view = await getFindWork(viewer.member.id, viewer.member.skills ?? []);
+  const [view, asks, askProjects] = await Promise.all([
+    getFindWork(viewer.member.id, viewer.member.skills ?? []),
+    // The blocker board lives here rather than on /projects: an unanswered ask
+    // IS somewhere to help, which is the exact question this page answers.
+    getOpenAsks(viewer.actor),
+    getAskProjectOptions(),
+  ]);
   const { openWork, counts } = view;
 
   const available = openWork.filter((w) => w.viewerStatus !== "committed");
@@ -59,7 +68,19 @@ export default async function FindWorkPage() {
         label="Get Involved"
         title="Find work"
         description="Everything the club is building, sorted by where you'd help most. Nobody needs to tell you what to work on — pick something and message the RE."
+        action={<AskForHelpForm projects={askProjects} />}
       />
+
+      {/*
+        People who are stuck, above the project list.
+
+        This is what's left of the blocker board. The other two sources —
+        blocked deliverables and check-in blockers — are facts about a project
+        and now sit under each division on /projects. A free-form ask isn't:
+        it's a person who can't get moving, and answering one is the fastest
+        way to be useful on a page that exists to answer "where can I help".
+      */}
+      <HelpWanted asks={asks} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile label="Active projects" value={counts.total} />

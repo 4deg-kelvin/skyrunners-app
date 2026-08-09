@@ -646,16 +646,72 @@ export type EventKind =
   | "competition"
   | "one_on_one";
 
+/**
+ * Anything the club gets together for.
+ *
+ * ---------------------------------------------------------------------------
+ * What this calendar is for, and what it isn't
+ * ---------------------------------------------------------------------------
+ *
+ * It answers *"what is happening right now, and can I join it?"* It is **not**
+ * a meeting-scheduling tool — there's no availability matching, no invite
+ * negotiation, no RSVP round-trip. Its job is the same as `/find-work`: make
+ * it possible to plug into the club's work without asking a Co-Lead.
+ *
+ * The case that matters most is the **ad-hoc engineering session**. If two
+ * people are working on the wing spar on Thursday night, that shows up and a
+ * third person can turn up. Everything else here is in service of that.
+ *
+ * A `one_on_one` is two engineers sitting down to engineer — explicitly not a
+ * performance review. It appears as a busy block so the time is visible;
+ * there's no agenda field, deliberately.
+ */
 export interface ClubEvent {
   id: string;
   title: string;
   kind: EventKind;
-  /** Set by leadership. Drives how prominently the event is surfaced. */
+  /**
+   * 1–5, so the view can lead with what matters without hiding the rest.
+   *
+   * **Not a proxy for "is this official".** A company tour can be a 5 and a
+   * routine standup a 2. Leadership sets it on club-wide events; a member
+   * creating an engineering session gets a sensible default by kind.
+   */
   importanceWeight: number;
   startsAt: string;
   endsAt?: string;
   location?: string;
+  /** Set for an engineering session. Links the event to the work. */
+  projectId?: string;
+  /** Who created it, so a member can edit or cancel their own session. */
+  createdBy?: string;
+  /**
+   * Who's expected. Names on a session rather than an RSVP flow — the point
+   * is "these two are working on it", not tracking acceptance.
+   *
+   * A `uuid[]` rather than a join table for the same reason
+   * `ProjectNotice.notifiedMemberIds` is: write-once, read-whole, never
+   * queried by attendee across events.
+   */
+  attendeeIds: string[];
+  /** Anyone can turn up to an open session; a 1:1 is the two people in it. */
+  isOpen: boolean;
+  notes?: string;
 }
+
+/** Default prominence by kind, so nobody has to think about it every time. */
+export const DEFAULT_EVENT_IMPORTANCE: Record<EventKind, number> = {
+  design_review: 4,
+  company_tour: 5,
+  company_visit: 4,
+  build_session: 3,
+  general_meeting: 4,
+  training: 3,
+  social: 3,
+  competition: 5,
+  // Visible so the time is known, quiet so it never outranks club work.
+  one_on_one: 1,
+};
 
 // ---------------------------------------------------------------------------
 // RE liveness

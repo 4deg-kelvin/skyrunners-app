@@ -366,7 +366,19 @@ export function AddSectionForm() {
   );
 }
 
-/** Rename an entry, change its expiry, or retire it. */
+/**
+ * Rename an entry, change its expiry, or retire it.
+ *
+ * **Club-wide, and therefore NOT rendered on anybody's profile.** Retiring the
+ * Trotec means it leaves the shop for everyone — that has no business sitting
+ * on a row inside one person's training list, next to controls that only
+ * affect that person. It lives in Settings with the academic calendar, which
+ * is the other "a Co-Lead configures the club" surface.
+ *
+ * The two scopes were mixed up in the first version and it read exactly as
+ * wrong as it was: a Lead verifying somebody's laser training could, from the
+ * same row, delete the laser.
+ */
 export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
   const [open, setOpen] = useState(false);
 

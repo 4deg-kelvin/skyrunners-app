@@ -47,16 +47,14 @@ export function LogHoursForm({
 }) {
   const [open, setOpen] = useState(false);
 
-  if (projects.length === 0) {
-    // Nothing to log against. Say so plainly rather than showing a form whose
-    // only dropdown is empty.
-    return (
-      <p className="text-sm text-ink-muted">
-        You&apos;re not on any projects yet, so there&apos;s nothing to log hours
-        against.
-      </p>
-    );
-  }
+  /*
+    No early return for "you're on no projects" any more.
+
+    There used to be one, because the dropdown would have been empty. Misc
+    changed that: somebody who turned up to an open build session and helped
+    for three hours has hours to log and no project — which is precisely the
+    person the old message told to go away.
+  */
 
   if (!open) {
     return (
@@ -104,7 +102,6 @@ export function LogHoursForm({
             <select
               name="projectId"
               defaultValue={defaultProjectId ?? projects[0]?.id}
-              required
               className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
             >
               {projects.map((p) => (
@@ -112,6 +109,17 @@ export function LogHoursForm({
                   {p.name}
                 </option>
               ))}
+              {/*
+                Misc, and it isn't a fallback for laziness.
+
+                It follows from the calendar: somebody sees an open build
+                session, turns up, and works three hours on a project they
+                aren't committed to. Those hours are real. Without this the
+                honest answer was impossible and logging them against the wrong
+                project was the only way through — which is worse for the
+                per-project totals than an unattributed entry.
+              */}
+              <option value="">Misc — helped on something else</option>
             </select>
           </label>
 
@@ -181,7 +189,11 @@ export function LogHoursForm({
                     )}
                   </span>{" "}
                   · {log.hours} hrs
-                  {project ? ` · ${project.name}` : ""}
+                  {/*
+                    A misc entry has no project, and a blank there reads as
+                    missing data rather than as a deliberate choice.
+                  */}
+                  {project ? ` · ${project.name}` : " · Misc"}
                   {log.description ? ` · ${log.description}` : ""}
                 </span>
 

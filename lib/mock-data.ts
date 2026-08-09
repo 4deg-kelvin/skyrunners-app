@@ -1530,11 +1530,19 @@ export const workLogs: WorkLog[] = [
 // ---------------------------------------------------------------------------
 
 export const events: ClubEvent[] = [
-  { id: "e-1", title: "Airframe v2 Critical Design Review", kind: "design_review", importanceWeight: 5, startsAt: "2026-08-12T16:00", endsAt: "2026-08-12T18:00", location: "Durand 450" },
-  { id: "e-2", title: "Skydio Facility Tour", kind: "company_tour", importanceWeight: 4, startsAt: "2026-08-19T13:00", endsAt: "2026-08-19T16:00", location: "San Mateo" },
-  { id: "e-3", title: "Weekly Build Session", kind: "build_session", importanceWeight: 2, startsAt: "2026-08-08T18:00", endsAt: "2026-08-08T21:00", location: "Robotics Room" },
-  { id: "e-4", title: "Fall Kickoff Social", kind: "social", importanceWeight: 1, startsAt: "2026-09-25T18:30", location: "Lake Lag" },
-  { id: "e-5", title: "Machine Shop Safety Training", kind: "training", importanceWeight: 3, startsAt: "2026-08-14T15:00", endsAt: "2026-08-14T17:00", location: "PRL" },
+  { id: "e-1", title: "Airframe v2 Critical Design Review", kind: "design_review", importanceWeight: 5, startsAt: "2026-08-12T16:00", endsAt: "2026-08-12T18:00", location: "Durand 450", attendeeIds: [], isOpen: true },
+  { id: "e-2", title: "Skydio Facility Tour", kind: "company_tour", importanceWeight: 5, startsAt: "2026-08-19T13:00", endsAt: "2026-08-19T16:00", location: "San Mateo", attendeeIds: [], isOpen: true },
+  { id: "e-3", title: "Weekly Build Session", kind: "build_session", importanceWeight: 3, startsAt: "2026-08-08T18:00", endsAt: "2026-08-08T21:00", location: "Robotics Room", attendeeIds: [], isOpen: true },
+  { id: "e-4", title: "Fall Kickoff Social", kind: "social", importanceWeight: 3, startsAt: "2026-09-25T18:30", location: "Lake Lag", attendeeIds: [], isOpen: true },
+  { id: "e-5", title: "Machine Shop Safety Training", kind: "training", importanceWeight: 3, startsAt: "2026-08-14T15:00", endsAt: "2026-08-14T17:00", location: "PRL", attendeeIds: [], isOpen: true },
+  // Two overlapping on purpose: a design review running inside the general
+  // meeting. The calendar MUST show both — that requirement is the one a
+  // standard grid quietly drops, so the seed exercises it.
+  { id: "e-6", title: "All-Hands", kind: "general_meeting", importanceWeight: 4, startsAt: "2026-08-12T16:00", endsAt: "2026-08-12T17:30", location: "Durand 450", attendeeIds: [], isOpen: true },
+  // The case the whole calendar exists for: two people on the spar Thursday
+  // night, and a third can see it and turn up.
+  { id: "e-7", title: "Spar layup, come help", kind: "build_session", importanceWeight: 2, startsAt: "2026-08-13T19:00", endsAt: "2026-08-13T22:00", location: "Lab 64", projectId: "p-layup", createdBy: "m-sofia", attendeeIds: ["m-sofia", "m-tyler"], isOpen: true, notes: "Third pair of hands welcome — no experience needed." },
+  { id: "e-8", title: "Tyler / Priya", kind: "one_on_one", importanceWeight: 1, startsAt: "2026-08-13T15:00", endsAt: "2026-08-13T15:30", createdBy: "m-priya", attendeeIds: ["m-priya", "m-tyler"], isOpen: false },
 ];
 
 // ---------------------------------------------------------------------------
@@ -2056,6 +2064,10 @@ export function catalogueItemsFor(sectionId: string) {
 
 export function certificationsFor(memberId: string) {
   return live().certifications.filter((c) => c.memberId === memberId);
+}
+
+export function getEvent(id: string) {
+  return live().events.find((e) => e.id === id);
 }
 
 export function helpRequestById(id: string) {

@@ -370,16 +370,24 @@ const terms: CollectionSpec<Term> = {
 const events: CollectionSpec<ClubEvent> = {
   key: "events",
   table: "events",
-  columns: "id, title, kind, importance_weight, starts_at, ends_at, location",
+  columns:
+    "id, title, kind, importance_weight, starts_at, ends_at, location, project_id, created_by, attendee_ids, is_open, notes",
   identify: (e) => e.id,
   fromRow: (r) => ({
     id: r.id as string,
     title: r.title as string,
     kind: r.kind as ClubEvent["kind"],
-    importanceWeight: r.importance_weight as number,
+    importanceWeight: Number(r.importance_weight ?? 3),
     startsAt: r.starts_at as string,
     endsAt: opt(r.ends_at as string),
     location: opt(r.location as string),
+    projectId: opt(r.project_id as string),
+    createdBy: opt(r.created_by as string),
+    attendeeIds: (r.attendee_ids as string[]) ?? [],
+    // Defaults true: an event nobody said otherwise about is one you can turn
+    // up to, which is the behaviour this calendar exists for.
+    isOpen: (r.is_open as boolean) ?? true,
+    notes: opt(r.notes as string),
   }),
   toRow: (e) => ({
     id: e.id,
@@ -389,7 +397,13 @@ const events: CollectionSpec<ClubEvent> = {
     starts_at: e.startsAt,
     ends_at: nul(e.endsAt),
     location: nul(e.location),
+    project_id: nul(e.projectId),
+    created_by: nul(e.createdBy),
+    attendee_ids: e.attendeeIds,
+    is_open: e.isOpen,
+    notes: nul(e.notes),
   }),
+  dependsOn: ["members", "projects"],
 };
 
 const projectArtifacts: CollectionSpec<ProjectArtifact> = {

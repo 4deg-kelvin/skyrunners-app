@@ -315,11 +315,16 @@ export default async function DashboardPage({
               <CardBody>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <SectionLabel>Trainings To Verify</SectionLabel>
+                  {/*
+                    The catalogue moved to Settings when `/trainings` was
+                    removed — a club-wide list belongs next to the academic
+                    calendar, not on a page about one person's record.
+                  */}
                   <Link
-                    href="/trainings"
+                    href="/settings"
                     className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
                   >
-                    The catalogue
+                    Edit the catalogue
                   </Link>
                 </div>
 

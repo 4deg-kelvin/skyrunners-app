@@ -48,7 +48,22 @@ function parseSchema(): Map<string, Set<string>> {
     .sort(); // 0001, 0002, ... so later migrations amend earlier ones
 
   for (const file of files) {
-    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+    /*
+      Strip `--` comments before parsing anything.
+
+      The alter-table matcher runs to the first `;`, and this file's migrations
+      are heavily commented — so one semicolon in an English sentence
+      ("open to drop in on; a 1:1 is the two people in it") silently truncated
+      the statement and reported two real columns as missing. The failure looks
+      like a schema bug and isn't, which is the worst kind.
+
+      Line comments only. No migration here uses block comments, and matching
+      those properly needs a real tokeniser rather than a regex.
+    */
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8").replace(
+      /--[^\n]*/g,
+      ""
+    );
 
     // --- create table -----------------------------------------------------
     const createRe = /create table (?:if not exists )?(\w+)\s*\(([\s\S]*?)\n\);/g;

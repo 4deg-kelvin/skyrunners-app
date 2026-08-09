@@ -9,8 +9,10 @@ import {
   HideCompletedProvider,
   HideCompletedToggle,
 } from "@/components/ui/completed-filter";
+import { DivisionExtras } from "@/components/ui/division-extras";
 import { DivisionProjectList } from "@/components/ui/project-tree";
 import { SectionLabel } from "@/components/ui/section-label";
+import { getDivisionExtras } from "@/lib/data/deadlines";
 import {
   countArchivedDivisions,
   getOrphanedProjects,
@@ -33,16 +35,21 @@ function countCompleted(nodes: ProjectTreeNode[]): number {
 }
 
 export default async function ProjectsPage() {
-  const [tree, orphans, formOptions, archivedCount, viewer] = await Promise.all([
-    getProjectTree(),
-    getOrphanedProjects(),
-    getProjectFormOptions(),
-    countArchivedDivisions(),
-    getViewer(),
-  ]);
+  const viewer = await getViewer();
+  const [tree, orphans, formOptions, archivedCount, extras] =
+    await Promise.all([
+      getProjectTree(),
+      getOrphanedProjects(),
+      getProjectFormOptions(),
+      countArchivedDivisions(),
+      // Deadlines and blocked work, folded in here rather than being two
+      // separate pages. Computed in one pass and looked up per division.
+      getDivisionExtras(),
+    ]);
 
   const mayCreate = can.createProject(viewer.actor, viewer.graph);
   const mayManageTeams = can.manageTeams(viewer.actor);
+  const todayIso = new Date().toISOString().slice(0, 10);
   const completedCount = tree.reduce(
     (total, { roots }) => total + countCompleted(roots),
     0
@@ -146,6 +153,20 @@ export default async function ProjectsPage() {
               </div>
 
               <DivisionProjectList roots={roots} />
+
+              {/*
+                What's due and what's stuck, both collapsed. These were
+                `/deadlines` and `/blockers` — neither was wrong, both were the
+                wrong size. A deadline is a property of a project and a blocker
+                is already flagged on the row above; making each a destination
+                asked people to navigate away to learn about the thing they
+                were already reading.
+              */}
+              <DivisionExtras
+                deadlines={extras[division.id]?.deadlines ?? []}
+                blocked={extras[division.id]?.blocked ?? []}
+                today={todayIso}
+              />
             </CardBody>
           </Card>
         ))}

@@ -74,6 +74,85 @@ export interface DeadlinesView {
   today: string;
 }
 
+/** What a division card shows beneath its project tree. */
+export interface DivisionExtrasData {
+  deadlines: DeadlineItem[];
+  blocked: {
+    projectId: string;
+    projectSlug: string;
+    projectName: string;
+    count: number;
+    worstAgeDays: number;
+  }[];
+}
+
+/**
+ * Deadlines and blocked work, keyed by division id.
+ *
+ * One pass over every project and deliverable, then a lookup per division —
+ * rather than a function the page calls once per division card, which would
+ * rescan everything five times.
+ *
+ * This is what `/deadlines` and `/blockers` became. Both were real pages for a
+ * day; both were the wrong size. A deadline is a property of a project and a
+ * blocker is already flagged on the project row, so making each a destination
+ * asked people to navigate away to learn something about the thing in front of
+ * them. Now they're two collapsed strips under the tree.
+ */
+export async function getDivisionExtras(): Promise<
+  Record<string, DivisionExtrasData>
+> {
+  const view = await getDeadlines();
+  const store = readStore();
+  const now = today();
+
+  const out: Record<string, DivisionExtrasData> = {};
+
+  for (const { division, items } of view.divisions) {
+    out[division.id] = { deadlines: items, blocked: [] };
+  }
+
+  // Blocked deliverables, grouped by project, then attributed to a division.
+  const byProject = new Map<string, { count: number; worst: number }>();
+  for (const deliverable of store.deliverables) {
+    if (deliverable.status !== "blocked") continue;
+    const existing = byProject.get(deliverable.projectId) ?? {
+      count: 0,
+      worst: 0,
+    };
+    existing.count += 1;
+    // No "blocked at" column exists, so the due date is the closest honest
+    // proxy for how long this has been stuck. Undated counts as new rather
+    // than ancient — guessing old would push real week-old blockers down.
+    const age = deliverable.dueDate
+      ? Math.max(0, daysBetween(deliverable.dueDate, now))
+      : 0;
+    existing.worst = Math.max(existing.worst, age);
+    byProject.set(deliverable.projectId, existing);
+  }
+
+  for (const [projectId, { count, worst }] of byProject) {
+    const project = getProject(projectId);
+    if (!project) continue;
+    const division = divisionForProject(projectId);
+    if (!division || !out[division.id]) continue;
+
+    out[division.id].blocked.push({
+      projectId,
+      projectSlug: project.slug,
+      projectName: project.name,
+      count,
+      worstAgeDays: worst,
+    });
+  }
+
+  for (const entry of Object.values(out)) {
+    entry.blocked.sort((a, b) => b.worstAgeDays - a.worstAgeDays);
+  }
+
+  return out;
+}
+
 function daysBetween(from: string, to: string): number {
   const a = Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
   const b = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
