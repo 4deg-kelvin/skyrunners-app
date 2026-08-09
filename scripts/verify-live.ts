@@ -126,10 +126,12 @@ await check("/dashboard      getDashboard", async () => dataModules.dashboard.ge
 await check("/updates        getUpdates", async () => dataModules.updates.getUpdates(actor));
 await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
 await check("/calendar       getUpcomingEvents", async () => dataModules.events.getUpcomingEvents());
-await check("/blockers       getBlockerBoard", async () => dataModules.blockers.getBlockerBoard(me.id));
-await check("/trainings      getTrainings", async () => dataModules.trainings.getTrainings(me.id));
-await check("/trainings      getClearanceIndex", async () => dataModules.trainings.getClearanceIndex());
-await check("/deadlines      getDeadlines", async () => dataModules.deadlines.getDeadlines());
+await check("/calendar       getCalendar", async () =>
+  dataModules.events.getCalendar({ memberId: me.id, isLeadership: true }));
+await check("/find-work      getOpenAsks", async () => dataModules.blockers.getOpenAsks(actor));
+await check("/projects       getDivisionExtras", async () => dataModules.deadlines.getDivisionExtras());
+await check("/members/[id]   getTrainings", async () => dataModules.trainings.getTrainings(me.id));
+await check("/settings       getCatalogue", async () => dataModules.trainings.getCatalogue());
 
 // The exact call shape the pages use. /members and /projects fire their data
 // functions in a Promise.all ALONGSIDE getViewer, so the read starts before the
