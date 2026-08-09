@@ -85,6 +85,22 @@ export function InviteMemberForm({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold text-ink">
+            Phone <span className="font-normal text-ink-muted">(optional)</span>
+          </span>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="(650) 555-0142"
+            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          />
+          <span className="mt-1 block text-xs text-ink-muted">
+            Shown instead of their email wherever people need to reach them.
+            They can change it later.
+          </span>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-semibold text-ink">
             Reports to
           </span>
           <select
@@ -134,7 +150,7 @@ export function InviteMemberForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
       >
         Cancel
       </button>

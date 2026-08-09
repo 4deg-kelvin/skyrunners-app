@@ -29,6 +29,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
@@ -253,6 +254,7 @@ async function inviteMemberAction$impl(
   const leadIdRaw = String(formData.get("leadId") ?? "");
   const result = await ops.inviteMember({
     email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? "") || undefined,
     fullName: String(formData.get("fullName") ?? ""),
     globalRole,
     // Default to the inviter: somebody with no Lead has nobody reading their
@@ -758,7 +760,9 @@ async function updateDeliverableAction$impl(
   const result = await ops.updateDeliverable({
     deliverableId: String(formData.get("deliverableId") ?? ""),
     title: String(formData.get("title") ?? ""),
+    ownerId: String(formData.get("ownerId") ?? "") || undefined,
     dueDate: String(formData.get("dueDate") ?? "") || undefined,
+    today: today(),
   });
 
   if (result.ok) refresh();
@@ -799,9 +803,14 @@ async function deleteProjectAction$impl(
     return denied("delete this project");
   }
 
-  const result = await ops.deleteProject(projectId);
-  if (result.ok) refresh();
-  return toResult(result, "Project deleted.");
+  // Only a Co-Lead can override the signed-off-work guard.
+  const result = await ops.deleteProject(projectId, isCoLead(viewer.actor));
+  if (!result.ok) return toResult(result, "");
+
+  refresh();
+  // The page you were on no longer exists, so staying put means a 404 for the
+  // thing you just deliberately deleted. Send them where the work is.
+  redirect("/projects");
 }
 
 async function updateTeamAction$impl(formData: FormData): Promise<ActionResult> {

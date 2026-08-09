@@ -19,7 +19,14 @@ export function ProjectBadges({
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="neutral">{PHASE_LABELS[project.phase]}</Badge>
+        {/*
+          Complete gets the green. Every other stage is a waypoint and reads as
+          neutral; finishing something is the one state worth celebrating, and a
+          grey "Complete" next to a grey "Concept" makes them look equivalent.
+        */}
+        <Badge tone={project.phase === "complete" ? "ok" : "neutral"}>
+          {PHASE_LABELS[project.phase]}
+        </Badge>
         <Badge tone={HEALTH_TONES[project.health]}>
           {HEALTH_LABELS[project.health]}
         </Badge>

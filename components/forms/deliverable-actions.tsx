@@ -31,10 +31,18 @@ export function DeliverableActions({
   deliverable,
   isOwner,
   canSignOff,
+  candidates = [],
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
   canSignOff: boolean;
+  /**
+   * Who this can be handed to. Everyone active, not just current project
+   * members — reassigning is how somebody joins, same as being given a new
+   * deliverable. Without this there was no way to act on "Owner left the
+   * project — needs reassigning", which is the one state that demands it.
+   */
+  candidates?: { id: string; name: string }[];
 }) {
   const [blocking, setBlocking] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -97,7 +105,7 @@ export function DeliverableActions({
           <button
             type="button"
             onClick={() => setReopening(false)}
-            className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+            className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
           >
             Cancel
           </button>
@@ -156,7 +164,7 @@ export function DeliverableActions({
         <button
           type="button"
           onClick={() => setBlocking(false)}
-          className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
         >
           Cancel
         </button>
@@ -192,6 +200,23 @@ export function DeliverableActions({
 
             <label className="block">
               <span className="mb-1 block text-sm font-semibold text-ink">
+                Owner
+              </span>
+              <select
+                name="ownerId"
+                defaultValue={deliverable.ownerId}
+                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              >
+                {candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-ink">
                 Due date
               </span>
               <input
@@ -211,7 +236,7 @@ export function DeliverableActions({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+            className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
           >
             Cancel
           </button>

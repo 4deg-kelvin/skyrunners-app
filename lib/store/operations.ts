@@ -45,6 +45,14 @@ import type {
  */
 export const MAX_BACKDATE_DAYS = 7;
 
+/**
+ * Set when someone is removed from a project while still owning open work.
+ *
+ * A sentinel rather than free text, because reassigning has to recognise it and
+ * clear it — and must NOT clear a blocker somebody actually wrote.
+ */
+export const OWNER_LEFT_NOTE = "Owner left the project — needs reassigning.";
+
 /** Sanity ceiling on a single entry. Catches 80 meaning 8.0. */
 const MAX_HOURS_PER_ENTRY = 16;
 
@@ -377,6 +385,13 @@ function slugify(name: string): string {
 export async function inviteMember(input: {
   email: string;
   fullName: string;
+  /**
+   * Optional at invite time, but asked for here because it's what the whole
+   * app shows instead of an email — an RE's contact line, a Lead chasing a
+   * check-in. Left to the member's own profile edit, it stayed empty and every
+   * contact link silently fell back to email.
+   */
+  phone?: string;
   globalRole: GlobalRole;
   leadId: string | null;
   primaryTeamId?: string;
@@ -384,6 +399,7 @@ export async function inviteMember(input: {
 }): Promise<Result<Member>> {
   const email = input.email.trim().toLowerCase();
   const fullName = input.fullName.trim();
+  const phone = input.phone?.trim();
 
   if (!fullName) return fail("Enter their name.");
   // Same rule as lib/env.ts and the CHECK constraint in 0001. Stated three
@@ -401,6 +417,7 @@ export async function inviteMember(input: {
     id: newId("member"),
     fullName,
     email,
+    phone: phone || undefined,
     globalRole: input.globalRole,
     // Active immediately. The alternative — invited-but-inactive — means a new
     // member signs in and is told they can't come in yet, which is the opposite
@@ -980,7 +997,9 @@ export async function deleteCheckIn(updateId: string): Promise<Result<null>> {
 export async function updateDeliverable(input: {
   deliverableId: string;
   title: string;
+  ownerId?: string;
   dueDate?: string;
+  today?: string;
 }): Promise<Result<Deliverable>> {
   const title = input.title.trim();
   if (!title) return fail<Deliverable>("Give the deliverable a title.");
@@ -993,6 +1012,39 @@ export async function updateDeliverable(input: {
 
     deliverable.title = title;
     deliverable.dueDate = input.dueDate || undefined;
+
+    if (input.ownerId && input.ownerId !== deliverable.ownerId) {
+      deliverable.ownerId = input.ownerId;
+
+      // Reassigning is the fix for "owner left the project", so clear that
+      // state rather than leaving a blocked item with a note that's no longer
+      // true. Any other blocker is somebody's real note and stays put.
+      if (
+        deliverable.status === "blocked" &&
+        deliverable.blockerNote === OWNER_LEFT_NOTE
+      ) {
+        deliverable.status = "open";
+        deliverable.blockerNote = undefined;
+      }
+
+      // Put the new owner on the project if they aren't already — same rule as
+      // creating a deliverable, and for the same reason: assigning work IS how
+      // someone joins, and a roster that omits the person doing the work lies.
+      const alreadyOn = store.projectMemberships.some(
+        (m) =>
+          m.projectId === deliverable.projectId && m.memberId === input.ownerId
+      );
+      if (!alreadyOn) {
+        store.projectMemberships.push({
+          projectId: deliverable.projectId,
+          memberId: input.ownerId,
+          role: "contributor",
+          joinedAt: input.today ?? deliverable.dueDate ?? "",
+          commitment: "committed",
+        });
+      }
+    }
+
     return ok(deliverable);
   });
 }
@@ -1042,7 +1094,18 @@ export async function updateProject(input: {
  * project is refused, because that history IS worth keeping. Archive those by
  * setting the phase to complete.
  */
-export async function deleteProject(projectId: string): Promise<Result<null>> {
+export async function deleteProject(
+  projectId: string,
+  /**
+   * Co-Lead override.
+   *
+   * The signed-off-work guard exists so nobody quietly erases delivered work
+   * from someone's record. A Co-Lead clearing up test projects is the case it
+   * gets in the way of, and they're the people trusted with the org's shape
+   * anyway — so they can proceed, and the UI says what will be lost.
+   */
+  force = false
+): Promise<Result<null>> {
   return guarded((store) => {
     const project = store.projects.find((p) => p.id === projectId);
     if (!project) return fail<null>("That project no longer exists.");
@@ -1056,9 +1119,9 @@ export async function deleteProject(projectId: string): Promise<Result<null>> {
     const delivered = store.deliverables.filter(
       (d) => d.projectId === projectId && d.status === "done"
     );
-    if (delivered.length > 0) {
+    if (delivered.length > 0 && !force) {
       return fail<null>(
-        `${delivered.length} deliverable${delivered.length === 1 ? " has" : "s have"} been signed off here and count towards people's records. Mark the project complete instead.`
+        `${delivered.length} deliverable${delivered.length === 1 ? " has" : "s have"} been signed off here and count towards people's records. Mark the project complete instead — or ask a Co-Lead if this was a test project.`
       );
     }
 
@@ -1476,7 +1539,7 @@ export async function removeProjectMember(input: {
     // deal with them, which is exactly who should.
     for (const d of openWork) {
       d.status = "blocked";
-      d.blockerNote = "Owner left the project — needs reassigning.";
+      d.blockerNote = OWNER_LEFT_NOTE;
       d.submittedAt = undefined;
     }
 
