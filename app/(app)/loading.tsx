@@ -9,9 +9,9 @@ export default function Loading() {
     <div className="space-y-6" aria-busy="true" aria-label="Loading">
       <Card>
         <CardBody>
-          <div className="h-3 w-24 animate-pulse rounded-full bg-line" />
-          <div className="mt-4 h-9 w-64 animate-pulse rounded-tile bg-line" />
-          <div className="mt-3 h-4 w-96 max-w-full animate-pulse rounded-full bg-line-soft" />
+          <div className="bg-line h-3 w-24 animate-pulse rounded-full" />
+          <div className="rounded-tile bg-line mt-4 h-9 w-64 animate-pulse" />
+          <div className="bg-line-soft mt-3 h-4 w-96 max-w-full animate-pulse rounded-full" />
         </CardBody>
       </Card>
 
@@ -19,8 +19,8 @@ export default function Loading() {
         {[0, 1, 2].map((i) => (
           <Card key={i}>
             <CardBody className="py-5">
-              <div className="h-3 w-20 animate-pulse rounded-full bg-line-soft" />
-              <div className="mt-3 h-6 w-16 animate-pulse rounded-tile bg-line" />
+              <div className="bg-line-soft h-3 w-20 animate-pulse rounded-full" />
+              <div className="rounded-tile bg-line mt-3 h-6 w-16 animate-pulse" />
             </CardBody>
           </Card>
         ))}
@@ -31,7 +31,7 @@ export default function Loading() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-20 animate-pulse rounded-tile border border-line bg-line-soft/40"
+              className="rounded-tile border-line bg-line-soft/40 h-20 animate-pulse border"
             />
           ))}
         </CardBody>

@@ -71,7 +71,7 @@ export function ActionForm({
         <button
           type="submit"
           disabled={pending || disabled}
-          className="inline-flex items-center justify-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700 disabled:opacity-60"
+          className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors disabled:opacity-60"
         >
           {pending ? (
             <>
@@ -79,7 +79,7 @@ export function ActionForm({
               {submittingLabel ?? "Saving…"}
             </>
           ) : (
-            submitLabel ?? "Save"
+            (submitLabel ?? "Save")
           )}
         </button>
       )}
@@ -91,12 +91,12 @@ export function ActionForm({
         a generic failure toast throws away the only useful part.
       */}
       {result && !result.ok ? (
-        <p role="alert" className="mt-2 text-sm font-medium text-risk-fg">
+        <p role="alert" className="text-risk-fg mt-2 text-sm font-medium">
           {result.error}
         </p>
       ) : null}
       {result?.ok && result.message ? (
-        <p role="status" className="mt-2 text-sm font-medium text-ok-fg">
+        <p role="status" className="text-ok-fg mt-2 text-sm font-medium">
           {result.message}
         </p>
       ) : null}
@@ -136,7 +136,7 @@ export function ActionButton({
           type="submit"
           disabled={pending}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-tile px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60",
+            "rounded-tile inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60",
             tones[tone]
           )}
         >

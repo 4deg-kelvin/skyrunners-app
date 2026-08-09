@@ -22,9 +22,9 @@ export function PageHeader({
       <CardBody className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <SectionLabel>{label}</SectionLabel>
-          <h1 className="mt-2 text-4xl font-bold text-ink">{title}</h1>
+          <h1 className="text-ink mt-2 text-4xl font-bold">{title}</h1>
           {description ? (
-            <p className="mt-2 text-[15px] text-ink-soft">{description}</p>
+            <p className="text-ink-soft mt-2 text-[15px]">{description}</p>
           ) : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

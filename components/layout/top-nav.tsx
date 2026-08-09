@@ -38,14 +38,14 @@ export function TopNav({
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-card">
+    <header className="border-line bg-card sticky top-0 z-50 border-b">
       <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-6 px-5 sm:px-8">
         {/* Wordmark — goes to the member's own home, same as "/" */}
         <Link href="/my-work" className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-full bg-cardinal-600 text-white">
+          <span className="bg-cardinal-600 flex size-8 items-center justify-center rounded-full text-white">
             <Plane className="size-4" strokeWidth={2.5} />
           </span>
-          <span className="text-lg font-bold tracking-tight text-cardinal-600">
+          <span className="text-cardinal-600 text-lg font-bold tracking-tight">
             SkyRunners HQ
           </span>
         </Link>
@@ -63,16 +63,16 @@ export function TopNav({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-tile px-3 py-2 text-[15px] transition-colors",
+                  "rounded-tile flex items-center gap-1.5 px-3 py-2 text-[15px] transition-colors",
                   active
-                    ? "font-semibold text-cardinal-600"
+                    ? "text-cardinal-600 font-semibold"
                     : "text-ink-soft hover:text-ink"
                 )}
               >
                 {item.label}
                 {showAlert ? (
                   <span
-                    className="size-2 rounded-full bg-cardinal-600"
+                    className="bg-cardinal-600 size-2 rounded-full"
                     aria-label={`${alertCount} item${alertCount === 1 ? "" : "s"} need attention`}
                   />
                 ) : null}
@@ -81,15 +81,11 @@ export function TopNav({
           })}
         </nav>
 
-        <AccountMenu
-          memberId={memberId}
-          userName={userName}
-          isDemo={isDemo}
-        />
+        <AccountMenu memberId={memberId} userName={userName} isDemo={isDemo} />
       </div>
 
       {/* Mobile nav — hours get logged in the lab, on phones */}
-      <nav className="flex items-center gap-1 overflow-x-auto border-t border-line px-5 py-2 md:hidden">
+      <nav className="border-line flex items-center gap-1 overflow-x-auto border-t px-5 py-2 md:hidden">
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
@@ -97,9 +93,9 @@ export function TopNav({
               key={item.href}
               href={item.href}
               className={cn(
-                "shrink-0 rounded-tile px-3 py-1.5 text-sm transition-colors",
+                "rounded-tile shrink-0 px-3 py-1.5 text-sm transition-colors",
                 active
-                  ? "font-semibold text-cardinal-600"
+                  ? "text-cardinal-600 font-semibold"
                   : "text-ink-soft hover:text-ink"
               )}
             >

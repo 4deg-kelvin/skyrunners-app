@@ -47,19 +47,19 @@ export function AccessIssues({
   }
 
   return (
-    <div className="rounded-card border border-warn-fg/25 bg-warn-bg">
+    <div className="rounded-card border-warn-fg/25 bg-warn-bg border">
       <div className="p-6 sm:p-7">
         <SectionLabel tone="muted">Access</SectionLabel>
 
         {waitingForActivation.length > 0 ? (
           <div className="mt-3">
-            <p className="flex items-start gap-2 text-[15px] font-semibold text-warn-fg">
+            <p className="text-warn-fg flex items-start gap-2 text-[15px] font-semibold">
               <UserCheck className="mt-0.5 size-4 shrink-0" />
               {waitingForActivation.length}{" "}
               {waitingForActivation.length === 1 ? "person has" : "people have"}{" "}
               signed in and can&apos;t do anything yet
             </p>
-            <p className="mt-1 text-sm text-ink-soft">
+            <p className="text-ink-soft mt-1 text-sm">
               They&apos;re stuck on the &ldquo;account inactive&rdquo; screen.
               Activating takes one click and gives them the whole app.
             </p>
@@ -68,16 +68,16 @@ export function AccessIssues({
               {waitingForActivation.map((m) => (
                 <div
                   key={m.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line bg-card px-4 py-2.5"
+                  className="rounded-tile border-line bg-card flex flex-wrap items-center justify-between gap-3 border px-4 py-2.5"
                 >
                   <span className="min-w-0">
                     <Link
                       href={`/members/${m.id}`}
-                      className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                      className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                     >
                       {m.fullName}
                     </Link>
-                    <span className="ml-2 text-sm text-ink-muted">
+                    <span className="text-ink-muted ml-2 text-sm">
                       {m.email}
                     </span>
                   </span>
@@ -96,14 +96,14 @@ export function AccessIssues({
 
         {neverSignedIn.length > 0 ? (
           <div className={waitingForActivation.length > 0 ? "mt-5" : "mt-3"}>
-            <p className="flex items-start gap-2 text-[15px] font-semibold text-ink">
-              <UserX className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+            <p className="text-ink flex items-start gap-2 text-[15px] font-semibold">
+              <UserX className="text-ink-muted mt-0.5 size-4 shrink-0" />
               {neverSignedIn.length} invited{" "}
               {neverSignedIn.length === 1 ? "person has" : "people have"} never
               signed in
             </p>
-            <p className="mt-1 flex items-start gap-2 text-sm text-ink-soft">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn-fg" />
+            <p className="text-ink-soft mt-1 flex items-start gap-2 text-sm">
+              <TriangleAlert className="text-warn-fg mt-0.5 size-3.5 shrink-0" />
               <span>
                 If they say they <em>have</em> signed in, the address below
                 isn&apos;t the one Google gave back — check it character for
@@ -117,12 +117,12 @@ export function AccessIssues({
               {neverSignedIn.map((m) => (
                 <div
                   key={m.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line bg-card px-4 py-2.5"
+                  className="rounded-tile border-line bg-card flex flex-wrap items-center justify-between gap-3 border px-4 py-2.5"
                 >
                   <span className="min-w-0">
                     <Link
                       href={`/members/${m.id}`}
-                      className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                      className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                     >
                       {m.fullName}
                     </Link>
@@ -130,7 +130,7 @@ export function AccessIssues({
                       The email is the whole diagnostic, so it's shown in full
                       and in a monospace-ish weight rather than truncated.
                     */}
-                    <span className="ml-2 text-sm font-semibold text-ink-soft">
+                    <span className="text-ink-soft ml-2 text-sm font-semibold">
                       {m.email}
                     </span>
                   </span>

@@ -595,8 +595,7 @@ const trainingSections: CollectionSpec<TrainingSection> = {
 const catalogueItems: CollectionSpec<CatalogueItem> = {
   key: "catalogueItems",
   table: "catalogue_items",
-  columns:
-    "id, section_id, name, kind, validity_months, sort_order, is_active",
+  columns: "id, section_id, name, kind, validity_months, sort_order, is_active",
   identify: (i) => i.id,
   fromRow: (r) => ({
     id: r.id as string,

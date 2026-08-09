@@ -51,7 +51,7 @@ export function CheckInForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+        className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <PenLine className="size-4" strokeWidth={2.5} />
         Write my check-in
@@ -60,18 +60,20 @@ export function CheckInForm({
   }
 
   return (
-    <div className="rounded-card border border-line bg-card p-4">
+    <div className="rounded-card border-line bg-card border p-4">
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-[15px] font-bold text-ink">Your {dueLabel} check-in</p>
+        <p className="text-ink text-[15px] font-bold">
+          Your {dueLabel} check-in
+        </p>
         <button
           onClick={() => setOpen(false)}
           aria-label="Close"
-          className="rounded-tile p-1 text-ink-muted hover:bg-surface"
+          className="rounded-tile text-ink-muted hover:bg-surface p-1"
         >
           <X className="size-4" />
         </button>
       </div>
-      <p className="mb-4 text-sm text-ink-muted">
+      <p className="text-ink-muted mb-4 text-sm">
         A line per project is enough.{" "}
         {readerName
           ? `${readerName} reads this to start a conversation, not to grade you.`
@@ -85,7 +87,7 @@ export function CheckInForm({
         className="space-y-4"
       >
         {sections.length === 0 ? (
-          <p className="rounded-tile bg-surface px-3.5 py-3 text-sm text-ink-soft">
+          <p className="rounded-tile bg-surface text-ink-soft px-3.5 py-3 text-sm">
             {/*
               Now only reachable when somebody is on NO projects at all.
               It used to appear whenever you hadn't logged hours, which meant
@@ -100,17 +102,17 @@ export function CheckInForm({
           sections.map((s) => (
             <div
               key={s.projectId}
-              className="rounded-tile border border-line px-3.5 py-3"
+              className="rounded-tile border-line border px-3.5 py-3"
             >
               {/* Repeated field carrying the project id, so the action can
                   reconstruct a variable number of sections from flat FormData. */}
               <input type="hidden" name="projectId" value={s.projectId} />
 
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-bold text-ink">
+                <span className="text-ink text-sm font-bold">
                   {s.projectName}
                 </span>
-                <span className="text-xs text-ink-muted">
+                <span className="text-ink-muted text-xs">
                   {formatNumber(s.hours, 1)} hrs logged
                 </span>
               </div>
@@ -125,7 +127,7 @@ export function CheckInForm({
                       ? `Last time: ${s.lastProgress.slice(0, 70)}…`
                       : "What moved forward?"
                   }
-                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+                  className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
                 />
               </label>
 
@@ -134,13 +136,13 @@ export function CheckInForm({
                   type="text"
                   name={`blockers:${s.projectId}`}
                   placeholder="Anything blocking you? (optional)"
-                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                  className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
                 />
                 <input
                   type="text"
                   name={`nextSteps:${s.projectId}`}
                   placeholder="Next steps (optional)"
-                  className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                  className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -148,19 +150,19 @@ export function CheckInForm({
         )}
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Anything else{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <textarea
             name="generalNote"
             rows={2}
             placeholder="Not tied to one project — availability, questions, anything."
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
 
-        <p className="text-xs text-ink-muted">
+        <p className="text-ink-muted text-xs">
           The per-project notes appear on those projects, where anyone can see
           them. Your total hours and reliability stay between you and your Lead.
         </p>

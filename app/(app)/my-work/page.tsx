@@ -15,15 +15,15 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
-import {
-  DeliverableRow,
-  ProgressBar,
-} from "@/components/ui/deliverable-row";
+import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getMyWork, type MyProjectCard as MyProjectCardData } from "@/lib/data/my-work";
+import {
+  getMyWork,
+  type MyProjectCard as MyProjectCardData,
+} from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
@@ -93,12 +93,12 @@ export default async function MyWorkPage() {
       <Card>
         <CardBody>
           <ContributionPanel record={contribution} isOwnRecord />
-          <p className="mt-5 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-5 text-sm">
             Your Lead and the REs of your projects see the same four numbers.
             There is no ranking and no hidden score —{" "}
             <Link
               href="/how-we-lead"
-              className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
             >
               here&apos;s what leadership looks for
             </Link>
@@ -113,14 +113,14 @@ export default async function MyWorkPage() {
           <CardBody>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SectionLabel>People Asking To Join Your Projects</SectionLabel>
-              <span className="text-sm text-ink-muted">
+              <span className="text-ink-muted text-sm">
                 {requestsAwaitingMe.length} waiting
               </span>
             </div>
-            <p className="mt-2 text-sm text-ink-soft">
+            <p className="text-ink-soft mt-2 text-sm">
               You control who joins your projects, which means you owe these
-              people an answer. A request left hanging is a member with nothing to
-              do.
+              people an answer. A request left hanging is a member with nothing
+              to do.
             </p>
 
             <div className="mt-4 space-y-2.5">
@@ -134,13 +134,13 @@ export default async function MyWorkPage() {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[15px] font-bold text-ink">
+                        <p className="text-ink text-[15px] font-bold">
                           {requester?.fullName ?? "Unknown member"}
                         </p>
                         {project ? (
                           <Link
                             href={`/projects/${project.slug}`}
-                            className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                            className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
                           >
                             {project.name}
                           </Link>
@@ -153,7 +153,7 @@ export default async function MyWorkPage() {
                       )}
                     </div>
                     {request.note ? (
-                      <p className="mt-2 text-sm text-ink-soft">
+                      <p className="text-ink-soft mt-2 text-sm">
                         &ldquo;{request.note}&rdquo;
                       </p>
                     ) : null}
@@ -178,7 +178,7 @@ export default async function MyWorkPage() {
         <Card>
           <CardBody>
             <SectionLabel>My Requests</SectionLabel>
-            <p className="mt-2 text-sm text-ink-soft">
+            <p className="text-ink-soft mt-2 text-sm">
               Waiting on an RE. Nothing is lost — you can see exactly where each
               ask stands.
             </p>
@@ -186,23 +186,26 @@ export default async function MyWorkPage() {
               {pendingMine.map(({ request, project, isStale }) => (
                 <div
                   key={request.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
+                  className="rounded-tile border-line flex flex-wrap items-center justify-between gap-3 border px-4 py-3"
                 >
                   <div className="min-w-0">
                     {project ? (
                       <Link
                         href={`/projects/${project.slug}`}
-                        className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                       >
                         {project.name}
                       </Link>
                     ) : null}
-                    <p className="mt-0.5 text-sm text-ink-muted">
+                    <p className="text-ink-muted mt-0.5 text-sm">
                       Asked{" "}
-                      {new Date(request.requestedAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {new Date(request.requestedAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -233,7 +236,7 @@ export default async function MyWorkPage() {
         <CardBody>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionLabel>What I Own</SectionLabel>
-            <span className="text-sm text-ink-muted">
+            <span className="text-ink-muted text-sm">
               {myDeliverables.length} open
             </span>
           </div>
@@ -250,7 +253,7 @@ export default async function MyWorkPage() {
                 <div key={deliverable.id}>
                   <Link
                     href={`/projects/${project.slug}`}
-                    className="mb-1 block text-[13px] font-semibold text-cardinal-600 hover:text-cardinal-700"
+                    className="text-cardinal-600 hover:text-cardinal-700 mb-1 block text-[13px] font-semibold"
                   >
                     {project.name}
                   </Link>
@@ -278,7 +281,7 @@ export default async function MyWorkPage() {
               <SectionLabel>
                 {currentUpdate.inSession ? "Update Due" : "Out Of Session"}
               </SectionLabel>
-              <h2 className="mt-2 text-2xl font-bold text-ink">
+              <h2 className="text-ink mt-2 text-2xl font-bold">
                 {currentUpdate.inSession
                   ? `${dueDate.toLocaleDateString("en-US", { weekday: "long" })} check-in`
                   : "Nothing due right now"}
@@ -288,7 +291,7 @@ export default async function MyWorkPage() {
                 as broken; "no check-ins during Winter break" reads as the club
                 working as intended. Same reasoning as the academic pause.
               */}
-              <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
+              <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
                 {currentUpdate.inSession ? (
                   <>
                     {currentUpdate.updatesPerWeek} a week, on the days you
@@ -326,26 +329,26 @@ export default async function MyWorkPage() {
               currentUpdate.sections.map(({ entry, project, breadcrumb }) => (
                 <div
                   key={entry.id}
-                  className="rounded-tile border border-line px-4 py-4"
+                  className="rounded-tile border-line border px-4 py-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <Breadcrumb trail={breadcrumb} className="mb-1" />
                       <Link
                         href={`/projects/${project.slug}`}
-                        className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                        className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                       >
                         {project.name}
                       </Link>
                     </div>
-                    <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-ink-soft">
+                    <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-sm font-semibold">
                       <Clock className="size-3.5" />
                       {formatNumber(entry.hours, 1)} hrs
                     </span>
                   </div>
 
-                  <div className="mt-3 rounded-tile border border-dashed border-line px-3.5 py-3">
-                    <p className="text-sm text-ink-muted">
+                  <div className="rounded-tile border-line mt-3 border border-dashed px-3.5 py-3">
+                    <p className="text-ink-muted text-sm">
                       {entry.progress ||
                         "No progress written yet for this project."}
                     </p>
@@ -375,16 +378,16 @@ export default async function MyWorkPage() {
             </div>
           ) : null}
 
-          <p className="mt-4 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-4 text-sm">
             Heads-down on academics?{" "}
             <Link
               href="/settings"
-              className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
             >
               Pause your check-ins
             </Link>{" "}
-            — it doesn&apos;t count against you, and there&apos;s no backlog when
-            you come back.
+            — it doesn&apos;t count against you, and there&apos;s no backlog
+            when you come back.
           </p>
         </CardBody>
       </Card>
@@ -396,7 +399,7 @@ export default async function MyWorkPage() {
             <SectionLabel>My Projects</SectionLabel>
             <Link
               href="/projects"
-              className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
             >
               Find work
             </Link>
@@ -447,7 +450,7 @@ export default async function MyWorkPage() {
         <Card>
           <CardBody>
             <SectionLabel>Following</SectionLabel>
-            <p className="mt-2 text-sm text-ink-soft">
+            <p className="text-ink-soft mt-2 text-sm">
               Watching only — no deliverables, no update obligations.
             </p>
             <div className="mt-4 space-y-2.5">
@@ -455,12 +458,12 @@ export default async function MyWorkPage() {
                 <Link
                   key={project.id}
                   href={`/projects/${project.slug}`}
-                  className="block rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                  className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
                 >
                   <Breadcrumb trail={breadcrumb} className="mb-1" />
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="flex items-center gap-2 text-[15px] font-bold text-ink">
-                      <Eye className="size-3.5 text-ink-muted" />
+                    <span className="text-ink flex items-center gap-2 text-[15px] font-bold">
+                      <Eye className="text-ink-muted size-3.5" />
                       {project.name}
                     </span>
                     <ProjectBadges project={project} />
@@ -496,13 +499,13 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
   } = card;
 
   return (
-    <div className="rounded-tile border border-line px-4 py-4">
+    <div className="rounded-tile border-line border px-4 py-4">
       <Breadcrumb trail={breadcrumb} className="mb-1.5" />
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Link
           href={`/projects/${project.slug}`}
-          className="text-[17px] font-bold text-ink hover:text-cardinal-600"
+          className="text-ink hover:text-cardinal-600 text-[17px] font-bold"
         >
           {project.name}
         </Link>
@@ -541,7 +544,7 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
           </div>
         </div>
       ) : project.phase === "complete" ? null : (
-        <p className="mt-3 text-sm text-ink-muted">
+        <p className="text-ink-muted mt-3 text-sm">
           Nothing assigned to you here yet — ask the RE what needs picking up.
         </p>
       )}
@@ -557,7 +560,7 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
         </div>
       ) : null}
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+      <div className="text-ink-muted mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
         <span className="flex items-center gap-1.5">
           <Clock className="size-3.5" />
           {formatNumber(hoursLogged, 1)} hrs logged
@@ -575,14 +578,14 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
       </div>
 
       {lastUpdate ? (
-        <div className="mt-3.5 rounded-tile bg-surface px-3.5 py-3">
+        <div className="rounded-tile bg-surface mt-3.5 px-3.5 py-3">
           <SectionLabel tone="muted">Your last update here</SectionLabel>
-          <p className="mt-1.5 text-sm text-ink-soft">
+          <p className="text-ink-soft mt-1.5 text-sm">
             {lastUpdate.entry.progress}
           </p>
           {lastUpdate.entry.blockers ? (
-            <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+            <p className="text-ink-soft mt-2 flex items-start gap-1.5 text-sm">
+              <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
               <span className="font-medium">{lastUpdate.entry.blockers}</span>
             </p>
           ) : null}

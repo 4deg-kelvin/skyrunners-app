@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
-import { addProjectMemberAction, createProjectAction, setProjectREAction } from "@/lib/actions";
+import {
+  addProjectMemberAction,
+  createProjectAction,
+  setProjectREAction,
+} from "@/lib/actions";
 
 export interface Option {
   id: string;
@@ -44,7 +48,7 @@ export function CreateProjectForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+        className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <Plus className="size-4" strokeWidth={2.5} />
         {label}
@@ -58,42 +62,45 @@ export function CreateProjectForm({
       submitLabel="Create project"
       submittingLabel="Creating…"
       resetOnSuccess
-      className="w-full rounded-card border border-line bg-card p-4 text-left"
+      className="rounded-card border-line bg-card w-full border p-4 text-left"
     >
-      {parentId ? <input type="hidden" name="parentId" value={parentId} /> : null}
+      {parentId ? (
+        <input type="hidden" name="parentId" value={parentId} />
+      ) : null}
 
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">Name</span>
+        <span className="text-ink mb-1 block text-sm font-semibold">Name</span>
         <input
           type="text"
           name="name"
           required
           placeholder="Tail Boom Redesign"
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
 
       <label className="mt-3 block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
-          What is it? <span className="font-normal text-ink-muted">(optional)</span>
+        <span className="text-ink mb-1 block text-sm font-semibold">
+          What is it?{" "}
+          <span className="text-ink-muted font-normal">(optional)</span>
         </span>
         <textarea
           name="description"
           rows={2}
           placeholder="One sentence someone browsing Find Work would understand."
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Responsible Engineer
           </span>
           <select
             name="primaryReId"
             defaultValue={defaultReId}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           >
             {people.map((p) => (
               <option key={p.id} value={p.id}>
@@ -101,20 +108,20 @@ export function CreateProjectForm({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Accountable for the deliverables. Can be changed later.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Target date{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="date"
             name="targetDate"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
       </div>
@@ -122,12 +129,12 @@ export function CreateProjectForm({
       {!parentId ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Division
             </span>
             <select
               name="teamId"
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
             >
               <option value="">— pick one —</option>
               {divisions.map((d) => (
@@ -136,19 +143,19 @@ export function CreateProjectForm({
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-xs text-ink-muted">
+            <span className="text-ink-muted mt-1 block text-xs">
               Without one it won&apos;t show up grouped on Projects.
             </span>
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Sits under{" "}
-              <span className="font-normal text-ink-muted">(optional)</span>
+              <span className="text-ink-muted font-normal">(optional)</span>
             </span>
             <select
               name="parentId"
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
             >
               <option value="">Top level</option>
               {parents.map((p) => (
@@ -164,7 +171,7 @@ export function CreateProjectForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink mt-3 ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -188,7 +195,7 @@ export function AddProjectMemberForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Plus className="size-3.5" strokeWidth={2.5} />
         Add member
@@ -202,17 +209,17 @@ export function AddProjectMemberForm({
       submitLabel="Add to project"
       submittingLabel="Adding…"
       resetOnSuccess
-      className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5"
     >
       <input type="hidden" name="projectId" value={projectId} />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Who</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">Who</span>
           <select
             name="memberId"
             required
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           >
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
@@ -223,25 +230,25 @@ export function AddProjectMemberForm({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             What they own{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="text"
             name="responsibility"
             placeholder="Structural analysis"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
       </div>
 
       {canAssignRE ? (
-        <label className="mt-3 flex items-start gap-2 text-sm text-ink">
+        <label className="text-ink mt-3 flex items-start gap-2 text-sm">
           <input type="checkbox" name="asRE" value="yes" className="mt-1" />
           <span>
             Make them a Responsible Engineer
-            <span className="block text-xs text-ink-muted">
+            <span className="text-ink-muted block text-xs">
               RE authority inherits down — they&apos;ll be able to manage this
               project and everything under it.
             </span>
@@ -252,7 +259,7 @@ export function AddProjectMemberForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink mt-3 ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -273,7 +280,7 @@ export function REControls({
   isPrimary: boolean;
 }) {
   if (isPrimary) {
-    return <span className="text-xs text-ink-muted">Primary RE</span>;
+    return <span className="text-ink-muted text-xs">Primary RE</span>;
   }
 
   return (

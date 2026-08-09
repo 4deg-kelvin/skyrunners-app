@@ -42,7 +42,7 @@ export default async function ProjectArchivePage() {
         action={
           <Link
             href="/projects"
-            className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-2 text-sm font-semibold text-ink hover:bg-surface"
+            className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-2 text-sm font-semibold"
           >
             <ArrowLeft className="size-4" strokeWidth={2.5} />
             Back to projects
@@ -62,14 +62,7 @@ export default async function ProjectArchivePage() {
         </Card>
       ) : (
         archived.map(
-          ({
-            division,
-            lead,
-            archivedBy,
-            subTeams,
-            projects,
-            memberCount,
-          }) => {
+          ({ division, lead, archivedBy, subTeams, projects, memberCount }) => {
             const delivered = projects.reduce((n, p) => n + p.delivered, 0);
 
             return (
@@ -83,11 +76,11 @@ export default async function ProjectArchivePage() {
                         </SectionLabel>
                         <Badge tone="neutral">Retired</Badge>
                       </div>
-                      <h2 className="mt-1.5 text-2xl font-bold text-ink">
+                      <h2 className="text-ink mt-1.5 text-2xl font-bold">
                         {division.name}
                       </h2>
                       {division.description ? (
-                        <p className="mt-1.5 text-[15px] text-ink-soft">
+                        <p className="text-ink-soft mt-1.5 text-[15px]">
                           {division.description}
                         </p>
                       ) : null}
@@ -97,7 +90,7 @@ export default async function ProjectArchivePage() {
                         "this is gone" answers the wrong question — the useful
                         one is who decided and what for.
                       */}
-                      <p className="mt-2 text-sm text-ink-muted">
+                      <p className="text-ink-muted mt-2 text-sm">
                         Archived
                         {division.archivedAt
                           ? ` ${new Date(
@@ -113,7 +106,7 @@ export default async function ProjectArchivePage() {
                         {lead ? ` · Led by ${lead.fullName}` : ""}
                       </p>
                       {division.archiveNote ? (
-                        <p className="mt-1.5 text-sm text-ink-soft">
+                        <p className="text-ink-soft mt-1.5 text-sm">
                           &ldquo;{division.archiveNote}&rdquo;
                         </p>
                       ) : null}
@@ -138,22 +131,22 @@ export default async function ProjectArchivePage() {
                   </div>
 
                   {subTeams.length > 0 ? (
-                    <p className="mt-4 text-sm text-ink-muted">
-                      <span className="font-semibold text-ink-soft">
+                    <p className="text-ink-muted mt-4 text-sm">
+                      <span className="text-ink-soft font-semibold">
                         Sub-teams:
                       </span>{" "}
                       {subTeams.map((t) => t.name).join(", ")}
                     </p>
                   ) : null}
 
-                  <div className="mt-5 border-t border-line pt-5">
+                  <div className="border-line mt-5 border-t pt-5">
                     <SectionLabel tone="muted">
                       What it built · {projects.length}
                     </SectionLabel>
 
                     <div className="mt-3 space-y-2.5">
                       {projects.length === 0 ? (
-                        <p className="text-sm text-ink-muted">
+                        <p className="text-ink-muted text-sm">
                           No projects were ever filed under this division.
                         </p>
                       ) : (
@@ -166,15 +159,15 @@ export default async function ProjectArchivePage() {
                           <Link
                             key={project.id}
                             href={`/projects/${project.slug}`}
-                            className="block rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                            className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                              <span className="text-[15px] font-bold text-ink">
+                              <span className="text-ink text-[15px] font-bold">
                                 {project.name}
                               </span>
                               <ProjectBadges project={project} />
                             </div>
-                            <p className="mt-1.5 text-sm text-ink-muted">
+                            <p className="text-ink-muted mt-1.5 text-sm">
                               {res.length > 0
                                 ? `${res.length > 1 ? "REs" : "RE"}: ${res
                                     .map((r) => r.fullName)

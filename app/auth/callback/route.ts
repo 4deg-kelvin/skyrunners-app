@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
   // Only allow relative redirects. An absolute URL here would be an open
   // redirect — an attacker could send someone a login link that bounces them to
   // a lookalike site after a genuine sign-in.
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/my-work";
+  const safeNext =
+    next.startsWith("/") && !next.startsWith("//") ? next : "/my-work";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`);

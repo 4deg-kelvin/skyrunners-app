@@ -34,7 +34,7 @@ export function DeliverableRow({
   return (
     <div
       className={cn(
-        "rounded-tile border border-line px-4 py-3",
+        "rounded-tile border-line border px-4 py-3",
         done && "opacity-60",
         className
       )}
@@ -42,7 +42,7 @@ export function DeliverableRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p
           className={cn(
-            "text-[15px] font-semibold text-ink",
+            "text-ink text-[15px] font-semibold",
             done && "line-through"
           )}
         >
@@ -56,11 +56,11 @@ export function DeliverableRow({
         </div>
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+      <div className="text-ink-muted mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         {showOwner && owner ? (
           <Link
             href={`/members/${owner.id}`}
-            className="font-medium text-ink-soft hover:text-cardinal-600"
+            className="text-ink-soft hover:text-cardinal-600 font-medium"
           >
             {owner.fullName}
           </Link>
@@ -88,8 +88,8 @@ export function DeliverableRow({
       </div>
 
       {deliverable.blockerNote ? (
-        <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+        <p className="text-ink-soft mt-2 flex items-start gap-1.5 text-sm">
+          <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
           <span className="font-medium">{deliverable.blockerNote}</span>
         </p>
       ) : null}
@@ -108,13 +108,13 @@ export function ProgressBar({
   const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
+      <div className="bg-line h-1.5 flex-1 overflow-hidden rounded-full">
         <div
-          className="h-full rounded-full bg-cardinal-600"
+          className="bg-cardinal-600 h-full rounded-full"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="shrink-0 text-xs font-semibold text-ink-muted">
+      <span className="text-ink-muted shrink-0 text-xs font-semibold">
         {pct}%
       </span>
     </div>

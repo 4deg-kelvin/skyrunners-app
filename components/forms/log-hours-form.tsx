@@ -60,7 +60,7 @@ export function LogHoursForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+        className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <Plus className="size-4" strokeWidth={2.5} />
         Log hours
@@ -75,13 +75,13 @@ export function LogHoursForm({
   earliest.setUTCDate(earliest.getUTCDate() - maxBackdateDays);
 
   return (
-    <div className="rounded-card border border-line bg-card p-4">
+    <div className="rounded-card border-line bg-card border p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-[15px] font-bold text-ink">Log hours</p>
+        <p className="text-ink text-[15px] font-bold">Log hours</p>
         <button
           onClick={() => setOpen(false)}
           aria-label="Close"
-          className="rounded-tile p-1 text-ink-muted hover:bg-surface"
+          className="rounded-tile text-ink-muted hover:bg-surface p-1"
         >
           <X className="size-4" />
         </button>
@@ -96,13 +96,13 @@ export function LogHoursForm({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Project
             </span>
             <select
               name="projectId"
               defaultValue={defaultProjectId ?? projects[0]?.id}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
             >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -124,7 +124,7 @@ export function LogHoursForm({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Hours
             </span>
             <input
@@ -136,43 +136,45 @@ export function LogHoursForm({
               required
               inputMode="decimal"
               placeholder="2.5"
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
             />
           </label>
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Date</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Date
+          </span>
           <input
             type="date"
             name="workDate"
             defaultValue={today}
             min={earliest.toISOString().slice(0, 10)}
             max={today}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink sm:w-auto"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px] sm:w-auto"
           />
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Up to {maxBackdateDays} days back.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             What you did{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="text"
             name="description"
             placeholder="Mesh refinement on the spar model"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
       </ActionForm>
 
       {recent.length > 0 ? (
-        <div className="mt-4 border-t border-line pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+        <div className="border-line mt-4 border-t pt-3">
+          <p className="text-ink-muted text-xs font-semibold tracking-wide uppercase">
             Logged recently
           </p>
           <ul className="mt-2 space-y-1.5">
@@ -181,8 +183,8 @@ export function LogHoursForm({
                 key={log.id}
                 className="flex flex-wrap items-center justify-between gap-2 text-sm"
               >
-                <span className="min-w-0 text-ink-soft">
-                  <span className="font-semibold text-ink">
+                <span className="text-ink-soft min-w-0">
+                  <span className="text-ink font-semibold">
                     {new Date(`${log.workDate}T00:00:00Z`).toLocaleDateString(
                       "en-US",
                       { month: "short", day: "numeric", timeZone: "UTC" }
@@ -204,7 +206,7 @@ export function LogHoursForm({
                   read.
                 */}
                 {locked ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+                  <span className="text-ink-muted inline-flex shrink-0 items-center gap-1 text-xs">
                     <Lock className="size-3" />
                     In a sent check-in
                   </span>

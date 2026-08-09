@@ -12,12 +12,7 @@ export function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-card border border-line bg-card",
-        className
-      )}
-    >
+    <div className={cn("rounded-card border-line bg-card border", className)}>
       {children}
     </div>
   );
@@ -35,5 +30,5 @@ export function CardBody({
 
 /** Hairline divider used between stacked label/value pairs. */
 export function CardDivider({ className }: { className?: string }) {
-  return <div className={cn("h-px bg-line-soft", className)} />;
+  return <div className={cn("bg-line-soft h-px", className)} />;
 }

@@ -20,7 +20,7 @@ export function SectionLabel({
   return (
     <p
       className={cn(
-        "text-[11px] font-semibold uppercase tracking-[0.1em]",
+        "text-[11px] font-semibold tracking-[0.1em] uppercase",
         tone === "cardinal" ? "text-cardinal-600" : "text-ink-muted",
         className
       )}
@@ -41,7 +41,7 @@ export function FieldLabel({
   return (
     <p
       className={cn(
-        "text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-muted",
+        "text-ink-muted text-[11px] font-semibold tracking-[0.09em] uppercase",
         className
       )}
     >

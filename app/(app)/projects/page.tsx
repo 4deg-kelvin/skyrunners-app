@@ -36,8 +36,8 @@ function countCompleted(nodes: ProjectTreeNode[]): number {
 
 export default async function ProjectsPage() {
   const viewer = await getViewer();
-  const [tree, orphans, formOptions, archivedCount, extras] =
-    await Promise.all([
+  const [tree, orphans, formOptions, archivedCount, extras] = await Promise.all(
+    [
       getProjectTree(),
       getOrphanedProjects(),
       getProjectFormOptions(),
@@ -45,7 +45,8 @@ export default async function ProjectsPage() {
       // Deadlines and blocked work, folded in here rather than being two
       // separate pages. Computed in one pass and looked up per division.
       getDivisionExtras(),
-    ]);
+    ]
+  );
 
   const mayCreate = can.createProject(viewer.actor, viewer.graph);
   const mayManageTeams = can.manageTeams(viewer.actor);
@@ -57,104 +58,104 @@ export default async function ProjectsPage() {
 
   return (
     <HideCompletedProvider>
-    <div className="space-y-6">
-      <PageHeader
-        label="All Divisions"
-        title="Projects"
-        description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
+      <div className="space-y-6">
+        <PageHeader
+          label="All Divisions"
+          title="Projects"
+          description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
               Available to everyone, not just leadership. Reading the page is
               the one thing every member does here, and how much finished work
               you want in the way of that is a personal preference.
             */}
-            <HideCompletedToggle count={completedCount} />
-            {mayCreate ? (
-              <>
-                {mayManageTeams ? (
-                  <CreateTeamForm
+              <HideCompletedToggle count={completedCount} />
+              {mayCreate ? (
+                <>
+                  {mayManageTeams ? (
+                    <CreateTeamForm
+                      divisions={formOptions.divisions}
+                      people={formOptions.people}
+                    />
+                  ) : null}
+                  <CreateProjectForm
+                    parents={formOptions.parents}
                     divisions={formOptions.divisions}
                     people={formOptions.people}
+                    defaultReId={viewer.member.id}
                   />
-                ) : null}
-                <CreateProjectForm
-                  parents={formOptions.parents}
-                  divisions={formOptions.divisions}
-                  people={formOptions.people}
-                  defaultReId={viewer.member.id}
-                />
-              </>
-            ) : null}
-          </div>
-        }
-      />
+                </>
+              ) : null}
+            </div>
+          }
+        />
 
-      {/* Data-integrity warning rather than silently hiding work */}
-      {orphans.length > 0 ? (
-        <Card className="border-warn-fg/25 bg-warn-bg">
-          <CardBody className="py-4">
-            <p className="flex items-start gap-2 text-sm text-warn-fg">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-              <span>
-                <span className="font-semibold">
-                  {orphans.length} project
-                  {orphans.length === 1 ? "" : "s"} not linked to a division:
-                </span>{" "}
-                {orphans.map((p) => p.name).join(", ")}. Assign each an owning
-                team so members can find them.
-              </span>
-            </p>
-          </CardBody>
-        </Card>
-      ) : null}
+        {/* Data-integrity warning rather than silently hiding work */}
+        {orphans.length > 0 ? (
+          <Card className="border-warn-fg/25 bg-warn-bg">
+            <CardBody className="py-4">
+              <p className="text-warn-fg flex items-start gap-2 text-sm">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  <span className="font-semibold">
+                    {orphans.length} project
+                    {orphans.length === 1 ? "" : "s"} not linked to a division:
+                  </span>{" "}
+                  {orphans.map((p) => p.name).join(", ")}. Assign each an owning
+                  team so members can find them.
+                </span>
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
 
-      <div className="space-y-6">
-        {tree.map(({ division, lead, roots }) => (
-          <Card key={division.id}>
-            <CardBody>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <SectionLabel>Division</SectionLabel>
-                    {mayManageTeams ? (
-                      <EditTeamForm
-                        team={{
-                          id: division.id,
-                          name: division.name,
-                          parentId: division.parentId,
-                          leadId: division.leadId,
-                        }}
-                        divisions={formOptions.divisions}
-                        people={formOptions.people}
-                      />
+        <div className="space-y-6">
+          {tree.map(({ division, lead, roots }) => (
+            <Card key={division.id}>
+              <CardBody>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <SectionLabel>Division</SectionLabel>
+                      {mayManageTeams ? (
+                        <EditTeamForm
+                          team={{
+                            id: division.id,
+                            name: division.name,
+                            parentId: division.parentId,
+                            leadId: division.leadId,
+                          }}
+                          divisions={formOptions.divisions}
+                          people={formOptions.people}
+                        />
+                      ) : null}
+                    </div>
+                    <h2 className="text-ink mt-1.5 text-2xl font-bold">
+                      {division.name}
+                    </h2>
+                    {division.description ? (
+                      <p className="text-ink-soft mt-1.5 text-[15px]">
+                        {division.description}
+                      </p>
                     ) : null}
                   </div>
-                  <h2 className="mt-1.5 text-2xl font-bold text-ink">
-                    {division.name}
-                  </h2>
-                  {division.description ? (
-                    <p className="mt-1.5 text-[15px] text-ink-soft">
-                      {division.description}
-                    </p>
+                  {lead ? (
+                    <div className="text-right">
+                      <SectionLabel tone="muted">Division Lead</SectionLabel>
+                      <Link
+                        href={`/members/${lead.id}`}
+                        className="text-ink hover:text-cardinal-600 mt-1 block text-[15px] font-bold"
+                      >
+                        {lead.fullName}
+                      </Link>
+                    </div>
                   ) : null}
                 </div>
-                {lead ? (
-                  <div className="text-right">
-                    <SectionLabel tone="muted">Division Lead</SectionLabel>
-                    <Link
-                      href={`/members/${lead.id}`}
-                      className="mt-1 block text-[15px] font-bold text-ink hover:text-cardinal-600"
-                    >
-                      {lead.fullName}
-                    </Link>
-                  </div>
-                ) : null}
-              </div>
 
-              <DivisionProjectList roots={roots} />
+                <DivisionProjectList roots={roots} />
 
-              {/*
+                {/*
                 What's due and what's stuck, both collapsed. These were
                 `/deadlines` and `/blockers` — neither was wrong, both were the
                 wrong size. A deadline is a property of a project and a blocker
@@ -162,33 +163,33 @@ export default async function ProjectsPage() {
                 asked people to navigate away to learn about the thing they
                 were already reading.
               */}
-              <DivisionExtras
-                deadlines={extras[division.id]?.deadlines ?? []}
-                blocked={extras[division.id]?.blocked ?? []}
-                today={todayIso}
-              />
-            </CardBody>
-          </Card>
-        ))}
-      </div>
+                <DivisionExtras
+                  deadlines={extras[division.id]?.deadlines ?? []}
+                  blocked={extras[division.id]?.blocked ?? []}
+                  today={todayIso}
+                />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
 
-      {/*
+        {/*
         The way back to what was retired.
         Archiving a division only makes sense if the history is reachable —
         otherwise it's a delete with extra steps, and the club loses its record
         of what it built. Shown to everyone; restoring is the Co-Lead part.
       */}
-      {archivedCount > 0 ? (
-        <Link
-          href="/projects/archive"
-          className="flex items-center gap-2 rounded-tile border border-line px-4 py-3 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface hover:text-ink"
-        >
-          <Archive className="size-4 shrink-0" />
-          Archive · {archivedCount} retired division
-          {archivedCount === 1 ? "" : "s"} and what they built
-        </Link>
-      ) : null}
-    </div>
+        {archivedCount > 0 ? (
+          <Link
+            href="/projects/archive"
+            className="rounded-tile border-line text-ink-soft hover:bg-surface hover:text-ink flex items-center gap-2 border px-4 py-3 text-sm font-semibold transition-colors"
+          >
+            <Archive className="size-4 shrink-0" />
+            Archive · {archivedCount} retired division
+            {archivedCount === 1 ? "" : "s"} and what they built
+          </Link>
+        ) : null}
+      </div>
     </HideCompletedProvider>
   );
 }

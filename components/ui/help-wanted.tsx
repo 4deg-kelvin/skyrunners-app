@@ -43,31 +43,32 @@ export function HelpWanted({ asks }: { asks: BlockerItem[] }) {
   const stale = asks.filter((a) => a.stale).length;
 
   return (
-    <div className="rounded-card border border-line bg-card">
+    <div className="rounded-card border-line bg-card border">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         className="flex w-full flex-wrap items-center justify-between gap-3 px-6 py-4 text-left"
       >
-        <span className="flex items-center gap-2 text-[15px] font-bold text-ink">
-          <HelpCircle className="size-4 text-cardinal-600" />
-          {asks.length} {asks.length === 1 ? "person needs" : "people need"} help
+        <span className="text-ink flex items-center gap-2 text-[15px] font-bold">
+          <HelpCircle className="text-cardinal-600 size-4" />
+          {asks.length} {asks.length === 1 ? "person needs" : "people need"}{" "}
+          help
           {stale > 0 ? (
             <Badge tone="risk">{stale} waiting 3+ days</Badge>
           ) : null}
         </span>
-        <span className="text-sm font-semibold text-cardinal-600">
+        <span className="text-cardinal-600 text-sm font-semibold">
           {open ? "Hide" : "Show"}
         </span>
       </button>
 
       {open ? (
         <div className="space-y-2.5 px-6 pb-5">
-          <p className="text-sm text-ink-soft">
-            Anyone can answer — you don&apos;t have to be on the project. That&apos;s
-            the point: it&apos;s the route to being useful that doesn&apos;t wait on
-            one person&apos;s inbox.
+          <p className="text-ink-soft text-sm">
+            Anyone can answer — you don&apos;t have to be on the project.
+            That&apos;s the point: it&apos;s the route to being useful that
+            doesn&apos;t wait on one person&apos;s inbox.
           </p>
 
           {asks.map((item) => {
@@ -83,17 +84,17 @@ export function HelpWanted({ asks }: { asks: BlockerItem[] }) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[15px] font-bold text-ink">
+                    <p className="text-ink text-[15px] font-bold">
                       {item.title}
                     </p>
-                    <p className="mt-0.5 text-sm text-ink-muted">
+                    <p className="text-ink-muted mt-0.5 text-sm">
                       {item.member?.fullName ?? "Unknown member"}
                       {item.project ? (
                         <>
                           {" · "}
                           <Link
                             href={`/projects/${item.project.slug}`}
-                            className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+                            className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
                           >
                             {item.project.name}
                           </Link>
@@ -108,7 +109,7 @@ export function HelpWanted({ asks }: { asks: BlockerItem[] }) {
                 </div>
 
                 {item.detail ? (
-                  <p className="mt-2 text-sm text-ink-soft">{item.detail}</p>
+                  <p className="text-ink-soft mt-2 text-sm">{item.detail}</p>
                 ) : null}
 
                 {item.member ? (
@@ -120,14 +121,14 @@ export function HelpWanted({ asks }: { asks: BlockerItem[] }) {
                 ) : null}
 
                 {request.replies.length > 0 ? (
-                  <div className="mt-3 space-y-2 border-l-2 border-line pl-3">
+                  <div className="border-line mt-3 space-y-2 border-l-2 pl-3">
                     {request.replies.map((reply, i) => (
                       <div key={reply.id}>
-                        <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+                        <p className="text-ink-soft flex items-center gap-1.5 text-xs font-semibold">
                           <MessageSquare className="size-3" />
                           {item.repliers[i]?.fullName ?? "Someone"}
                         </p>
-                        <p className="mt-0.5 text-sm text-ink-soft">
+                        <p className="text-ink-soft mt-0.5 text-sm">
                           {reply.body}
                         </p>
                       </div>

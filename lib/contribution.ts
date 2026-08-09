@@ -68,11 +68,7 @@ export const WEEKLY_HOURS_MINIMUM = 10;
  * climb. "You scored 54" gives them a verdict.
  */
 export type CommitmentTier =
-  | "core"
-  | "committed"
-  | "contributing"
-  | "light"
-  | "paused";
+  "core" | "committed" | "contributing" | "light" | "paused";
 
 export const TIER_LABELS: Record<CommitmentTier, string> = {
   core: "Core",
@@ -90,13 +86,15 @@ export const TIER_DESCRIPTIONS: Record<CommitmentTier, string> = {
   paused: "Paused for academics. Nothing counted, nothing owed.",
 };
 
-export const TIER_THRESHOLDS: { tier: CommitmentTier; minHoursPerWeek: number }[] =
-  [
-    { tier: "core", minHoursPerWeek: 12 },
-    { tier: "committed", minHoursPerWeek: 8 },
-    { tier: "contributing", minHoursPerWeek: 4 },
-    { tier: "light", minHoursPerWeek: 0 },
-  ];
+export const TIER_THRESHOLDS: {
+  tier: CommitmentTier;
+  minHoursPerWeek: number;
+}[] = [
+  { tier: "core", minHoursPerWeek: 12 },
+  { tier: "committed", minHoursPerWeek: 8 },
+  { tier: "contributing", minHoursPerWeek: 4 },
+  { tier: "light", minHoursPerWeek: 0 },
+];
 
 export function commitmentTier(
   hoursPerWeek: number,
@@ -181,8 +179,7 @@ export function buildContributionRecord(
   i: ContributionInputs
 ): ContributionRecord {
   const assigned = i.deliverablesCompleted + i.deliverablesOpen;
-  const hoursPerWeek =
-    i.activeWeeks > 0 ? i.hoursTotal / i.activeWeeks : 0;
+  const hoursPerWeek = i.activeWeeks > 0 ? i.hoursTotal / i.activeWeeks : 0;
   const tier = commitmentTier(hoursPerWeek, i.isPaused);
   const missed = Math.max(0, i.updatesDue - i.updatesOnTime - i.updatesLate);
 
@@ -205,8 +202,7 @@ export function buildContributionRecord(
       meetsMinimum: hoursPerWeek >= WEEKLY_HOURS_MINIMUM,
     },
     reliability: {
-      onTimeRate:
-        i.updatesDue > 0 ? i.updatesOnTime / i.updatesDue : null,
+      onTimeRate: i.updatesDue > 0 ? i.updatesOnTime / i.updatesDue : null,
       onTime: i.updatesOnTime,
       late: i.updatesLate,
       missed,

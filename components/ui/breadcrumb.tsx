@@ -19,7 +19,7 @@ export function Breadcrumb({
   return (
     <p
       className={cn(
-        "flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-muted",
+        "text-ink-muted flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]",
         className
       )}
     >
@@ -29,7 +29,7 @@ export function Breadcrumb({
           <span
             className={
               node.kind === "division"
-                ? "font-semibold text-cardinal-600"
+                ? "text-cardinal-600 font-semibold"
                 : undefined
             }
           >

@@ -39,16 +39,16 @@ export function EntryResponse({
   // is the reply to it. Only an RE sees a way to change it.
   if (existing && !editing) {
     return (
-      <div className="mt-2.5 rounded-tile border-l-2 border-cardinal-600 bg-surface px-3 py-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+      <div className="rounded-tile border-cardinal-600 bg-surface mt-2.5 border-l-2 px-3 py-2">
+        <p className="text-ink-soft flex items-center gap-1.5 text-xs font-semibold">
           <CornerDownRight className="size-3" />
           {responderName ?? "The RE"} replied
         </p>
-        <p className="mt-1 text-sm text-ink-soft">{existing}</p>
+        <p className="text-ink-soft mt-1 text-sm">{existing}</p>
         {canRespond ? (
           <button
             onClick={() => setEditing(true)}
-            className="mt-1.5 text-xs font-semibold text-cardinal-600 hover:text-cardinal-700"
+            className="text-cardinal-600 hover:text-cardinal-700 mt-1.5 text-xs font-semibold"
           >
             Edit
           </button>
@@ -63,7 +63,7 @@ export function EntryResponse({
     return (
       <button
         onClick={() => setEditing(true)}
-        className="mt-2.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface mt-2.5 border px-3 py-1.5 text-sm font-semibold"
       >
         Reply to this
       </button>
@@ -76,12 +76,12 @@ export function EntryResponse({
       submitLabel={existing ? "Save reply" : "Send reply"}
       submittingLabel="Sending…"
       onSuccess={() => setEditing(false)}
-      className="mt-2.5 rounded-tile border border-line bg-surface p-3"
+      className="rounded-tile border-line bg-surface mt-2.5 border p-3"
     >
       <input type="hidden" name="entryId" value={entryId} />
       <input type="hidden" name="projectId" value={projectId} />
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           Your answer to {authorName}
         </span>
         <textarea
@@ -89,10 +89,10 @@ export function EntryResponse({
           rows={2}
           defaultValue={existing}
           placeholder="I'll order a replacement seal — carry on with the dry layups meanwhile."
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
-      <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-1 mb-2.5 text-xs">
         You&apos;re answering as the RE of this project, not as their Lead.
         Everyone can see it — it&apos;s part of the project&apos;s history.
         {existing ? " Clearing the box removes the reply." : ""}
@@ -100,7 +100,7 @@ export function EntryResponse({
       <button
         type="button"
         onClick={() => setEditing(false)}
-        className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
       >
         Cancel
       </button>

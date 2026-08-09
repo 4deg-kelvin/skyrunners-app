@@ -18,17 +18,12 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-tile border border-line px-5 py-4",
-        className
-      )}
-    >
-      <FieldLabel className="mb-1.5 normal-case tracking-normal text-[13px] font-medium">
+    <div className={cn("rounded-tile border-line border px-5 py-4", className)}>
+      <FieldLabel className="mb-1.5 text-[13px] font-medium tracking-normal normal-case">
         {label}
       </FieldLabel>
-      <p className="text-xl font-bold text-ink">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-ink-muted">{hint}</p> : null}
+      <p className="text-ink text-xl font-bold">{value}</p>
+      {hint ? <p className="text-ink-muted mt-1 text-xs">{hint}</p> : null}
     </div>
   );
 }
@@ -44,7 +39,7 @@ export function DetailRow({
   return (
     <div className="py-4">
       <FieldLabel className="mb-1.5">{label}</FieldLabel>
-      <div className="text-[15px] font-bold text-ink">{children}</div>
+      <div className="text-ink text-[15px] font-bold">{children}</div>
     </div>
   );
 }

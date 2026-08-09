@@ -45,12 +45,12 @@ export function ProjectTeamForm({
 
   if (!open) {
     return (
-      <p className="text-sm text-ink-muted">
+      <p className="text-ink-muted text-sm">
         Division:{" "}
-        <span className="font-semibold text-ink">{currentDivisionName}</span>{" "}
+        <span className="text-ink font-semibold">{currentDivisionName}</span>{" "}
         <button
           onClick={() => setOpen(true)}
-          className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+          className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
         >
           Change
         </button>
@@ -59,9 +59,9 @@ export function ProjectTeamForm({
   }
 
   return (
-    <div className="rounded-tile border border-line bg-surface p-3">
+    <div className="rounded-tile border-line bg-surface border p-3">
       {!currentDivisionName ? (
-        <p className="mb-2 text-sm text-warn-fg">
+        <p className="text-warn-fg mb-2 text-sm">
           No division set, so this project doesn&apos;t appear on Projects or
           Find Work.
         </p>
@@ -77,7 +77,7 @@ export function ProjectTeamForm({
         <select
           name="teamId"
           defaultValue={currentTeamId ?? ""}
-          className="mb-2 w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+          className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
         >
           <option value="">Not assigned</option>
           {teams.map((t) => (
@@ -86,7 +86,7 @@ export function ProjectTeamForm({
             </option>
           ))}
         </select>
-        <p className="mb-2 text-xs text-ink-muted">
+        <p className="text-ink-muted mb-2 text-xs">
           Members browse by division, so a project without one is hard to find.
         </p>
       </ActionForm>
@@ -113,7 +113,7 @@ export function CreateTeamForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Plus className="size-4" />
         New division
@@ -128,11 +128,11 @@ export function CreateTeamForm({
       submittingLabel="Creating…"
       resetOnSuccess
       onSuccess={() => setOpen(false)}
-      className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5"
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Name
           </span>
           <input
@@ -140,18 +140,18 @@ export function CreateTeamForm({
             name="name"
             required
             placeholder="Avionics"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Sits under
           </span>
           <select
             name="parentId"
             defaultValue=""
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="">Nothing — this is a division</option>
             {divisions.map((d) => (
@@ -169,13 +169,13 @@ export function CreateTeamForm({
           name never appeared.
         */}
         <label className="block sm:col-span-2">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Division Lead
           </span>
           <select
             name="leadId"
             defaultValue=""
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="">Nobody yet</option>
             {people.map((p) => (
@@ -187,7 +187,7 @@ export function CreateTeamForm({
         </label>
       </div>
 
-      <p className="mb-3 mt-3 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-3 mb-3 text-xs">
         Divisions are the top level — Airframe, Avionics, and so on. Leave the
         second box alone to make one; pick a division to nest a sub-team inside
         it.
@@ -196,7 +196,7 @@ export function CreateTeamForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -239,7 +239,7 @@ export function EditTeamForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+        className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
       >
         Edit
       </button>
@@ -247,7 +247,7 @@ export function EditTeamForm({
   }
 
   return (
-    <div className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5">
+    <div className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5">
       <ActionForm
         action={updateTeamAction}
         submitLabel="Save"
@@ -258,7 +258,7 @@ export function EditTeamForm({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Name
             </span>
             <input
@@ -266,18 +266,18 @@ export function EditTeamForm({
               name="name"
               required
               defaultValue={team.name}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Sits under
             </span>
             <select
               name="parentId"
               defaultValue={team.parentId ?? ""}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             >
               <option value="">Nothing — this is a division</option>
               {divisions
@@ -297,13 +297,13 @@ export function EditTeamForm({
             name on /projects just stopped being there.
           */}
           <label className="block sm:col-span-2">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Division Lead
             </span>
             <select
               name="leadId"
               defaultValue={team.leadId ?? ""}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             >
               <option value="">Nobody</option>
               {people.map((p) => (
@@ -318,13 +318,13 @@ export function EditTeamForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-5 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink mt-3 ml-5 text-sm font-semibold"
         >
           Cancel
         </button>
       </ActionForm>
 
-      <div className="mt-3 border-t border-line pt-3">
+      <div className="border-line mt-3 border-t pt-3">
         {archiving ? (
           <ActionForm
             action={archiveTeamAction}
@@ -337,17 +337,17 @@ export function EditTeamForm({
           >
             <input type="hidden" name="teamId" value={team.id} />
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-ink">
+              <span className="text-ink mb-1 block text-sm font-semibold">
                 Why is {team.name} being retired?
               </span>
               <input
                 type="text"
                 name="note"
                 placeholder="Merged into Airframe for 2026–27."
-                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               />
             </label>
-            <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+            <p className="text-ink-muted mt-1 mb-2.5 text-xs">
               Optional, and shown on the archive page. Somebody reading this in
               two years is the person it&apos;s for. Its projects, sub-teams and
               completed work all come with it — nothing is deleted. Refused if
@@ -356,7 +356,7 @@ export function EditTeamForm({
             <button
               type="button"
               onClick={() => setArchiving(false)}
-              className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+              className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
             >
               Cancel
             </button>
@@ -365,7 +365,7 @@ export function EditTeamForm({
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setArchiving(true)}
-              className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+              className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
             >
               <Archive className="size-3.5" strokeWidth={2.5} />
               Archive division
@@ -377,7 +377,7 @@ export function EditTeamForm({
               pendingLabel="Deleting…"
               tone="danger"
             />
-            <span className="text-xs text-ink-muted">
+            <span className="text-ink-muted text-xs">
               Archive keeps the history. Delete only works on a division nothing
               points at.
             </span>
@@ -402,7 +402,7 @@ export function RestoreTeamButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <RotateCcw className="size-3.5" strokeWidth={2.5} />
         Restore
@@ -412,7 +412,7 @@ export function RestoreTeamButton({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-ink-soft">Bring {teamName} back?</span>
+      <span className="text-ink-soft text-sm">Bring {teamName} back?</span>
       <ActionButton
         action={restoreTeamAction}
         fields={{ teamId }}
@@ -422,7 +422,7 @@ export function RestoreTeamButton({
       />
       <button
         onClick={() => setConfirming(false)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Cancel
       </button>

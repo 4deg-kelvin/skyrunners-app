@@ -324,10 +324,7 @@ export const HELP_REQUEST_STALE_DAYS = 3;
  * ask becomes visible rather than lost.
  */
 export type JoinRequestStatus =
-  | "pending"
-  | "accepted"
-  | "declined"
-  | "withdrawn";
+  "pending" | "accepted" | "declined" | "withdrawn";
 
 /** A request older than this needs escalating — a silent RE is a blocked member. */
 export const JOIN_REQUEST_STALE_DAYS = 5;
@@ -368,11 +365,7 @@ export interface JoinRequest {
  * quietly reintroduces self-certification.
  */
 export type DeliverableStatus =
-  | "open"
-  | "in_progress"
-  | "blocked"
-  | "submitted"
-  | "done";
+  "open" | "in_progress" | "blocked" | "submitted" | "done";
 
 /**
  * One flat list per project. Four fields that matter: title, ONE owner, a date,
@@ -430,11 +423,7 @@ export interface WorkLog {
 // ---------------------------------------------------------------------------
 
 export type UpdateStatus =
-  | "pending"
-  | "submitted"
-  | "late"
-  | "missed"
-  | "reviewed";
+  "pending" | "submitted" | "late" | "missed" | "reviewed";
 
 /** Club-wide default. Members pick which weekdays. */
 export const UPDATES_PER_WEEK_DEFAULT = 2;
@@ -621,10 +610,7 @@ export interface CatalogueItem {
  * Co-Lead, and the operation refuses the member's own id regardless.
  */
 export type CertificationStatus =
-  | "requested"
-  | "verified"
-  | "expired"
-  | "rejected";
+  "requested" | "verified" | "expired" | "rejected";
 
 export interface MemberCertification {
   id: string;

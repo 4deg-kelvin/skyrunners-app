@@ -37,7 +37,7 @@ export function RequestTrainingForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
       >
         {item.kind === "site_access" ? "I have access" : "I'm trained"}
       </button>
@@ -50,13 +50,13 @@ export function RequestTrainingForm({
       submitLabel="Send to my Lead"
       submittingLabel="Sending…"
       onSuccess={() => setOpen(false)}
-      className="mt-2 w-full rounded-tile border border-line bg-surface p-3"
+      className="rounded-tile border-line bg-surface mt-2 w-full border p-3"
     >
       <input type="hidden" name="itemId" value={item.id} />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             {item.kind === "site_access" ? "Access granted on" : "Trained on"}
           </span>
           <input
@@ -65,32 +65,32 @@ export function RequestTrainingForm({
             required
             defaultValue={today}
             max={today}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Certificate link{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="url"
             name="certificateUrl"
             placeholder="https://…"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
       </div>
 
-      <p className="mb-2.5 mt-2 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-2 mb-2.5 text-xs">
         Your Lead confirms it — nobody verifies their own training.
       </p>
 
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -117,29 +117,29 @@ export function VerifyControls({
         submitLabel="Send back"
         submittingLabel="Sending…"
         onSuccess={() => setRejecting(false)}
-        className="mt-2 w-full rounded-tile border border-line bg-surface p-3"
+        className="rounded-tile border-line bg-surface mt-2 w-full border p-3"
       >
         <input type="hidden" name="certificationId" value={certificationId} />
         <input type="hidden" name="memberId" value={memberId} />
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             What does {memberName} still need to do?
           </span>
           <input
             type="text"
             name="note"
             placeholder="Do the Lab 64 orientation first, then re-submit."
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
-        <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-1 mb-2.5 text-xs">
           They see this. A bare no on a safety record leaves somebody guessing
           what to fix.
         </p>
         <button
           type="button"
           onClick={() => setRejecting(false)}
-          className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
         >
           Cancel
         </button>
@@ -158,7 +158,7 @@ export function VerifyControls({
       />
       <button
         onClick={() => setRejecting(true)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Not yet
       </button>
@@ -182,7 +182,7 @@ export function RevokeButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="text-sm font-semibold text-ink-muted hover:text-risk-fg"
+        className="text-ink-muted hover:text-risk-fg text-sm font-semibold"
       >
         Withdraw
       </button>
@@ -191,7 +191,7 @@ export function RevokeButton({
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <span className="text-sm text-ink-soft">Withdraw {itemName}?</span>
+      <span className="text-ink-soft text-sm">Withdraw {itemName}?</span>
       <ActionButton
         action={revokeCertificationAction}
         fields={{ certificationId, memberId }}
@@ -201,7 +201,7 @@ export function RevokeButton({
       />
       <button
         onClick={() => setConfirming(false)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Keep it
       </button>
@@ -227,7 +227,7 @@ export function AddCatalogueItemForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Plus className="size-4" />
         Add training
@@ -242,26 +242,30 @@ export function AddCatalogueItemForm({
       submittingLabel="Adding…"
       resetOnSuccess
       onSuccess={() => setOpen(false)}
-      className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5"
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Name</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Name
+          </span>
           <input
             type="text"
             name="name"
             required
             placeholder="Waterjet"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Site</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Site
+          </span>
           <select
             name="sectionId"
             required
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           >
             {sections.map((s) => (
               <option key={s.id} value={s.id}>
@@ -272,11 +276,13 @@ export function AddCatalogueItemForm({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Kind</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Kind
+          </span>
           <select
             name="kind"
             defaultValue="machine"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="machine">Machine training</option>
             <option value="site_access">Site access (a door)</option>
@@ -284,21 +290,21 @@ export function AddCatalogueItemForm({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Expires after{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="number"
             name="validityMonths"
             min="1"
             placeholder="months — blank for never"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
       </div>
 
-      <p className="mb-2.5 mt-3 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-3 mb-2.5 text-xs">
         Appears on everyone&apos;s list immediately, unearned. Site access is a
         door; a machine training is clearance on one machine inside it, and
         neither implies the other. Set an expiry only if the clearance really
@@ -309,7 +315,7 @@ export function AddCatalogueItemForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -324,7 +330,7 @@ export function AddSectionForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+        className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
       >
         Add a site
       </button>
@@ -338,10 +344,10 @@ export function AddSectionForm() {
       submittingLabel="Adding…"
       resetOnSuccess
       onSuccess={() => setOpen(false)}
-      className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5"
     >
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           Site name
         </span>
         <input
@@ -349,16 +355,16 @@ export function AddSectionForm() {
           name="name"
           required
           placeholder="Product Realization Lab"
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
         />
       </label>
-      <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-1 mb-2.5 text-xs">
         A building or lab the club works in. Machines go inside one.
       </p>
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -386,7 +392,7 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs font-semibold text-cardinal-600 hover:text-cardinal-700"
+        className="text-cardinal-600 hover:text-cardinal-700 text-xs font-semibold"
       >
         Edit
       </button>
@@ -394,7 +400,7 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
   }
 
   return (
-    <div className="mt-2 w-full rounded-tile border border-line bg-surface p-3">
+    <div className="rounded-tile border-line bg-surface mt-2 w-full border p-3">
       <ActionForm
         action={updateCatalogueItemAction}
         submitLabel="Save"
@@ -404,7 +410,7 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
         <input type="hidden" name="itemId" value={item.id} />
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Name
             </span>
             <input
@@ -412,11 +418,11 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
               name="name"
               required
               defaultValue={item.name}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Expires after (months)
             </span>
             <input
@@ -425,20 +431,20 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
               min="1"
               defaultValue={item.validityMonths ?? ""}
               placeholder="blank for never"
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
           </label>
         </div>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-5 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink mt-3 ml-5 text-sm font-semibold"
         >
           Cancel
         </button>
       </ActionForm>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+      <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
         <ActionButton
           action={setCatalogueItemActiveAction}
           fields={{ itemId: item.id, isActive: item.isActive ? "no" : "yes" }}
@@ -446,7 +452,7 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
           pendingLabel="Saving…"
           tone={item.isActive ? "danger" : "primary"}
         />
-        <span className="text-xs text-ink-muted">
+        <span className="text-ink-muted text-xs">
           Retiring hides it from the list. People already cleared keep the
           record — deleting it would erase who was trained on what.
         </span>

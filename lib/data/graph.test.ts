@@ -260,7 +260,11 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
 
   test("a Co-Lead can still do anything", () => {
     assert.equal(
-      can.manageProject({ id: CO_LEAD, globalRole: "co_lead" }, graph, CHILD_PRJ),
+      can.manageProject(
+        { id: CO_LEAD, globalRole: "co_lead" },
+        graph,
+        CHILD_PRJ
+      ),
       true
     );
   });
@@ -275,7 +279,11 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
 
   test("a member cannot manage a project they have no role on", () => {
     assert.equal(
-      can.manageProject({ id: MEMBER, globalRole: "member" }, graph, PARENT_PRJ),
+      can.manageProject(
+        { id: MEMBER, globalRole: "member" },
+        graph,
+        PARENT_PRJ
+      ),
       false
     );
   });

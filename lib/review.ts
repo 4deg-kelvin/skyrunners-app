@@ -253,10 +253,7 @@ export function unansweredSectionsFor(
             (entry.blockers?.trim() || entry.nextSteps?.trim())
         )
         .map((entry) => {
-          const ageDays = Math.max(
-            0,
-            daysBetween(update.submittedAt!, today)
-          );
+          const ageDays = Math.max(0, daysBetween(update.submittedAt!, today));
           return {
             entry,
             author: members.find((m) => m.id === update.memberId),

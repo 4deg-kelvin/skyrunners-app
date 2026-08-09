@@ -18,7 +18,15 @@ import { fileURLToPath } from "node:url";
 const ROOT = new URL("../", import.meta.url);
 
 /** Tried in order. The empty string first, so exact paths win. */
-const CANDIDATES = ["", ".ts", ".tsx", ".mjs", ".js", "/index.ts", "/index.tsx"];
+const CANDIDATES = [
+  "",
+  ".ts",
+  ".tsx",
+  ".mjs",
+  ".js",
+  "/index.ts",
+  "/index.tsx",
+];
 
 function firstExisting(base) {
   for (const ext of CANDIDATES) {

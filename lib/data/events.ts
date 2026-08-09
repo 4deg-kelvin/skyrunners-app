@@ -110,7 +110,9 @@ export async function getCalendar(input: {
   const now = today();
 
   const horizon = new Date(`${now}T00:00:00Z`);
-  horizon.setUTCDate(horizon.getUTCDate() + (input.horizonDays ?? HORIZON_DAYS));
+  horizon.setUTCDate(
+    horizon.getUTCDate() + (input.horizonDays ?? HORIZON_DAYS)
+  );
   const until = horizon.toISOString().slice(0, 10);
 
   /*
@@ -177,11 +179,12 @@ export async function getCalendar(input: {
   ]
     .sort()
     .map((date) => {
-      const dayEvents = (byDay.get(date) ?? []).sort((a, b) =>
-        // Time first, then importance — a 5 at 6pm must not jump above a 2 at
-        // 9am, or the day stops reading as a day.
-        a.startsAt.localeCompare(b.startsAt) ||
-        b.importanceWeight - a.importanceWeight
+      const dayEvents = (byDay.get(date) ?? []).sort(
+        (a, b) =>
+          // Time first, then importance — a 5 at 6pm must not jump above a 2 at
+          // 9am, or the day stops reading as a day.
+          a.startsAt.localeCompare(b.startsAt) ||
+          b.importanceWeight - a.importanceWeight
       );
 
       return {
@@ -194,8 +197,7 @@ export async function getCalendar(input: {
             .filter((m): m is Member => Boolean(m)),
           organiser: event.createdBy ? getMember(event.createdBy) : undefined,
           isAttending: event.attendeeIds.includes(input.memberId),
-          canManage:
-            input.isLeadership || event.createdBy === input.memberId,
+          canManage: input.isLeadership || event.createdBy === input.memberId,
           overlaps: dayEvents.some(
             (other) => other.id !== event.id && timesOverlap(event, other)
           ),

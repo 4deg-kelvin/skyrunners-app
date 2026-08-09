@@ -12,11 +12,7 @@
  * per-project half of everyone's update publicly, on the project page.
  */
 
-import {
-  getMember,
-  getProject,
-  today,
-} from "@/lib/mock-data";
+import { getMember, getProject, today } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { isCoLead, type Actor } from "@/lib/permissions";
 import {

@@ -112,16 +112,18 @@ describe("the seeded catalogue matches the club's real shop", () => {
     const prl = store.trainingSections.find((s) => s.name === "PRL");
     const items = store.catalogueItems.filter((i) => i.sectionId === prl?.id);
 
-    assert.deepEqual(
-      items.map((i) => `${i.kind}:${i.name}`).sort(),
-      ["machine:CNC machines", "site_access:PRL"]
-    );
+    assert.deepEqual(items.map((i) => `${i.kind}:${i.name}`).sort(), [
+      "machine:CNC machines",
+      "site_access:PRL",
+    ]);
   });
 
   test("nothing expires yet", () => {
     // The expiry path is built and dormant, which is the correct state.
     assert.ok(
-      disk.readStore().catalogueItems.every((i) => i.validityMonths === undefined)
+      disk
+        .readStore()
+        .catalogueItems.every((i) => i.validityMonths === undefined)
     );
   });
 });
@@ -228,8 +230,9 @@ describe("request and verify", () => {
 describe("expiry cancels the clearance", () => {
   /** Give the laser a validity, since nothing in the real list has one. */
   function makeExpirable(months: number) {
-    disk.readStore().catalogueItems.find((i) => i.id === LASER)!.validityMonths =
-      months;
+    disk
+      .readStore()
+      .catalogueItems.find((i) => i.id === LASER)!.validityMonths = months;
   }
 
   test("no expiry is set when the item never expires", async () => {
@@ -360,7 +363,9 @@ describe("the catalogue is data, not an enum", () => {
 
     assert.equal(result.ok, true);
     // No deploy, no union type, no migration. This IS the requirement.
-    assert.ok(disk.readStore().catalogueItems.some((i) => i.name === "Waterjet"));
+    assert.ok(
+      disk.readStore().catalogueItems.some((i) => i.name === "Waterjet")
+    );
   });
 
   test("and it's immediately requestable, unearned", async () => {
@@ -396,12 +401,17 @@ describe("the catalogue is data, not an enum", () => {
     const section = await ops.createTrainingSection({ name: "New Lab" });
     if (!section.ok) throw new Error(section.error);
 
-    const misc = disk.readStore().trainingSections.find((s) => s.name === "Misc");
+    const misc = disk
+      .readStore()
+      .trainingSections.find((s) => s.name === "Misc");
     assert.ok(section.value.sortOrder < (misc?.sortOrder ?? 99));
   });
 
   test("duplicate sites are refused", async () => {
-    assert.equal((await ops.createTrainingSection({ name: "Lab 64" })).ok, false);
+    assert.equal(
+      (await ops.createTrainingSection({ name: "Lab 64" })).ok,
+      false
+    );
   });
 
   test("duplicate names within one section are refused", async () => {
@@ -486,7 +496,8 @@ describe("the catalogue is data, not an enum", () => {
 
   test("unknown ids fail rather than throwing", async () => {
     assert.equal(
-      (await ops.setCatalogueItemActive({ itemId: "nope", isActive: false })).ok,
+      (await ops.setCatalogueItemActive({ itemId: "nope", isActive: false }))
+        .ok,
       false
     );
     assert.equal(

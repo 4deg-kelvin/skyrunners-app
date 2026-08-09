@@ -52,14 +52,14 @@ export function TrainingRecord({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionLabel>Trainings &amp; Facility Access</SectionLabel>
-        <span className="text-sm text-ink-muted">
+        <span className="text-ink-muted text-sm">
           {counts.verified} cleared
           {counts.pending > 0 ? ` · ${counts.pending} awaiting` : ""}
           {counts.expired > 0 ? ` · ${counts.expired} lapsed` : ""}
         </span>
       </div>
 
-      <p className="mt-2 text-sm text-ink-soft">
+      <p className="text-ink-soft mt-2 text-sm">
         Site access gets you in the door; a machine training clears you on one
         machine inside it. Neither implies the other.
       </p>
@@ -67,13 +67,13 @@ export function TrainingRecord({
       <div className="mt-4 space-y-5">
         {sections.map(({ section, siteAccess, machines }) => (
           <div key={section.id}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink">
+            <p className="text-ink text-xs font-semibold tracking-wide uppercase">
               {section.name}
             </p>
 
             {siteAccess.length > 0 ? (
               <div className="mt-2">
-                <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+                <p className="text-ink-muted flex items-center gap-1.5 text-xs">
                   <DoorOpen className="size-3" />
                   Getting in
                 </p>
@@ -96,7 +96,7 @@ export function TrainingRecord({
 
             {machines.length > 0 ? (
               <div className="mt-3">
-                <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+                <p className="text-ink-muted flex items-center gap-1.5 text-xs">
                   <Wrench className="size-3" />
                   Machines
                 </p>
@@ -125,7 +125,7 @@ export function TrainingRecord({
         because vanishing a record silently looks like a bug.
       */}
       {retiredHeld.length > 0 ? (
-        <div className="mt-5 border-t border-line pt-4">
+        <div className="border-line mt-5 border-t pt-4">
           <SectionLabel tone="muted">Retired from the catalogue</SectionLabel>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {retiredHeld.map(({ item }) => (
@@ -165,9 +165,9 @@ function Row({
     record?.status === "verified" && record.verifiedById === record.memberId;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-line px-3 py-2">
+    <div className="rounded-tile border-line flex flex-wrap items-center justify-between gap-2 border px-3 py-2">
       <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-ink">{item.name}</span>
+        <span className="text-ink text-sm font-semibold">{item.name}</span>
         {record ? (
           <Badge tone={CERTIFICATION_STATUS_TONES[record.status]}>
             {CERTIFICATION_STATUS_LABELS[record.status]}
@@ -175,18 +175,18 @@ function Row({
         ) : null}
         {selfVerified ? <Badge tone="neutral">Self-verified</Badge> : null}
         {record?.status === "verified" && record.expiresAt ? (
-          <span className="text-xs text-ink-muted">
+          <span className="text-ink-muted text-xs">
             until {record.expiresAt}
           </span>
         ) : null}
         {record?.status === "verified" && verifier && !selfVerified ? (
-          <span className="text-xs text-ink-muted">by {verifier.fullName}</span>
+          <span className="text-ink-muted text-xs">by {verifier.fullName}</span>
         ) : null}
       </span>
 
       <span className="flex shrink-0 items-center gap-2">
         {record?.status === "expired" ? (
-          <span className="flex items-center gap-1 text-xs text-risk-fg">
+          <span className="text-risk-fg flex items-center gap-1 text-xs">
             <TriangleAlert className="size-3" />
             Not cleared
           </span>
@@ -208,7 +208,7 @@ function Row({
               memberName={memberName}
             />
           ) : (
-            <span className="text-xs text-ink-muted">Awaiting a Lead</span>
+            <span className="text-ink-muted text-xs">Awaiting a Lead</span>
           )
         ) : null}
 

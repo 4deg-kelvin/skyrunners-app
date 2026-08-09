@@ -47,13 +47,13 @@ function CheckInCard({
     <div
       className={
         escalated
-          ? "rounded-tile border border-cardinal-600 px-4 py-3.5"
-          : "rounded-tile border border-line px-4 py-3.5"
+          ? "rounded-tile border-cardinal-600 border px-4 py-3.5"
+          : "rounded-tile border-line border px-4 py-3.5"
       }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[15px] font-bold text-ink">
+          <p className="text-ink text-[15px] font-bold">
             {author ? (
               <Link
                 href={`/members/${author.id}`}
@@ -65,7 +65,7 @@ function CheckInCard({
               "Unknown member"
             )}
           </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-0.5 text-sm">
             Due {formatDue(update.dueAt)}
             {update.submittedAt
               ? ` · submitted ${formatDue(update.submittedAt)}`
@@ -74,7 +74,7 @@ function CheckInCard({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {showHours && update.hoursThisPeriod > 0 ? (
-            <span className="flex items-center gap-1.5 text-sm text-ink-muted">
+            <span className="text-ink-muted flex items-center gap-1.5 text-sm">
               <Clock className="size-3.5" />
               {formatNumber(update.hoursThisPeriod, 1)} hrs
             </span>
@@ -98,30 +98,30 @@ function CheckInCard({
                 {project ? (
                   <Link
                     href={`/projects/${project.slug}`}
-                    className="text-sm font-bold text-cardinal-600 hover:text-cardinal-700"
+                    className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold"
                   >
                     {project.name}
                   </Link>
                 ) : (
-                  <span className="text-sm font-bold text-ink">
+                  <span className="text-ink text-sm font-bold">
                     Unknown project
                   </span>
                 )}
                 {showHours ? (
-                  <span className="text-xs text-ink-muted">
+                  <span className="text-ink-muted text-xs">
                     {formatNumber(entry.hours, 1)} hrs
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1.5 text-sm text-ink-soft">{entry.progress}</p>
+              <p className="text-ink-soft mt-1.5 text-sm">{entry.progress}</p>
               {entry.blockers ? (
-                <p className="mt-1.5 text-sm text-risk-fg">
+                <p className="text-risk-fg mt-1.5 text-sm">
                   <span className="font-semibold">Blocked:</span>{" "}
                   {entry.blockers}
                 </p>
               ) : null}
               {entry.nextSteps ? (
-                <p className="mt-1.5 text-sm text-ink-muted">
+                <p className="text-ink-muted mt-1.5 text-sm">
                   <span className="font-semibold">Next:</span> {entry.nextSteps}
                 </p>
               ) : null}
@@ -129,24 +129,22 @@ function CheckInCard({
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-sm text-ink-muted">
-          Nothing written yet.
-        </p>
+        <p className="text-ink-muted mt-2 text-sm">Nothing written yet.</p>
       )}
 
       {update.generalNote ? (
-        <p className="mt-2.5 text-sm text-ink-soft">{update.generalNote}</p>
+        <p className="text-ink-soft mt-2.5 text-sm">{update.generalNote}</p>
       ) : null}
 
       {action ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {action}
           {escalated ? (
-            <span className="text-sm font-semibold text-cardinal-600">
+            <span className="text-cardinal-600 text-sm font-semibold">
               Waiting {ageDays} days — your Lead can see this
             </span>
           ) : ageDays > 0 ? (
-            <span className="text-sm text-ink-muted">
+            <span className="text-ink-muted text-sm">
               Waiting {ageDays} {ageDays === 1 ? "day" : "days"}
             </span>
           ) : null}
@@ -177,7 +175,7 @@ export default async function UpdatesPage() {
               <SectionLabel>Waiting On You</SectionLabel>
               <Link
                 href="/dashboard"
-                className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
               >
                 Dashboard
               </Link>
@@ -226,7 +224,7 @@ export default async function UpdatesPage() {
               )}
             </div>
 
-            <p className="mt-4 text-sm text-ink-muted">
+            <p className="text-ink-muted mt-4 text-sm">
               Only people who report to you appear here. Marking one read stops
               its clock — after {graceDays} days an unread check-in is shown to
               the Lead above you, because a report nobody reads is worse than no
@@ -260,7 +258,7 @@ export default async function UpdatesPage() {
             <SectionLabel>My Check-ins</SectionLabel>
             <Link
               href="/settings"
-              className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
             >
               Change my days
             </Link>
@@ -280,13 +278,13 @@ export default async function UpdatesPage() {
             )}
           </div>
 
-          <p className="mt-4 flex items-start gap-1.5 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-4 flex items-start gap-1.5 text-sm">
             <Lock className="mt-0.5 size-3.5 shrink-0" />
             <span>
               Your total hours and reliability are visible only to you and your
-              Lead chain. The per-project notes above are public — they belong to
-              the project, and they&apos;re how someone spots a blocker they can
-              clear.
+              Lead chain. The per-project notes above are public — they belong
+              to the project, and they&apos;re how someone spots a blocker they
+              can clear.
             </span>
           </p>
         </CardBody>
