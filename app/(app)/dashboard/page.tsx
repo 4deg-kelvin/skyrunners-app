@@ -136,14 +136,17 @@ export default async function DashboardPage({
               <DetailRow label="Divisions">{counts.divisions}</DetailRow>
               <CardDivider />
               <DetailRow label="Active projects">{counts.projects}</DetailRow>
-              <CardDivider />
-              <DetailRow label="Date created">
-                {new Date(club.createdAt).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </DetailRow>
+              {/*
+                "Date created" and "Annual cycle" used to sit here and in the
+                stat row. Both came from a hard-coded literal in
+                `lib/mock-data.ts` — so real leadership was being shown an
+                invented founding date for a club that has existed for years,
+                and a cycle string that would go stale and then contradict the
+                academic calendar, which is the actual source of "what period
+                are we in". Nothing read either value. Small wrongness on the
+                leadership page is how people learn to distrust the numbers
+                next to it.
+              */}
             </div>
           </CardBody>
         </Card>
@@ -204,7 +207,6 @@ export default async function DashboardPage({
               </div>
 
               <div className="mt-7 grid gap-4 sm:grid-cols-3">
-                <StatTile label="Annual cycle" value={club.cycle} />
                 <StatTile
                   label="Hours logged this week"
                   value={formatNumber(view.hoursThisWeek, 1)}
