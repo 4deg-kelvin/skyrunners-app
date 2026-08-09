@@ -399,6 +399,19 @@ its project.
 - **Engagement is a flashlight, not a scoreboard.** Outcomes outweigh hours; no
   leaderboard function exists, deliberately. See `lib/engagement.ts`.
 - **Calendar sync is opt-in**, Google and Apple.
+- **An event links to a project, both ways.** The calendar row links to the
+  project; the project's sidebar lists its upcoming sessions with the attend
+  button, and its timeline shows them as round dots beside the deliverable
+  diamonds. Optional on create and editable afterwards — a session created
+  club-wide is very often about work the organiser isn't on.
+- **Invite-only events are Co-Lead only, deliberately.** An open calendar is
+  the point of the feature — it exists so a member can plug into the club's
+  work without asking — so every closed event subtracts from it. Don't widen
+  this to leadership: the cases that need one (a sponsor visit with a
+  headcount, an interview panel) are things a Co-Lead is arranging anyway.
+  `setEventGuestList` is the only way a closed event's list can change, since
+  `setEventAttendance` refuses those by design, and closing an open event never
+  evicts whoever already joined.
 - **Creating projects must feel effortless for leadership** — permissions are deliberately
   permissive there.
 
