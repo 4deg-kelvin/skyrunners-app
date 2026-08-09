@@ -679,6 +679,71 @@ async function removeProjectMemberAction$impl(
   return toResult(result, "Removed from the project.");
 }
 
+async function deleteDeliverableAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const deliverableId = String(formData.get("deliverableId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.deleteDeliverable(viewer.actor, viewer.graph, projectId)) {
+    return denied("delete deliverables on this project");
+  }
+
+  const result = await ops.deleteDeliverable(deliverableId);
+  if (result.ok) refresh();
+  return toResult(result, "Deliverable deleted.");
+}
+
+async function deleteCheckInAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const updateId = String(formData.get("updateId") ?? "");
+  const authorId = String(formData.get("authorId") ?? "");
+
+  if (!can.deleteCheckIn(viewer.actor, authorId)) {
+    return denied("delete this check-in");
+  }
+
+  const result = await ops.deleteCheckIn(updateId);
+  if (result.ok) refresh();
+  return toResult(result, "Check-in deleted.");
+}
+
+async function setProjectTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const teamId = String(formData.get("teamId") ?? "") || null;
+
+  if (!can.setProjectTeam(viewer.actor, viewer.graph, projectId)) {
+    return denied("change which team owns this project");
+  }
+
+  const result = await ops.setProjectTeam({ projectId, teamId });
+  if (result.ok) refresh();
+  return toResult(result, "Owning team set. It shows under that division now.");
+}
+
+async function createTeamAction$impl(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  if (!can.manageTeams(viewer.actor)) {
+    return denied("create divisions");
+  }
+
+  const result = await ops.createTeam({
+    name: String(formData.get("name") ?? ""),
+    parentId: String(formData.get("parentId") ?? "") || null,
+    leadId: String(formData.get("leadId") ?? "") || undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Created.");
+}
+
 // ---------------------------------------------------------------------------
 // The exported actions
 // ---------------------------------------------------------------------------
@@ -794,4 +859,20 @@ export async function setFollowingAction(formData: FormData): Promise<ActionResu
 
 export async function removeProjectMemberAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => removeProjectMemberAction$impl(formData));
+}
+
+export async function deleteDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteDeliverableAction$impl(formData));
+}
+
+export async function deleteCheckInAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteCheckInAction$impl(formData));
+}
+
+export async function setProjectTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setProjectTeamAction$impl(formData));
+}
+
+export async function createTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createTeamAction$impl(formData));
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CornerDownRight, TriangleAlert, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { CreateTeamForm } from "@/components/forms/team-admin";
 import { CreateProjectForm } from "@/components/forms/project-admin";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,6 +26,7 @@ export default async function ProjectsPage() {
   ]);
 
   const mayCreate = can.createProject(viewer.actor, viewer.graph);
+  const mayManageTeams = can.manageTeams(viewer.actor);
 
   return (
     <div className="space-y-6">
@@ -34,12 +36,17 @@ export default async function ProjectsPage() {
         description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
         action={
           mayCreate ? (
-            <CreateProjectForm
-              parents={formOptions.parents}
-              divisions={formOptions.divisions}
-              people={formOptions.people}
-              defaultReId={viewer.member.id}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {mayManageTeams ? (
+                <CreateTeamForm divisions={formOptions.divisions} />
+              ) : null}
+              <CreateProjectForm
+                parents={formOptions.parents}
+                divisions={formOptions.divisions}
+                people={formOptions.people}
+                defaultReId={viewer.member.id}
+              />
+            </div>
           ) : undefined
         }
       />

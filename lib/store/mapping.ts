@@ -46,6 +46,15 @@ export interface CollectionSpec<T> {
   columns: string;
   /** Stable identity for diffing. Composite for join tables with no id. */
   identify: (row: T) => string;
+  /**
+   * Which column the upsert conflicts on.
+   *
+   * Defaults to the primary key, which is correct for every table whose id the
+   * app actually carries. Set it where the table has a surrogate `id` we never
+   * send: otherwise the upsert finds no conflict, inserts a fresh row, and
+   * fails on a unique constraint over the real key instead.
+   */
+  conflictTarget?: string;
   fromRow: (row: Record<string, unknown>) => T;
   toRow: (value: T) => Record<string, unknown>;
   /**
@@ -180,8 +189,11 @@ const projectMemberships: CollectionSpec<ProjectMembership> = {
   columns:
     "project_id, member_id, role, responsibility, joined_at, left_at, added_by",
   // No surrogate id in the app's shape, so identity is the pair — which is
-  // also the unique index in 0001.
+  // also the unique constraint added in 0013. That constraint is what this
+  // upsert conflicts on; without it, changing an existing membership (making
+  // someone an RE) inserts a second row and fails.
   identify: (m) => `${m.projectId}:${m.memberId}`,
+  conflictTarget: "project_id,member_id",
   fromRow: (r) => ({
     projectId: r.project_id as string,
     memberId: r.member_id as string,
@@ -298,6 +310,10 @@ const updateSchedules: CollectionSpec<UpdateSchedule> = {
   table: "update_schedules",
   columns: "member_id, weekdays, updates_per_week, due_time, paused_until",
   identify: (s) => s.memberId,
+  // Surrogate `id` PK the app never sees; the real key is member_id. Without
+  // this, pausing check-ins failed with "duplicate key value violates
+  // update_schedules_member_id_key".
+  conflictTarget: "member_id",
   fromRow: (r) => ({
     memberId: r.member_id as string,
     weekdays: (r.weekdays as number[]) ?? [],

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { ActionButton, ActionForm } from "./action-form";
 import {
   confirmDeliverableAction,
+  deleteDeliverableAction,
   createDeliverableAction,
   reopenDeliverableAction,
   setDeliverableStatusAction,
@@ -43,7 +44,14 @@ export function DeliverableActions({
   if (status === "done") {
     return (
       <p className="text-sm text-ok-fg">
-        Signed off{deliverable.completedAt ? ` ${deliverable.completedAt}` : ""}.
+        Signed off
+        {deliverable.completedAt
+          ? ` ${new Date(deliverable.completedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}`
+          : ""}
+        .
       </p>
     );
   }
@@ -188,6 +196,21 @@ export function DeliverableActions({
           I&apos;m blocked
         </button>
       )}
+
+      {/*
+        Deleting is the RE's call, and only before sign-off — once something is
+        done it counts towards its owner's record, and removing it would quietly
+        take away work they actually did. The operation refuses that too.
+      */}
+      {canSignOff ? (
+        <ActionButton
+          action={deleteDeliverableAction}
+          fields={fields}
+          label="Delete"
+          pendingLabel="Deleting…"
+          tone="danger"
+        />
+      ) : null}
     </div>
   );
 }

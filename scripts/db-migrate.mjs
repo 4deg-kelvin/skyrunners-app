@@ -5,6 +5,16 @@
  *   SUPABASE_DB_URL="postgresql://postgres:PASSWORD@db.<ref>.supabase.co:5432/postgres" \
  *     node scripts/db-migrate.mjs
  *
+ * NOTE: that direct `db.<ref>.supabase.co` host is IPv6-only and does not
+ * resolve on many networks. It fails with ENOTFOUND, which reads like a typo in
+ * the hostname rather than a routing problem, and cost a session before the
+ * pattern was spotted. Use the POOLER instead:
+ *
+ *   postgresql://postgres.<ref>:PASSWORD@aws-0-ca-central-1.pooler.supabase.com:5432/postgres
+ *
+ * The username carries the project ref for the pooler. That form works, and is
+ * what scripts/verify-live.ts already uses.
+ *
  * The connection string is read from the environment and NEVER written to disk
  * or committed — it contains the database superuser password, which is the one
  * credential that bypasses RLS entirely.

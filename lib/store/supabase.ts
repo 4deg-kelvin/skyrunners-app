@@ -175,7 +175,10 @@ export async function persistDiff(
     if (upserts.length > 0) {
       const { error } = await supabase
         .from(spec.table)
-        .upsert(upserts.map((v) => spec.toRow(v)));
+        .upsert(
+          upserts.map((v) => spec.toRow(v)),
+          spec.conflictTarget ? { onConflict: spec.conflictTarget } : undefined
+        );
       if (error) {
         throw new Error(`Saving ${spec.table} failed: ${error.message}`);
       }

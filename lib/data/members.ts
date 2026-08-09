@@ -101,7 +101,22 @@ export async function getRoster(): Promise<RosterRow[]> {
   // then died on "Live store not loaded". Guarding at the boundary means call
   // order stops mattering.
   await preloadLiveStore();
-  return activeMembers().map((member) => {
+  // Everyone, not just active people.
+  //
+  // Filtering to active here meant a deactivated member or an alum vanished
+  // from the roster completely — along with the Reactivate button, which lives
+  // on their row. Marking someone alumni was a one-way door with no way back.
+  //
+  // Active first, then by name, so the working roster still reads normally and
+  // the rest sits underneath it.
+  const order = { active: 0, inactive: 1, alumni: 2 } as const;
+  return [...readStore().members]
+    .sort(
+      (a, b) =>
+        (order[a.status] ?? 3) - (order[b.status] ?? 3) ||
+        a.fullName.localeCompare(b.fullName)
+    )
+    .map((member) => {
     const mine = memberProjects(member.id);
     const deliverables = myDeliverables(member.id);
     const inputs = contributionInputsFor(member.id);

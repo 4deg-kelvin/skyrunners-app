@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CornerDownRight, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { ProjectTeamForm } from "@/components/forms/team-admin";
 import { ContactLink } from "@/components/ui/contact-link";
 import {
   AddDeliverableForm,
@@ -58,6 +59,8 @@ export default async function ProjectDetailPage({
     progress,
     attentionFlags,
     assignableMembers,
+    division,
+    teamOptions,
   } = view;
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
@@ -252,6 +255,34 @@ export default async function ProjectDetailPage({
               </div>
             </CardBody>
           </Card>
+
+          {/*
+            Owning team. Only for people who can edit the project, and only
+            worth surfacing prominently when it's missing — that's the state
+            that hides the project from the pages members actually browse.
+          */}
+          {mayManage ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Owning team</SectionLabel>
+                {division ? (
+                  <p className="mt-2 text-[15px] text-ink-soft">
+                    Under <span className="font-semibold text-ink">{division.name}</span>.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[15px] text-warn-fg">
+                    Not linked to a division, so this project doesn&apos;t
+                    appear on Projects or Find Work. Pick its owning team.
+                  </p>
+                )}
+                <ProjectTeamForm
+                  projectId={project.id}
+                  currentTeamId={project.teamId}
+                  teams={teamOptions}
+                />
+              </CardBody>
+            </Card>
+          ) : null}
 
           {/* Team */}
           <Card>

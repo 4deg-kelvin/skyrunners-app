@@ -17,6 +17,23 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://ldijsmcnjrihwvxtypqy.supabase.co
 process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JEqTbPs2obkLIX2mo7qJYQ_6VXCPc5D";
 
 import pg from "pg";
+
+/**
+ * Hand back date/time columns as raw strings.
+ *
+ * This harness reads over SQL, but the APP reads over PostgREST — and the two
+ * disagree: node-postgres parses timestamps into JavaScript `Date` objects,
+ * PostgREST returns ISO strings. `lib/types.ts` says string, and the code does
+ * `submittedAt.slice(0, 10)`.
+ *
+ * So the harness reported "iso.slice is not a function" for a page that works
+ * perfectly in production. A verification script that fails differently from
+ * the real thing is worse than none — it costs a debugging session and trains
+ * you to ignore it. 1082 = date, 1114 = timestamp, 1184 = timestamptz.
+ */
+for (const oid of [1082, 1114, 1184]) {
+  pg.types.setTypeParser(oid, (v: string) => v);
+}
 import { installLiveBackend } from "../lib/store/disk.ts";
 import { COLLECTIONS } from "../lib/store/mapping.ts";
 
@@ -66,7 +83,16 @@ const graph = { getMember, getProject, directREs };
 
 async function check(name: string, fn: () => Promise<unknown>) {
   try { await fn(); console.log("  ✓ " + name); }
-  catch (e) { console.log("  ✗ " + name + "  →  " + (e as Error).message.split("\n")[0].slice(0, 90)); }
+  catch (e) {
+    const error = e as Error;
+    console.log("  ✗ " + name + "  →  " + error.message.split("\n")[0].slice(0, 90));
+    // The first app frame. Without it a failure names the symptom and not the
+    // line, which costs a round trip every single time.
+    const frame = (error.stack ?? "")
+      .split("\n")
+      .find((l) => l.includes("lib") && l.includes(".ts"));
+    if (frame) console.log("      " + frame.trim());
+  }
 }
 
 await check("/my-work        getMyWork", async () => dataModules.myWork.getMyWork(me.id));
