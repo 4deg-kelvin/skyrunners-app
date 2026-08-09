@@ -1581,3 +1581,76 @@ describe("a new sub-project can't be created past its parent's date", () => {
     );
   });
 });
+
+describe("a new project records when it started", () => {
+  /*
+    Nothing draws a span yet — the mini Gantt is the next phase. This is
+    recorded now because backfilling a start date later is guesswork, and the
+    field was silently never set: every project created through the app had no
+    left edge for a bar.
+  */
+  test("start date defaults to today", async () => {
+    const result = await ops.createProject({
+      name: "Dated On Creation",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.value.startDate, TODAY);
+  });
+
+  test("an explicit target counts as overridden, so a roll-up won't erase it", async () => {
+    // `datesOverridden = false` means "derive these dates from the children".
+    // A date somebody typed must not be treated as derived.
+    const withDate = await ops.createProject({
+      name: "Has A Deadline",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      targetDate: "2026-12-01",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    assert.equal(withDate.ok, true);
+    if (withDate.ok) assert.equal(withDate.value.datesOverridden, true);
+
+    const without = await ops.createProject({
+      name: "Open Ended Too",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    assert.equal(without.ok, true);
+    if (without.ok) assert.equal(without.value.datesOverridden, false);
+  });
+
+  test("start never lands after target, which the DB also refuses", async () => {
+    // 0001_core_schema.sql has
+    //   check (target_date is null or start_date is null or target_date >= start_date)
+    // so a project that violated it would load fine locally and fail on insert.
+    const result = await ops.createProject({
+      name: "Backwards",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      targetDate: "2026-01-01", // before TODAY
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+
+    if (result.ok) {
+      assert.ok(
+        !result.value.startDate ||
+          !result.value.targetDate ||
+          result.value.startDate <= result.value.targetDate,
+        "start date must not be after the target"
+      );
+    }
+  });
+});

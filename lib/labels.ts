@@ -343,3 +343,80 @@ export const ATTENTION_LABELS: Record<AttentionReason, string> = {
   health_flagged: "Flagged by its RE",
   past_target: "Past its target date",
 };
+
+// ---------------------------------------------------------------------------
+// When the next check-in is due
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn a check-in due date into something that says WHEN.
+ *
+ * Both the My Work heading and the composer title used to print a bare weekday
+ * — "Your Sunday check-in". That's ambiguous at best and wrong at worst:
+ *
+ *   - On the day itself it reads like something scheduled for later, so the
+ *     person who could write it in two minutes puts it off.
+ *   - Once it's late it still says "Sunday", which reads as a future
+ *     obligation. The one state the member most needs to notice is the one the
+ *     label hides — and the whole escalation model is built on lateness being
+ *     visible.
+ *   - "Sunday" doesn't say WHICH Sunday.
+ *
+ * Dates are compared as strings and rendered in UTC deliberately. `dueAt`
+ * carries a time (`2026-08-09T23:59`) and parses as LOCAL, while a bare
+ * `2026-08-09` parses as UTC midnight — mix them and you lose a day. In a
+ * negative-offset timezone, which is all of them here, formatting a UTC
+ * midnight without `timeZone: "UTC"` names the day before.
+ */
+export function checkInDue(
+  dueAt: string,
+  today: string
+): {
+  /** Heading form: "Today's check-in", "Sunday's check-in". */
+  heading: string;
+  /** Sentence form, for "Your …": "check-in, due today". */
+  phrase: string;
+  isLate: boolean;
+} {
+  const dueDay = dueAt.slice(0, 10);
+  const ms =
+    Date.parse(`${dueDay}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`);
+  const days = Math.round(ms / 86_400_000);
+
+  const weekday = new Date(`${dueDay}T00:00:00Z`).toLocaleDateString("en-US", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+
+  if (days === 0) {
+    return {
+      heading: "Today's check-in",
+      phrase: "check-in, due today",
+      isLate: false,
+    };
+  }
+  if (days === 1) {
+    return {
+      heading: "Tomorrow's check-in",
+      phrase: "check-in, due tomorrow",
+      isLate: false,
+    };
+  }
+  if (days > 1) {
+    return {
+      heading: `${weekday}'s check-in`,
+      phrase: `check-in, due ${weekday}`,
+      isLate: false,
+    };
+  }
+
+  // Late. Say how late — the same rule as every other escalation in the app:
+  // age names a real gap, where a weekday just names a day.
+  const late = Math.abs(days);
+  const howLate = late === 1 ? "1 day late" : `${late} days late`;
+  return {
+    heading: `${weekday}'s check-in — ${howLate}`,
+    phrase: `check-in, ${howLate}`,
+    isLate: true,
+  };
+}

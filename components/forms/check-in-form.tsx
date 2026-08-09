@@ -36,6 +36,12 @@ export function CheckInForm({
   readerName,
 }: {
   sections: CheckInSection[];
+  /**
+   * When it's due, already phrased — "check-in, due today", "check-in, 2 days
+   * late". Built by `checkInDue` in `lib/labels.ts` rather than here, because
+   * display strings live there and a client component shouldn't be deciding
+   * what today is.
+   */
   dueLabel: string;
   /**
    * Who actually reads this. Undefined when the member has nobody above them
@@ -62,9 +68,7 @@ export function CheckInForm({
   return (
     <div className="rounded-card border-line bg-card border p-4">
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-ink text-[15px] font-bold">
-          Your {dueLabel} check-in
-        </p>
+        <p className="text-ink text-[15px] font-bold">Your {dueLabel}</p>
         <button
           onClick={() => setOpen(false)}
           aria-label="Close"

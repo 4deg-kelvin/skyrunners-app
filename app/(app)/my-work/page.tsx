@@ -25,7 +25,11 @@ import {
   type MyProjectCard as MyProjectCardData,
 } from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
-import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
+import {
+  checkInDue,
+  UPDATE_STATUS_LABELS,
+  UPDATE_STATUS_TONES,
+} from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
@@ -64,7 +68,9 @@ export default async function MyWorkPage() {
   const mayLogHours = can.logOwnHours(viewer.actor, me.id);
   const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
 
-  const dueDate = new Date(currentUpdate.update.dueAt);
+  // "Sunday check-in" said nothing about whether Sunday had already been and
+  // gone. `checkInDue` answers when, and says so out loud once it's late.
+  const due = checkInDue(currentUpdate.update.dueAt, today);
   const firstName = me.preferredName ?? me.fullName.split(" ")[0];
 
   return (
@@ -283,7 +289,7 @@ export default async function MyWorkPage() {
               </SectionLabel>
               <h2 className="text-ink mt-2 text-2xl font-bold">
                 {currentUpdate.inSession
-                  ? `${dueDate.toLocaleDateString("en-US", { weekday: "long" })} check-in`
+                  ? due.heading
                   : "Nothing due right now"}
               </h2>
               {/*
@@ -367,9 +373,7 @@ export default async function MyWorkPage() {
                   hours: s.entry.hours,
                   lastProgress: s.entry.progress || undefined,
                 }))}
-                dueLabel={dueDate.toLocaleDateString("en-US", {
-                  weekday: "long",
-                })}
+                dueLabel={due.phrase}
                 readerName={myLead?.preferredName ?? myLead?.fullName}
               />
               <ButtonLink href="/updates" variant="secondary">

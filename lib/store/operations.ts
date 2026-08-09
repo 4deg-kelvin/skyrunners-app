@@ -784,12 +784,37 @@ export async function setMemberStatus(input: {
 // Projects
 // ---------------------------------------------------------------------------
 
+/**
+ * When a new project starts. Today, unless that would be after it's due.
+ *
+ * A target in the past is legitimate — somebody entering work the club has been
+ * doing for a month, or a deadline already missed. But `0001_core_schema.sql`
+ * carries
+ *
+ *     check (target_date is null or start_date is null or target_date >= start_date)
+ *
+ * so defaulting to today there would produce a row that is fine in demo mode
+ * and fails on INSERT against Postgres — a bug that only appears in live mode,
+ * which is the worst place to find one.
+ */
+function startDateFor(input: {
+  startDate?: string;
+  targetDate?: string;
+  today: string;
+}): string {
+  const start = input.startDate || input.today;
+  if (input.targetDate && input.targetDate < start) return input.targetDate;
+  return start;
+}
+
 export async function createProject(input: {
   name: string;
   description?: string;
   parentId: string | null;
   teamId?: string;
   primaryReId: string;
+  /** Defaults to `today`. Nothing in the UI asks for it yet. */
+  startDate?: string;
   targetDate?: string;
   createdBy: string;
   today: string;
@@ -844,8 +869,30 @@ export async function createProject(input: {
     reIds: [input.primaryReId],
     phase: "concept",
     health: "on_track",
+    /*
+      Today, unless told otherwise.
+
+      This was simply never set, so every project created through the app had
+      no start date at all — only the seed had them. Nothing surfaced it yet,
+      because nothing draws a span: a bar needs a left edge, and there wasn't
+      one. Backfilling later would be guesswork, so it starts being recorded
+      now even though the thing that reads it isn't built.
+
+      Today is the honest answer. A project exists from the moment somebody
+      created it; the alternative is asking for a date at creation, and
+      creating projects is meant to feel effortless for leadership.
+    */
+    startDate: startDateFor(input),
     targetDate: input.targetDate || undefined,
-    datesOverridden: false,
+    /*
+      True only when somebody actually named an end date.
+
+      `datesOverridden = false` means "roll this project's dates up from its
+      children" — a parent with no date of its own spans whatever its
+      sub-projects span. Hard-coding false meant a target the creator typed by
+      hand would have been treated as derived and overwritten by a roll-up.
+    */
+    datesOverridden: Boolean(input.targetDate),
     isOpenToJoin: true,
   };
 
