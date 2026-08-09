@@ -37,6 +37,17 @@
   --color-risk-fg: #8c1515;
   --color-neutral-bg: #f1efec;
   --color-neutral-fg: #5f5f5f;
+  /*
+    "In progress", and the only reason it exists.
+
+    Green already means COMPLETE, and the timeline needs a distinct colour for
+    work that is running fine but isn't finished. Using green for both made a
+    chart of half-green bars where the two shades meant different things and
+    nothing said which. Blue is the one hue not already spoken for by
+    ok / warn / risk / cardinal.
+  */
+  --color-info-bg: #e8eef7;
+  --color-info-fg: #1f4e79;
 
   /* Radii — generous, matching the reference */
   --radius-tile: 0.75rem; /* 12px — stat tiles, buttons */

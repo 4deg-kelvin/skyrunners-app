@@ -219,7 +219,7 @@ export interface ProjectArtifact {
 // Project notices — the app writing in the project's own feed
 // ---------------------------------------------------------------------------
 
-export type ProjectNoticeKind = "completed" | "reopened";
+export type ProjectNoticeKind = "completed" | "reopened" | "re_paused";
 
 /**
  * A milestone the app announced, rather than a person writing it.
@@ -737,7 +737,16 @@ export type AttentionReason =
   | "re_silent"
   | "blocker_stale"
   | "deliverables_overdue"
-  | "no_deputy_re"
+  /*
+    `no_deputy_re` used to live here as a standing flag on any parent project
+    with one RE. Removed 2026-08-09: in a club this size that's most of them,
+    most of the time, and there is frequently no second person to name — so it
+    was permanent, unactionable, and taught people to ignore the flags beside
+    it. The risk is covered three other ways now: `re_silent` says so when the
+    sole RE actually goes quiet, `removeProjectMember` refuses to strip the
+    last RE off a parent project, and pausing in that position alerts the RE's
+    Lead.
+  */
   | "health_flagged"
   /**
    * Past its target date and still not complete.
@@ -755,8 +764,14 @@ export interface ProjectAttentionFlag {
   projectId: string;
   reason: AttentionReason;
   detail: string;
-  /** Higher is more urgent. */
-  severity: 1 | 2 | 3;
+  /**
+   * Higher is more urgent.
+   *
+   * 4 is reserved for "and nobody can cover" — a sole RE who has gone quiet
+   * leaves every sub-project with no route to a decision at all, which is
+   * worse than the same silence on a project someone else can act on.
+   */
+  severity: 1 | 2 | 3 | 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -780,6 +795,14 @@ export interface ProjectAttentionFlag {
  */
 export interface ClubSettings {
   id: string;
+  /**
+   * What the club calls itself. Undefined falls back to the shipped default.
+   *
+   * Was a hard-coded literal in `lib/mock-data.ts` that rendered in LIVE mode,
+   * which made the club's own name the one thing about it nobody could change.
+   */
+  clubName?: string;
+  clubDescription?: string;
   coreHours: number;
   committedHours: number;
   contributingHours: number;

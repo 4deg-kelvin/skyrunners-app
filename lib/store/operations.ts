@@ -1015,6 +1015,49 @@ export async function addProjectMember(input: {
 }
 
 /** Add or remove RE status on a project. */
+/**
+ * Would this leave a project that has sub-projects with a single RE?
+ *
+ * RE authority inherits DOWNWARD, so the REs of a parent are the escalation
+ * route for everything beneath it. Strip it to one person and every
+ * sub-project's unblock path runs through somebody who might graduate, go on
+ * exchange, or simply stop answering — and nobody else has the authority to
+ * act.
+ *
+ * This replaced a standing "No deputy RE" warning that fired on every parent
+ * project with one RE. That was permanent, unactionable (there often isn't a
+ * second person to name), and taught people to ignore the flags around it. A
+ * guard at the moment of removal is the same protection at the one moment
+ * somebody can do something about it — and it doesn't nag anyone who has
+ * simply never had a deputy.
+ *
+ * Returns the message, so `setProjectRE` and `removeProjectMember` can't drift.
+ */
+function wouldStrandSubProjects(
+  store: StoreShape,
+  projectId: string,
+  losingReId: string
+): string | null {
+  const project = store.projects.find((p) => p.id === projectId);
+  if (!project) return null;
+  if (!project.reIds.includes(losingReId)) return null;
+
+  const hasChildren = store.projects.some((p) => p.parentId === projectId);
+  if (!hasChildren) return null;
+
+  const remaining = project.reIds.filter((id) => id !== losingReId);
+  if (remaining.length > 0) return null;
+
+  const childCount = store.projects.filter(
+    (p) => p.parentId === projectId
+  ).length;
+  return (
+    `That would leave ${project.name} with no RE, and ${childCount} sub-project` +
+    `${childCount === 1 ? "" : "s"} escalate through it. Name another RE first — ` +
+    `otherwise nobody can unblock the work underneath.`
+  );
+}
+
 export async function setProjectRE(input: {
   projectId: string;
   memberId: string;
@@ -1045,6 +1088,13 @@ export async function setProjectRE(input: {
         "They're the primary RE. Make someone else primary first."
       );
     }
+
+    const stranded = wouldStrandSubProjects(
+      store,
+      input.projectId,
+      input.memberId
+    );
+    if (stranded) return fail<null>(stranded);
 
     project.reIds = project.reIds.filter((id) => id !== input.memberId);
     const m = store.projectMemberships.find(
@@ -3040,6 +3090,52 @@ export async function setCheckInPause(input: {
 
     schedule.pausedUntil = input.until ?? undefined;
 
+    /*
+      Tell their Lead if pausing leaves a subtree with nobody who can act.
+
+      An academic pause is a good thing and the app actively encourages it, so
+      the member is told nothing and asked for nothing — they are not doing
+      anything wrong. But if they are the only RE of a project with
+      sub-projects, everything underneath now has no route to a decision, and
+      the person who can fix that is their Lead.
+
+      This is the third of the three moments that replaced the standing "No
+      deputy RE" flag: silence, removal, and pause. It's the one with no other
+      signal — the app looks entirely normal afterwards.
+    */
+    if (input.until) {
+      const member = store.members.find((m) => m.id === input.memberId);
+      const leadId = member?.leadId;
+
+      if (leadId) {
+        for (const project of store.projects) {
+          if (project.phase === "complete") continue;
+          if (!project.reIds.includes(input.memberId)) continue;
+          if (project.reIds.length > 1) continue;
+          if (!store.projects.some((p) => p.parentId === project.id)) continue;
+
+          const children = store.projects.filter(
+            (p) => p.parentId === project.id
+          ).length;
+
+          store.projectNotices.push({
+            id: newId("notice"),
+            projectId: project.id,
+            kind: "re_paused",
+            body:
+              `${member?.preferredName || member?.fullName || "The RE"} has paused check-ins until ${input.until}, ` +
+              `and they're the only RE on ${project.name} — ${children} sub-project${children === 1 ? "" : "s"} ` +
+              `escalate through it. Worth naming a second RE while they're out.`,
+            createdById: input.memberId,
+            createdAt: input.today,
+            // Their Lead specifically. Not the whole chain: this is one
+            // person's job to act on, which is what makes it get done.
+            notifiedMemberIds: [leadId],
+          });
+        }
+      }
+    }
+
     if (input.until) {
       // Clear obligations already sitting open. Leaving them would mean coming
       // back from a pause to a wall of missed check-ins, which is exactly the
@@ -3260,6 +3356,18 @@ export async function removeProjectMember(input: {
   memberId: string;
 }): Promise<Result<{ reassigned: number }>> {
   return guarded((store) => {
+    // Leaving the project takes the RE role with it, so the same guard applies
+    // — otherwise the rule would be trivially bypassable by removing the
+    // person rather than the role.
+    const stranded = wouldStrandSubProjects(
+      store,
+      input.projectId,
+      input.memberId
+    );
+    if (stranded) {
+      return fail<{ reassigned: number }>(stranded);
+    }
+
     const openWork = store.deliverables.filter(
       (d) =>
         d.projectId === input.projectId &&
@@ -3387,5 +3495,40 @@ export async function setEventGuestList(input: {
       ),
     ];
     return ok(event);
+  });
+}
+
+/**
+ * Rename the club, or reword what it says it does.
+ *
+ * Separate from `updateClubTiers` even though both write the same row: they're
+ * different decisions with different blast radius. Renaming is cosmetic and
+ * reversible; moving the tier floors changes how every member is described.
+ * One form for both would invite doing the second while meaning the first.
+ */
+export async function updateClubIdentity(input: {
+  name: string;
+  description: string;
+  actorId: string;
+}): Promise<Result<ClubSettings>> {
+  const name = input.name.trim();
+  if (!name) return fail<ClubSettings>("The club needs a name.");
+  if (name.length > 80) {
+    return fail<ClubSettings>("That name is too long for the header.");
+  }
+
+  return guarded((store) => {
+    const row = store.clubSettings[0];
+    if (!row) {
+      return fail<ClubSettings>(
+        "Club settings are missing. Apply migration 0020 before editing them."
+      );
+    }
+
+    row.clubName = name;
+    row.clubDescription = input.description.trim() || undefined;
+    row.updatedAt = new Date().toISOString();
+    row.updatedBy = input.actorId;
+    return ok(row);
   });
 }

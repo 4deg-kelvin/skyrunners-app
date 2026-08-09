@@ -8,6 +8,7 @@ import { Badge } from "./badge";
 import type { DeadlineItem } from "@/lib/data/deadlines";
 import type { GanttChart } from "@/lib/gantt";
 import { Gantt } from "./gantt";
+import { useHideCompleted } from "./completed-filter";
 
 /**
  * Two collapsed strips at the bottom of a division card: what's due, and
@@ -33,6 +34,7 @@ import { Gantt } from "./gantt";
 export function DivisionExtras({
   deadlines,
   timeline,
+  timelineLive,
   blocked,
   today,
 }: {
@@ -46,6 +48,8 @@ export function DivisionExtras({
    * that four things land in the same fortnight; the list says which days.
    */
   timeline: GanttChart | null;
+  /** The same chart without finished work, for when the page toggle is on. */
+  timelineLive: GanttChart | null;
   /** Projects in this division with blocked work or an unanswered blocker. */
   blocked: {
     projectId: string;
@@ -57,6 +61,9 @@ export function DivisionExtras({
   }[];
   today: string;
 }) {
+  const hideCompleted = useHideCompleted();
+  const shownTimeline = hideCompleted ? timelineLive : timeline;
+
   const [showDeadlines, setShowDeadlines] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
 
@@ -88,11 +95,22 @@ export function DivisionExtras({
 
           {showDeadlines ? (
             <div className="mt-2.5 space-y-1.5">
-              {timeline ? (
+              {/*
+                Follows the page's own Hide-completed switch rather than
+                inventing a second control. A division with three years of
+                finished work behind it otherwise renders a chart that is
+                mostly history, which buries the two bars somebody came to
+                look at.
+              */}
+              {shownTimeline ? (
                 <div className="rounded-tile border-line mb-3 border px-3 py-3">
                   <Gantt
-                    chart={timeline}
-                    caption="Every project in this division. The red line is today."
+                    chart={shownTimeline}
+                    caption={
+                      hideCompleted
+                        ? "Live projects in this division. The red line is today."
+                        : "Every project in this division. The red line is today."
+                    }
                   />
                 </div>
               ) : null}

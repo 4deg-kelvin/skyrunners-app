@@ -1,0 +1,93 @@
+"use client";
+
+import { useState } from "react";
+import { Pencil } from "lucide-react";
+
+import { ActionForm } from "./action-form";
+import { updateClubIdentityAction } from "@/lib/actions";
+
+/**
+ * Rename the club.
+ *
+ * Small, but it was the one fact about the club nobody could change: the name
+ * and description were a hard-coded literal in `lib/mock-data.ts` that rendered
+ * on the dashboard in live mode. Fine while the only club was the one the code
+ * was written for; wrong the moment anybody forks it, and wrong now that every
+ * other piece of club configuration — divisions, terms, the trainings
+ * catalogue, the commitment tiers — is editable from the UI.
+ *
+ * Deliberately NOT folded into the tier editor next to it. Renaming is
+ * cosmetic and reversible; moving the tier floors changes how every member is
+ * described. One form for both would invite doing the second while meaning the
+ * first.
+ */
+export function ClubIdentityForm({
+  name,
+  description,
+}: {
+  name: string;
+  description: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
+      >
+        <Pencil className="size-3.5" strokeWidth={2.5} />
+        Edit
+      </button>
+    );
+  }
+
+  return (
+    <ActionForm
+      action={updateClubIdentityAction}
+      submitLabel="Save"
+      submittingLabel="Saving…"
+      onSuccess={() => setOpen(false)}
+      className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5 text-left"
+    >
+      <label className="block">
+        <span className="text-ink mb-1 block text-sm font-semibold">Name</span>
+        <input
+          type="text"
+          name="clubName"
+          required
+          maxLength={80}
+          defaultValue={name}
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+        />
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-ink mb-1 block text-sm font-semibold">
+          What the club does{" "}
+          <span className="text-ink-muted font-normal">(optional)</span>
+        </span>
+        <input
+          type="text"
+          name="clubDescription"
+          defaultValue={description}
+          placeholder="Drone delivery, GPS-denied autonomy, and aircraft design."
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+        />
+      </label>
+
+      <p className="text-ink-muted mt-2 mb-2.5 text-xs">
+        Shown on the dashboard. The name in the top-left corner is part of the
+        app itself and doesn&apos;t change.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
+      >
+        Cancel
+      </button>
+    </ActionForm>
+  );
+}

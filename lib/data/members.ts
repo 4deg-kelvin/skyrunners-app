@@ -51,6 +51,16 @@ export interface RosterOptions {
 export interface RosterRow {
   member: Member;
   lead?: Member;
+  /**
+   * Units this person leads, nearest-to-the-top first.
+   *
+   * `globalRole` says "lead" but not WHAT of, and leading a division is a
+   * materially different job from leading a sub-team — a Division Lead is a
+   * top RE over everything inside it (see `leadsTeamAbove`). The roster is the
+   * page people use to answer "who do I ask about this?", so the answer has to
+   * name the thing, not the rank.
+   */
+  leads: { id: string; name: string; isDivision: boolean }[];
   /** Committed only — following isn't staffing. */
   committedCount: number;
   reCount: number;
@@ -135,6 +145,7 @@ export async function getRoster(): Promise<RosterRow[]> {
       return {
         member,
         lead: member.leadId ? getMember(member.leadId) : undefined,
+        leads: teamsLedBy(member.id),
         committedCount: committedProjectCount(member.id),
         reCount: mine.filter((p) => p.role === "re").length,
         deliverablesCompleted: deliverables.filter((d) => d.status === "done")
@@ -306,3 +317,28 @@ export async function getMemberProfile(
   has called this since. Deleted rather than left as a function nobody can
   explain the purpose of.
 */
+
+/**
+ * Teams and divisions this person leads. Divisions first.
+ *
+ * A division is a team with no parent, and the distinction matters on the
+ * roster: leading one makes you a top RE over every project inside it, at any
+ * depth. Leading a sub-team is the same authority over a much smaller subtree.
+ * "Lead" alone says neither.
+ */
+function teamsLedBy(
+  memberId: string
+): { id: string; name: string; isDivision: boolean }[] {
+  return readStore()
+    .teams.filter((t) => t.leadId === memberId && t.isActive !== false)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      isDivision: t.parentId === null,
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.isDivision) - Number(a.isDivision) ||
+        a.name.localeCompare(b.name)
+    );
+}

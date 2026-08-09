@@ -339,7 +339,6 @@ export const ATTENTION_LABELS: Record<AttentionReason, string> = {
   re_silent: "RE has gone quiet",
   blocker_stale: "Blocker unanswered",
   deliverables_overdue: "Deliverables overdue",
-  no_deputy_re: "No deputy RE",
   health_flagged: "Flagged by its RE",
   past_target: "Past its target date",
 };

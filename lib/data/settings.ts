@@ -5,6 +5,7 @@
  */
 
 import {
+  clubIdentity,
   clubTiers,
   getMember,
   scheduleFor,
@@ -98,4 +99,13 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
 export async function getClubTiers(): Promise<TierThresholds> {
   await preloadLiveStore();
   return clubTiers();
+}
+
+/** The club's own name and description, for the Co-Lead editor. */
+export async function getClubIdentity(): Promise<{
+  name: string;
+  description: string;
+}> {
+  await preloadLiveStore();
+  return clubIdentity();
 }

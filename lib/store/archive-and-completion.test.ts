@@ -1806,3 +1806,135 @@ describe("a deliverable can't be due after its project", () => {
     assert.equal(result.ok, true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// What replaced the standing "No deputy RE" flag
+// ---------------------------------------------------------------------------
+
+describe("the last RE can't be stripped off a project with sub-projects", () => {
+  /*
+    The flag that used to warn about this fired on every parent project with
+    one RE — permanent, and usually unfixable because there was no second
+    person to name. A guard at the moment of removal is the same protection at
+    the one moment somebody can act on it.
+  */
+
+  test("un-RE-ing the last one is already blocked, by the primary guard", async () => {
+    /*
+      Worth pinning as the reason the sub-project guard is defensive here
+      rather than the thing doing the work. The last RE is by definition the
+      primary, and `setProjectRE` refuses to strip the primary first — so on
+      this path you always hit that message. The sub-project guard behind it
+      only fires if `primaryReId` has drifted out of `reIds`, which is a data
+      fault rather than a normal action.
+    */
+    const result = await ops.setProjectRE({
+      projectId: "p-wing-spar",
+      memberId: "m-tyler",
+      isRE: false,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /primary/i);
+  });
+
+  test("a non-last RE can be removed freely", async () => {
+    await ops.setProjectRE({
+      projectId: "p-wing-spar",
+      memberId: "m-noah",
+      isRE: true,
+    });
+    const result = await ops.setProjectRE({
+      projectId: "p-wing-spar",
+      memberId: "m-noah",
+      isRE: false,
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("leaving the project entirely is refused the same way", async () => {
+    // Otherwise the rule is bypassable by removing the person, not the role.
+    const result = await ops.removeProjectMember({
+      projectId: "p-wing-spar",
+      memberId: "m-tyler",
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /sub-project/i);
+  });
+
+  test("a project with no sub-projects is unaffected", async () => {
+    // p-propulsion-test is a leaf. Nothing escalates through it.
+    const result = await ops.removeProjectMember({
+      projectId: "p-propulsion-test",
+      memberId: "m-hana",
+    });
+    assert.equal(result.ok, true);
+  });
+});
+
+describe("pausing as the sole RE of a parent tells your Lead", () => {
+  test("a notice lands on the project, addressed to their Lead", async () => {
+    const tyler = disk.readStore().members.find((m) => m.id === "m-tyler")!;
+    assert.ok(tyler.leadId, "the fixture needs Tyler to have a Lead");
+
+    const before = noticesOn("p-wing-spar").length;
+    const result = await ops.setCheckInPause({
+      memberId: "m-tyler",
+      until: "2026-09-30",
+      today: TODAY,
+    });
+    assert.equal(result.ok, true);
+
+    const notices = noticesOn("p-wing-spar");
+    assert.equal(notices.length, before + 1);
+    const latest = notices[notices.length - 1];
+    assert.equal(latest.kind, "re_paused");
+    assert.deepEqual(latest.notifiedMemberIds, [tyler.leadId]);
+    assert.match(latest.body, /only RE/i);
+  });
+
+  test("resuming doesn't post anything", async () => {
+    await ops.setCheckInPause({
+      memberId: "m-tyler",
+      until: "2026-09-30",
+      today: TODAY,
+    });
+    const before = noticesOn("p-wing-spar").length;
+
+    await ops.setCheckInPause({
+      memberId: "m-tyler",
+      until: null,
+      today: TODAY,
+    });
+    assert.equal(noticesOn("p-wing-spar").length, before);
+  });
+
+  test("no notice when somebody else can cover", async () => {
+    await ops.setProjectRE({
+      projectId: "p-wing-spar",
+      memberId: "m-noah",
+      isRE: true,
+    });
+    const before = noticesOn("p-wing-spar").length;
+
+    await ops.setCheckInPause({
+      memberId: "m-tyler",
+      until: "2026-09-30",
+      today: TODAY,
+    });
+    assert.equal(
+      noticesOn("p-wing-spar").length,
+      before,
+      "two REs means the subtree still has a route to a decision"
+    );
+  });
+
+  test("no notice for a leaf project — nothing escalates through it", async () => {
+    const before = noticesOn("p-propulsion-test").length;
+    await ops.setCheckInPause({
+      memberId: "m-hana",
+      until: "2026-09-30",
+      today: TODAY,
+    });
+    assert.equal(noticesOn("p-propulsion-test").length, before);
+  });
+});

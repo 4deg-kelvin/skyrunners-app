@@ -88,6 +88,18 @@ export interface DivisionExtrasData {
    * an empty axis is worse than nothing.
    */
   timeline: GanttChart | null;
+  /**
+   * The same chart with finished projects dropped.
+   *
+   * Two charts rather than one filtered on the client, because the window
+   * auto-fits the dates PRESENT — remove a project and the remaining bars have
+   * to be re-laid-out against a narrower span, which is `buildGantt`'s job and
+   * not something a component should re-derive. It's pure maths over a handful
+   * of rows, so computing both costs nothing.
+   *
+   * Null when hiding completed work would leave nothing to draw.
+   */
+  timelineLive: GanttChart | null;
   blocked: {
     projectId: string;
     projectSlug: string;
@@ -124,6 +136,7 @@ export async function getDivisionExtras(): Promise<
       deadlines: items,
       blocked: [],
       timeline: timelineFor(division.id, store.projects, now),
+      timelineLive: timelineFor(division.id, store.projects, now, true),
     };
   }
 
@@ -310,11 +323,32 @@ async function getDeadlines(): Promise<DeadlinesView> {
 function timelineFor(
   divisionId: string,
   allProjects: Project[],
-  now: string
+  now: string,
+  /**
+   * Drop finished work.
+   *
+   * A parent is only dropped if everything under it is finished too — a
+   * completed project with live sub-projects still has to render, or its
+   * children lose the row they're indented beneath and the nesting says
+   * nothing.
+   */
+  liveOnly = false
 ): GanttChart | null {
-  const mine = allProjects.filter(
+  let mine = allProjects.filter(
     (p) => divisionForProject(p.id)?.id === divisionId
   );
+
+  if (liveOnly) {
+    const hasLiveDescendant = (id: string): boolean =>
+      mine.some(
+        (c) =>
+          c.parentId === id &&
+          (c.phase !== "complete" || hasLiveDescendant(c.id))
+      );
+    mine = mine.filter(
+      (p) => p.phase !== "complete" || hasLiveDescendant(p.id)
+    );
+  }
   if (mine.length === 0) return null;
 
   const byParent = new Map<string | null, Project[]>();

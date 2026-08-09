@@ -666,7 +666,7 @@ const clubSettings: CollectionSpec<ClubSettings> = {
   key: "clubSettings",
   table: "club_settings",
   columns:
-    "id, core_hours, committed_hours, contributing_hours, minimum_hours, updated_at, updated_by",
+    "id, core_hours, committed_hours, contributing_hours, minimum_hours, club_name, club_description, updated_at, updated_by",
   identify: () => "1",
   fromRow: (r) => ({
     id: String(r.id ?? "1"),
@@ -674,6 +674,8 @@ const clubSettings: CollectionSpec<ClubSettings> = {
     committedHours: Number(r.committed_hours ?? 8),
     contributingHours: Number(r.contributing_hours ?? 4),
     minimumHours: Number(r.minimum_hours ?? 10),
+    clubName: opt(r.club_name as string),
+    clubDescription: opt(r.club_description as string),
     updatedAt: opt(r.updated_at as string),
     updatedBy: opt(r.updated_by as string),
   }),
@@ -683,6 +685,8 @@ const clubSettings: CollectionSpec<ClubSettings> = {
     committed_hours: c.committedHours,
     contributing_hours: c.contributingHours,
     minimum_hours: c.minimumHours,
+    club_name: nul(c.clubName),
+    club_description: nul(c.clubDescription),
     updated_at: c.updatedAt ?? new Date().toISOString(),
     updated_by: nul(c.updatedBy),
   }),

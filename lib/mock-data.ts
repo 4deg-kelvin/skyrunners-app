@@ -2820,24 +2820,38 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
   // Live projects, not the seed literals: on a clean database this was still
   // producing attention flags for mock projects that do not exist.
   for (const project of live().projects) {
+    /*
+      A single point of failure is only a PROBLEM once the single point stops
+      responding.
+
+      This used to be its own always-on flag: any project with sub-projects and
+      one RE got "No deputy RE" permanently. In a thirty-person club that's most
+      parent projects, most of the time, and it isn't something an RE can
+      realistically fix — there often isn't a second person to name. A warning
+      that is always on and can't be acted on is one people learn to scroll
+      past, which costs the flags next to it their credibility.
+
+      So it's folded into silence, where it's genuinely actionable: the RE has
+      gone quiet AND nobody else can cover, which is the moment the subtree
+      actually stalls. The structural risk is handled instead by
+      `removeProjectMember` refusing to strip the last RE off a parent, and by
+      an alert to their Lead if they pause while holding that position.
+    */
     const silentDays = daysBetween(lastActive(project.primaryReId), today());
     if (silentDays >= RE_SILENT_DAYS) {
+      const soleRE =
+        childProjects(project.id).length > 0 && project.reIds.length < 2;
+      const who = getMember(project.primaryReId)?.fullName ?? "The RE";
+
       flags.push({
         projectId: project.id,
         reason: "re_silent",
-        detail: `${getMember(project.primaryReId)?.fullName ?? "The RE"} hasn't been active in ${Math.round(silentDays)} days.`,
-        severity: 3,
-      });
-    }
-
-    // A project with children and only one RE has a single point of failure
-    if (childProjects(project.id).length > 0 && project.reIds.length < 2) {
-      flags.push({
-        projectId: project.id,
-        reason: "no_deputy_re",
-        detail:
-          "Has sub-projects but only one RE. Name a deputy so it doesn't stall if they're unavailable.",
-        severity: 1,
+        detail: soleRE
+          ? `${who} hasn't been active in ${Math.round(silentDays)} days, and they're the only RE — everything under this project is waiting on one person. Name a second RE.`
+          : `${who} hasn't been active in ${Math.round(silentDays)} days.`,
+        // Worse when nobody can cover: the sub-projects have no route to a
+        // decision at all, rather than a slow one.
+        severity: soleRE ? 4 : 3,
       });
     }
 
@@ -3108,6 +3122,20 @@ export function contributionInputsFor(
  * no row, and the four signals are not worth a 500 over a config value that
  * has a perfectly good default.
  */
+/**
+ * The club's name and one-line description.
+ *
+ * Falls back to the shipped literal, so an un-edited club reads exactly as it
+ * always has and this needed no data migration.
+ */
+export function clubIdentity(): { name: string; description: string } {
+  const row = live().clubSettings?.[0];
+  return {
+    name: row?.clubName?.trim() || club.name,
+    description: row?.clubDescription?.trim() || club.description,
+  };
+}
+
 export function clubTiers(): TierThresholds {
   const row = live().clubSettings?.[0];
   if (!row) return DEFAULT_TIERS;

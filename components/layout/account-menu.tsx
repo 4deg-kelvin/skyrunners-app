@@ -113,7 +113,7 @@ export function AccountMenu({
             className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] transition-colors"
           >
             <Settings className="text-ink-muted size-4" />
-            Update schedule
+            Settings
           </Link>
 
           <div className="bg-line-soft h-px" />

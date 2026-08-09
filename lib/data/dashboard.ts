@@ -29,6 +29,7 @@
 import {
   atRiskProjects,
   club,
+  clubIdentity,
   divisions,
   getMember,
   getProject,
@@ -504,7 +505,8 @@ export async function getDashboard(
     : [];
 
   return {
-    club,
+    // The editable name/description, falling back to the shipped default.
+    club: { ...club, ...clubIdentity() },
     hasAcademicCalendar: store.terms.length > 0,
     isLeadOfNobody: overseen.length === 0,
     counts: {

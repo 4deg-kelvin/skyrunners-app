@@ -1867,6 +1867,33 @@ async function updateClubTiersAction$impl(
   return toResult(result, "Expectations updated — /how-we-lead now says so.");
 }
 
+async function updateClubIdentityAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  // Same gate as the tiers: this is the club's own identity, and it renders on
+  // every leadership page.
+  if (!can.manageEngagementWeights(viewer.actor)) {
+    return denied("rename the club");
+  }
+
+  const result = await ops.updateClubIdentity({
+    name: String(formData.get("clubName") ?? ""),
+    description: String(formData.get("clubDescription") ?? ""),
+    actorId: viewer.member.id,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+export async function updateClubIdentityAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => updateClubIdentityAction$impl(formData));
+}
+
 export async function updateClubTiersAction(
   formData: FormData
 ): Promise<ActionResult> {

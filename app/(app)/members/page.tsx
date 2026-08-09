@@ -79,6 +79,7 @@ export default async function MembersPage() {
               ({
                 member,
                 lead,
+                leads,
                 committedCount,
                 reCount,
                 deliverablesCompleted,
@@ -110,6 +111,24 @@ export default async function MembersPage() {
                             {ROLE_LABELS[member.globalRole]}
                           </Badge>
                         ) : null}
+                        {/*
+                          WHAT they lead, not just that they do.
+
+                          "Lead" alone doesn't say whether somebody runs a
+                          whole division — which makes them a top RE over every
+                          project inside it — or one sub-team. This page is
+                          where people answer "who do I ask about this?", so it
+                          has to name the unit.
+                        */}
+                        {leads.map((unit) => (
+                          <Badge
+                            key={unit.id}
+                            tone={unit.isDivision ? "cardinal" : "neutral"}
+                          >
+                            {unit.name}
+                            {unit.isDivision ? " Lead" : " sub-team"}
+                          </Badge>
+                        ))}
                         {/* Alumni and deactivated people stay on the roster so
                             they can be brought back. Say which they are. */}
                         {member.status !== "active" ? (

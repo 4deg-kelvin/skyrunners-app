@@ -5,6 +5,7 @@ import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { TierAdminForm } from "@/components/forms/tier-admin";
+import { ClubIdentityForm } from "@/components/forms/club-identity";
 import {
   AddCatalogueItemForm,
   AddSectionForm,
@@ -14,7 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
-import { getClubTiers, getSettings } from "@/lib/data/settings";
+import {
+  getClubIdentity,
+  getClubTiers,
+  getSettings,
+} from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
@@ -39,10 +44,11 @@ function termRange(startsOn: string, endsOn: string): string {
 
 export default async function SettingsPage() {
   const viewer = await getViewer();
-  const [view, catalogue, tiers] = await Promise.all([
+  const [view, catalogue, tiers, identity] = await Promise.all([
     getSettings(viewer.member.id),
     getCatalogue(),
     getClubTiers(),
+    getClubIdentity(),
   ]);
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
@@ -57,8 +63,18 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         label="My Settings"
-        title="Update schedule"
-        description="Choose the days you check in. Twice a week, on days that fit your schedule."
+        title="Settings"
+        /*
+          The page grew well past its original job.
+
+          It was called "Update schedule" when that's all it held. It now
+          carries the profile, check-in days, the academic pause, and — for
+          Co-Leads — the club's name, the commitment expectations, the academic
+          calendar and the trainings catalogue. A menu item saying "Update
+          schedule" hides all of that behind a name for one of its sections,
+          so somebody looking for their phone number never opens it.
+        */
+        description="Your profile, the days you check in, and pausing for academics. Co-Leads also set the club's expectations, academic calendar and trainings catalogue here."
       />
 
       {/* Profile first: it's the thing a new member needs on day one. */}
@@ -156,6 +172,28 @@ export default async function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/* The club's own name. Co-Lead only, like everything else that
+          reshapes the org. */}
+      {mayEditTiers ? (
+        <Card>
+          <CardBody>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionLabel>The Club</SectionLabel>
+              <ClubIdentityForm
+                name={identity.name}
+                description={identity.description}
+              />
+            </div>
+            <h3 className="text-ink mt-3 text-[17px] font-bold">
+              {identity.name}
+            </h3>
+            <p className="text-ink-soft mt-1 text-[15px]">
+              {identity.description}
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {/*
         The commitment expectations.
