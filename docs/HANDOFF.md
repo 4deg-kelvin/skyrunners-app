@@ -24,7 +24,7 @@ PW=<db-password> npm run verify:live   # does every page work on real data?
 
 ---
 
-## The five bugs that cost the most time
+## The six bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -75,6 +75,31 @@ constraint, and — the big one — `profiles.id` having a foreign key to
 
 **`npm run db:migrate` is idempotent now** (a `schema_migrations` ledger), so
 re-running is a verified no-op.
+
+### 6. The snapshot loading later than the first read
+
+Every page except `/my-work` and `/dashboard` died with "Something broke", and
+saving a profile edit failed the same way.
+
+The preload used to be the caller's job, and `getViewer()` was the only caller.
+Those two pages happen to `await getViewer()` first. Everything else does
+
+```ts
+Promise.all([getRoster(), getRosterOptions(), getViewer()])
+```
+
+which starts the reads *before* the preload — so `readStore()` found no snapshot
+and threw. Writes broke identically: `updateProfile()` reached `mutate()` with
+nothing loaded.
+
+**Anything that reads the store must load it itself.** All 16 functions in
+`lib/data/*` now open with `await preloadLiveStore()`. It's idempotent, so call
+order stopped being something you can get wrong. If you add a data function, add
+that line — `npm run verify:live` is what catches you if you forget.
+
+The general shape of this one: *it worked on the pages I happened to click.*
+Two of eleven pages sequenced their calls differently, and that was enough to
+make the bug look like a data problem rather than an ordering one.
 
 ---
 
