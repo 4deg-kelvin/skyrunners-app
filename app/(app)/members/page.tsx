@@ -6,13 +6,13 @@ import {
   MemberAdminControls,
 } from "@/components/forms/member-admin";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getRoster, getRosterOptions } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
-import { initials } from "@/lib/utils";
 
 export default async function MembersPage() {
   const [roster, options, viewer] = await Promise.all([
@@ -62,18 +62,11 @@ export default async function MembersPage() {
                   className="rounded-tile border border-line px-4 py-4"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-sm font-bold text-cardinal-600">
-                      {member.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={member.photoUrl}
-                    alt=""
-                    className="size-full rounded-full object-cover"
-                  />
-                ) : (
-                  initials(member.fullName)
-                )}
-                    </span>
+                    <Avatar
+                      name={member.fullName}
+                      photoUrl={member.photoUrl}
+                      className="size-11 text-sm"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <Link

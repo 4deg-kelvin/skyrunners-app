@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
@@ -19,7 +20,7 @@ import { getMemberProfile } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
-import { formatNumber, initials } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 export default async function MemberProfilePage({
   params,
@@ -67,18 +68,11 @@ export default async function MemberProfilePage({
             <SectionLabel>Details</SectionLabel>
 
             <div className="mt-5 flex items-center gap-4">
-              <span className="flex size-[72px] shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-2xl font-bold text-cardinal-600">
-                {member.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={member.photoUrl}
-                    alt=""
-                    className="size-full rounded-full object-cover"
-                  />
-                ) : (
-                  initials(member.fullName)
-                )}
-              </span>
+              <Avatar
+                name={member.fullName}
+                photoUrl={member.photoUrl}
+                className="size-[72px] text-2xl"
+              />
               <ContactLink member={member} />
             </div>
 

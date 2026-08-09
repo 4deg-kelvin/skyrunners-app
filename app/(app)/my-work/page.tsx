@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import {
   DeliverableRow,
@@ -21,7 +22,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getMyWork } from "@/lib/data/my-work";
+import { getMyWork, type MyProjectCard as MyProjectCardData } from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
@@ -45,6 +46,19 @@ export default async function MyWorkPage() {
   } = view;
 
   const pendingMine = myRequests.filter((r) => r.request.status === "pending");
+
+  /*
+    Finished projects go to the bottom, behind a toggle.
+
+    Same reasoning as /projects: this page answers "what am I doing", and a
+    project you finished last quarter competes with that for the only thing
+    it has — vertical space. The record still matters, so it's collapsed
+    rather than dropped.
+  */
+  const liveProjects = committed.filter((c) => c.project.phase !== "complete");
+  const finishedProjects = committed.filter(
+    (c) => c.project.phase === "complete"
+  );
 
   const mayLogHours = can.logOwnHours(viewer.actor, me.id);
   const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
@@ -394,121 +408,36 @@ export default async function MyWorkPage() {
               actionLabel="Browse projects"
               actionHref="/projects"
             />
+          ) : liveProjects.length === 0 ? (
+            <EmptyState
+              className="mt-5 py-8"
+              message="Everything you're on is finished. Nice — now find the next thing."
+              actionLabel="Find work"
+              actionHref="/find-work"
+            />
           ) : (
             <div className="mt-5 space-y-3">
-              {committed.map(
-                ({
-                  project,
-                  membership,
-                  breadcrumb,
-                  res,
-                  hoursLogged,
-                  myDeliverables: mine,
-                  overdueCount,
-                  progress,
-                  lastUpdate,
-                }) => (
-                  <div
-                    key={project.id}
-                    className="rounded-tile border border-line px-4 py-4"
-                  >
-                    <Breadcrumb trail={breadcrumb} className="mb-1.5" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <Link
-                        href={`/projects/${project.slug}`}
-                        className="text-[17px] font-bold text-ink hover:text-cardinal-600"
-                      >
-                        {project.name}
-                      </Link>
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {membership.role === "re" ? (
-                          <Badge tone="cardinal">You are RE</Badge>
-                        ) : null}
-                        {overdueCount > 0 ? (
-                          <Badge tone="risk">{overdueCount} overdue</Badge>
-                        ) : null}
-                        <ProjectBadges project={project} />
-                      </div>
-                    </div>
-
-                    {progress.total > 0 ? (
-                      <ProgressBar
-                        fraction={progress.fraction}
-                        className="mt-3"
-                      />
-                    ) : null}
-
-                    {/* What I own here — concrete, not a text field */}
-                    {mine.length > 0 ? (
-                      <div className="mt-4">
-                        <SectionLabel tone="muted">My deliverables</SectionLabel>
-                        <div className="mt-2 space-y-2">
-                          {mine.map((d) => (
-                            <DeliverableRow
-                              key={d.id}
-                              deliverable={d}
-                              showOwner={false}
-                              overdue={
-                                d.status !== "done" &&
-                                !!d.dueDate &&
-                                new Date(d.dueDate) < new Date()
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-sm text-ink-muted">
-                        Nothing assigned to you here yet — ask the RE what needs
-                        picking up.
-                      </p>
-                    )}
-
-                    {res.length > 0 ? (
-                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                        <SectionLabel tone="muted">
-                          {res.length > 1 ? "REs" : "RE"}
-                        </SectionLabel>
-                        {res.map((re) => (
-                          <ContactLink key={re.id} member={re} showLabel={false} />
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="size-3.5" />
-                        {formatNumber(hoursLogged, 1)} hrs logged
-                      </span>
-                      {project.timeCommitment ? (
-                        <span>{project.timeCommitment}</span>
-                      ) : null}
-                    </div>
-
-                    {lastUpdate ? (
-                      <div className="mt-3.5 rounded-tile bg-surface px-3.5 py-3">
-                        <SectionLabel tone="muted">
-                          Your last update here
-                        </SectionLabel>
-                        <p className="mt-1.5 text-sm text-ink-soft">
-                          {lastUpdate.entry.progress}
-                        </p>
-                        {lastUpdate.entry.blockers ? (
-                          <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
-                            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
-                            <span className="font-medium">
-                              {lastUpdate.entry.blockers}
-                            </span>
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              )}
+              {liveProjects.map((card) => (
+                <MyProjectCard key={card.project.id} card={card} />
+              ))}
             </div>
           )}
+
+          {/*
+            Finished projects last, behind a toggle — the same rule as
+            /projects. What you're working on is what this page is for; what
+            you finished is a record, and mixed together the record wins on
+            volume as the year goes on.
+          */}
+          {finishedProjects.length > 0 ? (
+            <CompletedProjectsSection count={finishedProjects.length}>
+              <div className="mt-3 space-y-3">
+                {finishedProjects.map((card) => (
+                  <MyProjectCard key={card.project.id} card={card} />
+                ))}
+              </div>
+            </CompletedProjectsSection>
+          ) : null}
         </CardBody>
       </Card>
 
@@ -540,6 +469,114 @@ export default async function MyWorkPage() {
             </div>
           </CardBody>
         </Card>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One committed project, as it appears on My Work.
+ *
+ * Extracted so the same card can render in both the live list and the
+ * completed section without a hundred lines of duplicate JSX. A plain function
+ * component, not a client one — nothing here is interactive.
+ */
+function MyProjectCard({ card }: { card: MyProjectCardData }) {
+  const {
+    project,
+    membership,
+    breadcrumb,
+    res,
+    hoursLogged,
+    myDeliverables: mine,
+    overdueCount,
+    progress,
+    lastUpdate,
+  } = card;
+
+  return (
+    <div className="rounded-tile border border-line px-4 py-4">
+      <Breadcrumb trail={breadcrumb} className="mb-1.5" />
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Link
+          href={`/projects/${project.slug}`}
+          className="text-[17px] font-bold text-ink hover:text-cardinal-600"
+        >
+          {project.name}
+        </Link>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {membership.role === "re" ? (
+            <Badge tone="cardinal">You are RE</Badge>
+          ) : null}
+          {overdueCount > 0 ? (
+            <Badge tone="risk">{overdueCount} overdue</Badge>
+          ) : null}
+          <ProjectBadges project={project} />
+        </div>
+      </div>
+
+      {progress.total > 0 ? (
+        <ProgressBar fraction={progress.fraction} className="mt-3" />
+      ) : null}
+
+      {/* What I own here — concrete, not a text field */}
+      {mine.length > 0 ? (
+        <div className="mt-4">
+          <SectionLabel tone="muted">My deliverables</SectionLabel>
+          <div className="mt-2 space-y-2">
+            {mine.map((d) => (
+              <DeliverableRow
+                key={d.id}
+                deliverable={d}
+                showOwner={false}
+                overdue={
+                  d.status !== "done" &&
+                  !!d.dueDate &&
+                  new Date(d.dueDate) < new Date()
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ) : project.phase === "complete" ? null : (
+        <p className="mt-3 text-sm text-ink-muted">
+          Nothing assigned to you here yet — ask the RE what needs picking up.
+        </p>
+      )}
+
+      {res.length > 0 ? (
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <SectionLabel tone="muted">
+            {res.length > 1 ? "REs" : "RE"}
+          </SectionLabel>
+          {res.map((re) => (
+            <ContactLink key={re.id} member={re} showLabel={false} />
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+        <span className="flex items-center gap-1.5">
+          <Clock className="size-3.5" />
+          {formatNumber(hoursLogged, 1)} hrs logged
+        </span>
+        {project.timeCommitment ? <span>{project.timeCommitment}</span> : null}
+      </div>
+
+      {lastUpdate ? (
+        <div className="mt-3.5 rounded-tile bg-surface px-3.5 py-3">
+          <SectionLabel tone="muted">Your last update here</SectionLabel>
+          <p className="mt-1.5 text-sm text-ink-soft">
+            {lastUpdate.entry.progress}
+          </p>
+          {lastUpdate.entry.blockers ? (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-soft">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+              <span className="font-medium">{lastUpdate.entry.blockers}</span>
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

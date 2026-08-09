@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionForm } from "./action-form";
+import { Avatar } from "@/components/ui/avatar";
 import { updateProfileAction } from "@/lib/actions";
 import type { Member } from "@/lib/types";
 
@@ -123,14 +124,11 @@ export function ProfileForm({
           <span className="font-normal text-ink-muted">(optional)</span>
         </span>
         <div className="flex items-center gap-3">
-          {member.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={member.photoUrl}
-              alt=""
-              className="size-11 shrink-0 rounded-full object-cover"
-            />
-          ) : null}
+          <Avatar
+            name={member.fullName}
+            photoUrl={member.photoUrl}
+            className="size-11 text-sm"
+          />
           <input
             type="url"
             name="photoUrl"

@@ -423,7 +423,16 @@ export async function getDashboard(
   // --- the roll-up, for Co-Leads -------------------------------------------
   const rollUp = isCoLead(actor)
     ? everyone
-        .filter((m) => m.globalRole !== "member" && m.status === "active")
+        .filter(
+          (m) =>
+            m.globalRole !== "member" &&
+            m.status === "active" &&
+            // Not yourself. A roll-up is what you read to check on OTHER
+            // people's oversight — your own reports are already the review
+            // queue at the top of this same page, so appearing here is both
+            // duplicated and faintly absurd ("Anish Bayya: caught up").
+            m.id !== actor.id
+        )
         .map((lead) => {
           const theirReports = everyone.filter(
             (m) => m.leadId === lead.id && m.status === "active"
