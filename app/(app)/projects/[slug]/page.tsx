@@ -23,7 +23,6 @@ import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
 import {
-  getAllProjectSlugs,
   getProjectBySlug,
 } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
@@ -35,11 +34,6 @@ import {
 } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
-
-export async function generateStaticParams() {
-  const slugs = await getAllProjectSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
 
 export default async function ProjectDetailPage({
   params,

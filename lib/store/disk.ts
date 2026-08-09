@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { join } from "path";
 
+import { isLiveMode } from "../env.ts";
+
 import {
   members as seedMembers,
   projects as seedProjects,
@@ -238,9 +240,33 @@ export function installLiveBackend(
   livePersister = persister;
 }
 
-/** Read-only snapshot. Never mutate what this returns. */
+/**
+ * Read-only snapshot. Never mutate what this returns.
+ *
+ * In live mode this MUST come from Postgres. It used to fall through to the
+ * mock seed whenever the snapshot wasn't loaded, and that silent fallback
+ * produced the worst bug in the project so far: the app ran live, the demo
+ * banner was gone, sign-in worked — and every page showed the fake club as
+ * though it were real data. Nothing looked broken.
+ *
+ * So live mode fails loudly instead. A missing snapshot means `preloadLiveStore`
+ * didn't run for this request, which is a wiring bug, and an error naming it is
+ * worth far more than a page that quietly lies.
+ */
 export function readStore(): Readonly<StoreShape> {
-  return liveResolver?.() ?? load();
+  if (isLiveMode()) {
+    const live = liveResolver?.();
+    if (!live) {
+      throw new Error(
+        "Live store not loaded for this request. Something read data before " +
+          "getViewer() ran — that's the only place preloadLiveStore() is called. " +
+          "Never fall back to mock data here; showing the sample club as real " +
+          "data is worse than an error page."
+      );
+    }
+    return live;
+  }
+  return load();
 }
 
 /**
