@@ -11,6 +11,10 @@ const NAV_ITEMS = [
   // High in the nav on purpose: "I have nothing to do" is the club's biggest
   // retention problem, and this page is the answer to it.
   { href: "/find-work", label: "Find Work" },
+  // Next to Find Work because they're the same problem from opposite ends:
+  // "I have nothing to do" and "I can't get unstuck". Both used to require
+  // asking a Co-Lead, which is the thing this app exists to remove.
+  { href: "/blockers", label: "Blockers" },
   { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },

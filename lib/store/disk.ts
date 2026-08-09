@@ -28,6 +28,7 @@ import type {
   JoinRequest,
   ProgressUpdate,
   ProjectMembership,
+  HelpRequest,
   ProjectNotice,
   UpdateSchedule,
   WorkLog,
@@ -98,6 +99,8 @@ export interface StoreShape {
   projectArtifacts: ProjectArtifact[];
   /** Milestones the app announced in a project's feed — see `ProjectNotice`. */
   projectNotices: ProjectNotice[];
+  /** Free-form asks on the blocker board — see `HelpRequest`. */
+  helpRequests: HelpRequest[];
 }
 
 /**
@@ -108,7 +111,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 6;
+const STORE_VERSION = 7;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -142,6 +145,8 @@ function seed(): StoreShape {
     // Nothing to seed: a notice only exists because somebody completed a
     // project inside the app.
     projectNotices: [],
+    // Likewise — an ask only exists because a member posted one.
+    helpRequests: [],
   });
 }
 

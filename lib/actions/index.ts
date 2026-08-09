@@ -36,6 +36,7 @@ import { can, isCoLead } from "@/lib/permissions";
 import {
   today,
   getProject,
+  helpRequestById,
   hoursOnProjectThisWeek,
   memberProjects,
   projectDeliverables,
@@ -854,6 +855,123 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Phase 6 — the blocker board
+// ---------------------------------------------------------------------------
+
+async function postHelpRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.postHelpRequest()) return denied("post on the blocker board");
+
+  const result = await ops.postHelpRequest({
+    memberId: viewer.member.id,
+    title: String(formData.get("title") ?? ""),
+    detail: String(formData.get("detail") ?? ""),
+    projectId: String(formData.get("projectId") ?? "") || undefined,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Posted. Anyone in the club can answer it.");
+}
+
+async function replyToHelpRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.replyToHelpRequest()) return denied("answer on the blocker board");
+
+  const result = await ops.replyToHelpRequest({
+    requestId: String(formData.get("requestId") ?? ""),
+    memberId: viewer.member.id,
+    body: String(formData.get("body") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Answer posted.");
+}
+
+/**
+ * Resolving needs the ask's own state to decide, so it's read first.
+ *
+ * The rule is "the asker, whoever replied, or a Co-Lead" — which the action
+ * layer can't evaluate from the form alone without trusting it.
+ */
+async function resolveHelpRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const request = helpRequestById(requestId);
+  if (!request) return { ok: false, error: "That request no longer exists." };
+
+  if (
+    !can.resolveHelpRequest(
+      viewer.actor,
+      request.memberId,
+      request.replies.map((r) => r.memberId)
+    )
+  ) {
+    return denied("close this one");
+  }
+
+  const result = await ops.resolveHelpRequest({
+    requestId,
+    resolvedById: viewer.member.id,
+    note: String(formData.get("note") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Marked sorted.");
+}
+
+async function reopenHelpRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const request = helpRequestById(requestId);
+  if (!request) return { ok: false, error: "That request no longer exists." };
+
+  if (
+    !can.resolveHelpRequest(
+      viewer.actor,
+      request.memberId,
+      request.replies.map((r) => r.memberId)
+    )
+  ) {
+    return denied("reopen this one");
+  }
+
+  const result = await ops.reopenHelpRequest(requestId);
+  if (result.ok) refresh();
+  return toResult(result, "Reopened.");
+}
+
+async function deleteHelpRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+
+  const request = helpRequestById(requestId);
+  if (!request) return { ok: false, error: "That request no longer exists." };
+
+  if (!can.deleteHelpRequest(viewer.actor, request.memberId)) {
+    return denied("delete this one");
+  }
+
+  const result = await ops.deleteHelpRequest(requestId);
+  if (result.ok) refresh();
+  return toResult(result, "Deleted.");
+}
+
+// ---------------------------------------------------------------------------
 // Phase 5 — the academic calendar
 // ---------------------------------------------------------------------------
 
@@ -1128,6 +1246,26 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function postHelpRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => postHelpRequestAction$impl(formData));
+}
+
+export async function replyToHelpRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => replyToHelpRequestAction$impl(formData));
+}
+
+export async function resolveHelpRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => resolveHelpRequestAction$impl(formData));
+}
+
+export async function reopenHelpRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => reopenHelpRequestAction$impl(formData));
+}
+
+export async function deleteHelpRequestAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteHelpRequestAction$impl(formData));
 }
 
 export async function createTermAction(formData: FormData): Promise<ActionResult> {

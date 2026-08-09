@@ -26,6 +26,8 @@ import type {
   Deliverable,
   DeliverableStatus,
   GlobalRole,
+  HelpReply,
+  HelpRequest,
   JoinRequest,
   Member,
   MemberStatus,
@@ -1601,6 +1603,143 @@ export async function createTeam(input: {
 
     store.teams.push(team);
     return ok(team);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — the blocker board
+// ---------------------------------------------------------------------------
+
+/**
+ * Post an ask.
+ *
+ * No permission check beyond being signed in, and that's the design: the board
+ * exists because membership is RE-controlled, so a member waiting on a join
+ * request needs a route to being useful that doesn't depend on one person
+ * answering their inbox.
+ */
+export async function postHelpRequest(input: {
+  memberId: string;
+  title: string;
+  detail?: string;
+  projectId?: string;
+  today: string;
+}): Promise<Result<HelpRequest>> {
+  const title = input.title.trim();
+  if (!title) return fail<HelpRequest>("Say what you're stuck on.");
+  if (title.length > 160) {
+    // A title is what people scan on the board. Past a line it stops being
+    // scannable, and the detail field is right there.
+    return fail<HelpRequest>(
+      "Keep the headline to a line — put the rest in the detail."
+    );
+  }
+
+  return guarded((store) => {
+    if (input.projectId && !store.projects.some((p) => p.id === input.projectId)) {
+      return fail<HelpRequest>("That project no longer exists.");
+    }
+
+    const request: HelpRequest = {
+      id: newId("help"),
+      memberId: input.memberId,
+      title,
+      detail: input.detail?.trim() || undefined,
+      projectId: input.projectId || undefined,
+      createdAt: input.today,
+      replies: [],
+    };
+
+    store.helpRequests.push(request);
+    return ok(request);
+  });
+}
+
+/** Answer somebody's ask. Anyone can — that's the point of the board. */
+export async function replyToHelpRequest(input: {
+  requestId: string;
+  memberId: string;
+  body: string;
+  today: string;
+}): Promise<Result<HelpReply>> {
+  const body = input.body.trim();
+  if (!body) return fail<HelpReply>("Write something first.");
+
+  return guarded((store) => {
+    const request = store.helpRequests.find((h) => h.id === input.requestId);
+    if (!request) return fail<HelpReply>("That request no longer exists.");
+    if (request.resolvedAt) {
+      return fail<HelpReply>("That one's already been sorted out.");
+    }
+
+    const reply: HelpReply = {
+      id: newId("reply"),
+      requestId: request.id,
+      memberId: input.memberId,
+      body,
+      createdAt: input.today,
+    };
+
+    request.replies.push(reply);
+    return ok(reply);
+  });
+}
+
+/**
+ * Mark an ask sorted.
+ *
+ * Open to whoever unblocked it, not just the asker: often the person who
+ * answered knows it's done before the asker comes back to say so. Kept rather
+ * than deleted — a resolved ask with a note is the useful half, and it's how
+ * the next person with the same problem finds the answer.
+ */
+export async function resolveHelpRequest(input: {
+  requestId: string;
+  resolvedById: string;
+  note?: string;
+  today: string;
+}): Promise<Result<HelpRequest>> {
+  return guarded((store) => {
+    const request = store.helpRequests.find((h) => h.id === input.requestId);
+    if (!request) return fail<HelpRequest>("That request no longer exists.");
+    if (request.resolvedAt) {
+      return fail<HelpRequest>("That one's already marked sorted.");
+    }
+
+    request.resolvedAt = input.today;
+    request.resolvedById = input.resolvedById;
+    request.resolutionNote = input.note?.trim() || undefined;
+    return ok(request);
+  });
+}
+
+/** Reopen one that wasn't actually sorted. */
+export async function reopenHelpRequest(
+  requestId: string
+): Promise<Result<HelpRequest>> {
+  return guarded((store) => {
+    const request = store.helpRequests.find((h) => h.id === requestId);
+    if (!request) return fail<HelpRequest>("That request no longer exists.");
+
+    request.resolvedAt = undefined;
+    request.resolvedById = undefined;
+    request.resolutionNote = undefined;
+    return ok(request);
+  });
+}
+
+/** Delete your own ask. The caller checks who's allowed. */
+export async function deleteHelpRequest(
+  requestId: string
+): Promise<Result<null>> {
+  return guarded((store) => {
+    if (!store.helpRequests.some((h) => h.id === requestId)) {
+      return fail<null>("That request no longer exists.");
+    }
+    // Replies go with it — they're `on delete cascade` in SQL, and the store
+    // carries them inline, so removing the request removes them either way.
+    store.helpRequests = store.helpRequests.filter((h) => h.id !== requestId);
+    return ok(null);
   });
 }
 

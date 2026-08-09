@@ -15,6 +15,8 @@
 import type {
   ClubEvent,
   Deliverable,
+  HelpReply,
+  HelpRequest,
   JoinRequest,
   Member,
   ProgressUpdate,
@@ -494,6 +496,67 @@ const projectNotices: CollectionSpec<ProjectNotice> = {
 };
 
 /**
+ * Help requests carry their replies inline, the same shape `progressUpdates`
+ * uses for entries: two tables, one object. `supabase.ts` stitches on read and
+ * splits on write.
+ */
+const helpRequests: CollectionSpec<HelpRequest> = {
+  key: "helpRequests",
+  table: "help_requests",
+  columns:
+    "id, member_id, title, detail, project_id, created_at, resolved_at, resolved_by, resolution_note",
+  identify: (h) => h.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    memberId: r.member_id as string,
+    title: r.title as string,
+    detail: opt(r.detail as string),
+    projectId: opt(r.project_id as string),
+    createdAt: r.created_at as string,
+    resolvedAt: opt(r.resolved_at as string),
+    resolvedById: opt(r.resolved_by as string),
+    resolutionNote: opt(r.resolution_note as string),
+    // Filled in by the loader, like `ProgressUpdate.entries`.
+    replies: [],
+  }),
+  toRow: (h) => ({
+    id: h.id,
+    member_id: h.memberId,
+    title: h.title,
+    detail: nul(h.detail),
+    project_id: nul(h.projectId),
+    created_at: h.createdAt,
+    resolved_at: nul(h.resolvedAt),
+    resolved_by: nul(h.resolvedById),
+    resolution_note: nul(h.resolutionNote),
+  }),
+  dependsOn: ["members", "projects"],
+};
+
+/** Columns for the replies table, which has no collection of its own. */
+export const HELP_REPLY_COLUMNS = "id, request_id, member_id, body, created_at";
+
+export function helpReplyFromRow(r: Record<string, unknown>): HelpReply {
+  return {
+    id: r.id as string,
+    requestId: r.request_id as string,
+    memberId: r.member_id as string,
+    body: (r.body as string) ?? "",
+    createdAt: r.created_at as string,
+  };
+}
+
+export function helpReplyToRow(reply: HelpReply) {
+  return {
+    id: reply.id,
+    request_id: reply.requestId,
+    member_id: reply.memberId,
+    body: reply.body,
+    created_at: reply.createdAt,
+  };
+}
+
+/**
  * Order matters: inserts run top to bottom, deletes bottom to top, so a row is
  * never written before what it references or deleted while still referenced.
  */
@@ -511,6 +574,7 @@ export const COLLECTIONS = [
   projectArtifacts,
   progressUpdates,
   projectNotices,
+  helpRequests,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

@@ -743,3 +743,200 @@ describe("the academic calendar", () => {
     assert.equal((await ops.deleteTerm("nope", "2026-08-10")).ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 6 — the blocker board
+// ---------------------------------------------------------------------------
+
+describe("asking for help", () => {
+  const ASKER = "m-tyler";
+  const HELPER = "m-sofia";
+
+  async function ask(title = "Need an Onshape hand", projectId?: string) {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title,
+      detail: "Mate constraints keep over-defining.",
+      projectId,
+      today: TODAY,
+    });
+    if (!result.ok) throw new Error(result.error);
+    return result.value;
+  }
+
+  function stored(id: string) {
+    return disk.readStore().helpRequests.find((h) => h.id === id);
+  }
+
+  test("anyone can post one, with no project", async () => {
+    // The case the board exists for: a member waiting on a join request has
+    // nowhere else to put a question.
+    const request = await ask();
+    assert.equal(stored(request.id)?.title, "Need an Onshape hand");
+    assert.equal(stored(request.id)?.projectId, undefined);
+  });
+
+  test("it can be attached to a project", async () => {
+    const request = await ask("CFD question", "p-wing-spar");
+    assert.equal(stored(request.id)?.projectId, "p-wing-spar");
+  });
+
+  test("a project that doesn't exist is refused", async () => {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "Question",
+      projectId: "not-a-project",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("an empty title is refused", async () => {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "   ",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("a title longer than a line is refused", async () => {
+    // The title is what people scan on the board; past a line it stops being
+    // scannable and the detail field is right there.
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "x".repeat(161),
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("somebody else can answer it", async () => {
+    const request = await ask();
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "Fully define the sketch first.",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(stored(request.id)?.replies.length, 1);
+    assert.equal(stored(request.id)?.replies[0].memberId, HELPER);
+  });
+
+  test("an empty answer is refused", async () => {
+    const request = await ask();
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "  ",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("resolving records who and how", async () => {
+    const request = await ask();
+    const result = await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      note: "Sofia walked me through it.",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    const saved = stored(request.id);
+    assert.equal(saved?.resolvedAt, TODAY);
+    assert.equal(saved?.resolvedById, HELPER);
+    assert.equal(saved?.resolutionNote, "Sofia walked me through it.");
+  });
+
+  test("a resolved ask is kept, not deleted", async () => {
+    // The note on how it got sorted is the useful half — it's how the next
+    // person with the same problem finds the answer.
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+    assert.ok(stored(request.id), "the row must survive being resolved");
+  });
+
+  test("answering a sorted one is refused", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "One more thing",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("resolving twice is refused", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+    const again = await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: ASKER,
+      today: TODAY,
+    });
+    assert.equal(again.ok, false);
+  });
+
+  test("reopening clears the resolution", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      note: "Sorted",
+      today: TODAY,
+    });
+
+    assert.equal((await ops.reopenHelpRequest(request.id)).ok, true);
+    const saved = stored(request.id);
+    assert.equal(saved?.resolvedAt, undefined);
+    assert.equal(saved?.resolvedById, undefined);
+    assert.equal(saved?.resolutionNote, undefined);
+  });
+
+  test("deleting takes the replies with it", async () => {
+    const request = await ask();
+    await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "Try this",
+      today: TODAY,
+    });
+
+    assert.equal((await ops.deleteHelpRequest(request.id)).ok, true);
+    assert.equal(stored(request.id), undefined);
+  });
+
+  test("unknown ids fail rather than throwing", async () => {
+    assert.equal((await ops.reopenHelpRequest("nope")).ok, false);
+    assert.equal((await ops.deleteHelpRequest("nope")).ok, false);
+    assert.equal(
+      (
+        await ops.resolveHelpRequest({
+          requestId: "nope",
+          resolvedById: HELPER,
+          today: TODAY,
+        })
+      ).ok,
+      false
+    );
+  });
+});

@@ -1971,6 +1971,17 @@ export function projectUpdateFeed(projectId: string) {
 }
 
 /** Blockers across a member's projects — what a Lead most needs to see. */
+export function helpRequestById(id: string) {
+  return live().helpRequests.find((h) => h.id === id);
+}
+
+/** Every free-form ask, newest first. The board re-sorts by age. */
+export function helpRequests() {
+  return [...live().helpRequests].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
+}
+
 export function openBlockers() {
   return live().progressUpdates
     .filter((u) => u.submittedAt)
