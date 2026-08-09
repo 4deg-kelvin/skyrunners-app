@@ -102,6 +102,15 @@ await check("/members        getRosterOptions", async () => dataModules.members.
 await check("/members/[id]   getMemberProfile", async () => dataModules.members.getMemberProfile(me.id, true));
 await check("/projects       getProjectTree", async () => dataModules.projects.getProjectTree());
 await check("/projects       getProjectFormOptions", async () => dataModules.projects.getProjectFormOptions());
+await check("/projects       countArchivedDivisions", async () => dataModules.projects.countArchivedDivisions());
+await check("/projects/archive getArchivedDivisions", async () => dataModules.projects.getArchivedDivisions());
+// The one route whose data function takes a slug, so it needs a real project.
+// Skipped rather than failed on an empty club: a red line for "there is no
+// project to open" would train you to ignore the red lines.
+await check("/projects/[slug] getProjectBySlug", async () =>
+  snap.projects[0]
+    ? dataModules.projects.getProjectBySlug(snap.projects[0].slug, me.id)
+    : Promise.resolve(null));
 await check("/dashboard      getDashboard", async () => dataModules.dashboard.getDashboard(actor, graph));
 await check("/updates        getUpdates", async () => dataModules.updates.getUpdates(actor));
 await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
