@@ -853,6 +853,79 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
   return toResult(result, "Division deleted.");
 }
 
+// ---------------------------------------------------------------------------
+// Phase 5 — the academic calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * `generatesObligations` arrives as a tri-state from the form.
+ *
+ * Absent means "use the default for this kind", which is what the create form
+ * sends. Present means the Co-Lead deliberately overrode it — a summer term
+ * that does generate obligations, say, for a team running over the break.
+ */
+function obligationOverride(formData: FormData): boolean | undefined {
+  if (!formData.has("generatesObligations")) return undefined;
+  return String(formData.get("generatesObligations")) === "yes";
+}
+
+const TERM_KINDS = ["quarter", "finals", "break", "summer"] as const;
+
+function termKindFrom(formData: FormData): (typeof TERM_KINDS)[number] {
+  const raw = String(formData.get("kind") ?? "");
+  return (TERM_KINDS as readonly string[]).includes(raw)
+    ? (raw as (typeof TERM_KINDS)[number])
+    : "quarter";
+}
+
+async function createTermAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+
+  const result = await ops.createTerm({
+    name: String(formData.get("name") ?? ""),
+    kind: termKindFrom(formData),
+    startsOn: String(formData.get("startsOn") ?? ""),
+    endsOn: String(formData.get("endsOn") ?? ""),
+    generatesObligations: obligationOverride(formData),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Added to the calendar.");
+}
+
+async function updateTermAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+
+  const result = await ops.updateTerm({
+    termId: String(formData.get("termId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    kind: termKindFrom(formData),
+    startsOn: String(formData.get("startsOn") ?? ""),
+    endsOn: String(formData.get("endsOn") ?? ""),
+    generatesObligations: obligationOverride(formData),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+async function deleteTermAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+
+  const result = await ops.deleteTerm(String(formData.get("termId") ?? ""), today());
+  if (result.ok) refresh();
+  return toResult(result, "Removed from the calendar.");
+}
+
 async function archiveTeamAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -1055,6 +1128,18 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function createTermAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createTermAction$impl(formData));
+}
+
+export async function updateTermAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateTermAction$impl(formData));
+}
+
+export async function deleteTermAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteTermAction$impl(formData));
 }
 
 export async function archiveTeamAction(formData: FormData): Promise<ActionResult> {

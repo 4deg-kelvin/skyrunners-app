@@ -18,6 +18,7 @@ import type {
   ProjectHealth,
   ProjectPhase,
   ProjectRole,
+  TermKind,
   TrainingCategory,
   TrainingStatus,
   UpdateStatus,
@@ -283,6 +284,32 @@ export function byWeekOrder(a: number, b: number): number {
   const order = SELECTABLE_UPDATE_DAYS as readonly number[];
   return order.indexOf(a) - order.indexOf(b);
 }
+
+// ---------------------------------------------------------------------------
+// Academic calendar
+// ---------------------------------------------------------------------------
+
+export const TERM_KIND_LABELS: Record<TermKind, string> = {
+  quarter: "Quarter",
+  finals: "Finals week",
+  break: "Break",
+  summer: "Summer",
+};
+
+/** Only a quarter generates check-in obligations. Everything else is a pause. */
+export const TERM_KIND_HINTS: Record<TermKind, string> = {
+  quarter: "Check-ins run normally.",
+  finals: "No check-ins, no nudges, and no missed rows.",
+  break: "No check-ins, no nudges, and no missed rows.",
+  summer: "No check-ins by default — override if a team is running.",
+};
+
+export const TERM_KIND_ORDER: TermKind[] = [
+  "quarter",
+  "finals",
+  "break",
+  "summer",
+];
 
 // ---------------------------------------------------------------------------
 // Project attention flags

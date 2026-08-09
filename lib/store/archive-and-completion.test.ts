@@ -578,3 +578,168 @@ describe("check-in days can be any day of the week", () => {
     assert.equal((await pick(1, 1)).ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 — the academic calendar
+// ---------------------------------------------------------------------------
+
+describe("the academic calendar", () => {
+  /*
+    The seed calendar, for reference:
+      Summer 2026    2026-06-15 → 2026-09-20   no obligations
+      Autumn 2026    2026-09-21 → 2026-12-04   obligations
+      Autumn finals  2026-12-05 → 2026-12-12   no obligations
+      Winter break   2026-12-13 → 2027-01-04   no obligations
+      Winter 2027    2027-01-05 → 2027-03-19   obligations
+  */
+  function termNamed(name: string) {
+    return disk.readStore().terms.find((t) => t.name === name);
+  }
+
+  /** Same lookup, but for the cases that would be meaningless if it missed. */
+  function requireTerm(name: string) {
+    const found = termNamed(name);
+    if (!found) throw new Error(`No such term in the seed: ${name}`);
+    return found;
+  }
+
+  test("a quarter generates obligations by default", async () => {
+    const result = await ops.createTerm({
+      name: "Spring 2027",
+      kind: "quarter",
+      startsOn: "2027-03-29",
+      endsOn: "2027-06-09",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Spring 2027")?.generatesObligations, true);
+  });
+
+  test("finals, breaks and summer do not", async () => {
+    const kinds = [
+      ["finals", "Spring finals"],
+      ["break", "Spring break"],
+      ["summer", "Summer 2027"],
+    ] as const;
+
+    // The mistake this default exists to prevent is a finals week that still
+    // generates check-ins — nudges landing on students mid-finals.
+    let cursor = 20;
+    for (const [kind, name] of kinds) {
+      const result = await ops.createTerm({
+        name,
+        kind,
+        startsOn: `2027-06-${cursor}`,
+        endsOn: `2027-06-${cursor + 2}`,
+      });
+      assert.equal(result.ok, true, name);
+      assert.equal(termNamed(name)?.generatesObligations, false, name);
+      cursor += 4;
+    }
+  });
+
+  test("the default can be overridden deliberately", async () => {
+    const result = await ops.createTerm({
+      name: "Summer build",
+      kind: "summer",
+      startsOn: "2027-07-01",
+      endsOn: "2027-08-31",
+      generatesObligations: true,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Summer build")?.generatesObligations, true);
+  });
+
+  test("overlapping periods are refused, and the message names the clash", async () => {
+    // `termFor(date)` returns the FIRST match, so two periods covering one day
+    // would make "are check-ins due today" depend on insertion order.
+    const result = await ops.createTerm({
+      name: "Overlaps autumn",
+      kind: "quarter",
+      startsOn: "2026-12-01",
+      endsOn: "2026-12-20",
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /Autumn/i);
+  });
+
+  test("touching but not overlapping is fine", async () => {
+    // Winter 2027 ends 2027-03-19. Starting on the 20th must be allowed, or
+    // the calendar can never be filled in without gaps.
+    const result = await ops.createTerm({
+      name: "Day after winter",
+      kind: "break",
+      startsOn: "2027-03-20",
+      endsOn: "2027-03-28",
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("an end before the start is refused", async () => {
+    const result = await ops.createTerm({
+      name: "Backwards",
+      kind: "quarter",
+      startsOn: "2027-05-01",
+      endsOn: "2027-04-01",
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("a nameless period is refused", async () => {
+    const result = await ops.createTerm({
+      name: "   ",
+      kind: "quarter",
+      startsOn: "2027-05-01",
+      endsOn: "2027-06-01",
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("editing a period can keep its own dates", async () => {
+    // The overlap check has to ignore the row being edited, or renaming a term
+    // without touching its dates would fail against itself.
+    const autumn = requireTerm("Autumn 2026");
+    const result = await ops.updateTerm({
+      termId: autumn.id,
+      name: "Autumn Quarter 2026",
+      kind: "quarter",
+      startsOn: autumn.startsOn,
+      endsOn: autumn.endsOn,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Autumn Quarter 2026")?.startsOn, autumn.startsOn);
+  });
+
+  test("editing into somebody else's dates is still refused", async () => {
+    const autumn = requireTerm("Autumn 2026");
+    const result = await ops.updateTerm({
+      termId: autumn.id,
+      name: "Autumn 2026",
+      kind: "quarter",
+      startsOn: "2026-12-01",
+      endsOn: "2026-12-31", // runs over finals and into the break
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("the period covering today cannot be deleted", async () => {
+    // Removing it would move everyone's obligations with no visible cause.
+    const summer = requireTerm("Summer 2026");
+    const result = await ops.deleteTerm(summer.id, "2026-08-10");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /covers today/i);
+  });
+
+  test("any other period can be", async () => {
+    const winter = requireTerm("Winter 2027");
+    assert.equal((await ops.deleteTerm(winter.id, "2026-08-10")).ok, true);
+    assert.equal(termNamed("Winter 2027"), undefined);
+  });
+
+  test("an unknown id fails rather than throwing", async () => {
+    assert.equal((await ops.deleteTerm("nope", "2026-08-10")).ok, false);
+  });
+});

@@ -13,6 +13,7 @@ import {
   getMember,
   getProject,
   hoursOnProject,
+  inSession,
   isOverdue,
   joinRequestsAwaitingMe,
   lastEntryForProject,
@@ -25,6 +26,7 @@ import {
   projectREs,
   recentWorkLogs,
   scheduleFor,
+  termFor,
   today,
 } from "@/lib/mock-data";
 import {
@@ -97,6 +99,17 @@ export interface MyWorkView {
     update: ProgressUpdate;
     sections: UpdateDraftSection[];
     updatesPerWeek: number;
+    /**
+     * Whether the club is in a period that generates check-ins at all.
+     *
+     * Separate from the personal pause: one is the academic calendar, the
+     * other is a member choosing to step back. Both mean nothing is owed, and
+     * a page that says nothing in either case reads as broken rather than as
+     * "you're fine".
+     */
+    inSession: boolean;
+    /** The period covering today, for saying WHY nothing is due. */
+    termName?: string;
   };
   /** Everything they own across all projects, soonest due first. */
   myDeliverables: { deliverable: Deliverable; project: Project }[];
@@ -191,6 +204,8 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
       update: currentUpdate,
       sections,
       updatesPerWeek: scheduleFor(memberId)?.updatesPerWeek ?? 2,
+      inSession: inSession(today()),
+      termName: termFor(today())?.name,
     },
     myDeliverables: cards
       .flatMap((c) =>

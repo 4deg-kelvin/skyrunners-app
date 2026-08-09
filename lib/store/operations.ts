@@ -32,6 +32,7 @@ import type {
   ProgressUpdate,
   Project,
   Team,
+  Term,
   WorkLog,
 } from "../types.ts";
 
@@ -1600,6 +1601,155 @@ export async function createTeam(input: {
 
     store.teams.push(team);
     return ok(team);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — the academic calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * A term, a finals week, a break or summer.
+ *
+ * This table is the reason the club's contribution data means anything past one
+ * quarter. Without it every finals week and winter break silently generates
+ * weeks of `missed` check-ins for all 35 members — by autumn the record is
+ * noise, and nudges land on students mid-finals, which is the worst possible
+ * message at the worst possible moment.
+ *
+ * `generatesObligations` defaults from `kind` rather than being a free checkbox,
+ * because the one that matters is the one a tired Co-Lead would get wrong at
+ * 1am: a finals week that still generates check-ins.
+ */
+function defaultGeneratesObligations(kind: Term["kind"]): boolean {
+  return kind === "quarter";
+}
+
+/** Overlap is what makes `termFor` ambiguous, so it's refused, not merged. */
+function overlappingTerm(
+  store: StoreShape,
+  startsOn: string,
+  endsOn: string,
+  ignoreId?: string
+): Term | undefined {
+  return store.terms.find(
+    (t) => t.id !== ignoreId && t.startsOn <= endsOn && startsOn <= t.endsOn
+  );
+}
+
+function validateTermDates(startsOn: string, endsOn: string): string | null {
+  if (!startsOn || !endsOn) return "A term needs a start and an end date.";
+  if (endsOn < startsOn) return "The end date is before the start date.";
+  return null;
+}
+
+export async function createTerm(input: {
+  name: string;
+  kind: Term["kind"];
+  startsOn: string;
+  endsOn: string;
+  /** Omit to take the sensible default for the kind. */
+  generatesObligations?: boolean;
+}): Promise<Result<Term>> {
+  const name = input.name.trim();
+  if (!name) return fail<Term>("Give the term a name.");
+
+  const dateError = validateTermDates(input.startsOn, input.endsOn);
+  if (dateError) return fail<Term>(dateError);
+
+  return guarded((store) => {
+    const clash = overlappingTerm(store, input.startsOn, input.endsOn);
+    if (clash) {
+      // `termFor(date)` returns the FIRST match, so two terms covering one day
+      // would make "are check-ins due today" depend on array order.
+      return fail<Term>(
+        `That overlaps ${clash.name} (${clash.startsOn} to ${clash.endsOn}). Terms can't cover the same day.`
+      );
+    }
+
+    const term: Term = {
+      id: newId("term"),
+      name,
+      kind: input.kind,
+      startsOn: input.startsOn,
+      endsOn: input.endsOn,
+      generatesObligations:
+        input.generatesObligations ?? defaultGeneratesObligations(input.kind),
+    };
+
+    store.terms.push(term);
+    return ok(term);
+  });
+}
+
+export async function updateTerm(input: {
+  termId: string;
+  name: string;
+  kind: Term["kind"];
+  startsOn: string;
+  endsOn: string;
+  generatesObligations?: boolean;
+}): Promise<Result<Term>> {
+  const name = input.name.trim();
+  if (!name) return fail<Term>("Give the term a name.");
+
+  const dateError = validateTermDates(input.startsOn, input.endsOn);
+  if (dateError) return fail<Term>(dateError);
+
+  return guarded((store) => {
+    const term = store.terms.find((t) => t.id === input.termId);
+    if (!term) return fail<Term>("That term no longer exists.");
+
+    const clash = overlappingTerm(
+      store,
+      input.startsOn,
+      input.endsOn,
+      term.id
+    );
+    if (clash) {
+      return fail<Term>(
+        `That overlaps ${clash.name} (${clash.startsOn} to ${clash.endsOn}). Terms can't cover the same day.`
+      );
+    }
+
+    term.name = name;
+    term.kind = input.kind;
+    term.startsOn = input.startsOn;
+    term.endsOn = input.endsOn;
+    term.generatesObligations =
+      input.generatesObligations ?? defaultGeneratesObligations(input.kind);
+    return ok(term);
+  });
+}
+
+/**
+ * Remove a term.
+ *
+ * Hard delete, unlike people and projects, and that's deliberate: a term is a
+ * date range, not a record of anything anyone did. Nothing references it by id
+ * — `termFor` matches on dates — so removing one changes which days count as
+ * in-session and destroys no history.
+ *
+ * Refused for a term covering today, because the immediate effect would be
+ * every member's check-in obligation appearing or vanishing under them with no
+ * obvious cause.
+ */
+export async function deleteTerm(
+  termId: string,
+  today: string
+): Promise<Result<null>> {
+  return guarded((store) => {
+    const term = store.terms.find((t) => t.id === termId);
+    if (!term) return fail<null>("That term no longer exists.");
+
+    if (term.startsOn <= today && today <= term.endsOn) {
+      return fail<null>(
+        `${term.name} covers today. Change its dates instead — deleting it would move everyone's check-in obligations without warning.`
+      );
+    }
+
+    store.terms = store.terms.filter((t) => t.id !== termId);
+    return ok(null);
   });
 }
 
