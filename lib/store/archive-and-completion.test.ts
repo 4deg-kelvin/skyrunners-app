@@ -1048,3 +1048,159 @@ describe("the RE answers a check-in section", () => {
     assert.equal(result.ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Deleting a member record
+// ---------------------------------------------------------------------------
+
+describe("deleting a member record", () => {
+  const CO_LEAD = "m-anish";
+
+  function memberById(id: string) {
+    return disk.readStore().members.find((m) => m.id === id);
+  }
+
+  /** A row with no history — the duplicate-profile case this exists for. */
+  async function freshMember(email = "julia@stanford.edu") {
+    const result = await ops.inviteMember({
+      email,
+      fullName: "Julia Hale",
+      globalRole: "member",
+      leadId: CO_LEAD,
+      today: TODAY,
+    });
+    if (!result.ok) throw new Error(result.error);
+    return result.value;
+  }
+
+  test("a record with no history deletes cleanly", async () => {
+    const julia = await freshMember();
+    const result = await ops.deleteMember({
+      memberId: julia.id,
+      actorId: CO_LEAD,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(memberById(julia.id), undefined);
+  });
+
+  test("their check-in schedule goes with them", async () => {
+    // Invite creates one. Leaving it behind would be a row pointing at nobody.
+    const julia = await freshMember();
+    await ops.deleteMember({ memberId: julia.id, actorId: CO_LEAD });
+
+    assert.equal(
+      disk.readStore().updateSchedules.some((u) => u.memberId === julia.id),
+      false
+    );
+  });
+
+  test("you can't delete yourself", async () => {
+    const result = await ops.deleteMember({
+      memberId: CO_LEAD,
+      actorId: CO_LEAD,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /your own account/i);
+  });
+
+  test("the last Co-Lead can't be deleted", async () => {
+    // A lock-out guard, not a caution — `force` must not bypass it.
+    const store = disk.readStore();
+    for (const m of store.members) {
+      if (m.globalRole === "co_lead" && m.id !== CO_LEAD) m.globalRole = "lead";
+    }
+
+    const result = await ops.deleteMember({
+      memberId: CO_LEAD,
+      actorId: "m-priya",
+      force: true,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("somebody with real history is refused, and told what", async () => {
+    // m-sofia has a submitted check-in in the seed.
+    const result = await ops.deleteMember({
+      memberId: "m-sofia",
+      actorId: CO_LEAD,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /check-in|deliverable/i);
+      // The message has to point at the right tool, or somebody forces it.
+      assert.match(result.error, /Deactivate/i);
+    }
+    assert.ok(memberById("m-sofia"));
+  });
+
+  test("a Co-Lead can force past the history guard", async () => {
+    // The duplicate-profile case: the row looks real but isn't.
+    const store = disk.readStore();
+    // Sofia is the primary RE of p-layup, which is refused separately — hand
+    // it over first so this test exercises the history guard alone.
+    const layup = store.projects.find((p) => p.id === "p-layup")!;
+    layup.primaryReId = CO_LEAD;
+    layup.reIds = [CO_LEAD];
+
+    const result = await ops.deleteMember({
+      memberId: "m-sofia",
+      actorId: CO_LEAD,
+      force: true,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(memberById("m-sofia"), undefined);
+  });
+
+  test("being a primary RE blocks it, even forced", async () => {
+    // A project with no RE is the one state the model can't represent, so this
+    // refuses rather than guessing a replacement.
+    const result = await ops.deleteMember({
+      memberId: "m-tyler",
+      actorId: CO_LEAD,
+      force: true,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /primary RE/i);
+  });
+
+  test("their reports move up rather than being orphaned", async () => {
+    /*
+      A member whose `leadId` points at a deleted row has nobody reading their
+      check-ins and no escalation path, and nothing in the app would report it
+      — the exact silent failure the review chain exists to prevent.
+    */
+    const julia = await freshMember();
+    const store = disk.readStore();
+    store.members.find((m) => m.id === "m-tyler")!.leadId = julia.id;
+
+    await ops.deleteMember({ memberId: julia.id, actorId: CO_LEAD });
+
+    // Julia reported to the Co-Lead, so Tyler now does too.
+    assert.equal(memberById("m-tyler")?.leadId, CO_LEAD);
+  });
+
+  test("a division they led is left without a lead, not pointing at a ghost", async () => {
+    const julia = await freshMember();
+    const store = disk.readStore();
+    store.teams.find((t) => t.id === "div-skydelta")!.leadId = julia.id;
+
+    await ops.deleteMember({ memberId: julia.id, actorId: CO_LEAD });
+
+    assert.equal(
+      disk.readStore().teams.find((t) => t.id === "div-skydelta")?.leadId,
+      undefined
+    );
+  });
+
+  test("an unknown id fails rather than throwing", async () => {
+    const result = await ops.deleteMember({
+      memberId: "nope",
+      actorId: CO_LEAD,
+    });
+    assert.equal(result.ok, false);
+  });
+});

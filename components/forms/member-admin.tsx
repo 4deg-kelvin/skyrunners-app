@@ -8,6 +8,7 @@ import {
   inviteMemberAction,
   setGlobalRoleAction,
   setMemberLeadAction,
+  deleteMemberAction,
   setMemberStatusAction,
 } from "@/lib/actions";
 import type { GlobalRole, MemberStatus } from "@/lib/types";
@@ -174,6 +175,7 @@ export function MemberAdminControls({
   canSetRole,
   canReassign,
   canSetStatus,
+  canDelete,
 }: {
   memberId: string;
   memberName: string;
@@ -184,10 +186,12 @@ export function MemberAdminControls({
   canSetRole: boolean;
   canReassign: boolean;
   canSetStatus: boolean;
+  /** Co-Lead only, and never their own record. */
+  canDelete: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  if (!canSetRole && !canReassign && !canSetStatus) return null;
+  if (!canSetRole && !canReassign && !canSetStatus && !canDelete) return null;
 
   if (!open) {
     return (
@@ -297,6 +301,105 @@ export function MemberAdminControls({
           )}
         </div>
       ) : null}
+
+      {canDelete ? (
+        <DeleteMemberControl memberId={memberId} memberName={memberName} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Delete a record outright. Co-Leads only, and never your own.
+ *
+ * ---------------------------------------------------------------------------
+ * This is not "somebody left the club"
+ * ---------------------------------------------------------------------------
+ *
+ * Deactivating is that, and it keeps their history — which is the standing
+ * rule and stays. This is for a **broken row**, and the commonest by far is a
+ * duplicate: somebody is invited as one address, signs in with another, and
+ * the trigger that links invites to accounts finds no match and creates a
+ * second inactive profile. One person, two records, one of which can never be
+ * signed in to and clutters every picker in the app.
+ *
+ * Deactivating that row would leave it on the roster forever, marked as though
+ * a real person had left.
+ *
+ * Two steps, and the second one names what will be lost, because the guard the
+ * force flag overrides is the one protecting real work.
+ */
+function DeleteMemberControl({
+  memberId,
+  memberName,
+}: {
+  memberId: string;
+  memberName: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [force, setForce] = useState(false);
+
+  if (!confirming) {
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+        <button
+          onClick={() => setConfirming(true)}
+          className="text-sm font-semibold text-ink-muted hover:text-risk-fg"
+        >
+          Delete record
+        </button>
+        <span className="text-xs text-ink-muted">
+          For a duplicate or broken profile. To remove someone who left, use
+          Deactivate — that keeps their history.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <p className="text-sm font-semibold text-ink">
+        Delete {memberName}&apos;s record permanently?
+      </p>
+      <p className="mt-1 text-xs text-ink-muted">
+        Their project memberships, hours, check-ins, trainings and requests go
+        with it. Anyone reporting to them moves up to {memberName}&apos;s own
+        Lead rather than being orphaned. Refused if they&apos;re the primary RE
+        of anything — hand those over first.
+      </p>
+
+      <label className="mt-2 flex items-start gap-2 text-xs text-ink-soft">
+        <input
+          type="checkbox"
+          checked={force}
+          onChange={(e) => setForce(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          They have signed-off work or submitted check-ins, and I still want to
+          delete it. Only tick this for a duplicate profile — for a real person
+          it erases their record from the club&apos;s history.
+        </span>
+      </label>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <ActionButton
+          action={deleteMemberAction}
+          fields={{ memberId, force: force ? "yes" : "no" }}
+          label="Yes, delete it"
+          pendingLabel="Deleting…"
+          tone="danger"
+        />
+        <button
+          onClick={() => {
+            setConfirming(false);
+            setForce(false);
+          }}
+          className="text-sm font-semibold text-ink-muted hover:text-ink"
+        >
+          Keep it
+        </button>
+      </div>
     </div>
   );
 }

@@ -43,7 +43,7 @@ import type { OrgGraph } from "../permissions.ts";
  * fails here, loudly, instead of arriving as an `undefined` three layers away.
  */
 export const PROFILE_COLUMNS =
-  "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at";
+  "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at";
 
 export const PROJECT_COLUMNS =
   "id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment";
@@ -99,6 +99,7 @@ interface ProfileRow {
   primary_team_id: string | null;
   skills: string[] | null;
   joined_at: string;
+  last_active_at: string | null;
 }
 
 interface ProjectRow {
@@ -157,6 +158,10 @@ export function toMember(row: ProfileRow): Member {
     primaryTeamId: optional(row.primary_team_id),
     skills: optional(row.skills),
     joinedAt: row.joined_at,
+    // Undefined means never signed in — the distinction that separates
+    // "invited but the email doesn't match" from "signed in, awaiting
+    // activation". See `Member.lastActiveAt`.
+    lastActiveAt: optional(row.last_active_at),
   };
 }
 

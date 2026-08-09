@@ -363,6 +363,31 @@ async function setMemberLeadAction$impl(
   return toResult(result, "Reporting line updated.");
 }
 
+async function deleteMemberAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.deleteMember(viewer.actor, memberId)) {
+    return denied("delete member records");
+  }
+
+  const result = await ops.deleteMember({
+    memberId,
+    // From the session. The operation refuses self-deletion independently, but
+    // it can only do that if it's told who is asking.
+    actorId: viewer.member.id,
+    // Only a Co-Lead reaches here at all, and the history guard is the one
+    // they're allowed to override — it exists to stop an accident, not to stop
+    // them.
+    force: String(formData.get("force") ?? "") === "yes",
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Record deleted.");
+}
+
 async function setMemberStatusAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -1516,6 +1541,10 @@ export async function setGlobalRoleAction(formData: FormData): Promise<ActionRes
 
 export async function setMemberLeadAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => setMemberLeadAction$impl(formData));
+}
+
+export async function deleteMemberAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteMemberAction$impl(formData));
 }
 
 export async function setMemberStatusAction(formData: FormData): Promise<ActionResult> {

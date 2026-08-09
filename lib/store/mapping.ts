@@ -74,7 +74,7 @@ const members: CollectionSpec<Member> = {
   key: "members",
   table: "profiles",
   columns:
-    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at",
+    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at",
   identify: (m) => m.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -93,6 +93,7 @@ const members: CollectionSpec<Member> = {
     primaryTeamId: opt(r.primary_team_id as string),
     skills: opt(r.skills as string[]),
     joinedAt: r.joined_at as string,
+    lastActiveAt: opt(r.last_active_at as string),
   }),
   toRow: (m) => ({
     id: m.id,
@@ -109,6 +110,7 @@ const members: CollectionSpec<Member> = {
     primary_team_id: nul(m.primaryTeamId),
     skills: m.skills ?? [],
     joined_at: m.joinedAt,
+    last_active_at: nul(m.lastActiveAt),
   }),
 };
 
