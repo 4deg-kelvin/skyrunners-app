@@ -73,7 +73,36 @@ a club whose members filter it.
 
 ## 2. Discord
 
-### Read this before anything else: you almost certainly want a webhook, not a bot
+### Status: the app side is BUILT and waiting on a token
+
+Anish asked for DMs rather than channel posts, and a webhook cannot DM anybody
+— only a bot can. So the bot path below is the one to follow.
+
+What exists already:
+
+- `profiles.discord_user_id` (migration 0025), with a field on Settings → your
+  profile. Members paste their own; it's optional and validated as a snowflake.
+- `lib/notify/discord.ts` — opens a DM channel and posts to it.
+- Wired into the three events worth pushing: **you were added to a project**,
+  **your join request was answered** (either way), and **one of your people
+  submitted a check-in**.
+
+**All of it is inert until `DISCORD_BOT_TOKEN` is set.** No token means no
+send, no error, and nothing in the UI changes. Add the variable and it starts
+working with no deploy of app code.
+
+Two things to know about the behaviour:
+
+- Discord refuses a DM to somebody who **shares no server with the bot**, and
+  to anybody who has "allow DMs from server members" switched off. Both are
+  silent no-ops by design — a member's Discord privacy setting must never make
+  somebody else's save fail.
+- Sends run via `after()`, so they happen once the response is already on its
+  way. A slow or broken Discord can never hold up a save.
+
+Set `NEXT_PUBLIC_SITE_URL` too, or the links in those DMs point at localhost.
+
+### Why a webhook is still right for anything channel-shaped
 
 For "post a message in a channel when something happens in the app", a
 **webhook** is the right tool and a **bot** is not. The difference is large:

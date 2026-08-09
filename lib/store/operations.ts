@@ -643,6 +643,7 @@ export async function inviteMember(input: {
 export interface ProfileEdits {
   preferredName?: string;
   phone?: string;
+  discordUserId?: string;
   major?: string;
   classYear?: number;
   photoUrl?: string;
@@ -674,6 +675,25 @@ export async function updateProfile(input: {
     return fail("A photo link needs to start with http:// or https://");
   }
 
+  /*
+    A Discord id is 17-20 digits and nothing else.
+
+    Checked here as well as by the column constraint, because the two things
+    people actually paste — a username like `anish#0001`, or a whole
+    `<@1234567890>` mention — both look plausible and would silently never
+    receive anything. A constraint violation would say
+    `violates check constraint "profiles_discord_user_id_check"`, which tells
+    a member nothing.
+  */
+  if (edits.discordUserId) {
+    const id = edits.discordUserId.trim();
+    if (!/^[0-9]{17,20}$/.test(id)) {
+      return fail(
+        "A Discord ID is a long string of digits — not your username. Turn on Developer Mode in Discord, right-click your name, and Copy User ID."
+      );
+    }
+  }
+
   return guarded((store) => {
     const member = store.members.find((m) => m.id === input.memberId);
     if (!member) return fail<Member>("That member no longer exists.");
@@ -695,6 +715,7 @@ export async function updateProfile(input: {
 
     apply("preferredName", text(edits.preferredName));
     apply("phone", text(edits.phone));
+    apply("discordUserId", text(edits.discordUserId));
     apply("major", text(edits.major));
     apply("photoUrl", text(edits.photoUrl));
 

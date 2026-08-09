@@ -71,6 +71,39 @@ export function ProfileForm({
         </label>
       </div>
 
+      {/*
+        Discord. Optional, and the field explains what to paste.
+
+        Almost everybody's first attempt is their username, which looks
+        plausible and would silently never receive anything — so the hint
+        names the exact clicks rather than saying "your Discord ID".
+      */}
+      <label className="mt-3 block">
+        <span className="text-ink mb-1 block text-sm font-semibold">
+          Discord ID{" "}
+          <span className="text-ink-muted font-normal">(optional)</span>
+        </span>
+        <input
+          type="text"
+          name="discordUserId"
+          inputMode="numeric"
+          defaultValue={member.discordUserId ?? ""}
+          placeholder="461208577118896129"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+        />
+        <span className="text-ink-muted mt-1 block text-xs">
+          Lets the club bot message you directly when you&apos;re added to
+          something or an ask of yours is answered — nothing else. It&apos;s a
+          long number, not your username: in Discord turn on{" "}
+          <span className="text-ink font-semibold">
+            Settings → Advanced → Developer Mode
+          </span>
+          , then right-click your own name and{" "}
+          <span className="text-ink font-semibold">Copy User ID</span>. Leave it
+          blank and nothing changes.
+        </span>
+      </label>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">

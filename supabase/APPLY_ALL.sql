@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql
 
 
 -- ==========================================================================
@@ -3375,4 +3375,50 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0024_event_rsvp_policies.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0025_discord_user_id.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0025 — a member's Discord id, so the app can DM them
+--
+-- Notifications are in-app only, which means somebody added to a project finds
+-- out the next time they happen to open the site. For the events that matter —
+-- you've been put on something, your ask was answered, one of your people just
+-- checked in — that's too late to be useful.
+--
+-- A DM rather than a channel post, deliberately. A channel that fires on every
+-- club event gets muted inside a week, and a muted channel is worse than no
+-- channel: it looks like notification coverage and delivers none. A DM arrives
+-- for exactly the person who needs to act, and nobody else sees it.
+--
+-- Nullable and opt-in. A member who never fills it in simply gets nothing
+-- extra, and every path checks for it — see `lib/notify/discord.ts`.
+--
+-- Stored as text, not a number: Discord snowflakes are 64-bit and JavaScript
+-- rounds those past 2^53. `"1234567890123456789"` survives; 1234567890123456789
+-- silently becomes a different id.
+-- ---------------------------------------------------------------------------
+
+alter table profiles
+  add column if not exists discord_user_id text;
+
+-- Digits only, 17-20 of them. Catches the commonest paste errors — a username
+-- like "anish#0001", or the whole "<@1234...>" mention wrapper.
+alter table profiles
+  drop constraint if exists profiles_discord_user_id_check;
+alter table profiles
+  add constraint profiles_discord_user_id_check
+  check (discord_user_id is null or discord_user_id ~ '^[0-9]{17,20}$');
+
+insert into schema_migrations (version)
+values ('0025_discord_user_id')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0025_discord_user_id.sql
 -- ==========================================================================

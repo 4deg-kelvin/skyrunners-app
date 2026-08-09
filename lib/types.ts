@@ -42,6 +42,15 @@ export interface Member {
    * lives in one place.
    */
   phone?: string;
+  /**
+   * Their Discord user id, so the club's bot can DM them.
+   *
+   * Opt-in and nullable: no id simply means no Discord notifications, and
+   * every send path checks. A snowflake id as TEXT, never a number —
+   * JavaScript rounds 64-bit integers past 2^53, so parsing one silently
+   * yields a different person's id.
+   */
+  discordUserId?: string;
   globalRole: GlobalRole;
   status: MemberStatus;
   /** The one person they report to. Null for co-leads. */

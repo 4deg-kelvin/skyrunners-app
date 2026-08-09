@@ -36,6 +36,7 @@ import { can, isCoLead } from "@/lib/permissions";
 import {
   today,
   getEvent,
+  getMember,
   getProject,
   helpRequestById,
   hoursOnProjectThisWeek,
@@ -45,6 +46,49 @@ import {
 import * as ops from "@/lib/store/operations";
 import type { Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
+import { after } from "next/server";
+import { sendDiscordDM, discordMessages } from "@/lib/notify/discord";
+
+/**
+ * Fire a Discord DM without making the caller wait for it, or care if it fails.
+ *
+ * `after()` runs the callback once the response has been sent, which is exactly
+ * right here: the database write already committed, so the member's action has
+ * succeeded whatever Discord does next. A bare floating promise would be the
+ * obvious alternative and is wrong — serverless can freeze the process the
+ * moment the response returns, so the fetch would sometimes just never happen.
+ *
+ * Nothing here can throw into the action. `sendDiscordDM` swallows its own
+ * failures, and the try/catch covers the case where `after` itself is
+ * unavailable (it isn't, in Next 15, but a notification must never be able to
+ * break a save).
+ */
+function notify(discordUserId: string | undefined, message: string): void {
+  if (!discordUserId) return;
+  try {
+    after(async () => {
+      await sendDiscordDM(discordUserId, message);
+    });
+  } catch {
+    // Not worth a log line: the write succeeded and the courtesy didn't.
+  }
+}
+
+/**
+ * Absolute links for those messages.
+ *
+ * A DM is read on a lock screen with no browser context, so a relative path is
+ * useless. `NEXT_PUBLIC_SITE_URL` when set, Vercel's own host otherwise, and
+ * localhost in development.
+ */
+function appUrl(path: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  return `${base}${path}`;
+}
 
 export interface ActionResult {
   ok: boolean;
@@ -344,6 +388,7 @@ async function updateProfileAction$impl(
     edits: {
       preferredName: String(formData.get("preferredName") ?? ""),
       phone: String(formData.get("phone") ?? ""),
+      discordUserId: String(formData.get("discordUserId") ?? ""),
       major: String(formData.get("major") ?? ""),
       photoUrl: String(formData.get("photoUrl") ?? ""),
       classYear: yearRaw ? Number(yearRaw) : 0,
@@ -513,7 +558,24 @@ async function addProjectMemberAction$impl(
     today: today(),
   });
 
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+
+    // They didn't ask for this and have no reason to be looking, which is
+    // exactly the test for whether something is worth pushing out.
+    const added = getMember(String(formData.get("memberId") ?? ""));
+    const project = getProject(projectId);
+    if (added && project) {
+      notify(
+        added.discordUserId,
+        discordMessages.addedToProject({
+          projectName: project.name,
+          addedBy: viewer.member.preferredName ?? viewer.member.fullName,
+          url: appUrl(`/projects/${project.slug}`),
+        })
+      );
+    }
+  }
   return toResult(result, asRE ? "Added as an RE." : "Added to the project.");
 }
 
@@ -590,7 +652,31 @@ async function submitCheckInAction$impl(
     today: today(),
   });
 
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+
+    /*
+      The Lead, not the member.
+
+      This is the one notification with a real deadline attached: an unread
+      check-in escalates after three days, and the whole review model rests on
+      one named person actually reading it. Everything else the app surfaces
+      can wait until somebody opens the site; this can't.
+    */
+    const lead = viewer.member.leadId
+      ? getMember(viewer.member.leadId)
+      : undefined;
+    if (lead) {
+      notify(
+        lead.discordUserId,
+        discordMessages.checkInSubmitted({
+          memberName: viewer.member.preferredName ?? viewer.member.fullName,
+          projectCount: entries.filter((e) => e.progress.trim()).length,
+          url: appUrl("/dashboard"),
+        })
+      );
+    }
+  }
   return toResult(result, "Check-in sent to your Lead.");
 }
 
@@ -727,7 +813,37 @@ async function decideJoinRequestAction$impl(
     today: today(),
   });
 
-  if (result.ok) refresh();
+  if (result.ok) {
+    refresh();
+
+    /*
+      The one somebody is definitely waiting on.
+
+      A tracked join request exists precisely so an ask isn't an email into the
+      void — but until now the answer only appeared if the member happened to
+      open My Work. Told either way: a decline with the RE's note is far better
+      than silence, and silence is what the whole feature was built to avoid.
+    */
+    // From the operation's return value, not the form — the request knows who
+    // asked, and a client-supplied member id would be a way to redirect
+    // somebody else's notification.
+    const asker = getMember(result.value.memberId);
+    const project = getProject(projectId);
+    if (asker && project) {
+      notify(
+        asker.discordUserId,
+        accept
+          ? discordMessages.joinRequestApproved({
+              projectName: project.name,
+              url: appUrl(`/projects/${project.slug}`),
+            })
+          : discordMessages.joinRequestDeclined({
+              projectName: project.name,
+              note: responseNote.trim() || undefined,
+            })
+      );
+    }
+  }
   return toResult(result, accept ? "Added to the project." : "Declined.");
 }
 
