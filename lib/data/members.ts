@@ -11,6 +11,7 @@ import {
   committedProjectCount,
   contributionInputsFor,
   getMember,
+  getProject,
   hoursOnProject,
   isOverdue,
   memberProjects,
@@ -28,8 +29,10 @@ import {
 import type {
   Deliverable,
   Member,
+  ProgressUpdate,
   Project,
   ProjectMembership,
+  UpdateEntry,
 } from "@/lib/types";
 import type { BreadcrumbNode } from "./my-work";
 import { preloadLiveStore } from "@/lib/store/request";
@@ -144,6 +147,25 @@ export interface MemberProfileView {
   canViewEffort: boolean;
   /** Only populated when `canViewEffort` is true. */
   contribution?: ContributionRecord;
+  /**
+   * This person's check-in history, newest first. Empty unless `canViewEffort`.
+   *
+   * The review QUEUE on the dashboard stays scoped to direct reports, because
+   * that's an obligation and it escalates — a Co-Lead with forty items owes
+   * nothing in particular. Reading is a different act from being accountable
+   * for reading, so it lives here, on the person, and follows the wider rule:
+   * yourself, anyone up your chain, or a Co-Lead.
+   */
+  checkIns: MemberCheckIn[];
+}
+
+/** One submitted check-in, with each project entry resolved. */
+export interface MemberCheckIn {
+  update: ProgressUpdate;
+  /** Whether a Lead has already read it, and when. */
+  reviewedAt?: string;
+  reviewedBy?: Member;
+  sections: { entry: UpdateEntry; project?: Project }[];
 }
 
 export async function getMemberProfile(
@@ -189,6 +211,27 @@ export async function getMemberProfile(
     contribution: canViewEffort
       ? buildContributionRecord(contributionInputsFor(memberId))
       : undefined,
+    checkIns: canViewEffort
+      ? readStore()
+          // Only ones actually sent. A `pending` row is a slot the member
+          // hasn't filled in yet, and `missed` is an empty one that expired —
+          // neither is something to read.
+          .progressUpdates.filter((u) => u.memberId === memberId && u.submittedAt)
+          .sort((a, b) =>
+            (b.submittedAt ?? "").localeCompare(a.submittedAt ?? "")
+          )
+          .map((update) => ({
+            update,
+            reviewedAt: update.reviewedAt ?? undefined,
+            reviewedBy: update.reviewedBy
+              ? getMember(update.reviewedBy)
+              : undefined,
+            sections: update.entries.map((entry) => ({
+              entry,
+              project: getProject(entry.projectId),
+            })),
+          }))
+      : [],
   };
 }
 
