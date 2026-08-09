@@ -10,6 +10,13 @@ import {
   DeliverableActions,
 } from "@/components/forms/deliverable-actions";
 import { AskToJoinButton } from "@/components/forms/project-actions";
+import { ProjectEditForm } from "@/components/forms/project-edit";
+import {
+  AddProjectMemberForm,
+  REControls,
+} from "@/components/forms/project-admin";
+import { ActionButton } from "@/components/forms/action-form";
+import { removeProjectMemberAction } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -30,7 +37,6 @@ import { getViewer } from "@/lib/data/viewer";
 import {
   ATTENTION_LABELS,
   PHASE_LABELS,
-  PHASE_ORDER,
   PROJECT_ROLE_LABELS,
 } from "@/lib/labels";
 import { can } from "@/lib/permissions";
@@ -64,6 +70,8 @@ export default async function ProjectDetailPage({
   } = view;
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
+  const mayAssignRE = can.assignRE(viewer.actor, viewer.graph, project.id);
+  const mayDelete = can.deleteProject(viewer.actor, viewer.graph, project.id);
 
   const mayAddMember = can.addProjectMember(
     viewer.actor,
@@ -86,7 +94,6 @@ export default async function ProjectDetailPage({
     project.id
   );
 
-  const phaseIndex = PHASE_ORDER.indexOf(project.phase);
 
   return (
     <div className="space-y-6">
@@ -150,25 +157,22 @@ export default async function ProjectDetailPage({
                     {PHASE_LABELS[project.phase]}
                   </h2>
                 </div>
-                <ProjectBadges project={project} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <ProjectBadges project={project} />
+                  {mayManage ? (
+                    <ProjectEditForm project={project} canDelete={mayDelete} />
+                  ) : null}
+                </div>
               </div>
 
-              {/* Phase progress — where in the lifecycle this sits */}
-              <div className="mt-5 flex gap-1">
-                {PHASE_ORDER.map((phase, i) => (
-                  <div
-                    key={phase}
-                    title={PHASE_LABELS[phase]}
-                    className={`h-1.5 flex-1 rounded-full ${
-                      i <= phaseIndex ? "bg-cardinal-600" : "bg-line"
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="mt-2 flex justify-between text-xs text-ink-muted">
-                <span>{PHASE_LABELS[PHASE_ORDER[0]]}</span>
-                <span>{PHASE_LABELS[PHASE_ORDER[PHASE_ORDER.length - 1]]}</span>
-              </div>
+              {/*
+                The lifecycle bar that used to sit here is gone.
+                It looked like a progress bar and wasn't one — it showed which
+                of nine named stages the project is at, right next to a real
+                completion bar on the deliverables. Two identical-looking bars
+                meaning different things is worse than one. The stage is the
+                heading and the badge; the bar added nothing.
+              */}
 
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <StatTile
@@ -256,32 +260,13 @@ export default async function ProjectDetailPage({
             </CardBody>
           </Card>
 
-          {/*
-            Owning team. Only for people who can edit the project, and only
-            worth surfacing prominently when it's missing — that's the state
-            that hides the project from the pages members actually browse.
-          */}
           {mayManage ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Owning team</SectionLabel>
-                {division ? (
-                  <p className="mt-2 text-[15px] text-ink-soft">
-                    Under <span className="font-semibold text-ink">{division.name}</span>.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-[15px] text-warn-fg">
-                    Not linked to a division, so this project doesn&apos;t
-                    appear on Projects or Find Work. Pick its owning team.
-                  </p>
-                )}
-                <ProjectTeamForm
-                  projectId={project.id}
-                  currentTeamId={project.teamId}
-                  teams={teamOptions}
-                />
-              </CardBody>
-            </Card>
+            <ProjectTeamForm
+              projectId={project.id}
+              currentTeamId={project.teamId}
+              currentDivisionName={division?.name}
+              teams={teamOptions}
+            />
           ) : null}
 
           {/* Team */}
@@ -290,9 +275,14 @@ export default async function ProjectDetailPage({
               <div className="flex items-center justify-between gap-4">
                 <SectionLabel>Team</SectionLabel>
                 {mayAddMember ? (
-                  <Button variant="ghost" className="px-2 py-1">
-                    Add member
-                  </Button>
+                  <AddProjectMemberForm
+                    projectId={project.id}
+                    candidates={assignableMembers.map((m) => ({
+                      id: m.id,
+                      name: m.fullName,
+                    }))}
+                    canAssignRE={mayAssignRE}
+                  />
                 ) : null}
               </div>
 
@@ -328,11 +318,44 @@ export default async function ProjectDetailPage({
                           </p>
                         ) : null}
                       </div>
-                      <Badge
-                        tone={membership.role === "re" ? "cardinal" : "neutral"}
-                      >
-                        {PROJECT_ROLE_LABELS[membership.role]}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          tone={membership.role === "re" ? "cardinal" : "neutral"}
+                        >
+                          {PROJECT_ROLE_LABELS[membership.role]}
+                        </Badge>
+
+                        {/*
+                          Multiple REs per project is a deliberate part of the
+                          model, so promoting somebody has to be reachable from
+                          the roster rather than living in a form nothing
+                          rendered.
+                        */}
+                        {mayAssignRE ? (
+                          <REControls
+                            projectId={project.id}
+                            memberId={membership.memberId}
+                            isRE={membership.role === "re"}
+                            isPrimary={
+                              project.primaryReId === membership.memberId
+                            }
+                          />
+                        ) : null}
+
+                        {mayAddMember &&
+                        project.primaryReId !== membership.memberId ? (
+                          <ActionButton
+                            action={removeProjectMemberAction}
+                            fields={{
+                              projectId: project.id,
+                              memberId: membership.memberId,
+                            }}
+                            label="Remove"
+                            pendingLabel="Removing…"
+                            tone="danger"
+                          />
+                        ) : null}
+                      </div>
                     </div>
                   ))
                 )}

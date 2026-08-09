@@ -40,6 +40,7 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
+import type { Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 
 export interface ActionResult {
@@ -744,6 +745,89 @@ async function createTeamAction$impl(formData: FormData): Promise<ActionResult> 
   return toResult(result, "Created.");
 }
 
+async function updateDeliverableAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.editDeliverable(viewer.actor, viewer.graph, projectId)) {
+    return denied("edit deliverables on this project");
+  }
+
+  const result = await ops.updateDeliverable({
+    deliverableId: String(formData.get("deliverableId") ?? ""),
+    title: String(formData.get("title") ?? ""),
+    dueDate: String(formData.get("dueDate") ?? "") || undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+async function updateProjectAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageProject(viewer.actor, viewer.graph, projectId)) {
+    return denied("edit this project");
+  }
+
+  const result = await ops.updateProject({
+    projectId,
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? "") || undefined,
+    phase: String(formData.get("phase") ?? "concept") as Project["phase"],
+    health: String(formData.get("health") ?? "on_track") as Project["health"],
+    targetDate: String(formData.get("targetDate") ?? "") || undefined,
+    openRoles: String(formData.get("openRoles") ?? "") || undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Project updated.");
+}
+
+async function deleteProjectAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.deleteProject(viewer.actor, viewer.graph, projectId)) {
+    return denied("delete this project");
+  }
+
+  const result = await ops.deleteProject(projectId);
+  if (result.ok) refresh();
+  return toResult(result, "Project deleted.");
+}
+
+async function updateTeamAction$impl(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTeams(viewer.actor)) return denied("edit divisions");
+
+  const result = await ops.updateTeam({
+    teamId: String(formData.get("teamId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    parentId: String(formData.get("parentId") ?? "") || null,
+    leadId: String(formData.get("leadId") ?? "") || undefined,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTeams(viewer.actor)) return denied("delete divisions");
+
+  const result = await ops.deleteTeam(String(formData.get("teamId") ?? ""));
+  if (result.ok) refresh();
+  return toResult(result, "Division deleted.");
+}
+
 // ---------------------------------------------------------------------------
 // The exported actions
 // ---------------------------------------------------------------------------
@@ -875,4 +959,24 @@ export async function setProjectTeamAction(formData: FormData): Promise<ActionRe
 
 export async function createTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => createTeamAction$impl(formData));
+}
+
+export async function updateDeliverableAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateDeliverableAction$impl(formData));
+}
+
+export async function updateProjectAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateProjectAction$impl(formData));
+}
+
+export async function deleteProjectAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteProjectAction$impl(formData));
+}
+
+export async function updateTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateTeamAction$impl(formData));
+}
+
+export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => deleteTeamAction$impl(formData));
 }

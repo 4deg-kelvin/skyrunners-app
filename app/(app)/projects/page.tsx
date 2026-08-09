@@ -2,10 +2,11 @@ import Link from "next/link";
 import { CornerDownRight, TriangleAlert, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { CreateTeamForm } from "@/components/forms/team-admin";
+import { CreateTeamForm, EditTeamForm } from "@/components/forms/team-admin";
 import { CreateProjectForm } from "@/components/forms/project-admin";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
@@ -76,7 +77,19 @@ export default async function ProjectsPage() {
             <CardBody>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <SectionLabel>Division</SectionLabel>
+                  <div className="flex items-center gap-3">
+                    <SectionLabel>Division</SectionLabel>
+                    {mayManageTeams ? (
+                      <EditTeamForm
+                        team={{
+                          id: division.id,
+                          name: division.name,
+                          parentId: division.parentId,
+                        }}
+                        divisions={formOptions.divisions}
+                      />
+                    ) : null}
+                  </div>
                   <h2 className="mt-1.5 text-2xl font-bold text-ink">
                     {division.name}
                   </h2>
@@ -134,7 +147,7 @@ function ProjectNode({
   node: ProjectTreeNode;
   depth: number;
 }) {
-  const { project, res, memberCount, children } = node;
+  const { project, res, memberCount, blockedCount, children } = node;
 
   return (
     <div>
@@ -158,7 +171,20 @@ function ProjectNode({
               ) : null}
             </div>
 
-            <ProjectBadges project={project} className="shrink-0" />
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <ProjectBadges project={project} />
+              {/*
+                Someone marking their work blocked is a fact; project health is
+                the RE's judgement and only moves when they change it. Both
+                belong here — otherwise a blocked deliverable is invisible to
+                the person who could clear it.
+              */}
+              {blockedCount > 0 ? (
+                <Badge tone="risk">
+                  {blockedCount} blocked
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">

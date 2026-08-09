@@ -109,11 +109,17 @@ export async function getRoster(): Promise<RosterRow[]> {
   //
   // Active first, then by name, so the working roster still reads normally and
   // the rest sits underneath it.
-  const order = { active: 0, inactive: 1, alumni: 2 } as const;
+  // Active before everyone else, then by rank, then alphabetically. Rank first
+  // because the roster's most common use is "who do I ask about this?" — and
+  // that's answered by leadership, not by whoever's name starts with A.
+  const byStatus = { active: 0, inactive: 1, alumni: 2 } as const;
+  const byRank = { co_lead: 0, lead: 1, member: 2 } as const;
+
   return [...readStore().members]
     .sort(
       (a, b) =>
-        (order[a.status] ?? 3) - (order[b.status] ?? 3) ||
+        (byStatus[a.status] ?? 3) - (byStatus[b.status] ?? 3) ||
+        (byRank[a.globalRole] ?? 3) - (byRank[b.globalRole] ?? 3) ||
         a.fullName.localeCompare(b.fullName)
     )
     .map((member) => {
