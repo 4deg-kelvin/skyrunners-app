@@ -93,6 +93,20 @@ export interface FlaggedProject {
 
 export interface DashboardView {
   club: typeof club;
+  /**
+   * Whether the club has an academic calendar at all.
+   *
+   * With no terms, `inSession` is false for every date, so NOBODY is ever
+   * asked for a check-in — the review queue stays empty, reliability never
+   * accrues, and the core loop of the app is quietly switched off. The Settings
+   * page has always said so; nothing else did, and Settings is not a page a
+   * Co-Lead opens unprompted.
+   *
+   * This was the state of the live club: three real projects, real members,
+   * and no term. Surfaced on the dashboard because that's where leadership
+   * looks, and because it's the one setup step with no visible symptom.
+   */
+  hasAcademicCalendar: boolean;
   /** True when the viewer oversees nobody — changes the whole page's message. */
   isLeadOfNobody: boolean;
   counts: {
@@ -491,6 +505,7 @@ export async function getDashboard(
 
   return {
     club,
+    hasAcademicCalendar: store.terms.length > 0,
     isLeadOfNobody: overseen.length === 0,
     counts: {
       peopleOverseen: overseen.length,

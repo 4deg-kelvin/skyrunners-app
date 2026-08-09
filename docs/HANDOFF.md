@@ -22,6 +22,13 @@ npm run db:check        # is the database really there?
 PW=<db-password> npm run verify:live   # does every page work on real data?
 ```
 
+**Before the club uses it, somebody has to add a term.** Check-ins only
+generate inside an academic period the club has entered, and with no terms
+`inSession` is false for every date — so nobody is prompted, no review queue
+fills, and reliability never starts. It's the one setup step with no visible
+symptom, which is why the dashboard now says so in a banner. Settings →
+Academic Calendar.
+
 `verify:live` is the one that matters. It loads the whole database and calls the
 `lib/data/*` function behind every route, plus the two pages that call several
 in parallel. As of now: **all 21 pass**.

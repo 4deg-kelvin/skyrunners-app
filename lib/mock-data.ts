@@ -3005,12 +3005,29 @@ export function activeWeeksFor(memberId: string): number {
   const end = Date.parse(`${today()}T00:00:00Z`);
   if (!Number.isFinite(start) || end <= start) return 1;
 
+  /*
+    No academic calendar at all means no weeks are EXCLUDED, not that none
+    count.
+
+    `inSession` is false for every date when the terms table is empty, so
+    counting in-session weeks would return 0, floor to 1, and report somebody's
+    entire term of work as one week's worth — a member with 40 hours logged
+    would read as 40 hrs/week. That is what the live club looked like before
+    anyone had entered a quarter.
+
+    A club that hasn't said when it's off is a club that's on. Check-in
+    OBLIGATIONS still require an explicit term, deliberately — the app must not
+    start chasing people before anyone has set it up — but an hours average
+    should degrade to "every week since you joined" rather than to nonsense.
+  */
+  const hasCalendar = live().terms.length > 0;
+
   let weeks = 0;
   for (let t = start; t <= end; t += 7 * 86_400_000) {
     // Midweek, so a week counts if the club was running for most of it rather
     // than only on the exact day the member happened to join.
     const midweek = new Date(t + 3 * 86_400_000).toISOString().slice(0, 10);
-    if (inSession(midweek)) weeks++;
+    if (!hasCalendar || inSession(midweek)) weeks++;
   }
   return Math.max(1, weeks);
 }

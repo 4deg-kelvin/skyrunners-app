@@ -76,6 +76,42 @@ export default async function DashboardPage({
         }
       />
 
+      {/*
+        The one setup step whose absence has no other symptom.
+
+        Everything else missing is obvious — no divisions, no projects, an
+        empty roster. A missing academic calendar just means check-ins silently
+        never generate, which looks like "nobody has written one yet" rather
+        than "the feature is off".
+      */}
+      {!view.hasAcademicCalendar ? (
+        <Card className="border-warn-fg/40 bg-warn-bg/40">
+          <CardBody>
+            <div className="flex flex-wrap items-start gap-3">
+              <TriangleAlert className="text-warn-fg mt-0.5 size-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-ink text-[15px] font-bold">
+                  No academic calendar yet, so no check-ins are being asked for
+                </p>
+                <p className="text-ink-soft mt-1 max-w-2xl text-[15px]">
+                  Check-ins only generate inside a term the club has entered.
+                  Until one covers today, nobody is prompted to write one,
+                  nothing shows in your review queue, and reliability
+                  doesn&apos;t start counting. Everything else — hours,
+                  projects, deliverables — works normally.
+                </p>
+                <Link
+                  href="/settings"
+                  className="text-cardinal-600 hover:text-cardinal-700 mt-2 inline-block text-sm font-bold"
+                >
+                  Add this quarter in Settings →
+                </Link>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         {/* ---------------- Left: team summary ---------------- */}
         <Card className="h-fit">
