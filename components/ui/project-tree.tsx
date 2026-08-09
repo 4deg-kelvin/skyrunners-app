@@ -48,7 +48,7 @@ export function ProjectNode({
   return (
     <div>
       <div
-        className="rounded-tile border border-line transition-colors hover:bg-surface"
+        className="rounded-tile border-line hover:bg-surface border transition-colors"
         style={{ marginLeft: depth * 24 }}
       >
         <div className="flex items-start gap-2 px-4 py-3.5">
@@ -56,7 +56,7 @@ export function ProjectNode({
             <button
               onClick={() => setExpanded((v) => !v)}
               aria-label={expanded ? "Hide sub-projects" : "Show sub-projects"}
-              className="mt-0.5 rounded p-0.5 text-ink-muted hover:bg-line hover:text-ink"
+              className="text-ink-muted hover:bg-line hover:text-ink mt-0.5 rounded p-0.5"
             >
               {expanded ? (
                 <ChevronDown className="size-4" />
@@ -65,7 +65,7 @@ export function ProjectNode({
               )}
             </button>
           ) : depth > 0 ? (
-            <CornerDownRight className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+            <CornerDownRight className="text-ink-muted mt-0.5 size-4 shrink-0" />
           ) : (
             <span className="size-5 shrink-0" />
           )}
@@ -75,12 +75,12 @@ export function ProjectNode({
               <div className="min-w-0">
                 <Link
                   href={`/projects/${project.slug}`}
-                  className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                  className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                 >
                   {project.name}
                 </Link>
                 {project.description ? (
-                  <p className="mt-1 text-sm text-ink-soft">
+                  <p className="text-ink-soft mt-1 text-sm">
                     {project.description}
                   </p>
                 ) : null}
@@ -99,16 +99,16 @@ export function ProjectNode({
               </div>
             </div>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+            <div className="text-ink-muted mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
               {res.length > 0 ? (
                 <span>
-                  <span className="font-semibold text-ink-soft">
+                  <span className="text-ink-soft font-semibold">
                     {res.length > 1 ? "REs" : "RE"}:
                   </span>{" "}
                   {res.map((r) => r.fullName).join(", ")}
                 </span>
               ) : (
-                <span className="font-semibold text-warn-fg">No RE yet</span>
+                <span className="text-warn-fg font-semibold">No RE yet</span>
               )}
               <span>
                 {memberCount} {memberCount === 1 ? "person" : "people"}
@@ -121,7 +121,7 @@ export function ProjectNode({
               {children.length > 0 ? (
                 <button
                   onClick={() => setExpanded((v) => !v)}
-                  className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+                  className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
                 >
                   {expanded ? "Hide" : "Show"} {children.length} sub-project
                   {children.length === 1 ? "" : "s"}
@@ -135,7 +135,11 @@ export function ProjectNode({
       {expanded ? (
         <div className="mt-3 space-y-3">
           {children.map((child) => (
-            <ProjectNode key={child.project.id} node={child} depth={depth + 1} />
+            <ProjectNode
+              key={child.project.id}
+              node={child}
+              depth={depth + 1}
+            />
           ))}
         </div>
       ) : null}
@@ -181,8 +185,10 @@ export function DivisionProjectList({ roots }: { roots: ProjectTreeNode[] }) {
       </div>
 
       {finished.length > 0 && !hideCompleted ? (
-        <div className="mt-6 border-t border-line pt-5">
-          <SectionLabel tone="muted">Completed · {finished.length}</SectionLabel>
+        <div className="border-line mt-6 border-t pt-5">
+          <SectionLabel tone="muted">
+            Completed · {finished.length}
+          </SectionLabel>
           <div className="mt-3 space-y-3">
             {finished.map((node) => (
               <ProjectNode key={node.project.id} node={node} depth={0} />

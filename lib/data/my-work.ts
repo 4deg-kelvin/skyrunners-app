@@ -189,8 +189,12 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     }
   );
 
-  const committed = cards.filter((c) => c.membership.commitment === "committed");
-  const following = cards.filter((c) => c.membership.commitment === "following");
+  const committed = cards.filter(
+    (c) => c.membership.commitment === "committed"
+  );
+  const following = cards.filter(
+    (c) => c.membership.commitment === "following"
+  );
   const projects = committed;
 
   const currentUpdate = currentUpdateFor(memberId);

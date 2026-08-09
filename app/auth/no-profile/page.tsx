@@ -15,14 +15,14 @@ export default function NoProfilePage() {
       <Card>
         <CardBody className="py-8">
           <SectionLabel>Almost There</SectionLabel>
-          <h1 className="mt-2 text-3xl font-bold text-ink">
+          <h1 className="text-ink mt-2 text-3xl font-bold">
             You&apos;re not on the roster yet
           </h1>
-          <p className="mt-3 text-[15px] text-ink-soft">
+          <p className="text-ink-soft mt-3 text-[15px]">
             Your Stanford sign-in worked, but there&apos;s no SkyRunners profile
             attached to it yet. A Team Lead or Co-Lead needs to add you.
           </p>
-          <p className="mt-3 text-[15px] text-ink-soft">
+          <p className="text-ink-soft mt-3 text-[15px]">
             If someone already invited you, they may have used a different email
             address — worth checking which one, then signing in with that.
           </p>

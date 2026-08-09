@@ -147,14 +147,18 @@ export const KEY_EVENT_WEIGHT = 4;
  * Render `section.name` straight through.
  */
 
-export const CERTIFICATION_STATUS_LABELS: Record<CertificationStatus, string> = {
-  requested: "Awaiting verification",
-  verified: "Verified",
-  expired: "Expired",
-  rejected: "Not approved",
-};
+export const CERTIFICATION_STATUS_LABELS: Record<CertificationStatus, string> =
+  {
+    requested: "Awaiting verification",
+    verified: "Verified",
+    expired: "Expired",
+    rejected: "Not approved",
+  };
 
-export const CERTIFICATION_STATUS_TONES: Record<CertificationStatus, BadgeTone> = {
+export const CERTIFICATION_STATUS_TONES: Record<
+  CertificationStatus,
+  BadgeTone
+> = {
   requested: "warn",
   verified: "ok",
   // Red, not grey. An expired clearance that reads as merely "inactive" is how
@@ -264,7 +268,15 @@ export const WEEKDAY_NAMES = [
   "Saturday",
 ] as const;
 
-export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export const WEEKDAY_SHORT = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
 
 /**
  * Days offered for update deadlines. All seven.

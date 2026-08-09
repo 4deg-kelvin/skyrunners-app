@@ -126,25 +126,26 @@ export async function getRoster(): Promise<RosterRow[]> {
         a.fullName.localeCompare(b.fullName)
     )
     .map((member) => {
-    const mine = memberProjects(member.id);
-    const deliverables = myDeliverables(member.id);
-    const inputs = contributionInputsFor(member.id);
-    const hoursPerWeek =
-      inputs.activeWeeks > 0 ? inputs.hoursTotal / inputs.activeWeeks : 0;
+      const mine = memberProjects(member.id);
+      const deliverables = myDeliverables(member.id);
+      const inputs = contributionInputsFor(member.id);
+      const hoursPerWeek =
+        inputs.activeWeeks > 0 ? inputs.hoursTotal / inputs.activeWeeks : 0;
 
-    return {
-      member,
-      lead: member.leadId ? getMember(member.leadId) : undefined,
-      committedCount: committedProjectCount(member.id),
-      reCount: mine.filter((p) => p.role === "re").length,
-      deliverablesCompleted: deliverables.filter((d) => d.status === "done")
-        .length,
-      openDeliverables: deliverables.filter((d) => d.status !== "done").length,
-      overdueDeliverables: deliverables.filter(isOverdue).length,
-      tier: commitmentTier(hoursPerWeek, inputs.isPaused),
-      hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
-    };
-  });
+      return {
+        member,
+        lead: member.leadId ? getMember(member.leadId) : undefined,
+        committedCount: committedProjectCount(member.id),
+        reCount: mine.filter((p) => p.role === "re").length,
+        deliverablesCompleted: deliverables.filter((d) => d.status === "done")
+          .length,
+        openDeliverables: deliverables.filter((d) => d.status !== "done")
+          .length,
+        overdueDeliverables: deliverables.filter(isOverdue).length,
+        tier: commitmentTier(hoursPerWeek, inputs.isPaused),
+        hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
+      };
+    });
 }
 
 export interface MemberProjectRow {
@@ -258,7 +259,9 @@ export async function getMemberProfile(
           // Only ones actually sent. A `pending` row is a slot the member
           // hasn't filled in yet, and `missed` is an empty one that expired —
           // neither is something to read.
-          .progressUpdates.filter((u) => u.memberId === memberId && u.submittedAt)
+          .progressUpdates.filter(
+            (u) => u.memberId === memberId && u.submittedAt
+          )
           .sort((a, b) =>
             (b.submittedAt ?? "").localeCompare(a.submittedAt ?? "")
           )
@@ -294,15 +297,12 @@ export async function getMemberProfile(
   };
 }
 
-/** Every member id — used to pre-render profile pages at build time. */
-export async function getAllMemberIds(): Promise<string[]> {
-  // Ensure the live snapshot exists before any synchronous read.
-  //
-  // Idempotent and free once loaded. It's here rather than left to the caller
-  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
-  // which starts the read BEFORE getViewer has preloaded, and every such page
-  // then died on "Live store not loaded". Guarding at the boundary means call
-  // order stops mattering.
-  await preloadLiveStore();
-  return readStore().members.map((m) => m.id);
-}
+/*
+  `getAllMemberIds` used to live here, for `generateStaticParams`.
+
+  Build-time prerendering was removed — it ran with no request and no session,
+  hit the mock-data fallback, and baked profile pages for people who don't
+  exist (docs/HANDOFF.md §4). `app/(app)` is `force-dynamic` now, so nothing
+  has called this since. Deleted rather than left as a function nobody can
+  explain the purpose of.
+*/

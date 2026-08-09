@@ -23,14 +23,14 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-tile border border-dashed border-line px-4 py-6 text-center",
+        "rounded-tile border-line border border-dashed px-4 py-6 text-center",
         className
       )}
     >
-      <p className="text-sm text-ink-soft">{message}</p>
+      <p className="text-ink-soft text-sm">{message}</p>
       <Link
         href={actionHref}
-        className="mt-2 inline-block text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+        className="text-cardinal-600 hover:text-cardinal-700 mt-2 inline-block text-sm font-semibold"
       >
         {actionLabel}
       </Link>

@@ -11,10 +11,10 @@ export default function NotFound() {
     <Card>
       <CardBody className="py-12 text-center">
         <SectionLabel>Not Found</SectionLabel>
-        <h1 className="mt-3 text-3xl font-bold text-ink">
+        <h1 className="text-ink mt-3 text-3xl font-bold">
           We couldn&apos;t find that page
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-[15px] text-ink-soft">
+        <p className="text-ink-soft mx-auto mt-3 max-w-md text-[15px]">
           The link may be out of date, or the project or member may have been
           archived.
         </p>

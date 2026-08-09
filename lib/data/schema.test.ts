@@ -30,7 +30,13 @@ import { join } from "node:path";
 import { QUERIED_COLUMNS } from "./graph.ts";
 import { COLLECTIONS } from "../store/mapping.ts";
 
-const MIGRATIONS_DIR = join(import.meta.dirname, "..", "..", "supabase", "migrations");
+const MIGRATIONS_DIR = join(
+  import.meta.dirname,
+  "..",
+  "..",
+  "supabase",
+  "migrations"
+);
 
 /**
  * Parse `create table` and `alter table ... add column` out of the migrations.
@@ -66,7 +72,8 @@ function parseSchema(): Map<string, Set<string>> {
     );
 
     // --- create table -----------------------------------------------------
-    const createRe = /create table (?:if not exists )?(\w+)\s*\(([\s\S]*?)\n\);/g;
+    const createRe =
+      /create table (?:if not exists )?(\w+)\s*\(([\s\S]*?)\n\);/g;
     let match: RegExpExecArray | null;
 
     while ((match = createRe.exec(sql)) !== null) {
@@ -304,7 +311,10 @@ describe("the Postgres mapping matches the real schema", () => {
   for (const spec of COLLECTIONS) {
     test(`${spec.table} has every column ${String(spec.key)} maps`, () => {
       const actual = schema.get(spec.table);
-      assert.ok(actual, `No "create table ${spec.table}" in supabase/migrations/`);
+      assert.ok(
+        actual,
+        `No "create table ${spec.table}" in supabase/migrations/`
+      );
 
       const missing = spec.columns
         .split(",")

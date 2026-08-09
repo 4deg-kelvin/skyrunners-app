@@ -21,7 +21,11 @@ import type { Member, ProgressUpdate } from "./types.ts";
 
 const TODAY = "2026-08-10";
 
-function member(id: string, leadId: string | null, role: Member["globalRole"] = "member"): Member {
+function member(
+  id: string,
+  leadId: string | null,
+  role: Member["globalRole"] = "member"
+): Member {
   return {
     id,
     fullName: id,
@@ -166,7 +170,12 @@ describe("escalation names one Lead, not a pile of reports", () => {
     const theirReport = member("theirReport", "otherLead");
     const updates = [update("u1", "theirReport", "submitted", "2026-08-01")];
     assert.deepEqual(
-      escalationsFor("coLead", [...ALL, otherLead, theirReport], updates, TODAY),
+      escalationsFor(
+        "coLead",
+        [...ALL, otherLead, theirReport],
+        updates,
+        TODAY
+      ),
       []
     );
   });

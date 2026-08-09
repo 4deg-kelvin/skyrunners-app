@@ -42,7 +42,7 @@ export function InviteMemberForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+        className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <UserPlus className="size-4" strokeWidth={2.5} />
         Invite member
@@ -56,21 +56,23 @@ export function InviteMemberForm({
       submitLabel="Send invite"
       submittingLabel="Inviting…"
       resetOnSuccess
-      className="w-full rounded-card border border-line bg-card p-4"
+      className="rounded-card border-line bg-card w-full border p-4"
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Name</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Name
+          </span>
           <input
             type="text"
             name="fullName"
             required
             placeholder="Jordan Reyes"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Stanford email
           </span>
           <input
@@ -78,36 +80,36 @@ export function InviteMemberForm({
             name="email"
             required
             placeholder="jreyes@stanford.edu"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
-            Phone <span className="font-normal text-ink-muted">(optional)</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Phone <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="tel"
             name="phone"
             placeholder="(650) 555-0142"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Shown instead of their email wherever people need to reach them.
             They can change it later.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Reports to
           </span>
           <select
             name="leadId"
             defaultValue={defaultLeadId ?? ""}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           >
             {leads.map((l) => (
               <option key={l.id} value={l.id}>
@@ -115,17 +117,19 @@ export function InviteMemberForm({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Whoever reads their check-ins. Defaults to you.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Role</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Role
+          </span>
           <select
             name="globalRole"
             defaultValue="member"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           >
             <option value="member">Member</option>
             {canAppointLeadership ? (
@@ -136,14 +140,14 @@ export function InviteMemberForm({
             ) : null}
           </select>
           {!canAppointLeadership ? (
-            <span className="mt-1 block text-xs text-ink-muted">
+            <span className="text-ink-muted mt-1 block text-xs">
               Only a Co-Lead can invite someone as leadership.
             </span>
           ) : null}
         </label>
       </div>
 
-      <p className="mb-3 mt-3 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-3 mb-3 text-xs">
         They appear on the roster straight away and become a real account the
         first time they sign in with that address.
       </p>
@@ -151,7 +155,7 @@ export function InviteMemberForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -197,7 +201,7 @@ export function MemberAdminControls({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+        className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
       >
         Manage
       </button>
@@ -205,12 +209,12 @@ export function MemberAdminControls({
   }
 
   return (
-    <div className="mt-3 w-full space-y-3 rounded-tile border border-line bg-surface p-3.5">
+    <div className="rounded-tile border-line bg-surface mt-3 w-full space-y-3 border p-3.5">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-ink">Managing {memberName}</p>
+        <p className="text-ink text-sm font-bold">Managing {memberName}</p>
         <button
           onClick={() => setOpen(false)}
-          className="text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink text-sm font-semibold"
         >
           Done
         </button>
@@ -224,13 +228,13 @@ export function MemberAdminControls({
         >
           <input type="hidden" name="memberId" value={memberId} />
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Role
             </span>
             <select
               name="role"
               defaultValue={role}
-              className="mb-2 w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
             >
               <option value="member">Member</option>
               <option value="lead">Team Lead</option>
@@ -248,13 +252,13 @@ export function MemberAdminControls({
         >
           <input type="hidden" name="memberId" value={memberId} />
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Reports to
             </span>
             <select
               name="leadId"
               defaultValue={leadId ?? ""}
-              className="mb-2 w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
             >
               <option value="">Nobody (top of the chain)</option>
               {leadOptions
@@ -270,7 +274,7 @@ export function MemberAdminControls({
       ) : null}
 
       {canSetStatus ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <div className="border-line flex flex-wrap items-center gap-2 border-t pt-3">
           {status === "active" ? (
             <>
               <ActionButton
@@ -286,7 +290,7 @@ export function MemberAdminControls({
                 label="Mark alumni"
                 pendingLabel="Saving…"
               />
-              <span className="text-xs text-ink-muted">
+              <span className="text-ink-muted text-xs">
                 Never deletes — their history stays on the projects.
               </span>
             </>
@@ -341,14 +345,14 @@ function DeleteMemberControl({
 
   if (!confirming) {
     return (
-      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+      <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
         <button
           onClick={() => setConfirming(true)}
-          className="text-sm font-semibold text-ink-muted hover:text-risk-fg"
+          className="text-ink-muted hover:text-risk-fg text-sm font-semibold"
         >
           Delete record
         </button>
-        <span className="text-xs text-ink-muted">
+        <span className="text-ink-muted text-xs">
           For a duplicate or broken profile. To remove someone who left, use
           Deactivate — that keeps their history.
         </span>
@@ -357,18 +361,18 @@ function DeleteMemberControl({
   }
 
   return (
-    <div className="mt-3 border-t border-line pt-3">
-      <p className="text-sm font-semibold text-ink">
+    <div className="border-line mt-3 border-t pt-3">
+      <p className="text-ink text-sm font-semibold">
         Delete {memberName}&apos;s record permanently?
       </p>
-      <p className="mt-1 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-1 text-xs">
         Their project memberships, hours, check-ins, trainings and requests go
         with it. Anyone reporting to them moves up to {memberName}&apos;s own
         Lead rather than being orphaned. Refused if they&apos;re the primary RE
         of anything — hand those over first.
       </p>
 
-      <label className="mt-2 flex items-start gap-2 text-xs text-ink-soft">
+      <label className="text-ink-soft mt-2 flex items-start gap-2 text-xs">
         <input
           type="checkbox"
           checked={force}
@@ -395,7 +399,7 @@ function DeleteMemberControl({
             setConfirming(false);
             setForce(false);
           }}
-          className="text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink text-sm font-semibold"
         >
           Keep it
         </button>

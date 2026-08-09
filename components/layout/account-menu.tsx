@@ -55,17 +55,17 @@ export function AccountMenu({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex items-center gap-2.5 rounded-full border border-line py-1.5 pl-1.5 pr-3 transition-colors hover:bg-surface"
+        className="border-line hover:bg-surface flex items-center gap-2.5 rounded-full border py-1.5 pr-3 pl-1.5 transition-colors"
       >
-        <span className="flex size-8 items-center justify-center rounded-full bg-neutral-bg text-xs font-bold text-ink-soft">
+        <span className="bg-neutral-bg text-ink-soft flex size-8 items-center justify-center rounded-full text-xs font-bold">
           {initials(userName)}
         </span>
-        <span className="hidden text-[15px] font-medium text-ink sm:inline">
+        <span className="text-ink hidden text-[15px] font-medium sm:inline">
           {userName}
         </span>
         <ChevronDown
           className={cn(
-            "size-4 text-ink-muted transition-transform",
+            "text-ink-muted size-4 transition-transform",
             open && "rotate-180"
           )}
         />
@@ -74,40 +74,40 @@ export function AccountMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-card border border-line bg-card shadow-sm"
+          className="rounded-card border-line bg-card absolute right-0 z-50 mt-2 w-60 overflow-hidden border shadow-sm"
         >
           <Link
             href={`/members/${memberId}`}
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-[15px] text-ink transition-colors hover:bg-surface"
+            className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] transition-colors"
           >
-            <User className="size-4 text-ink-muted" />
+            <User className="text-ink-muted size-4" />
             My profile
           </Link>
           <Link
             href="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-3 text-[15px] text-ink transition-colors hover:bg-surface"
+            className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] transition-colors"
           >
-            <Settings className="size-4 text-ink-muted" />
+            <Settings className="text-ink-muted size-4" />
             Update schedule
           </Link>
 
-          <div className="h-px bg-line-soft" />
+          <div className="bg-line-soft h-px" />
 
           {isDemo ? (
-            <p className="px-4 py-3 text-sm text-ink-muted">
+            <p className="text-ink-muted px-4 py-3 text-sm">
               Demo mode — no account to sign out of.
             </p>
           ) : (
             <button
               role="menuitem"
               onClick={signOut}
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px] text-ink transition-colors hover:bg-surface"
+              className="text-ink hover:bg-surface flex w-full items-center gap-2.5 px-4 py-3 text-left text-[15px] transition-colors"
             >
-              <LogOut className="size-4 text-ink-muted" />
+              <LogOut className="text-ink-muted size-4" />
               Sign out
             </button>
           )}

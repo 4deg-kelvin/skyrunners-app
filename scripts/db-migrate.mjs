@@ -83,7 +83,9 @@ try {
   console.log("(no schema_migrations table yet — 0008 creates it)\n");
 }
 
-const pending = todo.filter((f) => !alreadyApplied.has(f.replace(/\.sql$/, "")));
+const pending = todo.filter(
+  (f) => !alreadyApplied.has(f.replace(/\.sql$/, ""))
+);
 const skipped = todo.length - pending.length;
 
 if (skipped > 0) {

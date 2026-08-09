@@ -387,7 +387,8 @@ describe("blocking", () => {
       "Waiting on the load cell"
     );
     assert.equal(good.ok, true);
-    if (good.ok) assert.equal(good.value.blockerNote, "Waiting on the load cell");
+    if (good.ok)
+      assert.equal(good.value.blockerNote, "Waiting on the load cell");
   });
 
   test("moving off blocked clears the note", async () => {

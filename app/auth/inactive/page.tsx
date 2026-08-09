@@ -15,15 +15,15 @@ export default function InactivePage() {
       <Card>
         <CardBody className="py-8">
           <SectionLabel>Account Inactive</SectionLabel>
-          <h1 className="mt-2 text-3xl font-bold text-ink">
+          <h1 className="text-ink mt-2 text-3xl font-bold">
             Your account isn&apos;t active
           </h1>
-          <p className="mt-3 text-[15px] text-ink-soft">
+          <p className="text-ink-soft mt-3 text-[15px]">
             Your profile is marked inactive or alumni, so the app is read-locked
             for now. Your contribution history is all still there — nothing gets
             deleted.
           </p>
-          <p className="mt-3 text-[15px] text-ink-soft">
+          <p className="text-ink-soft mt-3 text-[15px]">
             Rejoining? Ask a Co-Lead to reactivate you and everything comes back
             as it was.
           </p>

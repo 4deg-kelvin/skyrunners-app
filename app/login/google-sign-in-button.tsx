@@ -65,15 +65,15 @@ export function GoogleSignInButton({ next }: { next?: string }) {
       </Button>
 
       {failure === "network" ? (
-        <p className="mt-3 text-sm font-medium text-risk-fg">
+        <p className="text-risk-fg mt-3 text-sm font-medium">
           Couldn&apos;t reach Google. Check your connection and try again.
         </p>
       ) : null}
 
       {failure === "unconfigured" ? (
-        <p className="mt-3 text-sm font-medium text-risk-fg">
-          Sign-in isn&apos;t configured on this deployment. Nothing you can fix —
-          let whoever manages the server know.
+        <p className="text-risk-fg mt-3 text-sm font-medium">
+          Sign-in isn&apos;t configured on this deployment. Nothing you can fix
+          — let whoever manages the server know.
         </p>
       ) : null}
     </div>

@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "fs";
 import { join } from "path";
 
 import { isLiveMode } from "../env.ts";
@@ -179,14 +186,43 @@ function seed(): StoreShape {
 let cache: StoreShape | null = null;
 let writable: boolean | null = null;
 
+/**
+ * The file's mtime when we last read it, so a write by ANOTHER copy of this
+ * module is noticed.
+ *
+ * That sounds impossible in one process, and it is in production. But `next
+ * dev` compiles Server Actions and the RSC render into separate module
+ * instances, each with its own `cache`. So in demo mode an edit would save
+ * correctly — disk updated, action reporting success — and the page would go on
+ * rendering the value it first loaded, forever. Save, reload, unchanged.
+ *
+ * That is indistinguishable from "the write silently failed", which is the most
+ * expensive bug shape in this project (see `persistDiff` and the `profiles`
+ * delete policy for the same symptom with a different cause). It cost a round
+ * of debugging on the calendar edit form before the mtime was the giveaway.
+ *
+ * Live mode never reaches here — `readStore()` returns the per-request Postgres
+ * snapshot — so this is purely about keeping local demo testing honest.
+ */
+let cachedMtimeMs = 0;
+
 function load(): StoreShape {
-  if (cache) return cache;
+  if (cache) {
+    // Cheap: one stat, no parse, unless somebody else actually wrote.
+    try {
+      const { mtimeMs } = statSync(STORE_PATH);
+      if (mtimeMs === cachedMtimeMs) return cache;
+    } catch {
+      return cache;
+    }
+  }
 
   try {
     if (existsSync(STORE_PATH)) {
       const parsed = JSON.parse(readFileSync(STORE_PATH, "utf8")) as StoreShape;
       if (parsed.version === STORE_VERSION) {
         cache = parsed;
+        cachedMtimeMs = statSync(STORE_PATH).mtimeMs;
         return cache;
       }
       console.warn(
@@ -222,6 +258,10 @@ function persist() {
     const tmp = `${STORE_PATH}.tmp`;
     writeFileSync(tmp, JSON.stringify(cache, null, 2), "utf8");
     renameSync(tmp, STORE_PATH);
+    // Our own write. Recording it stops the next read re-parsing the file we
+    // just produced — and, more importantly, stops it replacing `cache` with a
+    // fresh object while `mutate` still holds a reference to this one.
+    cachedMtimeMs = statSync(STORE_PATH).mtimeMs;
     writable = true;
   } catch (error) {
     if (writable !== false) {

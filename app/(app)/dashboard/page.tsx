@@ -83,10 +83,10 @@ export default async function DashboardPage({
             <SectionLabel>Team Summary</SectionLabel>
 
             <div className="mt-5 flex items-center gap-4">
-              <div className="flex size-[72px] shrink-0 items-center justify-center rounded-tile bg-cardinal-50 text-2xl font-bold text-cardinal-600">
+              <div className="rounded-tile bg-cardinal-50 text-cardinal-600 flex size-[72px] shrink-0 items-center justify-center text-2xl font-bold">
                 SR
               </div>
-              <p className="text-xl font-bold text-ink">{club.name}</p>
+              <p className="text-ink text-xl font-bold">{club.name}</p>
             </div>
 
             <div className="mt-5">
@@ -131,8 +131,8 @@ export default async function DashboardPage({
                           href="/dashboard"
                           className={
                             scope === "mine"
-                              ? "font-bold text-cardinal-600"
-                              : "font-semibold text-ink-muted hover:text-ink"
+                              ? "text-cardinal-600 font-bold"
+                              : "text-ink-muted hover:text-ink font-semibold"
                           }
                         >
                           My reports
@@ -142,8 +142,8 @@ export default async function DashboardPage({
                           href="/dashboard?scope=club"
                           className={
                             scope === "club"
-                              ? "font-bold text-cardinal-600"
-                              : "font-semibold text-ink-muted hover:text-ink"
+                              ? "text-cardinal-600 font-bold"
+                              : "text-ink-muted hover:text-ink font-semibold"
                           }
                         >
                           Whole club
@@ -151,10 +151,10 @@ export default async function DashboardPage({
                       </div>
                     ) : null}
                   </div>
-                  <h2 className="mt-2 text-2xl font-bold text-ink">
+                  <h2 className="text-ink mt-2 text-2xl font-bold">
                     Cycle summary
                   </h2>
-                  <p className="mt-2 text-[15px] text-ink-soft">
+                  <p className="text-ink-soft mt-2 text-[15px]">
                     {scope === "club"
                       ? "Compliance, effort and project health across every active member."
                       : `Compliance, effort and project health for you and the ${counts.peopleOverseen} ${counts.peopleOverseen === 1 ? "person" : "people"} you oversee — not the whole club.`}
@@ -194,7 +194,7 @@ export default async function DashboardPage({
             <Card>
               <CardBody>
                 <SectionLabel>Not Being Read</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   These Leads have check-ins they haven&apos;t read. A report
                   nobody reads is worse than no report — the member spent effort
                   on it.
@@ -204,21 +204,21 @@ export default async function DashboardPage({
                   {escalations.map(({ lead, overdue, worstAgeDays }) => (
                     <div
                       key={lead.id}
-                      className="rounded-tile border border-warn-fg/30 bg-warn-bg/40 px-4 py-3.5"
+                      className="rounded-tile border-warn-fg/30 bg-warn-bg/40 border px-4 py-3.5"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         <Link
                           href={`/members/${lead.id}`}
-                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                         >
                           {lead.fullName}
                         </Link>
-                        <span className="text-sm font-semibold text-warn-fg">
+                        <span className="text-warn-fg text-sm font-semibold">
                           oldest waiting {worstAgeDays}{" "}
                           {worstAgeDays === 1 ? "day" : "days"}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-sm text-ink-soft">
+                      <p className="text-ink-soft mt-1.5 text-sm">
                         {overdue.length}{" "}
                         {overdue.length === 1 ? "person" : "people"} waiting:{" "}
                         {overdue
@@ -244,57 +244,66 @@ export default async function DashboardPage({
             <Card>
               <CardBody>
                 <SectionLabel>Waiting On You As RE</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   Not your reading queue — this is work on your projects that
                   can&apos;t move until you answer.
                 </p>
 
                 <div className="mt-4 space-y-2.5">
-                  {reQueue.signOffs.map(({ deliverable, owner, ageDays, escalated }) => (
-                    <div
-                      key={deliverable.id}
-                      className={`rounded-tile border px-4 py-3 ${
-                        escalated ? "border-warn-fg/30 bg-warn-bg/40" : "border-line"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-[15px] font-bold text-ink">
-                          {deliverable.title}
-                        </span>
-                        <span className="text-sm text-ink-muted">
-                          {ageDays === 0 ? "today" : `${ageDays}d waiting`}
-                        </span>
+                  {reQueue.signOffs.map(
+                    ({ deliverable, owner, ageDays, escalated }) => (
+                      <div
+                        key={deliverable.id}
+                        className={`rounded-tile border px-4 py-3 ${
+                          escalated
+                            ? "border-warn-fg/30 bg-warn-bg/40"
+                            : "border-line"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                          <span className="text-ink text-[15px] font-bold">
+                            {deliverable.title}
+                          </span>
+                          <span className="text-ink-muted text-sm">
+                            {ageDays === 0 ? "today" : `${ageDays}d waiting`}
+                          </span>
+                        </div>
+                        <p className="text-ink-soft mt-1 text-sm">
+                          {owner?.fullName ?? "Someone"} marked this done — it
+                          doesn&apos;t count until you confirm it.
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-ink-soft">
-                        {owner?.fullName ?? "Someone"} marked this done — it
-                        doesn&apos;t count until you confirm it.
-                      </p>
-                    </div>
-                  ))}
+                    )
+                  )}
 
-                  {reQueue.unanswered.map(({ entry, author, ageDays, escalated }) => (
-                    <div
-                      key={entry.id}
-                      className={`rounded-tile border px-4 py-3 ${
-                        escalated ? "border-warn-fg/30 bg-warn-bg/40" : "border-line"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-[15px] font-bold text-ink">
-                          {author?.fullName ?? "Someone"} is waiting on an answer
-                        </span>
-                        <span className="text-sm text-ink-muted">
-                          {ageDays === 0 ? "today" : `${ageDays}d waiting`}
-                        </span>
+                  {reQueue.unanswered.map(
+                    ({ entry, author, ageDays, escalated }) => (
+                      <div
+                        key={entry.id}
+                        className={`rounded-tile border px-4 py-3 ${
+                          escalated
+                            ? "border-warn-fg/30 bg-warn-bg/40"
+                            : "border-line"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                          <span className="text-ink text-[15px] font-bold">
+                            {author?.fullName ?? "Someone"} is waiting on an
+                            answer
+                          </span>
+                          <span className="text-ink-muted text-sm">
+                            {ageDays === 0 ? "today" : `${ageDays}d waiting`}
+                          </span>
+                        </div>
+                        <p className="text-ink-soft mt-1 text-sm">
+                          {entry.blockers || entry.nextSteps}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-ink-soft">
-                        {entry.blockers || entry.nextSteps}
-                      </p>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
 
-                <p className="mt-4 text-sm text-ink-muted">
+                <p className="text-ink-muted mt-4 text-sm">
                   Answer these on the project page — the reply lands in its
                   update feed where everyone can see it.
                 </p>
@@ -322,7 +331,7 @@ export default async function DashboardPage({
                   */}
                   <Link
                     href="/settings"
-                    className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                    className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
                   >
                     Edit the catalogue
                   </Link>
@@ -330,45 +339,52 @@ export default async function DashboardPage({
 
                 {trainings.pending.length > 0 ? (
                   <div className="mt-4 space-y-2.5">
-                    {trainings.pending.map(({ record, member, item, sectionName }) => (
-                      <div
-                        key={record.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={`/members/${member.id}`}
-                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
-                          >
-                            {member.fullName}
-                          </Link>
-                          <p className="mt-0.5 text-sm text-ink-muted">
-                            {item?.name ?? "A training"}
-                            {sectionName ? ` · ${sectionName}` : ""}
-                          </p>
+                    {trainings.pending.map(
+                      ({ record, member, item, sectionName }) => (
+                        <div
+                          key={record.id}
+                          className="rounded-tile border-line flex flex-wrap items-center justify-between gap-3 border px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <Link
+                              href={`/members/${member.id}`}
+                              className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                            >
+                              {member.fullName}
+                            </Link>
+                            <p className="text-ink-muted mt-0.5 text-sm">
+                              {item?.name ?? "A training"}
+                              {sectionName ? ` · ${sectionName}` : ""}
+                            </p>
+                          </div>
+                          <VerifyControls
+                            certificationId={record.id}
+                            memberId={member.id}
+                            memberName={member.fullName}
+                          />
                         </div>
-                        <VerifyControls
-                          certificationId={record.id}
-                          memberId={member.id}
-                          memberName={member.fullName}
-                        />
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 ) : null}
 
                 {trainings.expired.length > 0 ? (
-                  <div className="mt-4 rounded-tile border border-risk-fg/25 bg-risk-bg px-4 py-3">
-                    <p className="flex items-start gap-2 text-sm text-risk-fg">
+                  <div className="rounded-tile border-risk-fg/25 bg-risk-bg mt-4 border px-4 py-3">
+                    <p className="text-risk-fg flex items-start gap-2 text-sm">
                       <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                       <span>
                         <span className="font-semibold">
                           {trainings.expired.length} clearance
-                          {trainings.expired.length === 1 ? " has" : "s have"}{" "}
+                          {trainings.expired.length === 1
+                            ? " has"
+                            : "s have"}{" "}
                           lapsed:
                         </span>{" "}
                         {trainings.expired
-                          .map((t) => `${t.member.fullName} — ${t.item?.name ?? "a training"}`)
+                          .map(
+                            (t) =>
+                              `${t.member.fullName} — ${t.item?.name ?? "a training"}`
+                          )
                           .join("; ")}
                         . They&apos;re no longer cleared until it&apos;s redone.
                       </span>
@@ -391,42 +407,46 @@ export default async function DashboardPage({
             <Card>
               <CardBody>
                 <SectionLabel>Gone Quiet</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   No hours logged this week, but still holding open work. Worth
                   a message — usually it&apos;s midterms, sometimes it&apos;s
                   being stuck and not saying so.
                 </p>
 
                 <div className="mt-4 space-y-2.5">
-                  {goneQuiet.map(({ member, openDeliverables, lastLoggedAt }) => (
-                    <div
-                      key={member.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/members/${member.id}`}
-                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
-                        >
-                          {member.fullName}
-                        </Link>
-                        <p className="mt-0.5 text-sm text-ink-muted">
-                          {openDeliverables} open{" "}
-                          {openDeliverables === 1 ? "deliverable" : "deliverables"}
-                          {lastLoggedAt
-                            ? ` · last logged ${new Date(
-                                `${lastLoggedAt}T00:00:00Z`
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                timeZone: "UTC",
-                              })}`
-                            : " · has never logged hours"}
-                        </p>
+                  {goneQuiet.map(
+                    ({ member, openDeliverables, lastLoggedAt }) => (
+                      <div
+                        key={member.id}
+                        className="rounded-tile border-line flex flex-wrap items-center justify-between gap-3 border px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/members/${member.id}`}
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                          >
+                            {member.fullName}
+                          </Link>
+                          <p className="text-ink-muted mt-0.5 text-sm">
+                            {openDeliverables} open{" "}
+                            {openDeliverables === 1
+                              ? "deliverable"
+                              : "deliverables"}
+                            {lastLoggedAt
+                              ? ` · last logged ${new Date(
+                                  `${lastLoggedAt}T00:00:00Z`
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  timeZone: "UTC",
+                                })}`
+                              : " · has never logged hours"}
+                          </p>
+                        </div>
+                        <ContactLink member={member} showLabel={false} />
                       </div>
-                      <ContactLink member={member} showLabel={false} />
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               </CardBody>
             </Card>
@@ -444,7 +464,7 @@ export default async function DashboardPage({
             <Card>
               <CardBody>
                 <SectionLabel>Roll-Up</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   Every Lead and how their people are doing this week. Sorted by
                   who has somebody waiting longest.
                 </p>
@@ -453,12 +473,12 @@ export default async function DashboardPage({
                   {rollUp.map((row) => (
                     <div
                       key={row.lead.id}
-                      className="rounded-tile border border-line px-4 py-3"
+                      className="rounded-tile border-line border px-4 py-3"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         <Link
                           href={`/members/${row.lead.id}`}
-                          className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                         >
                           {row.lead.fullName}
                         </Link>
@@ -472,7 +492,7 @@ export default async function DashboardPage({
                           <Badge tone="ok">Caught up</Badge>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-ink-muted">
+                      <p className="text-ink-muted mt-1 text-sm">
                         {row.reports} {row.reports === 1 ? "report" : "reports"}{" "}
                         · {formatNumber(row.hoursThisWeek, 1)} hrs this week
                         {row.quietCount > 0
@@ -501,7 +521,7 @@ export default async function DashboardPage({
             <Card>
               <CardBody>
                 <SectionLabel>Finished Recently</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   Projects below you that were marked complete. You were told
                   because you&apos;re above them in the chain.
                 </p>
@@ -510,28 +530,28 @@ export default async function DashboardPage({
                   {completions.map(({ notice, project, ageDays }) => (
                     <div
                       key={notice.id}
-                      className="rounded-tile border border-ok-fg/25 bg-ok-bg px-4 py-3.5"
+                      className="rounded-tile border-ok-fg/25 bg-ok-bg border px-4 py-3.5"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         {project ? (
                           <Link
                             href={`/projects/${project.slug}`}
-                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                           >
                             {project.name}
                           </Link>
                         ) : (
-                          <span className="text-[15px] font-bold text-ink-muted">
+                          <span className="text-ink-muted text-[15px] font-bold">
                             A project that has since been removed
                           </span>
                         )}
-                        <span className="text-sm text-ink-muted">
+                        <span className="text-ink-muted text-sm">
                           {ageDays === 0
                             ? "today"
                             : `${ageDays} ${ageDays === 1 ? "day" : "days"} ago`}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-sm text-ink-soft">
+                      <p className="text-ink-soft mt-1.5 text-sm">
                         {notice.body}
                       </p>
                     </div>
@@ -549,7 +569,7 @@ export default async function DashboardPage({
                   <SectionLabel>Needs Review</SectionLabel>
                   <Link
                     href="/updates"
-                    className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                    className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
                   >
                     All updates
                   </Link>
@@ -563,81 +583,83 @@ export default async function DashboardPage({
                       actionHref="/updates"
                     />
                   ) : (
-                    reviewQueue.map(({ update, author, sections, ageDays, escalated }) => (
-                      <div
-                        key={update.id}
-                        className={
-                          escalated
-                            ? "rounded-tile border border-cardinal-600 px-4 py-3.5"
-                            : "rounded-tile border border-line px-4 py-3.5"
-                        }
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-[15px] font-bold text-ink">
-                            {author?.fullName ?? "Unknown member"}
-                            {/* Age, not a count. "12 unread" is ignorable;
+                    reviewQueue.map(
+                      ({ update, author, sections, ageDays, escalated }) => (
+                        <div
+                          key={update.id}
+                          className={
+                            escalated
+                              ? "rounded-tile border-cardinal-600 border px-4 py-3.5"
+                              : "rounded-tile border-line border px-4 py-3.5"
+                          }
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-ink text-[15px] font-bold">
+                              {author?.fullName ?? "Unknown member"}
+                              {/* Age, not a count. "12 unread" is ignorable;
                                 "waiting 5 days" names a specific person kept
                                 waiting, and is the same weight of problem
                                 whether you lead three people or fifteen. */}
-                            <span
-                              className={
-                                escalated
-                                  ? "ml-2 text-sm font-semibold text-cardinal-600"
-                                  : "ml-2 text-sm font-normal text-ink-muted"
-                              }
-                            >
-                              {ageDays === 0
-                                ? "today"
-                                : `waiting ${ageDays} ${ageDays === 1 ? "day" : "days"}`}
-                              {escalated ? " — your Lead can see this" : ""}
-                            </span>
-                          </p>
-                          <Badge tone={UPDATE_STATUS_TONES[update.status]}>
-                            {UPDATE_STATUS_LABELS[update.status]}
-                          </Badge>
-                        </div>
+                              <span
+                                className={
+                                  escalated
+                                    ? "text-cardinal-600 ml-2 text-sm font-semibold"
+                                    : "text-ink-muted ml-2 text-sm font-normal"
+                                }
+                              >
+                                {ageDays === 0
+                                  ? "today"
+                                  : `waiting ${ageDays} ${ageDays === 1 ? "day" : "days"}`}
+                                {escalated ? " — your Lead can see this" : ""}
+                              </span>
+                            </p>
+                            <Badge tone={UPDATE_STATUS_TONES[update.status]}>
+                              {UPDATE_STATUS_LABELS[update.status]}
+                            </Badge>
+                          </div>
 
-                        {/* One block per project, so it's always clear which
+                          {/* One block per project, so it's always clear which
                             piece of work each note refers to. */}
-                        <div className="mt-2.5 space-y-2.5">
-                          {sections.map(({ entry, project }) => (
-                            <div
-                              key={entry.id}
-                              className="border-l-2 border-line-soft pl-3"
-                            >
-                              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                {project ? (
-                                  <Link
-                                    href={`/projects/${project.slug}`}
-                                    className="text-[13px] font-semibold text-cardinal-600 hover:text-cardinal-700"
-                                  >
-                                    {project.name}
-                                  </Link>
-                                ) : (
-                                  <span className="text-[13px] font-semibold text-ink-muted">
-                                    Unknown project
+                          <div className="mt-2.5 space-y-2.5">
+                            {sections.map(({ entry, project }) => (
+                              <div
+                                key={entry.id}
+                                className="border-line-soft border-l-2 pl-3"
+                              >
+                                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                  {project ? (
+                                    <Link
+                                      href={`/projects/${project.slug}`}
+                                      className="text-cardinal-600 hover:text-cardinal-700 text-[13px] font-semibold"
+                                    >
+                                      {project.name}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-ink-muted text-[13px] font-semibold">
+                                      Unknown project
+                                    </span>
+                                  )}
+                                  <span className="text-ink-muted text-xs">
+                                    {formatNumber(entry.hours, 1)} hrs
                                   </span>
-                                )}
-                                <span className="text-xs text-ink-muted">
-                                  {formatNumber(entry.hours, 1)} hrs
-                                </span>
-                              </div>
-                              <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
-                                {entry.progress}
-                              </p>
-                              {entry.blockers ? (
-                                <p className="mt-1.5 flex items-start gap-1.5 text-sm text-ink-soft">
-                                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
-                                  <span className="font-medium">
-                                    {entry.blockers}
-                                  </span>
+                                </div>
+                                <p className="text-ink-soft mt-1 line-clamp-2 text-sm">
+                                  {entry.progress}
                                 </p>
-                              ) : null}
-                            </div>
-                          ))}
+                                {entry.blockers ? (
+                                  <p className="text-ink-soft mt-1.5 flex items-start gap-1.5 text-sm">
+                                    <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
+                                    <span className="font-medium">
+                                      {entry.blockers}
+                                    </span>
+                                  </p>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      )
+                    )
                   )}
                 </div>
               </CardBody>
@@ -651,16 +673,20 @@ export default async function DashboardPage({
                   <Badge tone="ok">Open now</Badge>
                 </div>
 
-                <h3 className="mt-4 text-[17px] font-bold text-ink">
+                <h3 className="text-ink mt-4 text-[17px] font-bold">
                   Today&apos;s check-in
                 </h3>
-                <p className="mt-1.5 text-sm text-ink-soft">
-                  Members submit twice a week on the days they choose.
-                  This window closes at 11:59 PM.
+                <p className="text-ink-soft mt-1.5 text-sm">
+                  Members submit twice a week on the days they choose. This
+                  window closes at 11:59 PM.
                 </p>
 
                 <div className="mt-5 grid grid-cols-3 gap-3">
-                  <MiniStat label="On time" value={compliance.onTime} tone="ok" />
+                  <MiniStat
+                    label="On time"
+                    value={compliance.onTime}
+                    tone="ok"
+                  />
                   <MiniStat label="Late" value={compliance.late} tone="warn" />
                   <MiniStat
                     label="Missed"
@@ -670,7 +696,7 @@ export default async function DashboardPage({
                 </div>
 
                 {compliance.pending > 0 ? (
-                  <p className="mt-3 text-sm text-ink-muted">
+                  <p className="text-ink-muted mt-3 text-sm">
                     {compliance.pending} not yet due — excluded from the
                     percentage.
                   </p>
@@ -696,7 +722,7 @@ export default async function DashboardPage({
                 <SectionLabel>Needs Attention</SectionLabel>
                 <Link
                   href="/projects"
-                  className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                  className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
                 >
                   All projects
                 </Link>
@@ -714,15 +740,15 @@ export default async function DashboardPage({
                     <Link
                       key={project.id}
                       href={`/projects/${project.slug}`}
-                      className="block rounded-tile border border-line px-4 py-3.5 transition-colors hover:bg-surface"
+                      className="rounded-tile border-line hover:bg-surface block border px-4 py-3.5 transition-colors"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-[15px] font-bold text-ink">
+                        <p className="text-ink text-[15px] font-bold">
                           {project.name}
                         </p>
                         <ProjectBadges project={project} />
                       </div>
-                      <p className="mt-1.5 text-sm text-ink-soft">
+                      <p className="text-ink-soft mt-1.5 text-sm">
                         {res.length > 1 ? "REs" : "RE"}:{" "}
                         {res.map((r) => r.fullName).join(", ") || "unassigned"}
                       </p>
@@ -755,9 +781,9 @@ function MiniStat({
         : "text-risk-fg";
 
   return (
-    <div className="rounded-tile border border-line px-3 py-3 text-center">
+    <div className="rounded-tile border-line border px-3 py-3 text-center">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <FieldLabel className="mt-1 text-[12px] font-medium normal-case tracking-normal">
+      <FieldLabel className="mt-1 text-[12px] font-medium tracking-normal normal-case">
         {label}
       </FieldLabel>
     </div>

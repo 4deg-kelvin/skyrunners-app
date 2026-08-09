@@ -116,8 +116,10 @@ export async function loadSnapshot(
   });
 
   // --- stitch the two halves of an update back together --------------------
-  const entryRows = (results[COLLECTIONS.length].data ??
-    []) as Record<string, unknown>[];
+  const entryRows = (results[COLLECTIONS.length].data ?? []) as Record<
+    string,
+    unknown
+  >[];
   const entriesByUpdate = new Map<string, UpdateEntry[]>();
   for (const row of entryRows) {
     const entry = entryFromRow(row);
@@ -130,8 +132,10 @@ export async function loadSnapshot(
   }
 
   // --- and the same for a help request's replies ---------------------------
-  const replyRows = (results[COLLECTIONS.length + 1].data ??
-    []) as Record<string, unknown>[];
+  const replyRows = (results[COLLECTIONS.length + 1].data ?? []) as Record<
+    string,
+    unknown
+  >[];
   const repliesByRequest = new Map<string, HelpReply[]>();
   for (const row of replyRows) {
     const reply = helpReplyFromRow(row);
@@ -179,6 +183,67 @@ function sameRow(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Change one existing row, as an UPDATE and never an upsert.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this function exists at all
+ * ---------------------------------------------------------------------------
+ *
+ * This whole file used to `upsert()` every row the diff touched, new or not.
+ * An upsert is `INSERT ... ON CONFLICT DO UPDATE`, so Postgres evaluates the
+ * table's **INSERT** policy `WITH CHECK` even when the row already exists and
+ * only an update happens.
+ *
+ * The effect was that every `for update` policy in the schema was dead. A Lead
+ * pressing "Mark as read" on somebody's check-in has `progress_updates_review`,
+ * an UPDATE policy that permits exactly that — and got:
+ *
+ *     new row violates row-level security policy for table "progress_updates"
+ *
+ * because the only INSERT policy is `progress_updates_write_own`, which quite
+ * correctly says you may only insert a check-in with your own `member_id`.
+ * Loosening THAT would let a Lead file a report in somebody's name, which is
+ * the one thing the reliability record must never allow.
+ *
+ * `update_entries_respond_re` had the identical latent bug — an RE answering a
+ * section would have failed the same way the first time anyone tried it.
+ *
+ * So: rows that already exist are updated, rows that don't are inserted, and
+ * the distinction is the diff's job rather than Postgres's.
+ *
+ * `.select()` for the same reason the deletes have it — a zero-row result means
+ * RLS hid the row from the statement, and reporting success there is the most
+ * expensive bug shape in this project.
+ */
+async function updateRow(
+  supabase: SupabaseClient,
+  table: string,
+  row: Record<string, unknown>
+): Promise<void> {
+  let query = supabase.from(table).update(row);
+
+  if ("id" in row && row.id) {
+    query = query.eq("id", row.id as string);
+  } else {
+    // Join tables have no id — match on the same composite key the diff
+    // identifies them with, exactly as the delete path does.
+    for (const [col, val] of Object.entries(row)) {
+      if (col.endsWith("_id")) query = query.eq(col, val as string);
+    }
+  }
+
+  const { data, error } = await query.select();
+  if (error) throw new Error(`Saving ${table} failed: ${error.message}`);
+  if (!data || data.length === 0) {
+    throw new Error(
+      `Saving ${table} changed nothing. The row is there but hidden from the ` +
+        `update by row-level security — check that ${table} has an UPDATE ` +
+        `policy covering this user for this row.`
+    );
+  }
+}
+
+/**
  * Write back only what changed.
  *
  * Inserts and updates run in `COLLECTIONS` order and deletes in reverse, so a
@@ -201,21 +266,28 @@ export async function persistDiff(
     const was = new Map(wasList.map((v) => [spec.identify(v), v]));
     const now = new Map(nowList.map((v) => [spec.identify(v), v]));
 
-    const upserts = nowList.filter((v) => {
+    // Split, so an edit never asks Postgres for INSERT rights. See `updateRow`.
+    const inserts = nowList.filter((v) => !was.has(spec.identify(v)));
+    const changes = nowList.filter((v) => {
       const prev = was.get(spec.identify(v));
-      return !prev || !sameRow(spec.toRow(prev), spec.toRow(v));
+      return prev && !sameRow(spec.toRow(prev), spec.toRow(v));
     });
 
-    if (upserts.length > 0) {
-      const { error } = await supabase
-        .from(spec.table)
-        .upsert(
-          upserts.map((v) => spec.toRow(v)),
-          spec.conflictTarget ? { onConflict: spec.conflictTarget } : undefined
-        );
+    if (inserts.length > 0) {
+      // Still an upsert rather than a plain insert: `identify()` is the app's
+      // idea of a key, and if it ever disagrees with the table's unique
+      // constraint, an upsert heals it where an insert would throw.
+      const { error } = await supabase.from(spec.table).upsert(
+        inserts.map((v) => spec.toRow(v)),
+        spec.conflictTarget ? { onConflict: spec.conflictTarget } : undefined
+      );
       if (error) {
         throw new Error(`Saving ${spec.table} failed: ${error.message}`);
       }
+    }
+
+    for (const value of changes) {
+      await updateRow(supabase, spec.table, spec.toRow(value));
     }
 
     const removed = wasList.filter((v) => !now.has(spec.identify(v)));
@@ -251,7 +323,9 @@ export async function persistDiff(
           */
           const { data, error } = await query.select();
           if (error) {
-            throw new Error(`Deleting from ${spec.table} failed: ${error.message}`);
+            throw new Error(
+              `Deleting from ${spec.table} failed: ${error.message}`
+            );
           }
           if (!data || data.length === 0) {
             throw new Error(
@@ -277,18 +351,32 @@ export async function persistDiff(
     after.progressUpdates.flatMap((u) => u.entries.map((e) => [e.id, e]))
   );
 
-  const entryUpserts = [...nowEntries.values()].filter((e) => {
+  // Split for the same reason as the collections above. This is the path an RE
+  // takes when answering somebody's section: `update_entries_respond_re` is an
+  // UPDATE policy, and an upsert would never reach it.
+  const newEntries = [...nowEntries.values()].filter(
+    (e) => !wasEntries.has(e.id)
+  );
+  const changedEntries = [...nowEntries.values()].filter((e) => {
     const prev = wasEntries.get(e.id);
-    return !prev || !sameRow(entryToRow(prev), entryToRow(e));
+    return prev && !sameRow(entryToRow(prev), entryToRow(e));
   });
-  if (entryUpserts.length > 0) {
+
+  if (newEntries.length > 0) {
     const { error } = await supabase
       .from("update_entries")
-      .upsert(entryUpserts.map(entryToRow));
-    if (error) throw new Error(`Saving update_entries failed: ${error.message}`);
+      .upsert(newEntries.map(entryToRow));
+    if (error)
+      throw new Error(`Saving update_entries failed: ${error.message}`);
   }
 
-  const goneEntries = [...wasEntries.keys()].filter((id) => !nowEntries.has(id));
+  for (const entry of changedEntries) {
+    await updateRow(supabase, "update_entries", entryToRow(entry));
+  }
+
+  const goneEntries = [...wasEntries.keys()].filter(
+    (id) => !nowEntries.has(id)
+  );
   if (goneEntries.length > 0) {
     const { error } = await supabase
       .from("update_entries")
@@ -310,18 +398,28 @@ export async function persistDiff(
     after.helpRequests.flatMap((h) => h.replies.map((r) => [r.id, r]))
   );
 
-  const replyUpserts = [...nowReplies.values()].filter((r) => {
+  const newReplies = [...nowReplies.values()].filter(
+    (r) => !wasReplies.has(r.id)
+  );
+  const changedReplies = [...nowReplies.values()].filter((r) => {
     const prev = wasReplies.get(r.id);
-    return !prev || !sameRow(helpReplyToRow(prev), helpReplyToRow(r));
+    return prev && !sameRow(helpReplyToRow(prev), helpReplyToRow(r));
   });
-  if (replyUpserts.length > 0) {
+
+  if (newReplies.length > 0) {
     const { error } = await supabase
       .from("help_replies")
-      .upsert(replyUpserts.map(helpReplyToRow));
+      .upsert(newReplies.map(helpReplyToRow));
     if (error) throw new Error(`Saving help_replies failed: ${error.message}`);
   }
 
-  const goneReplies = [...wasReplies.keys()].filter((id) => !nowReplies.has(id));
+  for (const reply of changedReplies) {
+    await updateRow(supabase, "help_replies", helpReplyToRow(reply));
+  }
+
+  const goneReplies = [...wasReplies.keys()].filter(
+    (id) => !nowReplies.has(id)
+  );
   if (goneReplies.length > 0) {
     const { error } = await supabase
       .from("help_replies")

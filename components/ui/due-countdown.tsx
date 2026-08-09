@@ -52,9 +52,9 @@ export function DueCountdown({
       className={cn(
         "flex items-center gap-1.5",
         overdue
-          ? "font-semibold text-risk-fg"
+          ? "text-risk-fg font-semibold"
           : soon
-            ? "font-semibold text-warn-fg"
+            ? "text-warn-fg font-semibold"
             : "text-ink-muted",
         className
       )}

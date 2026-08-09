@@ -55,21 +55,21 @@ export function DivisionExtras({
   if (live.length === 0 && blockedTotal === 0) return null;
 
   return (
-    <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4">
+    <div className="border-line mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t pt-4">
       {live.length > 0 ? (
         <div className="w-full">
           <button
             type="button"
             onClick={() => setShowDeadlines(!showDeadlines)}
             aria-expanded={showDeadlines}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
+            className="text-ink-soft hover:text-ink inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
           >
             <CalendarDays className="size-3.5" />
             {live.length} upcoming date{live.length === 1 ? "" : "s"}
             {overdue > 0 ? (
               <span className="text-risk-fg">· {overdue} overdue</span>
             ) : null}
-            <span className="font-normal text-ink-muted">
+            <span className="text-ink-muted font-normal">
               {showDeadlines ? "(hide)" : "(show)"}
             </span>
           </button>
@@ -79,7 +79,7 @@ export function DivisionExtras({
               {live.map((item) => (
                 <div
                   key={item.key}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-line px-3 py-1.5"
+                  className="rounded-tile border-line flex flex-wrap items-center justify-between gap-2 border px-3 py-1.5"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     {/*
@@ -96,7 +96,7 @@ export function DivisionExtras({
                         { month: "short", day: "numeric", timeZone: "UTC" }
                       )}
                     </span>
-                    <span className="min-w-0 text-sm text-ink">
+                    <span className="text-ink min-w-0 text-sm">
                       {item.title}
                       {item.kind === "project" ? (
                         <Badge tone="cardinal">Target</Badge>
@@ -108,7 +108,7 @@ export function DivisionExtras({
                       )}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-ink-muted">
+                  <span className="text-ink-muted shrink-0 text-xs">
                     {item.overdue
                       ? `${Math.abs(item.daysAway)}d overdue`
                       : item.daysAway === 0
@@ -117,7 +117,7 @@ export function DivisionExtras({
                   </span>
                 </div>
               ))}
-              <p className="pt-1 text-xs text-ink-muted">
+              <p className="text-ink-muted pt-1 text-xs">
                 Built from project targets and deliverable due dates — nothing
                 separate to keep up to date. Also on the calendar.
               </p>
@@ -132,11 +132,11 @@ export function DivisionExtras({
             type="button"
             onClick={() => setShowBlocked(!showBlocked)}
             aria-expanded={showBlocked}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-risk-fg transition-colors hover:opacity-80"
+            className="text-risk-fg inline-flex items-center gap-1.5 text-sm font-semibold transition-colors hover:opacity-80"
           >
             <TriangleAlert className="size-3.5" />
             {blockedTotal} blocked
-            <span className="font-normal text-ink-muted">
+            <span className="text-ink-muted font-normal">
               {showBlocked ? "(hide)" : "(show)"}
             </span>
           </button>
@@ -147,12 +147,12 @@ export function DivisionExtras({
                 <Link
                   key={row.projectId}
                   href={`/projects/${row.projectSlug}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-tile border border-risk-fg/25 bg-risk-bg px-3 py-1.5 transition-opacity hover:opacity-90"
+                  className="rounded-tile border-risk-fg/25 bg-risk-bg flex flex-wrap items-center justify-between gap-2 border px-3 py-1.5 transition-opacity hover:opacity-90"
                 >
-                  <span className="text-sm font-semibold text-ink">
+                  <span className="text-ink text-sm font-semibold">
                     {row.projectName}
                   </span>
-                  <span className="text-xs text-ink-muted">
+                  <span className="text-ink-muted text-xs">
                     {row.count} blocked ·{" "}
                     {row.worstAgeDays === 0
                       ? "today"
@@ -160,7 +160,7 @@ export function DivisionExtras({
                   </span>
                 </Link>
               ))}
-              <p className="pt-1 text-xs text-ink-muted">
+              <p className="text-ink-muted pt-1 text-xs">
                 Clear these on the project — its RE is the one who can.
               </p>
             </div>

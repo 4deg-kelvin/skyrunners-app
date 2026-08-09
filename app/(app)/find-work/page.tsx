@@ -99,13 +99,13 @@ export default async function FindWorkPage() {
       {/* How this works — the app is only useful if the flow is obvious */}
       <Card className="border-cardinal-200 bg-cardinal-50">
         <CardBody className="py-4">
-          <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">How joining works:</span>{" "}
+          <p className="text-ink-soft text-sm">
+            <span className="text-ink font-semibold">How joining works:</span>{" "}
             browse anything, then hit <em>Ask to join</em>. The project&apos;s
-            Responsible Engineer decides — they know what the project needs. Your
-            request goes into their queue and you can see it&apos;s pending, so
-            it won&apos;t vanish. If nobody replies in five days it gets flagged
-            for a Co-Lead.
+            Responsible Engineer decides — they know what the project needs.
+            Your request goes into their queue and you can see it&apos;s
+            pending, so it won&apos;t vanish. If nobody replies in five days it
+            gets flagged for a Co-Lead.
           </p>
         </CardBody>
       </Card>
@@ -116,7 +116,7 @@ export default async function FindWorkPage() {
             <SectionLabel>Where You&apos;d Help Most</SectionLabel>
             <Link
               href="/projects"
-              className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
             >
               See the full project tree
             </Link>
@@ -150,10 +150,10 @@ export default async function FindWorkPage() {
                 return (
                   <div
                     key={project.id}
-                    className="rounded-tile border border-line px-4 py-4"
+                    className="rounded-tile border-line border px-4 py-4"
                   >
                     {division ? (
-                      <p className="mb-1 text-[13px] font-semibold text-cardinal-600">
+                      <p className="text-cardinal-600 mb-1 text-[13px] font-semibold">
                         {division.name}
                       </p>
                     ) : null}
@@ -161,7 +161,7 @@ export default async function FindWorkPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <Link
                         href={`/projects/${project.slug}`}
-                        className="text-[17px] font-bold text-ink hover:text-cardinal-600"
+                        className="text-ink hover:text-cardinal-600 text-[17px] font-bold"
                       >
                         {project.name}
                       </Link>
@@ -176,22 +176,22 @@ export default async function FindWorkPage() {
                     </div>
 
                     {project.description ? (
-                      <p className="mt-2 text-[15px] text-ink-soft">
+                      <p className="text-ink-soft mt-2 text-[15px]">
                         {project.description}
                       </p>
                     ) : null}
 
                     {/* Skill match — the reason this project is near the top */}
                     {matchedSkills.length > 0 ? (
-                      <p className="mt-2.5 flex items-center gap-1.5 text-sm font-semibold text-cardinal-600">
+                      <p className="text-cardinal-600 mt-2.5 flex items-center gap-1.5 text-sm font-semibold">
                         <Sparkles className="size-3.5" />
                         Matches your {matchedSkills.join(", ")}
                       </p>
                     ) : null}
 
                     {project.openRoles ? (
-                      <p className="mt-2 text-[15px] text-ink-soft">
-                        <span className="font-semibold text-ink">
+                      <p className="text-ink-soft mt-2 text-[15px]">
+                        <span className="text-ink font-semibold">
                           Looking for:
                         </span>{" "}
                         {project.openRoles}
@@ -200,7 +200,7 @@ export default async function FindWorkPage() {
 
                     {/* Concrete work someone could pick up today */}
                     {needsAttention.length > 0 ? (
-                      <div className="mt-3 rounded-tile bg-surface px-3.5 py-3">
+                      <div className="rounded-tile bg-surface mt-3 px-3.5 py-3">
                         <SectionLabel tone="muted">
                           Stuck or overdue right now
                         </SectionLabel>
@@ -208,9 +208,9 @@ export default async function FindWorkPage() {
                           {needsAttention.slice(0, 3).map((d) => (
                             <li
                               key={d.id}
-                              className="flex items-start gap-1.5 text-sm text-ink-soft"
+                              className="text-ink-soft flex items-start gap-1.5 text-sm"
                             >
-                              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-cardinal-600" />
+                              <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
                               <span>
                                 {d.title}
                                 {d.blockerNote ? ` — ${d.blockerNote}` : ""}
@@ -228,7 +228,7 @@ export default async function FindWorkPage() {
                       />
                     ) : null}
 
-                    <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+                    <div className="text-ink-muted mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
                       <span className="flex items-center gap-1.5">
                         <Users className="size-3.5" />
                         {memberCount === 0
@@ -241,7 +241,7 @@ export default async function FindWorkPage() {
                     </div>
 
                     {/* Who to ask, and the action */}
-                    <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line-soft pt-4">
+                    <div className="border-line-soft mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
                       {viewerStatus === "requested" ? (
                         <Badge tone="warn">Request pending</Badge>
                       ) : (
@@ -253,7 +253,7 @@ export default async function FindWorkPage() {
 
                       {res.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                          <span className="text-sm text-ink-muted">
+                          <span className="text-ink-muted text-sm">
                             {res.length > 1 ? "REs:" : "RE:"}
                           </span>
                           {res.map((re) => (
@@ -265,7 +265,7 @@ export default async function FindWorkPage() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-sm text-ink-muted">
+                        <span className="text-ink-muted text-sm">
                           No RE assigned — ask a Co-Lead about this one.
                         </span>
                       )}
@@ -276,7 +276,7 @@ export default async function FindWorkPage() {
             )}
           </div>
 
-          <p className="mt-5 text-sm text-ink-muted">
+          <p className="text-ink-muted mt-5 text-sm">
             Asking to join lands in the RE&apos;s queue and shows here as
             pending, so it never disappears. If it sits for five days it
             escalates. Their contact details are on every card if you&apos;d
@@ -295,9 +295,9 @@ export default async function FindWorkPage() {
                 <Link
                   key={project.id}
                   href={`/projects/${project.slug}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                  className="rounded-tile border-line hover:bg-surface flex flex-wrap items-center justify-between gap-3 border px-4 py-3 transition-colors"
                 >
-                  <span className="text-[15px] font-bold text-ink">
+                  <span className="text-ink text-[15px] font-bold">
                     {project.name}
                   </span>
                   <ProjectBadges project={project} />

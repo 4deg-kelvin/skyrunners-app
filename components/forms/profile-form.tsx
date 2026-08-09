@@ -37,24 +37,24 @@ export function ProfileForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Goes by{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+            <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="text"
             name="preferredName"
             defaultValue={member.preferredName ?? ""}
             placeholder={member.fullName.split(" ")[0]}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             What the app calls you. Your full name stays on the roster.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Phone
           </span>
           <input
@@ -62,9 +62,9 @@ export function ProfileForm({
             name="phone"
             defaultValue={member.phone ?? ""}
             placeholder="(650) 555-0142"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Shown instead of your email wherever people need to reach you. A
             text gets answered; an email waits days.
           </span>
@@ -73,7 +73,7 @@ export function ProfileForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Major
           </span>
           <input
@@ -81,12 +81,12 @@ export function ProfileForm({
             name="major"
             defaultValue={member.major ?? ""}
             placeholder="Aeronautics & Astronautics"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Class year
           </span>
           <input
@@ -96,13 +96,13 @@ export function ProfileForm({
             max="2100"
             defaultValue={member.classYear ?? ""}
             placeholder="2028"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           Skills
         </span>
         <input
@@ -110,18 +110,18 @@ export function ProfileForm({
           name="skills"
           defaultValue={(member.skills ?? []).join(", ")}
           placeholder="CAD, composites, firmware"
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
-        <span className="mt-1 block text-xs text-ink-muted">
+        <span className="text-ink-muted mt-1 block text-xs">
           Comma-separated. Find Work uses these to put the projects you&apos;d
           help most with at the top, so it&apos;s worth filling in.
         </span>
       </label>
 
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           Photo link{" "}
-          <span className="font-normal text-ink-muted">(optional)</span>
+          <span className="text-ink-muted font-normal">(optional)</span>
         </span>
         <div className="flex items-center gap-3">
           <Avatar
@@ -134,10 +134,10 @@ export function ProfileForm({
             name="photoUrl"
             defaultValue={member.photoUrl ?? ""}
             placeholder="https://…"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </div>
-        <span className="mt-1 block text-xs text-ink-muted">
+        <span className="text-ink-muted mt-1 block text-xs">
           Picked up from your Google account when you first sign in. Paste a
           link to change it — uploads would need file storage, which isn&apos;t
           set up.
@@ -145,7 +145,7 @@ export function ProfileForm({
       </label>
 
       {editingSomeoneElse ? (
-        <p className="text-sm text-warn-fg">
+        <p className="text-warn-fg text-sm">
           You&apos;re editing {member.fullName}&apos;s profile, not your own.
         </p>
       ) : null}

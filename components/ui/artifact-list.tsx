@@ -75,7 +75,7 @@ export function ArtifactList({
         const Icon = KIND_ICONS[kind];
         return (
           <div key={kind}>
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-muted">
+            <p className="text-ink-muted flex items-center gap-2 text-[11px] font-semibold tracking-[0.09em] uppercase">
               <Icon className="size-3.5" />
               {ARTIFACT_KIND_LABELS[kind]}
             </p>
@@ -90,13 +90,13 @@ export function ArtifactList({
                     href={href}
                     target={isExternal ? "_blank" : undefined}
                     rel={isExternal ? "noopener noreferrer" : undefined}
-                    className="block rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                    className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <p className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+                      <p className="text-ink flex items-center gap-2 text-[15px] font-semibold">
                         {artifact.title}
                         {isExternal ? (
-                          <ExternalLink className="size-3.5 shrink-0 text-ink-muted" />
+                          <ExternalLink className="text-ink-muted size-3.5 shrink-0" />
                         ) : null}
                       </p>
                       {artifact.version ? (
@@ -105,17 +105,20 @@ export function ArtifactList({
                     </div>
 
                     {artifact.description ? (
-                      <p className="mt-1 text-sm text-ink-soft">
+                      <p className="text-ink-soft mt-1 text-sm">
                         {artifact.description}
                       </p>
                     ) : null}
 
-                    <p className="mt-1.5 text-sm text-ink-muted">
+                    <p className="text-ink-muted mt-1.5 text-sm">
                       {uploadedBy?.fullName ?? "Unknown"} ·{" "}
-                      {new Date(artifact.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {new Date(artifact.createdAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                        }
+                      )}
                     </p>
                   </a>
                 );

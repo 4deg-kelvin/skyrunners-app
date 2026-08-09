@@ -109,12 +109,12 @@ export function CompletedProjectsSection({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mt-6 border-t border-line pt-5">
+    <div className="border-line mt-6 border-t pt-5">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-muted transition-colors hover:text-ink"
+        className="text-ink-muted hover:text-ink inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.1em] uppercase transition-colors"
       >
         {open ? (
           <EyeOff className="size-3.5" strokeWidth={2.5} />
@@ -122,7 +122,7 @@ export function CompletedProjectsSection({
           <Eye className="size-3.5" strokeWidth={2.5} />
         )}
         Completed · {count}
-        <span className="font-normal normal-case tracking-normal text-ink-muted">
+        <span className="text-ink-muted font-normal tracking-normal normal-case">
           {open ? "(hide)" : "(show)"}
         </span>
       </button>
@@ -142,7 +142,7 @@ export function HideCompletedToggle({ count }: { count: number }) {
       type="button"
       onClick={() => setHidden(!hidden)}
       aria-pressed={hidden}
-      className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-surface"
+      className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold transition-colors"
     >
       {hidden ? (
         <Eye className="size-3.5" strokeWidth={2.5} />

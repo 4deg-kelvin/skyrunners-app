@@ -86,7 +86,11 @@ describe("mutate resolves the backend inside the request", () => {
 
     const count = await promise;
 
-    assert.equal(count, 1, "should have mutated the live snapshot, not the seed");
+    assert.equal(
+      count,
+      1,
+      "should have mutated the live snapshot, not the seed"
+    );
     assert.deepEqual(
       persisted,
       ["Edited"],
@@ -97,11 +101,16 @@ describe("mutate resolves the backend inside the request", () => {
 
   test("the mutation does NOT touch the disk store", async () => {
     const before = disk.readStore().members.length;
-    await disk.mutate((store) => store.members.push({ ...liveSnapshot.members[0], id: "x" }));
+    await disk.mutate((store) =>
+      store.members.push({ ...liveSnapshot.members[0], id: "x" })
+    );
     inRequest = false;
 
     // readStore in demo mode reads the seed; it must be untouched.
-    disk.installLiveBackend(() => null, async () => {});
+    disk.installLiveBackend(
+      () => null,
+      async () => {}
+    );
     assert.equal(
       disk.readStore().members.length,
       before,

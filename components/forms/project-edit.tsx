@@ -25,10 +25,27 @@ const HEALTHS: ProjectHealth[] = ["on_track", "at_risk", "blocked"];
 export function ProjectEditForm({
   project,
   canDelete,
+  canComplete,
+  parentTargetDate,
   incompleteDescendants,
 }: {
   project: Project;
   canDelete: boolean;
+  /**
+   * May mark this complete — a NARROWER right than opening this form.
+   *
+   * The assigned RE edits everything here; only somebody above the project can
+   * declare it finished. Hiding the option rather than letting the save fail:
+   * a dropdown entry that always errors is a dead control, and the sentence
+   * underneath says who to ask instead.
+   */
+  canComplete: boolean;
+  /**
+   * The parent's target date, if it has one. A sub-project can't be due after
+   * the thing it's part of, so the date input is capped and says why. The
+   * operation re-checks it — this is the half that stops you typing it.
+   */
+  parentTargetDate?: string;
   /**
    * Sub-projects at any depth that aren't complete.
    *
@@ -51,7 +68,7 @@ export function ProjectEditForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Pencil className="size-3.5" strokeWidth={2.5} />
         Edit project
@@ -60,7 +77,7 @@ export function ProjectEditForm({
   }
 
   return (
-    <div className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5">
+    <div className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5">
       <ActionForm
         action={updateProjectAction}
         submitLabel="Save changes"
@@ -70,40 +87,49 @@ export function ProjectEditForm({
         <input type="hidden" name="projectId" value={project.id} />
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">Name</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Name
+          </span>
           <input
             type="text"
             name="name"
             required
             defaultValue={project.name}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
 
         <label className="mt-3 block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             What it is
           </span>
           <textarea
             name="description"
             rows={2}
             defaultValue={project.description ?? ""}
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Stage
             </span>
             <select
               name="phase"
               value={phase}
               onChange={(e) => setPhase(e.target.value as Project["phase"])}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             >
-              {PHASE_ORDER.map((p) => (
+              {PHASE_ORDER.filter(
+                // Already complete? Keep it, or saving any other edit would
+                // silently demote the project.
+                (p) =>
+                  p !== "complete" ||
+                  canComplete ||
+                  project.phase === "complete"
+              ).map((p) => (
                 <option key={p} value={p}>
                   {PHASE_LABELS[p]}
                 </option>
@@ -112,13 +138,13 @@ export function ProjectEditForm({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               How it&apos;s going
             </span>
             <select
               name="health"
               defaultValue={project.health}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             >
               {HEALTHS.map((h) => (
                 <option key={h} value={h}>
@@ -129,19 +155,26 @@ export function ProjectEditForm({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Target date
             </span>
             <input
               type="date"
               name="targetDate"
               defaultValue={project.targetDate ?? ""}
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              max={parentTargetDate}
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
+            {parentTargetDate ? (
+              <span className="text-ink-muted mt-1 block text-xs">
+                Can&apos;t be after {parentTargetDate} — the project above is
+                due then.
+              </span>
+            ) : null}
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               Help wanted
             </span>
             <input
@@ -149,7 +182,7 @@ export function ProjectEditForm({
               name="openRoles"
               defaultValue={project.openRoles ?? ""}
               placeholder="CFD, composites layup"
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
           </label>
         </div>
@@ -162,13 +195,15 @@ export function ProjectEditForm({
           and being told no.
         */}
         {blockedFromCompleting ? (
-          <div className="mb-2.5 mt-3 rounded-tile border border-warn-fg/25 bg-warn-bg p-3">
-            <p className="flex items-start gap-2 text-sm text-warn-fg">
+          <div className="rounded-tile border-warn-fg/25 bg-warn-bg mt-3 mb-2.5 border p-3">
+            <p className="text-warn-fg flex items-start gap-2 text-sm">
               <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <span>
                 <span className="font-semibold">
                   {incompleteDescendants.length} sub-project
-                  {incompleteDescendants.length === 1 ? " isn't" : "s aren't"}{" "}
+                  {incompleteDescendants.length === 1
+                    ? " isn't"
+                    : "s aren't"}{" "}
                   complete:
                 </span>{" "}
                 {incompleteDescendants.map((d) => d.name).join(", ")}. Marking
@@ -182,7 +217,7 @@ export function ProjectEditForm({
         ) : null}
 
         {phase === "complete" && project.phase !== "complete" ? (
-          <p className="mb-2.5 mt-3 text-xs text-ink-muted">
+          <p className="text-ink-muted mt-3 mb-2.5 text-xs">
             Completing this posts a note in its updates feed and tells everyone
             above it — the REs of any parent projects, then the team leads, and
             finally the Division Lead. It stops there; Co-Leads aren&apos;t
@@ -190,7 +225,18 @@ export function ProjectEditForm({
           </p>
         ) : null}
 
-        <p className="mb-2.5 mt-3 text-xs text-ink-muted">
+        {!canComplete && project.phase !== "complete" ? (
+          <p className="text-ink-muted mt-3 text-xs">
+            <span className="text-ink font-semibold">
+              Marking this complete isn&apos;t yours to do.
+            </span>{" "}
+            You&apos;re accountable for finishing it; the RE above this project
+            — or your Division Lead — reviews it and agrees it&apos;s done. Set
+            the stage to flight test and tell them it&apos;s ready.
+          </p>
+        ) : null}
+
+        <p className="text-ink-muted mt-3 mb-2.5 text-xs">
           Stage is where this sits in the lifecycle. How it&apos;s going is
           separate — a project can be at flight test and still blocked. Help
           wanted is matched against people&apos;s skills on Find Work.
@@ -199,14 +245,14 @@ export function ProjectEditForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
         >
           Cancel
         </button>
       </ActionForm>
 
       {canDelete ? (
-        <div className="mt-3 border-t border-line pt-3">
+        <div className="border-line mt-3 border-t pt-3">
           {confirmingDelete ? (
             <div className="flex flex-wrap items-center gap-3">
               <ActionButton
@@ -218,7 +264,7 @@ export function ProjectEditForm({
               />
               <button
                 onClick={() => setConfirmingDelete(false)}
-                className="text-sm font-semibold text-ink-muted hover:text-ink"
+                className="text-ink-muted hover:text-ink text-sm font-semibold"
               >
                 Keep it
               </button>
@@ -227,11 +273,11 @@ export function ProjectEditForm({
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setConfirmingDelete(true)}
-                className="rounded-tile border border-cardinal-600 px-3 py-1.5 text-sm font-semibold text-cardinal-600 hover:bg-cardinal-50"
+                className="rounded-tile border-cardinal-600 text-cardinal-600 hover:bg-cardinal-50 border px-3 py-1.5 text-sm font-semibold"
               >
                 Delete project
               </button>
-              <span className="text-xs text-ink-muted">
+              <span className="text-ink-muted text-xs">
                 Refused if it has sub-projects or signed-off work — mark it
                 complete instead.
               </span>

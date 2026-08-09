@@ -37,7 +37,7 @@ export function AskToJoinButton({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700"
+        className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <UserPlus className="size-4" strokeWidth={2.5} />
         Ask to join
@@ -50,21 +50,21 @@ export function AskToJoinButton({
       action={requestToJoinAction}
       submitLabel="Send request"
       submittingLabel="Sending…"
-      className="w-full rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface w-full border p-3.5"
     >
       <input type="hidden" name="projectId" value={projectId} />
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           Anything to tell the RE of {projectName}?
         </span>
         <textarea
           name="note"
           rows={2}
           placeholder="What you'd bring, or how much time you have."
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
-      <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+      <p className="text-ink-muted mt-1 mb-2.5 text-xs">
         Optional. Goes into their queue — you&apos;ll see it as pending, and it
         gets flagged for a Co-Lead if nobody answers in five days.
       </p>
@@ -94,7 +94,7 @@ export function WithdrawRequestButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Withdraw
       </button>
@@ -103,7 +103,9 @@ export function WithdrawRequestButton({
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <span className="text-sm text-ink-soft">Withdraw from {projectName}?</span>
+      <span className="text-ink-soft text-sm">
+        Withdraw from {projectName}?
+      </span>
       <ActionButton
         action={withdrawJoinRequestAction}
         fields={{ requestId }}
@@ -113,7 +115,7 @@ export function WithdrawRequestButton({
       />
       <button
         onClick={() => setConfirming(false)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Keep it
       </button>
@@ -136,7 +138,7 @@ export function FollowToggle({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink transition-colors hover:bg-surface disabled:opacity-60"
+          className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60"
         >
           {following ? (
             <EyeOff className="size-3.5" />
@@ -178,30 +180,30 @@ export function JoinRequestDecision({
         action={decideJoinRequestAction}
         submitLabel="Send decline"
         submittingLabel="Sending…"
-        className="mt-3 rounded-tile border border-line bg-surface p-3"
+        className="rounded-tile border-line bg-surface mt-3 border p-3"
       >
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="accept" value="no" />
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Why not, or what would change your mind?
           </span>
           <textarea
             name="responseNote"
             rows={2}
             placeholder="Full for this quarter — try Spar Load Testing, they need people."
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
-        <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-1 mb-2.5 text-xs">
           {requesterName} sees this. Pointing them somewhere else is the
           difference between a no and a dead end.
         </p>
         <button
           type="button"
           onClick={() => setDeclining(false)}
-          className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
         >
           Cancel
         </button>
@@ -220,7 +222,7 @@ export function JoinRequestDecision({
       />
       <button
         onClick={() => setDeclining(true)}
-        className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
       >
         Decline
       </button>
@@ -244,7 +246,7 @@ export function RemoveMemberButton({
     return (
       <button
         onClick={() => setConfirming(true)}
-        className="text-sm font-semibold text-ink-muted hover:text-risk-fg"
+        className="text-ink-muted hover:text-risk-fg text-sm font-semibold"
       >
         Remove
       </button>
@@ -253,7 +255,7 @@ export function RemoveMemberButton({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-ink-soft">Remove {memberName}?</span>
+      <span className="text-ink-soft text-sm">Remove {memberName}?</span>
       <ActionButton
         action={removeProjectMemberAction}
         fields={{ projectId, memberId }}
@@ -263,7 +265,7 @@ export function RemoveMemberButton({
       />
       <button
         onClick={() => setConfirming(false)}
-        className="text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink text-sm font-semibold"
       >
         Cancel
       </button>

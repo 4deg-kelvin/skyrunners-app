@@ -10,6 +10,7 @@ import {
   updateDeliverableAction,
   createDeliverableAction,
   reopenDeliverableAction,
+  withdrawSignOffAction,
   setDeliverableStatusAction,
   submitDeliverableAction,
 } from "@/lib/actions";
@@ -31,11 +32,22 @@ export function DeliverableActions({
   deliverable,
   isOwner,
   canSignOff,
+  canWithdrawSignOff = false,
   candidates = [],
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
   canSignOff: boolean;
+  /**
+   * May overturn a sign-off that already happened.
+   *
+   * Deliberately a SECOND flag rather than a stronger reading of `canSignOff`.
+   * They answer different questions — "may you approve work here" versus "may
+   * you overrule somebody who already did" — and the whole point of the split
+   * is that the project's own RE has the first and not the second. Defaulting
+   * to false means a caller who forgets it loses the button, not the rule.
+   */
+  canWithdrawSignOff?: boolean;
   /**
    * Who this can be handed to. Everyone active, not just current project
    * members — reassigning is how somebody joins, same as being given a new
@@ -47,22 +59,85 @@ export function DeliverableActions({
   const [blocking, setBlocking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   const { id, projectId, status } = deliverable;
   const fields = { deliverableId: id, projectId };
 
   if (status === "done") {
+    const signedOn = deliverable.completedAt
+      ? ` ${new Date(deliverable.completedAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })}`
+      : "";
+
+    /*
+      Overturning a sign-off, and ONLY from above the project.
+
+      This state used to be a dead end — "Signed off." and nothing else — so a
+      deliverable approved in error was permanent, and the only route back was
+      deleting it, which the operation refuses precisely because it counts
+      towards somebody's record.
+
+      The RE at the project's own level signs work off; that's their job. Saying
+      the sign-off was WRONG is a different act, and it comes from the RE above
+      them or the Division Lead. `canWithdrawSignOff` carries that answer down —
+      it is NOT the same flag as `canSignOff`.
+    */
+    if (!canWithdrawSignOff) {
+      return <p className="text-ok-fg text-sm">Signed off{signedOn}.</p>;
+    }
+
+    if (rejecting) {
+      return (
+        <ActionForm
+          action={withdrawSignOffAction}
+          submitLabel="Reject it"
+          submittingLabel="Rejecting…"
+          onSuccess={() => setRejecting(false)}
+          className="rounded-tile border-risk-fg/30 bg-risk-bg/40 border p-3"
+        >
+          <input type="hidden" name="deliverableId" value={id} />
+          <input type="hidden" name="projectId" value={projectId} />
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              What doesn&apos;t meet the requirement?
+            </span>
+            <textarea
+              name="reason"
+              rows={2}
+              required
+              placeholder="Spar failed at 1.3g on the bench — the layup schedule doesn't match the drawing."
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            />
+          </label>
+          <p className="text-ink-muted mt-1 mb-2.5 text-xs">
+            This takes a completed deliverable back off the owner&apos;s record,
+            so the reason is required. If the project was marked complete,
+            it&apos;ll go back to active and everyone above it will be told.
+          </p>
+          <button
+            type="button"
+            onClick={() => setRejecting(false)}
+            className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+        </ActionForm>
+      );
+    }
+
     return (
-      <p className="text-sm text-ok-fg">
-        Signed off
-        {deliverable.completedAt
-          ? ` ${new Date(deliverable.completedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}`
-          : ""}
-        .
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-ok-fg text-sm">Signed off{signedOn}.</p>
+        <button
+          onClick={() => setRejecting(true)}
+          className="text-ink-muted hover:text-risk-fg text-sm font-semibold"
+        >
+          Reject this
+        </button>
+      </div>
     );
   }
 
@@ -71,7 +146,7 @@ export function DeliverableActions({
   if (status === "submitted") {
     if (!canSignOff) {
       return (
-        <p className="text-sm text-ink-muted">
+        <p className="text-ink-muted text-sm">
           Waiting on an RE to sign off. Nothing more for you to do.
         </p>
       );
@@ -83,12 +158,12 @@ export function DeliverableActions({
           action={reopenDeliverableAction}
           submitLabel="Send back"
           submittingLabel="Sending…"
-          className="rounded-tile border border-line bg-surface p-3"
+          className="rounded-tile border-line bg-surface border p-3"
         >
           <input type="hidden" name="deliverableId" value={id} />
           <input type="hidden" name="projectId" value={projectId} />
           <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-ink">
+            <span className="text-ink mb-1 block text-sm font-semibold">
               What still needs doing?
             </span>
             <textarea
@@ -96,16 +171,16 @@ export function DeliverableActions({
               rows={2}
               required
               placeholder="Load case 3 isn't covered — add it and resubmit."
-              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
             />
           </label>
-          <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+          <p className="text-ink-muted mt-1 mb-2.5 text-xs">
             Required. A rejection with no reason reads as a brush-off.
           </p>
           <button
             type="button"
             onClick={() => setReopening(false)}
-            className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+            className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
           >
             Cancel
           </button>
@@ -124,7 +199,7 @@ export function DeliverableActions({
         />
         <button
           onClick={() => setReopening(true)}
-          className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+          className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
         >
           Send back
         </button>
@@ -140,13 +215,13 @@ export function DeliverableActions({
         action={setDeliverableStatusAction}
         submitLabel="Mark blocked"
         submittingLabel="Saving…"
-        className="rounded-tile border border-line bg-surface p-3"
+        className="rounded-tile border-line bg-surface border p-3"
       >
         <input type="hidden" name="deliverableId" value={id} />
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="status" value="blocked" />
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             What&apos;s blocking it?
           </span>
           <input
@@ -154,17 +229,17 @@ export function DeliverableActions({
             name="blockerNote"
             required
             placeholder="Waiting on the load cell to arrive"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
-        <p className="mb-2.5 mt-1 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-1 mb-2.5 text-xs">
           This goes to the project&apos;s REs, and onto the blocker board where
           anyone can pick it up.
         </p>
         <button
           type="button"
           onClick={() => setBlocking(false)}
-          className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+          className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
         >
           Cancel
         </button>
@@ -174,7 +249,7 @@ export function DeliverableActions({
 
   if (editing) {
     return (
-      <div className="rounded-tile border border-line bg-surface p-3">
+      <div className="rounded-tile border-line bg-surface border p-3">
         <ActionForm
           action={updateDeliverableAction}
           submitLabel="Save"
@@ -186,7 +261,7 @@ export function DeliverableActions({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-ink">
+              <span className="text-ink mb-1 block text-sm font-semibold">
                 Title
               </span>
               <input
@@ -194,18 +269,18 @@ export function DeliverableActions({
                 name="title"
                 required
                 defaultValue={deliverable.title}
-                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-ink">
+              <span className="text-ink mb-1 block text-sm font-semibold">
                 Owner
               </span>
               <select
                 name="ownerId"
                 defaultValue={deliverable.ownerId}
-                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               >
                 {candidates.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -216,19 +291,19 @@ export function DeliverableActions({
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-ink">
+              <span className="text-ink mb-1 block text-sm font-semibold">
                 Due date
               </span>
               <input
                 type="date"
                 name="dueDate"
                 defaultValue={deliverable.dueDate ?? ""}
-                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               />
             </label>
           </div>
 
-          <p className="mb-2.5 mt-2 text-xs text-ink-muted">
+          <p className="text-ink-muted mt-2 mb-2.5 text-xs">
             Leave the date empty for no deadline. Dates drive the project&apos;s
             timeline, so a real one is worth more than a guessed one.
           </p>
@@ -236,13 +311,13 @@ export function DeliverableActions({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="ml-5 text-sm font-semibold text-ink-muted hover:text-ink"
+            className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
           >
             Cancel
           </button>
         </ActionForm>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+        <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
           <ActionButton
             action={deleteDeliverableAction}
             fields={fields}
@@ -250,7 +325,7 @@ export function DeliverableActions({
             pendingLabel="Deleting…"
             tone="danger"
           />
-          <span className="text-xs text-ink-muted">
+          <span className="text-ink-muted text-xs">
             Signed-off work can&apos;t be deleted — it counts towards its
             owner&apos;s record.
           </span>
@@ -288,7 +363,7 @@ export function DeliverableActions({
       ) : (
         <button
           onClick={() => setBlocking(true)}
-          className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+          className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
         >
           I&apos;m blocked
         </button>
@@ -302,7 +377,7 @@ export function DeliverableActions({
       {canSignOff ? (
         <button
           onClick={() => setEditing(true)}
-          className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+          className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
         >
           Edit
         </button>
@@ -332,7 +407,7 @@ export function AddDeliverableForm({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Plus className="size-3.5" strokeWidth={2.5} />
         Add deliverable
@@ -346,12 +421,12 @@ export function AddDeliverableForm({
       submitLabel="Add it"
       submittingLabel="Adding…"
       resetOnSuccess
-      className="rounded-tile border border-line bg-surface p-3.5"
+      className="rounded-tile border-line bg-surface border p-3.5"
     >
       <input type="hidden" name="projectId" value={projectId} />
 
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
+        <span className="text-ink mb-1 block text-sm font-semibold">
           What needs doing?
         </span>
         <input
@@ -359,19 +434,19 @@ export function AddDeliverableForm({
           name="title"
           required
           placeholder="Spar load case 3 analysed and written up"
-          className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
+          <span className="text-ink mb-1 block text-sm font-semibold">
             Owner
           </span>
           <select
             name="ownerId"
             required
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           >
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
@@ -379,20 +454,19 @@ export function AddDeliverableForm({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-ink-muted">
+          <span className="text-ink-muted mt-1 block text-xs">
             Exactly one. Anyone not on the project gets added.
           </span>
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-ink">
-            Due{" "}
-            <span className="font-normal text-ink-muted">(optional)</span>
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Due <span className="text-ink-muted font-normal">(optional)</span>
           </span>
           <input
             type="date"
             name="dueDate"
-            className="w-full rounded-tile border border-line bg-card px-3 py-2 text-[15px] text-ink"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
         </label>
       </div>
@@ -400,7 +474,7 @@ export function AddDeliverableForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="ml-3 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        className="text-ink-muted hover:text-ink mt-3 ml-3 text-sm font-semibold"
       >
         Cancel
       </button>

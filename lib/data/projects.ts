@@ -433,15 +433,8 @@ export async function getArchivedDivisions(): Promise<ArchivedDivision[]> {
   });
 }
 
-/** Every project slug — used to pre-render detail pages at build time. */
-export async function getAllProjectSlugs(): Promise<string[]> {
-  // Ensure the live snapshot exists before any synchronous read.
-  //
-  // Idempotent and free once loaded. It's here rather than left to the caller
-  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
-  // which starts the read BEFORE getViewer has preloaded, and every such page
-  // then died on "Live store not loaded". Guarding at the boundary means call
-  // order stops mattering.
-  await preloadLiveStore();
-  return readStore().projects.map((p) => p.slug);
-}
+/*
+  `getAllProjectSlugs` used to live here, for `generateStaticParams` — removed
+  for the same reason as `getAllMemberIds`. See the note in `lib/data/members.ts`
+  and docs/HANDOFF.md §4.
+*/

@@ -58,10 +58,7 @@ import type {
   WorkLog,
 } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
-import {
-  getTrainingQueue,
-  type TrainingQueueItem,
-} from "@/lib/data/trainings";
+import { getTrainingQueue, type TrainingQueueItem } from "@/lib/data/trainings";
 
 /**
  * How long a completion stays news on the dashboard.
@@ -160,7 +157,11 @@ export interface DashboardView {
    * absence nothing reports. Deliberately not a score or a flag on their
    * record — it's a prompt to have a conversation.
    */
-  goneQuiet: { member: Member; openDeliverables: number; lastLoggedAt?: string }[];
+  goneQuiet: {
+    member: Member;
+    openDeliverables: number;
+    lastLoggedAt?: string;
+  }[];
   /**
    * Per-Lead roll-up. Populated for Co-Leads only, empty for everyone else.
    *
@@ -270,7 +271,9 @@ export async function getDashboard(
 
   // A Co-Lead oversees the club; everyone else oversees their own subtree.
   const overseen = isCoLead(actor)
-    ? readStore().members.filter((m) => m.id !== actor.id && m.status === "active")
+    ? readStore().members.filter(
+        (m) => m.id !== actor.id && m.status === "active"
+      )
     : reportsBelow(actor.id).filter((m) => m.status === "active");
 
   const overseenIds = new Set(overseen.map((m) => m.id));
@@ -350,7 +353,9 @@ export async function getDashboard(
 
   // Compliance across the people the viewer oversees. Counting the whole club
   // would tell a Lead nothing about whether THEIR people are keeping up.
-  const scopedUpdates = progressUpdates.filter((u) => countedIds.has(u.memberId));
+  const scopedUpdates = progressUpdates.filter((u) =>
+    countedIds.has(u.memberId)
+  );
   const onTime = scopedUpdates.filter(
     (u) => u.status === "submitted" || u.status === "reviewed"
   ).length;
@@ -503,7 +508,12 @@ export async function getDashboard(
     },
     hoursThisWeek,
     reviewQueue,
-    escalations: escalationsFor(actor.id, readStore().members, progressUpdates, today()),
+    escalations: escalationsFor(
+      actor.id,
+      readStore().members,
+      progressUpdates,
+      today()
+    ),
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),

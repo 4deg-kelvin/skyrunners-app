@@ -74,6 +74,7 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
     currentTerm,
     inSession: currentTerm?.generatesObligations ?? false,
     terms,
-    calendarRunsOut: terms.length > 0 && terms[terms.length - 1].endsOn < today(),
+    calendarRunsOut:
+      terms.length > 0 && terms[terms.length - 1].endsOn < today(),
   };
 }

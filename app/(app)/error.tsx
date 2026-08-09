@@ -28,16 +28,16 @@ export default function Error({
     <Card>
       <CardBody className="py-12 text-center">
         <SectionLabel>Something Broke</SectionLabel>
-        <h1 className="mt-3 text-3xl font-bold text-ink">
+        <h1 className="text-ink mt-3 text-3xl font-bold">
           This page didn&apos;t load
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-[15px] text-ink-soft">
+        <p className="text-ink-soft mx-auto mt-3 max-w-md text-[15px]">
           Usually a temporary connection problem. Try again — if it keeps
           happening, send the message below to whoever is on call.
         </p>
 
         {process.env.NODE_ENV === "development" ? (
-          <pre className="mx-auto mt-5 max-w-xl overflow-x-auto rounded-tile bg-surface px-4 py-3 text-left text-xs text-ink-soft">
+          <pre className="rounded-tile bg-surface text-ink-soft mx-auto mt-5 max-w-xl overflow-x-auto px-4 py-3 text-left text-xs">
             {error.message}
           </pre>
         ) : null}

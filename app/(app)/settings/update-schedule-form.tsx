@@ -83,7 +83,7 @@ export function UpdateScheduleForm({
               aria-pressed={isOn}
               aria-label={WEEKDAY_NAMES[day]}
               className={cn(
-                "flex min-w-[76px] items-center justify-center gap-1.5 rounded-tile border px-4 py-3 text-sm font-semibold transition-colors",
+                "rounded-tile flex min-w-[76px] items-center justify-center gap-1.5 border px-4 py-3 text-sm font-semibold transition-colors",
                 isOn
                   ? "border-cardinal-600 bg-cardinal-600 text-white"
                   : "border-line bg-card text-ink-soft hover:bg-surface",
@@ -97,14 +97,14 @@ export function UpdateScheduleForm({
         })}
       </div>
 
-      <p className="mt-3 text-sm text-ink-muted">
+      <p className="text-ink-muted mt-3 text-sm">
         {complete
           ? `You'll submit on ${selected.map((d) => WEEKDAY_NAMES[d]).join(" and ")}, due 11:59 PM.`
           : `Pick ${updatesPerWeek - selected.length} more day${updatesPerWeek - selected.length === 1 ? "" : "s"}.`}
       </p>
 
       {tooClose ? (
-        <p className="mt-2 text-sm font-medium text-warn-fg">
+        <p className="text-warn-fg mt-2 text-sm font-medium">
           Those are back-to-back. Spreading them out gives you real progress to
           report each time — try Monday and Thursday.
         </p>

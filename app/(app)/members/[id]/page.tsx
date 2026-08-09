@@ -17,14 +17,13 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
 import { TrainingRecord } from "@/components/ui/training-record";
 import { ActionButton } from "@/components/forms/action-form";
+import { ReopenButton } from "@/components/forms/help-request-actions";
 import { deleteCheckInAction } from "@/lib/actions";
+import { getResolvedAsksFor } from "@/lib/data/blockers";
 import { getMemberProfile } from "@/lib/data/members";
 import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
-import {
-  ROLE_LABELS,
-  ROLE_TONES,
-} from "@/lib/labels";
+import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 
@@ -39,21 +38,19 @@ export default async function MemberProfilePage({
   // Decide visibility BEFORE fetching, so restricted numbers are never loaded
   // into a page that isn't allowed to show them.
   const canViewEffort = can.viewMemberEffort(viewer.actor, viewer.graph, id);
-  const [view, trainings] = await Promise.all([
+  const [view, trainings, resolvedAsks] = await Promise.all([
     getMemberProfile(id, canViewEffort),
     getTrainings(id),
+    // Asks they posted that got sorted. Public, like the trainings below it —
+    // the note on HOW it got sorted is the useful half, and it's how the next
+    // person with the same problem finds the answer without asking again.
+    getResolvedAsksFor(id, viewer.actor),
   ]);
 
   if (!view) notFound();
 
-  const {
-    member,
-    lead,
-    directReports,
-    projects,
-    contribution,
-    checkIns,
-  } = view;
+  const { member, lead, directReports, projects, contribution, checkIns } =
+    view;
   const isOwnProfile = viewer.member.id === member.id;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
@@ -165,13 +162,13 @@ export default async function MemberProfilePage({
                     }) => (
                       <div
                         key={project.id}
-                        className="rounded-tile border border-line px-4 py-3.5"
+                        className="rounded-tile border-line border px-4 py-3.5"
                       >
                         <Breadcrumb trail={breadcrumb} className="mb-1.5" />
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <Link
                             href={`/projects/${project.slug}`}
-                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
                           >
                             {project.name}
                           </Link>
@@ -203,8 +200,10 @@ export default async function MemberProfilePage({
                             ))}
                           </div>
                         ) : membership.responsibility ? (
-                          <p className="mt-2 text-sm text-ink-soft">
-                            <span className="font-semibold text-ink">Owns:</span>{" "}
+                          <p className="text-ink-soft mt-2 text-sm">
+                            <span className="text-ink font-semibold">
+                              Owns:
+                            </span>{" "}
                             {membership.responsibility}
                           </p>
                         ) : null}
@@ -216,7 +215,7 @@ export default async function MemberProfilePage({
                           the project page — hiding it here would be privacy
                           theatre that costs the page its point.
                         */}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+                        <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
                           {canViewEffort ? (
                             <span className="flex items-center gap-1.5">
                               <Clock className="size-3.5" />
@@ -245,12 +244,12 @@ export default async function MemberProfilePage({
                     <Link
                       key={report.id}
                       href={`/members/${report.id}`}
-                      className="rounded-tile border border-line px-4 py-3 transition-colors hover:bg-surface"
+                      className="rounded-tile border-line hover:bg-surface border px-4 py-3 transition-colors"
                     >
-                      <p className="text-[15px] font-bold text-ink">
+                      <p className="text-ink text-[15px] font-bold">
                         {report.fullName}
                       </p>
-                      <p className="mt-0.5 text-sm text-ink-muted">
+                      <p className="text-ink-muted mt-0.5 text-sm">
                         {report.major ?? "—"}
                       </p>
                     </Link>
@@ -269,12 +268,12 @@ export default async function MemberProfilePage({
                     record={contribution}
                     isOwnRecord={isOwnProfile}
                   />
-                  <p className="mt-5 text-sm text-ink-muted">
+                  <p className="text-ink-muted mt-5 text-sm">
                     Four independent signals, deliberately not combined into a
                     score and never ranked against other members.{" "}
                     <Link
                       href="/how-we-lead"
-                      className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+                      className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
                     >
                       What leadership looks for
                     </Link>
@@ -283,8 +282,8 @@ export default async function MemberProfilePage({
               ) : (
                 <>
                   <SectionLabel>Contribution</SectionLabel>
-                  <p className="mt-3 flex items-start gap-2 text-[15px] text-ink-soft">
-                    <Lock className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+                  <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
+                    <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
                     <span>
                       Hours and update contents are visible only to this
                       member&apos;s Lead chain and the REs of projects they
@@ -309,77 +308,79 @@ export default async function MemberProfilePage({
               <CardBody>
                 <SectionLabel>Check-ins</SectionLabel>
                 {checkIns.length === 0 ? (
-                  <p className="mt-3 text-[15px] text-ink-soft">
+                  <p className="text-ink-soft mt-3 text-[15px]">
                     {member.preferredName ?? member.fullName} hasn&apos;t
                     submitted a check-in yet.
                   </p>
                 ) : (
                   <ul className="mt-4 space-y-4">
-                    {checkIns.slice(0, 8).map(({ update, sections, reviewedBy }) => (
-                      <li
-                        key={update.id}
-                        className="rounded-tile border border-line bg-surface p-3.5"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <p className="text-sm font-bold text-ink">
-                            {new Date(
-                              update.submittedAt ?? update.dueAt
-                            ).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <p className="text-xs text-ink-muted">
-                              {update.hoursThisPeriod} hrs
-                              {reviewedBy
-                                ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
-                                : " · not yet read"}
+                    {checkIns
+                      .slice(0, 8)
+                      .map(({ update, sections, reviewedBy }) => (
+                        <li
+                          key={update.id}
+                          className="rounded-tile border-line bg-surface border p-3.5"
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <p className="text-ink text-sm font-bold">
+                              {new Date(
+                                update.submittedAt ?? update.dueAt
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
                             </p>
-                            {/*
+                            <div className="flex items-center gap-3">
+                              <p className="text-ink-muted text-xs">
+                                {update.hoursThisPeriod} hrs
+                                {reviewedBy
+                                  ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
+                                  : " · not yet read"}
+                              </p>
+                              {/*
                               Your own, or a Co-Lead clearing up. Anything a
                               Lead has already read stays — the operation
                               refuses it, because they acted on it.
                             */}
-                            {canDeleteCheckIns && !reviewedBy ? (
-                              <ActionButton
-                                action={deleteCheckInAction}
-                                fields={{
-                                  updateId: update.id,
-                                  authorId: member.id,
-                                }}
-                                label="Delete"
-                                pendingLabel="Deleting…"
-                                tone="danger"
-                              />
-                            ) : null}
+                              {canDeleteCheckIns && !reviewedBy ? (
+                                <ActionButton
+                                  action={deleteCheckInAction}
+                                  fields={{
+                                    updateId: update.id,
+                                    authorId: member.id,
+                                  }}
+                                  label="Delete"
+                                  pendingLabel="Deleting…"
+                                  tone="danger"
+                                />
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
 
-                        {sections.map(({ entry, project }) => (
-                          <div key={entry.id} className="mt-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                              {project?.name ?? "Unknown project"}
-                            </p>
-                            <p className="mt-1 text-[15px] text-ink-soft">
-                              {entry.progress}
-                            </p>
-                            {entry.blockers ? (
-                              <p className="mt-1 text-[15px] text-cardinal-700">
-                                Blocked: {entry.blockers}
+                          {sections.map(({ entry, project }) => (
+                            <div key={entry.id} className="mt-3">
+                              <p className="text-ink-muted text-xs font-semibold tracking-wide uppercase">
+                                {project?.name ?? "Unknown project"}
                               </p>
-                            ) : null}
-                          </div>
-                        ))}
+                              <p className="text-ink-soft mt-1 text-[15px]">
+                                {entry.progress}
+                              </p>
+                              {entry.blockers ? (
+                                <p className="text-cardinal-700 mt-1 text-[15px]">
+                                  Blocked: {entry.blockers}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
 
-                        {update.generalNote ? (
-                          <p className="mt-3 border-t border-line pt-3 text-[15px] text-ink-soft">
-                            {update.generalNote}
-                          </p>
-                        ) : null}
-                      </li>
-                    ))}
+                          {update.generalNote ? (
+                            <p className="border-line text-ink-soft mt-3 border-t pt-3 text-[15px]">
+                              {update.generalNote}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
                   </ul>
                 )}
               </CardBody>
@@ -394,6 +395,61 @@ export default async function MemberProfilePage({
             in Settings, because retiring a machine affects everyone and has no
             business on a row inside one member's record.
           */}
+          {/*
+            Asks that got answered.
+
+            This is also the ONLY route back from "Mark sorted". Resolving is
+            otherwise a one-way door: the ask leaves the Find Work board and
+            there is nowhere left to click. Somebody closing a thread too early
+            — the fix didn't hold, the part was still wrong — had to post the
+            whole question again and lose the replies.
+          */}
+          {resolvedAsks.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Answered Asks</SectionLabel>
+                <div className="mt-4 space-y-2.5">
+                  {resolvedAsks.map((ask) => (
+                    <div
+                      key={ask.key}
+                      className="rounded-tile border-line border px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-ink text-[15px] font-bold">
+                            {ask.title}
+                          </p>
+                          {ask.project ? (
+                            <Link
+                              href={`/projects/${ask.project.slug}`}
+                              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
+                            >
+                              {ask.project.name}
+                            </Link>
+                          ) : null}
+                        </div>
+                        <Badge tone="ok">Sorted</Badge>
+                      </div>
+
+                      {ask.request.resolutionNote ? (
+                        <p className="text-ink-soft mt-2 text-sm">
+                          <span className="text-ink font-semibold">How: </span>
+                          {ask.request.resolutionNote}
+                        </p>
+                      ) : null}
+
+                      {ask.canClose ? (
+                        <div className="mt-3">
+                          <ReopenButton requestId={ask.request.id} />
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           <Card>
             <CardBody>
               <TrainingRecord
@@ -404,7 +460,6 @@ export default async function MemberProfilePage({
               />
             </CardBody>
           </Card>
-
         </div>
       </div>
     </div>

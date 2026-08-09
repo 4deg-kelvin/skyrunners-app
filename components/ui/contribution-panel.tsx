@@ -40,7 +40,7 @@ export function ContributionPanel({
         </Badge>
       </div>
 
-      <p className="mt-2 text-sm text-ink-soft">
+      <p className="text-ink-soft mt-2 text-sm">
         {TIER_DESCRIPTIONS[commitment.tier]}
       </p>
 
@@ -85,7 +85,7 @@ export function ContributionPanel({
       </div>
 
       {delivered.overdue > 0 ? (
-        <p className="mt-4 text-sm font-medium text-cardinal-600">
+        <p className="text-cardinal-600 mt-4 text-sm font-medium">
           {delivered.overdue} deliverable
           {delivered.overdue === 1 ? " is" : "s are"} past due
           {isOwnRecord ? " — worth flagging to your RE if you're stuck." : "."}
@@ -94,7 +94,7 @@ export function ContributionPanel({
 
       {/* Scope is reported, never blended into the other signals */}
       {scope.reRoleCount > 0 ? (
-        <p className="mt-4 text-sm text-ink-muted">
+        <p className="text-ink-muted mt-4 text-sm">
           RE on {scope.reRoleCount} project
           {scope.reRoleCount === 1 ? "" : "s"} · committed to{" "}
           {scope.projectsCommitted}

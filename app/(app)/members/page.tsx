@@ -89,7 +89,7 @@ export default async function MembersPage() {
                 // carries the link instead.
                 <div
                   key={member.id}
-                  className="rounded-tile border border-line px-4 py-4"
+                  className="rounded-tile border-line border px-4 py-4"
                 >
                   <div className="flex items-start gap-3">
                     <Avatar
@@ -101,7 +101,7 @@ export default async function MembersPage() {
                       <div className="flex items-start justify-between gap-2">
                         <Link
                           href={`/members/${member.id}`}
-                          className="truncate text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          className="text-ink hover:text-cardinal-600 truncate text-[15px] font-bold"
                         >
                           {member.fullName}
                         </Link>
@@ -120,17 +120,17 @@ export default async function MembersPage() {
                           </Badge>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 truncate text-sm text-ink-muted">
+                      <p className="text-ink-muted mt-0.5 truncate text-sm">
                         {member.major}
                         {member.classYear
                           ? ` · '${String(member.classYear).slice(2)}`
                           : ""}
                       </p>
 
-                      <div className="mt-2.5 space-y-1 text-sm text-ink-soft">
+                      <div className="text-ink-soft mt-2.5 space-y-1 text-sm">
                         {/* Delivered work leads — it's the public, honest signal */}
                         <p>
-                          <span className="font-semibold text-ink">
+                          <span className="text-ink font-semibold">
                             {deliverablesCompleted}
                           </span>{" "}
                           delivered
@@ -145,7 +145,7 @@ export default async function MembersPage() {
                           {committedCount}{" "}
                           {committedCount === 1 ? "project" : "projects"}
                           {reCount > 0 ? (
-                            <span className="font-semibold text-cardinal-600">
+                            <span className="text-cardinal-600 font-semibold">
                               {" "}
                               · RE on {reCount}
                             </span>
@@ -166,7 +166,10 @@ export default async function MembersPage() {
                           status={member.status}
                           leadId={member.leadId}
                           leadOptions={options.leadOptions}
-                          canSetRole={can.setGlobalRole(viewer.actor, member.id)}
+                          canSetRole={can.setGlobalRole(
+                            viewer.actor,
+                            member.id
+                          )}
                           canReassign={can.reassignLead(
                             viewer.actor,
                             viewer.graph,

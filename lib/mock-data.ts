@@ -686,7 +686,10 @@ export const projects: Project[] = [
     phase: "detailed_design",
     health: "at_risk",
     startDate: "2026-05-01",
-    targetDate: "2026-09-30",
+    // After both its children (Layup 08-30, Load Test 10-15) and before its
+    // parent (Airframe v2, 12-15). The seed has to satisfy the nesting rule in
+    // `updateProject` or the sample club ships already in violation of it.
+    targetDate: "2026-10-30",
     datesOverridden: true,
     isOpenToJoin: true,
     openRoles: "FEA support",
@@ -784,7 +787,8 @@ export const projects: Project[] = [
     id: "p-avionics-bringup",
     name: "Avionics Bring-Up",
     slug: "avionics-bring-up",
-    description: "Flight controller integration, power distribution, telemetry.",
+    description:
+      "Flight controller integration, power distribution, telemetry.",
     parentId: null,
     teamId: "div-skybeta",
     primaryReId: "m-marcus",
@@ -873,59 +877,371 @@ export const projects: Project[] = [
 
 export const projectMemberships: ProjectMembership[] = [
   // Current user, so "My Work" has something to show
-  { projectId: "p-gps-denied", memberId: "m-anish", role: "contributor", responsibility: "Mission requirements and flight-test coordination", joinedAt: "2026-04-16", commitment: "committed" },
-  { projectId: "p-skydelta-concept", memberId: "m-anish", role: "re", responsibility: "Trade study scope and sizing review", joinedAt: "2026-07-01", commitment: "committed" },
+  {
+    projectId: "p-gps-denied",
+    memberId: "m-anish",
+    role: "contributor",
+    responsibility: "Mission requirements and flight-test coordination",
+    joinedAt: "2026-04-16",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-skydelta-concept",
+    memberId: "m-anish",
+    role: "re",
+    responsibility: "Trade study scope and sizing review",
+    joinedAt: "2026-07-01",
+    commitment: "committed",
+  },
   // Following: he chose to watch this one, nobody added him to it
-  { projectId: "p-avionics-bringup", memberId: "m-anish", role: "observer", joinedAt: "2026-05-06", commitment: "following" },
+  {
+    projectId: "p-avionics-bringup",
+    memberId: "m-anish",
+    role: "observer",
+    joinedAt: "2026-05-06",
+    commitment: "following",
+  },
 
-  { projectId: "p-airframe-v2", memberId: "m-priya", role: "re", responsibility: "Overall airframe integration", joinedAt: "2026-04-01", commitment: "committed" },
-  { projectId: "p-airframe-v2", memberId: "m-tyler", role: "re", responsibility: "Structural analysis", joinedAt: "2026-05-01", commitment: "committed" },
-  { projectId: "p-airframe-v2", memberId: "m-sofia", role: "contributor", responsibility: "Composite fabrication", joinedAt: "2026-05-04", commitment: "committed" },
-  { projectId: "p-wing-spar", memberId: "m-tyler", role: "re", responsibility: "Spar design and analysis", joinedAt: "2026-05-01", commitment: "committed" },
-  { projectId: "p-wing-spar", memberId: "m-noah", role: "contributor", responsibility: "Material characterization", joinedAt: "2026-06-02", commitment: "committed" },
-  { projectId: "p-layup", memberId: "m-sofia", role: "re", responsibility: "Process documentation", joinedAt: "2026-06-01", commitment: "committed" },
-  { projectId: "p-layup", memberId: "m-noah", role: "contributor", responsibility: "Coupon testing", joinedAt: "2026-06-10", commitment: "committed" },
-  { projectId: "p-load-test", memberId: "m-noah", role: "re", responsibility: "Test rig and instrumentation", joinedAt: "2026-07-15", commitment: "committed" },
-  { projectId: "p-gps-denied", memberId: "m-lena", role: "re", responsibility: "Autonomy architecture", joinedAt: "2026-04-15", commitment: "committed" },
-  { projectId: "p-gps-denied", memberId: "m-amara", role: "re", responsibility: "Perception stack", joinedAt: "2026-04-20", commitment: "committed" },
-  { projectId: "p-vio", memberId: "m-amara", role: "re", responsibility: "VIO implementation", joinedAt: "2026-05-01", commitment: "committed" },
-  { projectId: "p-vio", memberId: "m-omar", role: "contributor", responsibility: "Dataset collection", joinedAt: "2026-05-20", commitment: "committed" },
-  { projectId: "p-sim", memberId: "m-omar", role: "re", responsibility: "Simulation environment", joinedAt: "2026-06-01", commitment: "committed" },
-  { projectId: "p-avionics-bringup", memberId: "m-marcus", role: "re", responsibility: "Avionics integration", joinedAt: "2026-04-20", commitment: "committed" },
-  { projectId: "p-avionics-bringup", memberId: "m-kenji", role: "re", responsibility: "Electronics design", joinedAt: "2026-04-25", commitment: "committed" },
-  { projectId: "p-power", memberId: "m-kenji", role: "re", responsibility: "PDB schematic and layout", joinedAt: "2026-06-15", commitment: "committed" },
-  { projectId: "p-propulsion-test", memberId: "m-hana", role: "re", responsibility: "Test stand and data", joinedAt: "2026-05-20", commitment: "committed" },
-  { projectId: "p-outreach", memberId: "m-james", role: "re", responsibility: "Workshop program", joinedAt: "2026-08-01", commitment: "committed" },
-  { projectId: "p-outreach", memberId: "m-grace", role: "re", responsibility: "Curriculum and logistics", joinedAt: "2026-08-01", commitment: "committed" },
-  { projectId: "p-skydelta-concept", memberId: "m-priya", role: "re", responsibility: "Trade study lead", joinedAt: "2026-07-01", commitment: "committed" },
+  {
+    projectId: "p-airframe-v2",
+    memberId: "m-priya",
+    role: "re",
+    responsibility: "Overall airframe integration",
+    joinedAt: "2026-04-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-airframe-v2",
+    memberId: "m-tyler",
+    role: "re",
+    responsibility: "Structural analysis",
+    joinedAt: "2026-05-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-airframe-v2",
+    memberId: "m-sofia",
+    role: "contributor",
+    responsibility: "Composite fabrication",
+    joinedAt: "2026-05-04",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-wing-spar",
+    memberId: "m-tyler",
+    role: "re",
+    responsibility: "Spar design and analysis",
+    joinedAt: "2026-05-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-wing-spar",
+    memberId: "m-noah",
+    role: "contributor",
+    responsibility: "Material characterization",
+    joinedAt: "2026-06-02",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-layup",
+    memberId: "m-sofia",
+    role: "re",
+    responsibility: "Process documentation",
+    joinedAt: "2026-06-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-layup",
+    memberId: "m-noah",
+    role: "contributor",
+    responsibility: "Coupon testing",
+    joinedAt: "2026-06-10",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-load-test",
+    memberId: "m-noah",
+    role: "re",
+    responsibility: "Test rig and instrumentation",
+    joinedAt: "2026-07-15",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-gps-denied",
+    memberId: "m-lena",
+    role: "re",
+    responsibility: "Autonomy architecture",
+    joinedAt: "2026-04-15",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-gps-denied",
+    memberId: "m-amara",
+    role: "re",
+    responsibility: "Perception stack",
+    joinedAt: "2026-04-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-vio",
+    memberId: "m-amara",
+    role: "re",
+    responsibility: "VIO implementation",
+    joinedAt: "2026-05-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-vio",
+    memberId: "m-omar",
+    role: "contributor",
+    responsibility: "Dataset collection",
+    joinedAt: "2026-05-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-sim",
+    memberId: "m-omar",
+    role: "re",
+    responsibility: "Simulation environment",
+    joinedAt: "2026-06-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-avionics-bringup",
+    memberId: "m-marcus",
+    role: "re",
+    responsibility: "Avionics integration",
+    joinedAt: "2026-04-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-avionics-bringup",
+    memberId: "m-kenji",
+    role: "re",
+    responsibility: "Electronics design",
+    joinedAt: "2026-04-25",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-power",
+    memberId: "m-kenji",
+    role: "re",
+    responsibility: "PDB schematic and layout",
+    joinedAt: "2026-06-15",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-propulsion-test",
+    memberId: "m-hana",
+    role: "re",
+    responsibility: "Test stand and data",
+    joinedAt: "2026-05-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-outreach",
+    memberId: "m-james",
+    role: "re",
+    responsibility: "Workshop program",
+    joinedAt: "2026-08-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-outreach",
+    memberId: "m-grace",
+    role: "re",
+    responsibility: "Curriculum and logistics",
+    joinedAt: "2026-08-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-skydelta-concept",
+    memberId: "m-priya",
+    role: "re",
+    responsibility: "Trade study lead",
+    joinedAt: "2026-07-01",
+    commitment: "committed",
+  },
 
   // --- The wider club -------------------------------------------------------
   // Note m-blake appears NOWHERE below. That's deliberate: a brand-new member on
   // no projects is the state /find-work exists to fix, and it was previously
   // unrepresentable in mock data.
-  { projectId: "p-propulsion-test", memberId: "m-rosa", role: "re", responsibility: "Propulsion test campaign", joinedAt: "2026-04-02", commitment: "committed" },
-  { projectId: "p-propulsion-test", memberId: "m-ines", role: "contributor", responsibility: "Thermal instrumentation", joinedAt: "2026-05-01", commitment: "committed" },
-  { projectId: "p-propulsion-test", memberId: "m-theo", role: "contributor", responsibility: "Stand fabrication", joinedAt: "2026-05-20", commitment: "committed" },
-  { projectId: "p-propulsion-test", memberId: "m-victor", role: "contributor", responsibility: "CFD correlation", joinedAt: "2026-05-10", commitment: "committed" },
-  { projectId: "p-avionics-bringup", memberId: "m-yuki", role: "contributor", responsibility: "Telemetry link", joinedAt: "2026-04-12", commitment: "committed" },
-  { projectId: "p-avionics-bringup", memberId: "m-priyanka", role: "contributor", responsibility: "Flight-controller firmware", joinedAt: "2026-05-25", commitment: "committed" },
-  { projectId: "p-power", memberId: "m-owen", role: "contributor", responsibility: "Connector selection", joinedAt: "2026-07-05", commitment: "committed" },
-  { projectId: "p-vio", memberId: "m-caleb", role: "contributor", responsibility: "Feature-tracker tuning", joinedAt: "2026-04-28", commitment: "committed" },
-  { projectId: "p-vio", memberId: "m-lucia", role: "contributor", responsibility: "Camera calibration", joinedAt: "2026-05-02", commitment: "committed" },
-  { projectId: "p-sim", memberId: "m-mira", role: "contributor", responsibility: "Scenario scripting", joinedAt: "2026-06-18", commitment: "committed" },
-  { projectId: "p-gps-denied", memberId: "m-caleb", role: "contributor", responsibility: "Re-localisation experiments", joinedAt: "2026-06-01", commitment: "committed" },
-  { projectId: "p-airframe-v2", memberId: "m-arjun", role: "contributor", responsibility: "Fuselage CAD", joinedAt: "2026-05-02", commitment: "committed" },
-  { projectId: "p-wing-spar", memberId: "m-elena", role: "contributor", responsibility: "FEA support", joinedAt: "2026-06-01", commitment: "committed" },
-  { projectId: "p-wing-spar", memberId: "m-nadia", role: "contributor", responsibility: "Load case definition", joinedAt: "2026-04-10", commitment: "committed" },
-  { projectId: "p-layup", memberId: "m-jonas", role: "contributor", responsibility: "Layup assistance", joinedAt: "2026-06-12", commitment: "committed" },
-  { projectId: "p-layup", memberId: "m-aisha", role: "contributor", responsibility: "Resin characterisation", joinedAt: "2026-06-22", commitment: "committed" },
-  { projectId: "p-load-test", memberId: "m-elena", role: "contributor", responsibility: "Strain gauge layout", joinedAt: "2026-07-20", commitment: "committed" },
-  { projectId: "p-outreach", memberId: "m-daniel", role: "contributor", responsibility: "Workshop materials", joinedAt: "2026-05-20", commitment: "committed" },
-  { projectId: "p-outreach", memberId: "m-sara", role: "contributor", responsibility: "School outreach", joinedAt: "2026-06-26", commitment: "committed" },
-  { projectId: "p-skydelta-concept", memberId: "m-nadia", role: "contributor", responsibility: "Structural sizing", joinedAt: "2026-07-04", commitment: "committed" },
+  {
+    projectId: "p-propulsion-test",
+    memberId: "m-rosa",
+    role: "re",
+    responsibility: "Propulsion test campaign",
+    joinedAt: "2026-04-02",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-propulsion-test",
+    memberId: "m-ines",
+    role: "contributor",
+    responsibility: "Thermal instrumentation",
+    joinedAt: "2026-05-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-propulsion-test",
+    memberId: "m-theo",
+    role: "contributor",
+    responsibility: "Stand fabrication",
+    joinedAt: "2026-05-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-propulsion-test",
+    memberId: "m-victor",
+    role: "contributor",
+    responsibility: "CFD correlation",
+    joinedAt: "2026-05-10",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-avionics-bringup",
+    memberId: "m-yuki",
+    role: "contributor",
+    responsibility: "Telemetry link",
+    joinedAt: "2026-04-12",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-avionics-bringup",
+    memberId: "m-priyanka",
+    role: "contributor",
+    responsibility: "Flight-controller firmware",
+    joinedAt: "2026-05-25",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-power",
+    memberId: "m-owen",
+    role: "contributor",
+    responsibility: "Connector selection",
+    joinedAt: "2026-07-05",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-vio",
+    memberId: "m-caleb",
+    role: "contributor",
+    responsibility: "Feature-tracker tuning",
+    joinedAt: "2026-04-28",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-vio",
+    memberId: "m-lucia",
+    role: "contributor",
+    responsibility: "Camera calibration",
+    joinedAt: "2026-05-02",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-sim",
+    memberId: "m-mira",
+    role: "contributor",
+    responsibility: "Scenario scripting",
+    joinedAt: "2026-06-18",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-gps-denied",
+    memberId: "m-caleb",
+    role: "contributor",
+    responsibility: "Re-localisation experiments",
+    joinedAt: "2026-06-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-airframe-v2",
+    memberId: "m-arjun",
+    role: "contributor",
+    responsibility: "Fuselage CAD",
+    joinedAt: "2026-05-02",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-wing-spar",
+    memberId: "m-elena",
+    role: "contributor",
+    responsibility: "FEA support",
+    joinedAt: "2026-06-01",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-wing-spar",
+    memberId: "m-nadia",
+    role: "contributor",
+    responsibility: "Load case definition",
+    joinedAt: "2026-04-10",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-layup",
+    memberId: "m-jonas",
+    role: "contributor",
+    responsibility: "Layup assistance",
+    joinedAt: "2026-06-12",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-layup",
+    memberId: "m-aisha",
+    role: "contributor",
+    responsibility: "Resin characterisation",
+    joinedAt: "2026-06-22",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-load-test",
+    memberId: "m-elena",
+    role: "contributor",
+    responsibility: "Strain gauge layout",
+    joinedAt: "2026-07-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-outreach",
+    memberId: "m-daniel",
+    role: "contributor",
+    responsibility: "Workshop materials",
+    joinedAt: "2026-05-20",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-outreach",
+    memberId: "m-sara",
+    role: "contributor",
+    responsibility: "School outreach",
+    joinedAt: "2026-06-26",
+    commitment: "committed",
+  },
+  {
+    projectId: "p-skydelta-concept",
+    memberId: "m-nadia",
+    role: "contributor",
+    responsibility: "Structural sizing",
+    joinedAt: "2026-07-04",
+    commitment: "committed",
+  },
   // Following, not committed — watching without obligations.
-  { projectId: "p-gps-denied", memberId: "m-priyanka", role: "observer", joinedAt: "2026-06-30", commitment: "following" },
-  { projectId: "p-airframe-v2", memberId: "m-theo", role: "observer", joinedAt: "2026-07-11", commitment: "following" },
+  {
+    projectId: "p-gps-denied",
+    memberId: "m-priyanka",
+    role: "observer",
+    joinedAt: "2026-06-30",
+    commitment: "following",
+  },
+  {
+    projectId: "p-airframe-v2",
+    memberId: "m-theo",
+    role: "observer",
+    joinedAt: "2026-07-11",
+    commitment: "following",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -933,31 +1249,182 @@ export const projectMemberships: ProjectMembership[] = [
 // ---------------------------------------------------------------------------
 
 export const projectArtifacts: ProjectArtifact[] = [
-  { id: "a-1", projectId: "p-airframe-v2", kind: "presentation", title: "Airframe v2 PDR slides", externalUrl: "https://drive.google.com/skyrunners/pdr-airframe-v2", version: "rev C", uploadedById: "m-priya", createdAt: "2026-06-12" },
-  { id: "a-2", projectId: "p-airframe-v2", kind: "requirements", title: "Airframe requirements baseline", description: "42 requirements, 8 verified.", externalUrl: "https://drive.google.com/skyrunners/airframe-reqs", version: "v1.2", uploadedById: "m-priya", createdAt: "2026-05-30" },
-  { id: "a-3", projectId: "p-airframe-v2", kind: "cad", title: "Full assembly (Onshape)", externalUrl: "https://cad.onshape.com/documents/skyrunners-airframe-v2", uploadedById: "m-tyler", createdAt: "2026-06-02" },
-  { id: "a-4", projectId: "p-airframe-v2", kind: "analysis", title: "Mass budget spreadsheet", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-mass-budget", uploadedById: "m-tyler", createdAt: "2026-08-01" },
+  {
+    id: "a-1",
+    projectId: "p-airframe-v2",
+    kind: "presentation",
+    title: "Airframe v2 PDR slides",
+    externalUrl: "https://drive.google.com/skyrunners/pdr-airframe-v2",
+    version: "rev C",
+    uploadedById: "m-priya",
+    createdAt: "2026-06-12",
+  },
+  {
+    id: "a-2",
+    projectId: "p-airframe-v2",
+    kind: "requirements",
+    title: "Airframe requirements baseline",
+    description: "42 requirements, 8 verified.",
+    externalUrl: "https://drive.google.com/skyrunners/airframe-reqs",
+    version: "v1.2",
+    uploadedById: "m-priya",
+    createdAt: "2026-05-30",
+  },
+  {
+    id: "a-3",
+    projectId: "p-airframe-v2",
+    kind: "cad",
+    title: "Full assembly (Onshape)",
+    externalUrl: "https://cad.onshape.com/documents/skyrunners-airframe-v2",
+    uploadedById: "m-tyler",
+    createdAt: "2026-06-02",
+  },
+  {
+    id: "a-4",
+    projectId: "p-airframe-v2",
+    kind: "analysis",
+    title: "Mass budget spreadsheet",
+    externalUrl: "https://docs.google.com/spreadsheets/skyrunners-mass-budget",
+    uploadedById: "m-tyler",
+    createdAt: "2026-08-01",
+  },
 
-  { id: "a-5", projectId: "p-wing-spar", kind: "analysis", title: "Spar FEA results, 3.5g load case", description: "Abaqus run with the updated layup schedule.", externalUrl: "https://drive.google.com/skyrunners/spar-fea", uploadedById: "m-tyler", createdAt: "2026-08-05" },
-  { id: "a-6", projectId: "p-wing-spar", kind: "cad", title: "Spar geometry v3", externalUrl: "https://cad.onshape.com/documents/skyrunners-spar-v3", version: "v3", uploadedById: "m-tyler", createdAt: "2026-07-22" },
+  {
+    id: "a-5",
+    projectId: "p-wing-spar",
+    kind: "analysis",
+    title: "Spar FEA results, 3.5g load case",
+    description: "Abaqus run with the updated layup schedule.",
+    externalUrl: "https://drive.google.com/skyrunners/spar-fea",
+    uploadedById: "m-tyler",
+    createdAt: "2026-08-05",
+  },
+  {
+    id: "a-6",
+    projectId: "p-wing-spar",
+    kind: "cad",
+    title: "Spar geometry v3",
+    externalUrl: "https://cad.onshape.com/documents/skyrunners-spar-v3",
+    version: "v3",
+    uploadedById: "m-tyler",
+    createdAt: "2026-07-22",
+  },
 
-  { id: "a-7", projectId: "p-layup", kind: "doc", title: "Wet layup procedure (draft)", description: "Step-by-step with cure schedule. Needs review before it's the official process.", externalUrl: "https://docs.google.com/document/skyrunners-layup-procedure", uploadedById: "m-sofia", createdAt: "2026-07-28" },
-  { id: "a-8", projectId: "p-layup", kind: "test_report", title: "Coupon batch 1 tensile results", externalUrl: "https://drive.google.com/skyrunners/coupon-batch-1", uploadedById: "m-noah", createdAt: "2026-07-30" },
+  {
+    id: "a-7",
+    projectId: "p-layup",
+    kind: "doc",
+    title: "Wet layup procedure (draft)",
+    description:
+      "Step-by-step with cure schedule. Needs review before it's the official process.",
+    externalUrl: "https://docs.google.com/document/skyrunners-layup-procedure",
+    uploadedById: "m-sofia",
+    createdAt: "2026-07-28",
+  },
+  {
+    id: "a-8",
+    projectId: "p-layup",
+    kind: "test_report",
+    title: "Coupon batch 1 tensile results",
+    externalUrl: "https://drive.google.com/skyrunners/coupon-batch-1",
+    uploadedById: "m-noah",
+    createdAt: "2026-07-30",
+  },
 
-  { id: "a-9", projectId: "p-gps-denied", kind: "presentation", title: "Autonomy architecture review", externalUrl: "https://drive.google.com/skyrunners/autonomy-arch", uploadedById: "m-lena", createdAt: "2026-06-15" },
-  { id: "a-10", projectId: "p-gps-denied", kind: "requirements", title: "Mission requirements", description: "Baselined. 30km range, 4kg payload, GPS-denied for the final 500m.", externalUrl: "https://docs.google.com/document/skyrunners-mission-reqs", version: "v1.0", uploadedById: "m-anish", createdAt: "2026-07-02" },
+  {
+    id: "a-9",
+    projectId: "p-gps-denied",
+    kind: "presentation",
+    title: "Autonomy architecture review",
+    externalUrl: "https://drive.google.com/skyrunners/autonomy-arch",
+    uploadedById: "m-lena",
+    createdAt: "2026-06-15",
+  },
+  {
+    id: "a-10",
+    projectId: "p-gps-denied",
+    kind: "requirements",
+    title: "Mission requirements",
+    description:
+      "Baselined. 30km range, 4kg payload, GPS-denied for the final 500m.",
+    externalUrl: "https://docs.google.com/document/skyrunners-mission-reqs",
+    version: "v1.0",
+    uploadedById: "m-anish",
+    createdAt: "2026-07-02",
+  },
 
-  { id: "a-11", projectId: "p-vio", kind: "github", title: "skyrunners/vio-pipeline", description: "Main branch runs on the companion compute.", externalUrl: "https://github.com/4deg-kelvin/vio-pipeline", uploadedById: "m-amara", createdAt: "2026-05-10" },
-  { id: "a-12", projectId: "p-vio", kind: "test_report", title: "Indoor drift test, 50m runs", description: "Holding under 30cm across 12 runs.", externalUrl: "https://drive.google.com/skyrunners/vio-drift-indoor", uploadedById: "m-amara", createdAt: "2026-08-04" },
+  {
+    id: "a-11",
+    projectId: "p-vio",
+    kind: "github",
+    title: "skyrunners/vio-pipeline",
+    description: "Main branch runs on the companion compute.",
+    externalUrl: "https://github.com/4deg-kelvin/vio-pipeline",
+    uploadedById: "m-amara",
+    createdAt: "2026-05-10",
+  },
+  {
+    id: "a-12",
+    projectId: "p-vio",
+    kind: "test_report",
+    title: "Indoor drift test, 50m runs",
+    description: "Holding under 30cm across 12 runs.",
+    externalUrl: "https://drive.google.com/skyrunners/vio-drift-indoor",
+    uploadedById: "m-amara",
+    createdAt: "2026-08-04",
+  },
 
-  { id: "a-13", projectId: "p-sim", kind: "github", title: "skyrunners/gazebo-worlds", externalUrl: "https://github.com/4deg-kelvin/gazebo-worlds", uploadedById: "m-omar", createdAt: "2026-06-05" },
+  {
+    id: "a-13",
+    projectId: "p-sim",
+    kind: "github",
+    title: "skyrunners/gazebo-worlds",
+    externalUrl: "https://github.com/4deg-kelvin/gazebo-worlds",
+    uploadedById: "m-omar",
+    createdAt: "2026-06-05",
+  },
 
-  { id: "a-14", projectId: "p-power", kind: "cad", title: "PDB schematic + layout (KiCad)", externalUrl: "https://github.com/4deg-kelvin/skyrunners-pdb", version: "rev B", uploadedById: "m-kenji", createdAt: "2026-07-28" },
-  { id: "a-15", projectId: "p-power", kind: "requirements", title: "Power budget and PDB requirements", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-power-budget", uploadedById: "m-marcus", createdAt: "2026-06-20" },
+  {
+    id: "a-14",
+    projectId: "p-power",
+    kind: "cad",
+    title: "PDB schematic + layout (KiCad)",
+    externalUrl: "https://github.com/4deg-kelvin/skyrunners-pdb",
+    version: "rev B",
+    uploadedById: "m-kenji",
+    createdAt: "2026-07-28",
+  },
+  {
+    id: "a-15",
+    projectId: "p-power",
+    kind: "requirements",
+    title: "Power budget and PDB requirements",
+    externalUrl: "https://docs.google.com/spreadsheets/skyrunners-power-budget",
+    uploadedById: "m-marcus",
+    createdAt: "2026-06-20",
+  },
 
-  { id: "a-16", projectId: "p-propulsion-test", kind: "drawing", title: "Test stand fabrication drawings", externalUrl: "https://drive.google.com/skyrunners/test-stand-drawings", uploadedById: "m-hana", createdAt: "2026-06-28" },
+  {
+    id: "a-16",
+    projectId: "p-propulsion-test",
+    kind: "drawing",
+    title: "Test stand fabrication drawings",
+    externalUrl: "https://drive.google.com/skyrunners/test-stand-drawings",
+    uploadedById: "m-hana",
+    createdAt: "2026-06-28",
+  },
 
-  { id: "a-17", projectId: "p-skydelta-concept", kind: "analysis", title: "Sizing trade study (in progress)", description: "Comparing four configurations against the mission profile.", externalUrl: "https://docs.google.com/spreadsheets/skyrunners-skydelta-sizing", uploadedById: "m-anish", createdAt: "2026-08-04" },
+  {
+    id: "a-17",
+    projectId: "p-skydelta-concept",
+    kind: "analysis",
+    title: "Sizing trade study (in progress)",
+    description: "Comparing four configurations against the mission profile.",
+    externalUrl:
+      "https://docs.google.com/spreadsheets/skyrunners-skydelta-sizing",
+    uploadedById: "m-anish",
+    createdAt: "2026-08-04",
+  },
 ];
 
 export function artifactsFor(projectId: string): ProjectArtifact[] {
@@ -1032,8 +1499,8 @@ export function pendingRequestsFor(projectId: string): JoinRequest[] {
 }
 
 export function myJoinRequests(memberId: string) {
-  return live().joinRequests
-    .filter((r) => r.memberId === memberId)
+  return live()
+    .joinRequests.filter((r) => r.memberId === memberId)
     .map((r) => ({
       request: r,
       project: getProject(r.projectId),
@@ -1050,8 +1517,8 @@ export function myJoinRequests(memberId: string) {
  * control the gate, you owe people an answer.
  */
 export function joinRequestsAwaitingMe(memberId: string) {
-  return live().joinRequests
-    .filter((r) => r.status === "pending")
+  return live()
+    .joinRequests.filter((r) => r.status === "pending")
     .filter((r) => getProject(r.projectId)?.reIds.includes(memberId))
     .map((r) => ({
       request: r,
@@ -1063,8 +1530,8 @@ export function joinRequestsAwaitingMe(memberId: string) {
 
 /** Requests nobody has answered in too long — a silent RE blocks a member. */
 export function staleJoinRequests() {
-  return live().joinRequests
-    .filter(
+  return live()
+    .joinRequests.filter(
       (r) =>
         r.status === "pending" &&
         daysBetween(r.requestedAt, today()) >= JOIN_REQUEST_STALE_DAYS
@@ -1083,53 +1550,273 @@ export function staleJoinRequests() {
 
 export const deliverables: Deliverable[] = [
   // Wing spar redesign
-  { id: "d-1", projectId: "p-wing-spar", title: "Spar FEA converged at 3.5g limit load", ownerId: "m-tyler", dueDate: "2026-08-15", status: "in_progress", sortOrder: 1 },
-  { id: "d-2", projectId: "p-wing-spar", title: "Mass reduction options memo for CDR", ownerId: "m-tyler", dueDate: "2026-08-12", status: "open", sortOrder: 2 },
-  { id: "d-3", projectId: "p-wing-spar", title: "Material allowables from coupon data", ownerId: "m-noah", dueDate: "2026-07-30", status: "blocked", blockerNote: "Waiting on coupon results from the layup project.", sortOrder: 3 },
-  { id: "d-4", projectId: "p-wing-spar", title: "Preliminary spar geometry in CAD", ownerId: "m-tyler", status: "done", completedAt: "2026-06-20", sortOrder: 4 },
+  {
+    id: "d-1",
+    projectId: "p-wing-spar",
+    title: "Spar FEA converged at 3.5g limit load",
+    ownerId: "m-tyler",
+    dueDate: "2026-08-15",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-2",
+    projectId: "p-wing-spar",
+    title: "Mass reduction options memo for CDR",
+    ownerId: "m-tyler",
+    dueDate: "2026-08-12",
+    status: "open",
+    sortOrder: 2,
+  },
+  {
+    id: "d-3",
+    projectId: "p-wing-spar",
+    title: "Material allowables from coupon data",
+    ownerId: "m-noah",
+    dueDate: "2026-07-30",
+    status: "blocked",
+    blockerNote: "Waiting on coupon results from the layup project.",
+    sortOrder: 3,
+  },
+  {
+    id: "d-4",
+    projectId: "p-wing-spar",
+    title: "Preliminary spar geometry in CAD",
+    ownerId: "m-tyler",
+    status: "done",
+    completedAt: "2026-06-20",
+    sortOrder: 4,
+  },
 
   // Layup qualification
-  { id: "d-5", projectId: "p-layup", title: "Wet layup procedure written and reviewed", ownerId: "m-sofia", dueDate: "2026-08-20", status: "in_progress", sortOrder: 1 },
-  { id: "d-6", projectId: "p-layup", title: "Six coupons cured within spec", ownerId: "m-sofia", dueDate: "2026-08-25", status: "blocked", blockerNote: "Vacuum pump seal is leaking.", sortOrder: 2 },
-  { id: "d-7", projectId: "p-layup", title: "Coupon tensile test report", ownerId: "m-noah", dueDate: "2026-08-28", status: "open", sortOrder: 3 },
-  { id: "d-8", projectId: "p-layup", title: "Tooling fabricated", ownerId: "m-sofia", status: "done", completedAt: "2026-07-10", sortOrder: 4 },
+  {
+    id: "d-5",
+    projectId: "p-layup",
+    title: "Wet layup procedure written and reviewed",
+    ownerId: "m-sofia",
+    dueDate: "2026-08-20",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-6",
+    projectId: "p-layup",
+    title: "Six coupons cured within spec",
+    ownerId: "m-sofia",
+    dueDate: "2026-08-25",
+    status: "blocked",
+    blockerNote: "Vacuum pump seal is leaking.",
+    sortOrder: 2,
+  },
+  {
+    id: "d-7",
+    projectId: "p-layup",
+    title: "Coupon tensile test report",
+    ownerId: "m-noah",
+    dueDate: "2026-08-28",
+    status: "open",
+    sortOrder: 3,
+  },
+  {
+    id: "d-8",
+    projectId: "p-layup",
+    title: "Tooling fabricated",
+    ownerId: "m-sofia",
+    status: "done",
+    completedAt: "2026-07-10",
+    sortOrder: 4,
+  },
 
   // Airframe v2
-  { id: "d-9", projectId: "p-airframe-v2", title: "Mass budget updated with spar estimate", ownerId: "m-tyler", dueDate: "2026-08-14", status: "in_progress", sortOrder: 1 },
-  { id: "d-10", projectId: "p-airframe-v2", title: "CDR package assembled", ownerId: "m-priya", dueDate: "2026-08-11", status: "in_progress", sortOrder: 2 },
-  { id: "d-11", projectId: "p-airframe-v2", title: "Interface control document v1", ownerId: "m-priya", status: "done", completedAt: "2026-06-28", sortOrder: 3 },
+  {
+    id: "d-9",
+    projectId: "p-airframe-v2",
+    title: "Mass budget updated with spar estimate",
+    ownerId: "m-tyler",
+    dueDate: "2026-08-14",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-10",
+    projectId: "p-airframe-v2",
+    title: "CDR package assembled",
+    ownerId: "m-priya",
+    dueDate: "2026-08-11",
+    status: "in_progress",
+    sortOrder: 2,
+  },
+  {
+    id: "d-11",
+    projectId: "p-airframe-v2",
+    title: "Interface control document v1",
+    ownerId: "m-priya",
+    status: "done",
+    completedAt: "2026-06-28",
+    sortOrder: 3,
+  },
 
   // GPS-denied navigation
-  { id: "d-12", projectId: "p-gps-denied", title: "Flight-test plan for outdoor VIO runs", ownerId: "m-anish", dueDate: "2026-08-18", status: "in_progress", sortOrder: 1 },
-  { id: "d-13", projectId: "p-gps-denied", title: "Mission requirements baselined", ownerId: "m-anish", status: "done", completedAt: "2026-07-02", sortOrder: 2 },
-  { id: "d-14", projectId: "p-gps-denied", title: "Autonomy architecture diagram", ownerId: "m-lena", status: "done", completedAt: "2026-06-15", sortOrder: 3 },
+  {
+    id: "d-12",
+    projectId: "p-gps-denied",
+    title: "Flight-test plan for outdoor VIO runs",
+    ownerId: "m-anish",
+    dueDate: "2026-08-18",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-13",
+    projectId: "p-gps-denied",
+    title: "Mission requirements baselined",
+    ownerId: "m-anish",
+    status: "done",
+    completedAt: "2026-07-02",
+    sortOrder: 2,
+  },
+  {
+    id: "d-14",
+    projectId: "p-gps-denied",
+    title: "Autonomy architecture diagram",
+    ownerId: "m-lena",
+    status: "done",
+    completedAt: "2026-06-15",
+    sortOrder: 3,
+  },
 
   // VIO pipeline
-  { id: "d-15", projectId: "p-vio", title: "Drift under 30cm over 50m indoors", ownerId: "m-amara", status: "done", completedAt: "2026-08-04", sortOrder: 1 },
-  { id: "d-16", projectId: "p-vio", title: "Outdoor dataset collected and labelled", ownerId: "m-omar", dueDate: "2026-08-22", status: "open", sortOrder: 2 },
+  {
+    id: "d-15",
+    projectId: "p-vio",
+    title: "Drift under 30cm over 50m indoors",
+    ownerId: "m-amara",
+    status: "done",
+    completedAt: "2026-08-04",
+    sortOrder: 1,
+  },
+  {
+    id: "d-16",
+    projectId: "p-vio",
+    title: "Outdoor dataset collected and labelled",
+    ownerId: "m-omar",
+    dueDate: "2026-08-22",
+    status: "open",
+    sortOrder: 2,
+  },
 
   // Simulation
-  { id: "d-17", projectId: "p-sim", title: "ROS 2 migration of the Gazebo world", ownerId: "m-omar", dueDate: "2026-07-25", status: "blocked", blockerNote: "Plugin API changed; need guidance on whether to pin ROS 1.", sortOrder: 1 },
+  {
+    id: "d-17",
+    projectId: "p-sim",
+    title: "ROS 2 migration of the Gazebo world",
+    ownerId: "m-omar",
+    dueDate: "2026-07-25",
+    status: "blocked",
+    blockerNote: "Plugin API changed; need guidance on whether to pin ROS 1.",
+    sortOrder: 1,
+  },
 
   // Power distribution board
-  { id: "d-18", projectId: "p-power", title: "PDB schematic complete", ownerId: "m-kenji", status: "done", completedAt: "2026-07-28", sortOrder: 1 },
-  { id: "d-19", projectId: "p-power", title: "Board routing finished and reviewed", ownerId: "m-kenji", dueDate: "2026-08-16", status: "in_progress", sortOrder: 2 },
+  {
+    id: "d-18",
+    projectId: "p-power",
+    title: "PDB schematic complete",
+    ownerId: "m-kenji",
+    status: "done",
+    completedAt: "2026-07-28",
+    sortOrder: 1,
+  },
+  {
+    id: "d-19",
+    projectId: "p-power",
+    title: "Board routing finished and reviewed",
+    ownerId: "m-kenji",
+    dueDate: "2026-08-16",
+    status: "in_progress",
+    sortOrder: 2,
+  },
 
   // Propulsion test stand
-  { id: "d-20", projectId: "p-propulsion-test", title: "Test stand frame welded", ownerId: "m-hana", status: "done", completedAt: "2026-08-05", sortOrder: 1 },
-  { id: "d-21", projectId: "p-propulsion-test", title: "Load cell calibrated", ownerId: "m-hana", dueDate: "2026-08-19", status: "blocked", blockerNote: "Need calibration weights — do we own any?", sortOrder: 2 },
+  {
+    id: "d-20",
+    projectId: "p-propulsion-test",
+    title: "Test stand frame welded",
+    ownerId: "m-hana",
+    status: "done",
+    completedAt: "2026-08-05",
+    sortOrder: 1,
+  },
+  {
+    id: "d-21",
+    projectId: "p-propulsion-test",
+    title: "Load cell calibrated",
+    ownerId: "m-hana",
+    dueDate: "2026-08-19",
+    status: "blocked",
+    blockerNote: "Need calibration weights — do we own any?",
+    sortOrder: 2,
+  },
 
   // SkyDelta concept study
-  { id: "d-22", projectId: "p-skydelta-concept", title: "Mission sizing spreadsheet v1", ownerId: "m-anish", dueDate: "2026-08-29", status: "in_progress", sortOrder: 1 },
-  { id: "d-23", projectId: "p-skydelta-concept", title: "Trade study scope agreed with Co-Leads", ownerId: "m-anish", status: "done", completedAt: "2026-07-20", sortOrder: 2 },
+  {
+    id: "d-22",
+    projectId: "p-skydelta-concept",
+    title: "Mission sizing spreadsheet v1",
+    ownerId: "m-anish",
+    dueDate: "2026-08-29",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-23",
+    projectId: "p-skydelta-concept",
+    title: "Trade study scope agreed with Co-Leads",
+    ownerId: "m-anish",
+    status: "done",
+    completedAt: "2026-07-20",
+    sortOrder: 2,
+  },
 
   // Outreach
-  { id: "d-24", projectId: "p-outreach", title: "Four workshop lesson plans drafted", ownerId: "m-grace", dueDate: "2026-09-10", status: "open", sortOrder: 1 },
-  { id: "d-25", projectId: "p-outreach", title: "Parts list and budget for workshop kits", ownerId: "m-james", dueDate: "2026-09-01", status: "open", sortOrder: 2 },
+  {
+    id: "d-24",
+    projectId: "p-outreach",
+    title: "Four workshop lesson plans drafted",
+    ownerId: "m-grace",
+    dueDate: "2026-09-10",
+    status: "open",
+    sortOrder: 1,
+  },
+  {
+    id: "d-25",
+    projectId: "p-outreach",
+    title: "Parts list and budget for workshop kits",
+    ownerId: "m-james",
+    dueDate: "2026-09-01",
+    status: "open",
+    sortOrder: 2,
+  },
 
   // Load testing
-  { id: "d-26", projectId: "p-load-test", title: "Load rig CAD complete", ownerId: "m-noah", dueDate: "2026-08-30", status: "in_progress", sortOrder: 1 },
-  { id: "d-27", projectId: "p-load-test", title: "Instrumentation plan", ownerId: "m-noah", dueDate: "2026-09-15", status: "open", sortOrder: 2 },
+  {
+    id: "d-26",
+    projectId: "p-load-test",
+    title: "Load rig CAD complete",
+    ownerId: "m-noah",
+    dueDate: "2026-08-30",
+    status: "in_progress",
+    sortOrder: 1,
+  },
+  {
+    id: "d-27",
+    projectId: "p-load-test",
+    title: "Instrumentation plan",
+    ownerId: "m-noah",
+    dueDate: "2026-09-15",
+    status: "open",
+    sortOrder: 2,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1176,12 +1863,24 @@ export const seedCatalogueItems: CatalogueItem[] = [
   item("tr-rr-3dp", "sec-robotics", "3D printers", "machine", 10),
   item("tr-rr-h2d", "sec-robotics", "H2D Printer", "machine", 11),
   item("tr-rr-makera", "sec-robotics", "Makera desktop CNC", "machine", 12),
-  item("tr-rr-battery", "sec-robotics", "Battery handling and soldering", "machine", 13),
+  item(
+    "tr-rr-battery",
+    "sec-robotics",
+    "Battery handling and soldering",
+    "machine",
+    13
+  ),
 
   // --- Lab 64 machines ------------------------------------------------------
   item("tr-l64-prusa", "sec-lab64", "PRUSA 3D Printing", "machine", 10),
   item("tr-l64-trotec", "sec-lab64", "Trotec laser cutter", "machine", 11),
-  item("tr-l64-fablight", "sec-lab64", "Fablight metal laser cutter", "machine", 12),
+  item(
+    "tr-l64-fablight",
+    "sec-lab64",
+    "Fablight metal laser cutter",
+    "machine",
+    12
+  ),
   item("tr-l64-solder", "sec-lab64", "Soldering", "machine", 13),
   item("tr-l64-machining", "sec-lab64", "Machining tools", "machine", 14),
   item("tr-l64-vapor", "sec-lab64", "Vapor Phase One", "machine", 15),
@@ -1198,7 +1897,13 @@ export const seedCatalogueItems: CatalogueItem[] = [
   // --- CHIP machines --------------------------------------------------------
   item("tr-chip-3dp", "sec-chip", "3D printers", "machine", 10),
   item("tr-chip-laser", "sec-chip", "Laser cutter", "machine", 11),
-  item("tr-chip-electronics", "sec-chip", "Electronic equipment", "machine", 12),
+  item(
+    "tr-chip-electronics",
+    "sec-chip",
+    "Electronic equipment",
+    "machine",
+    12
+  ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -1211,11 +1916,46 @@ export const seedCatalogueItems: CatalogueItem[] = [
  * breaks, and by autumn the contribution data is meaningless.
  */
 export const terms: Term[] = [
-  { id: "t-su26", name: "Summer 2026", kind: "summer", startsOn: "2026-06-15", endsOn: "2026-09-20", generatesObligations: false },
-  { id: "t-au26", name: "Autumn 2026", kind: "quarter", startsOn: "2026-09-21", endsOn: "2026-12-04", generatesObligations: true },
-  { id: "t-au26f", name: "Autumn finals", kind: "finals", startsOn: "2026-12-05", endsOn: "2026-12-12", generatesObligations: false },
-  { id: "t-wbreak", name: "Winter break", kind: "break", startsOn: "2026-12-13", endsOn: "2027-01-04", generatesObligations: false },
-  { id: "t-wi27", name: "Winter 2027", kind: "quarter", startsOn: "2027-01-05", endsOn: "2027-03-19", generatesObligations: true },
+  {
+    id: "t-su26",
+    name: "Summer 2026",
+    kind: "summer",
+    startsOn: "2026-06-15",
+    endsOn: "2026-09-20",
+    generatesObligations: false,
+  },
+  {
+    id: "t-au26",
+    name: "Autumn 2026",
+    kind: "quarter",
+    startsOn: "2026-09-21",
+    endsOn: "2026-12-04",
+    generatesObligations: true,
+  },
+  {
+    id: "t-au26f",
+    name: "Autumn finals",
+    kind: "finals",
+    startsOn: "2026-12-05",
+    endsOn: "2026-12-12",
+    generatesObligations: false,
+  },
+  {
+    id: "t-wbreak",
+    name: "Winter break",
+    kind: "break",
+    startsOn: "2026-12-13",
+    endsOn: "2027-01-04",
+    generatesObligations: false,
+  },
+  {
+    id: "t-wi27",
+    name: "Winter 2027",
+    kind: "quarter",
+    startsOn: "2027-01-05",
+    endsOn: "2027-03-19",
+    generatesObligations: true,
+  },
 ];
 
 export function termFor(date: string): Term | undefined {
@@ -1503,43 +2243,274 @@ export const progressUpdates: ProgressUpdate[] = [
 // ---------------------------------------------------------------------------
 
 export const workLogs: WorkLog[] = [
-  { id: "w-me-1", memberId: "m-anish", projectId: "p-gps-denied", workDate: "2026-08-05", hours: 2.5, description: "Flight-test planning" },
-  { id: "w-me-2", memberId: "m-anish", projectId: "p-gps-denied", workDate: "2026-08-03", hours: 2, description: "Requirements review" },
-  { id: "w-me-3", memberId: "m-anish", projectId: "p-skydelta-concept", workDate: "2026-08-04", hours: 3, description: "Sizing spreadsheet" },
-  { id: "w-1", memberId: "m-sofia", projectId: "p-layup", workDate: "2026-08-05", hours: 3, description: "Coupon layup" },
-  { id: "w-2", memberId: "m-sofia", projectId: "p-layup", workDate: "2026-08-04", hours: 3.5, description: "Tooling prep" },
-  { id: "w-3", memberId: "m-tyler", projectId: "p-wing-spar", workDate: "2026-08-05", hours: 4, description: "FEA runs" },
-  { id: "w-4", memberId: "m-tyler", projectId: "p-wing-spar", workDate: "2026-08-03", hours: 5, description: "Mesh refinement" },
-  { id: "w-5", memberId: "m-amara", projectId: "p-vio", workDate: "2026-08-05", hours: 4.5, description: "Drift tuning" },
-  { id: "w-6", memberId: "m-amara", projectId: "p-vio", workDate: "2026-08-02", hours: 4, description: "Indoor test runs" },
-  { id: "w-7", memberId: "m-kenji", projectId: "p-power", workDate: "2026-08-04", hours: 7, description: "PCB routing" },
-  { id: "w-8", memberId: "m-hana", projectId: "p-propulsion-test", workDate: "2026-08-05", hours: 5.5, description: "Frame welding" },
-  { id: "w-9", memberId: "m-noah", projectId: "p-load-test", workDate: "2026-08-03", hours: 4, description: "Rig CAD" },
-  { id: "w-10", memberId: "m-omar", projectId: "p-sim", workDate: "2026-08-01", hours: 1.5, description: "ROS 2 migration attempt" },
+  {
+    id: "w-me-1",
+    memberId: "m-anish",
+    projectId: "p-gps-denied",
+    workDate: "2026-08-05",
+    hours: 2.5,
+    description: "Flight-test planning",
+  },
+  {
+    id: "w-me-2",
+    memberId: "m-anish",
+    projectId: "p-gps-denied",
+    workDate: "2026-08-03",
+    hours: 2,
+    description: "Requirements review",
+  },
+  {
+    id: "w-me-3",
+    memberId: "m-anish",
+    projectId: "p-skydelta-concept",
+    workDate: "2026-08-04",
+    hours: 3,
+    description: "Sizing spreadsheet",
+  },
+  {
+    id: "w-1",
+    memberId: "m-sofia",
+    projectId: "p-layup",
+    workDate: "2026-08-05",
+    hours: 3,
+    description: "Coupon layup",
+  },
+  {
+    id: "w-2",
+    memberId: "m-sofia",
+    projectId: "p-layup",
+    workDate: "2026-08-04",
+    hours: 3.5,
+    description: "Tooling prep",
+  },
+  {
+    id: "w-3",
+    memberId: "m-tyler",
+    projectId: "p-wing-spar",
+    workDate: "2026-08-05",
+    hours: 4,
+    description: "FEA runs",
+  },
+  {
+    id: "w-4",
+    memberId: "m-tyler",
+    projectId: "p-wing-spar",
+    workDate: "2026-08-03",
+    hours: 5,
+    description: "Mesh refinement",
+  },
+  {
+    id: "w-5",
+    memberId: "m-amara",
+    projectId: "p-vio",
+    workDate: "2026-08-05",
+    hours: 4.5,
+    description: "Drift tuning",
+  },
+  {
+    id: "w-6",
+    memberId: "m-amara",
+    projectId: "p-vio",
+    workDate: "2026-08-02",
+    hours: 4,
+    description: "Indoor test runs",
+  },
+  {
+    id: "w-7",
+    memberId: "m-kenji",
+    projectId: "p-power",
+    workDate: "2026-08-04",
+    hours: 7,
+    description: "PCB routing",
+  },
+  {
+    id: "w-8",
+    memberId: "m-hana",
+    projectId: "p-propulsion-test",
+    workDate: "2026-08-05",
+    hours: 5.5,
+    description: "Frame welding",
+  },
+  {
+    id: "w-9",
+    memberId: "m-noah",
+    projectId: "p-load-test",
+    workDate: "2026-08-03",
+    hours: 4,
+    description: "Rig CAD",
+  },
+  {
+    id: "w-10",
+    memberId: "m-omar",
+    projectId: "p-sim",
+    workDate: "2026-08-01",
+    hours: 1.5,
+    description: "ROS 2 migration attempt",
+  },
 
   // --- The wider club's hours ------------------------------------------------
   // Spread across the week so "hours this week" and the per-project totals an RE
   // sees are non-trivial. m-blake has none, which is the point of m-blake.
-  { id: "w-11", memberId: "m-yuki", projectId: "p-avionics-bringup", workDate: "2026-08-05", hours: 4, description: "Telemetry range testing" },
-  { id: "w-12", memberId: "m-yuki", projectId: "p-avionics-bringup", workDate: "2026-08-02", hours: 3, description: "Antenna comparison" },
-  { id: "w-13", memberId: "m-priyanka", projectId: "p-avionics-bringup", workDate: "2026-08-04", hours: 5, description: "Firmware toolchain migration" },
-  { id: "w-14", memberId: "m-owen", projectId: "p-power", workDate: "2026-08-05", hours: 2, description: "Connector trade study" },
-  { id: "w-15", memberId: "m-caleb", projectId: "p-vio", workDate: "2026-08-04", hours: 3.5, description: "Feature tracker swap" },
-  { id: "w-16", memberId: "m-caleb", projectId: "p-gps-denied", workDate: "2026-08-01", hours: 2.5, description: "Re-localisation experiments" },
-  { id: "w-17", memberId: "m-lucia", projectId: "p-vio", workDate: "2026-08-05", hours: 3.5, description: "Camera calibration" },
-  { id: "w-18", memberId: "m-mira", projectId: "p-sim", workDate: "2026-08-03", hours: 2, description: "Scenario scripting" },
-  { id: "w-19", memberId: "m-arjun", projectId: "p-airframe-v2", workDate: "2026-08-05", hours: 5, description: "Fuselage frame CAD" },
-  { id: "w-20", memberId: "m-elena", projectId: "p-wing-spar", workDate: "2026-08-02", hours: 3, description: "FEA mesh support" },
-  { id: "w-21", memberId: "m-nadia", projectId: "p-wing-spar", workDate: "2026-08-04", hours: 4.5, description: "Load case definition" },
-  { id: "w-22", memberId: "m-nadia", projectId: "p-skydelta-concept", workDate: "2026-08-05", hours: 2, description: "Structural sizing pass" },
-  { id: "w-23", memberId: "m-jonas", projectId: "p-layup", workDate: "2026-08-03", hours: 4, description: "Layup assistance" },
-  { id: "w-24", memberId: "m-aisha", projectId: "p-layup", workDate: "2026-08-05", hours: 3, description: "Resin cure trials" },
-  { id: "w-25", memberId: "m-ines", projectId: "p-propulsion-test", workDate: "2026-08-04", hours: 4.5, description: "Thermocouple wiring" },
-  { id: "w-26", memberId: "m-theo", projectId: "p-propulsion-test", workDate: "2026-08-02", hours: 6, description: "Stand fabrication" },
-  { id: "w-27", memberId: "m-victor", projectId: "p-propulsion-test", workDate: "2026-08-05", hours: 3.5, description: "CFD correlation" },
-  { id: "w-28", memberId: "m-rosa", projectId: "p-propulsion-test", workDate: "2026-08-04", hours: 5, description: "Test campaign planning" },
-  { id: "w-29", memberId: "m-daniel", projectId: "p-outreach", workDate: "2026-08-03", hours: 2.5, description: "Workshop materials" },
-  { id: "w-30", memberId: "m-sara", projectId: "p-outreach", workDate: "2026-08-05", hours: 2, description: "School scheduling" },
+  {
+    id: "w-11",
+    memberId: "m-yuki",
+    projectId: "p-avionics-bringup",
+    workDate: "2026-08-05",
+    hours: 4,
+    description: "Telemetry range testing",
+  },
+  {
+    id: "w-12",
+    memberId: "m-yuki",
+    projectId: "p-avionics-bringup",
+    workDate: "2026-08-02",
+    hours: 3,
+    description: "Antenna comparison",
+  },
+  {
+    id: "w-13",
+    memberId: "m-priyanka",
+    projectId: "p-avionics-bringup",
+    workDate: "2026-08-04",
+    hours: 5,
+    description: "Firmware toolchain migration",
+  },
+  {
+    id: "w-14",
+    memberId: "m-owen",
+    projectId: "p-power",
+    workDate: "2026-08-05",
+    hours: 2,
+    description: "Connector trade study",
+  },
+  {
+    id: "w-15",
+    memberId: "m-caleb",
+    projectId: "p-vio",
+    workDate: "2026-08-04",
+    hours: 3.5,
+    description: "Feature tracker swap",
+  },
+  {
+    id: "w-16",
+    memberId: "m-caleb",
+    projectId: "p-gps-denied",
+    workDate: "2026-08-01",
+    hours: 2.5,
+    description: "Re-localisation experiments",
+  },
+  {
+    id: "w-17",
+    memberId: "m-lucia",
+    projectId: "p-vio",
+    workDate: "2026-08-05",
+    hours: 3.5,
+    description: "Camera calibration",
+  },
+  {
+    id: "w-18",
+    memberId: "m-mira",
+    projectId: "p-sim",
+    workDate: "2026-08-03",
+    hours: 2,
+    description: "Scenario scripting",
+  },
+  {
+    id: "w-19",
+    memberId: "m-arjun",
+    projectId: "p-airframe-v2",
+    workDate: "2026-08-05",
+    hours: 5,
+    description: "Fuselage frame CAD",
+  },
+  {
+    id: "w-20",
+    memberId: "m-elena",
+    projectId: "p-wing-spar",
+    workDate: "2026-08-02",
+    hours: 3,
+    description: "FEA mesh support",
+  },
+  {
+    id: "w-21",
+    memberId: "m-nadia",
+    projectId: "p-wing-spar",
+    workDate: "2026-08-04",
+    hours: 4.5,
+    description: "Load case definition",
+  },
+  {
+    id: "w-22",
+    memberId: "m-nadia",
+    projectId: "p-skydelta-concept",
+    workDate: "2026-08-05",
+    hours: 2,
+    description: "Structural sizing pass",
+  },
+  {
+    id: "w-23",
+    memberId: "m-jonas",
+    projectId: "p-layup",
+    workDate: "2026-08-03",
+    hours: 4,
+    description: "Layup assistance",
+  },
+  {
+    id: "w-24",
+    memberId: "m-aisha",
+    projectId: "p-layup",
+    workDate: "2026-08-05",
+    hours: 3,
+    description: "Resin cure trials",
+  },
+  {
+    id: "w-25",
+    memberId: "m-ines",
+    projectId: "p-propulsion-test",
+    workDate: "2026-08-04",
+    hours: 4.5,
+    description: "Thermocouple wiring",
+  },
+  {
+    id: "w-26",
+    memberId: "m-theo",
+    projectId: "p-propulsion-test",
+    workDate: "2026-08-02",
+    hours: 6,
+    description: "Stand fabrication",
+  },
+  {
+    id: "w-27",
+    memberId: "m-victor",
+    projectId: "p-propulsion-test",
+    workDate: "2026-08-05",
+    hours: 3.5,
+    description: "CFD correlation",
+  },
+  {
+    id: "w-28",
+    memberId: "m-rosa",
+    projectId: "p-propulsion-test",
+    workDate: "2026-08-04",
+    hours: 5,
+    description: "Test campaign planning",
+  },
+  {
+    id: "w-29",
+    memberId: "m-daniel",
+    projectId: "p-outreach",
+    workDate: "2026-08-03",
+    hours: 2.5,
+    description: "Workshop materials",
+  },
+  {
+    id: "w-30",
+    memberId: "m-sara",
+    projectId: "p-outreach",
+    workDate: "2026-08-05",
+    hours: 2,
+    description: "School scheduling",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1547,19 +2518,101 @@ export const workLogs: WorkLog[] = [
 // ---------------------------------------------------------------------------
 
 export const events: ClubEvent[] = [
-  { id: "e-1", title: "Airframe v2 Critical Design Review", kind: "design_review", importanceWeight: 5, startsAt: "2026-08-12T16:00", endsAt: "2026-08-12T18:00", location: "Durand 450", attendeeIds: [], isOpen: true },
-  { id: "e-2", title: "Skydio Facility Tour", kind: "company_tour", importanceWeight: 5, startsAt: "2026-08-19T13:00", endsAt: "2026-08-19T16:00", location: "San Mateo", attendeeIds: [], isOpen: true },
-  { id: "e-3", title: "Weekly Build Session", kind: "build_session", importanceWeight: 3, startsAt: "2026-08-08T18:00", endsAt: "2026-08-08T21:00", location: "Robotics Room", attendeeIds: [], isOpen: true },
-  { id: "e-4", title: "Fall Kickoff Social", kind: "social", importanceWeight: 3, startsAt: "2026-09-25T18:30", location: "Lake Lag", attendeeIds: [], isOpen: true },
-  { id: "e-5", title: "Machine Shop Safety Training", kind: "training", importanceWeight: 3, startsAt: "2026-08-14T15:00", endsAt: "2026-08-14T17:00", location: "PRL", attendeeIds: [], isOpen: true },
+  {
+    id: "e-1",
+    title: "Airframe v2 Critical Design Review",
+    kind: "design_review",
+    importanceWeight: 5,
+    startsAt: "2026-08-12T16:00",
+    endsAt: "2026-08-12T18:00",
+    location: "Durand 450",
+    attendeeIds: [],
+    isOpen: true,
+  },
+  {
+    id: "e-2",
+    title: "Skydio Facility Tour",
+    kind: "company_tour",
+    importanceWeight: 5,
+    startsAt: "2026-08-19T13:00",
+    endsAt: "2026-08-19T16:00",
+    location: "San Mateo",
+    attendeeIds: [],
+    isOpen: true,
+  },
+  {
+    id: "e-3",
+    title: "Weekly Build Session",
+    kind: "build_session",
+    importanceWeight: 3,
+    startsAt: "2026-08-08T18:00",
+    endsAt: "2026-08-08T21:00",
+    location: "Robotics Room",
+    attendeeIds: [],
+    isOpen: true,
+  },
+  {
+    id: "e-4",
+    title: "Fall Kickoff Social",
+    kind: "social",
+    importanceWeight: 3,
+    startsAt: "2026-09-25T18:30",
+    location: "Lake Lag",
+    attendeeIds: [],
+    isOpen: true,
+  },
+  {
+    id: "e-5",
+    title: "Machine Shop Safety Training",
+    kind: "training",
+    importanceWeight: 3,
+    startsAt: "2026-08-14T15:00",
+    endsAt: "2026-08-14T17:00",
+    location: "PRL",
+    attendeeIds: [],
+    isOpen: true,
+  },
   // Two overlapping on purpose: a design review running inside the general
   // meeting. The calendar MUST show both — that requirement is the one a
   // standard grid quietly drops, so the seed exercises it.
-  { id: "e-6", title: "All-Hands", kind: "general_meeting", importanceWeight: 4, startsAt: "2026-08-12T16:00", endsAt: "2026-08-12T17:30", location: "Durand 450", attendeeIds: [], isOpen: true },
+  {
+    id: "e-6",
+    title: "All-Hands",
+    kind: "general_meeting",
+    importanceWeight: 4,
+    startsAt: "2026-08-12T16:00",
+    endsAt: "2026-08-12T17:30",
+    location: "Durand 450",
+    attendeeIds: [],
+    isOpen: true,
+  },
   // The case the whole calendar exists for: two people on the spar Thursday
   // night, and a third can see it and turn up.
-  { id: "e-7", title: "Spar layup, come help", kind: "build_session", importanceWeight: 2, startsAt: "2026-08-13T19:00", endsAt: "2026-08-13T22:00", location: "Lab 64", projectId: "p-layup", createdBy: "m-sofia", attendeeIds: ["m-sofia", "m-tyler"], isOpen: true, notes: "Third pair of hands welcome — no experience needed." },
-  { id: "e-8", title: "Tyler / Priya", kind: "one_on_one", importanceWeight: 1, startsAt: "2026-08-13T15:00", endsAt: "2026-08-13T15:30", createdBy: "m-priya", attendeeIds: ["m-priya", "m-tyler"], isOpen: false },
+  {
+    id: "e-7",
+    title: "Spar layup, come help",
+    kind: "build_session",
+    importanceWeight: 2,
+    startsAt: "2026-08-13T19:00",
+    endsAt: "2026-08-13T22:00",
+    location: "Lab 64",
+    projectId: "p-layup",
+    createdBy: "m-sofia",
+    attendeeIds: ["m-sofia", "m-tyler"],
+    isOpen: true,
+    notes: "Third pair of hands welcome — no experience needed.",
+  },
+  {
+    id: "e-8",
+    title: "Tyler / Priya",
+    kind: "one_on_one",
+    importanceWeight: 1,
+    startsAt: "2026-08-13T15:00",
+    endsAt: "2026-08-13T15:30",
+    createdBy: "m-priya",
+    attendeeIds: ["m-priya", "m-tyler"],
+    isOpen: false,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1606,14 +2659,14 @@ export function childProjects(parentId: string | null) {
 }
 
 export function projectMembers(projectId: string) {
-  return live().projectMemberships
-    .filter((pm) => pm.projectId === projectId)
+  return live()
+    .projectMemberships.filter((pm) => pm.projectId === projectId)
     .map((pm) => ({ ...pm, member: getMember(pm.memberId) }));
 }
 
 export function memberProjects(memberId: string) {
-  return live().projectMemberships
-    .filter((pm) => pm.memberId === memberId)
+  return live()
+    .projectMemberships.filter((pm) => pm.memberId === memberId)
     .map((pm) => ({ ...pm, project: getProject(pm.projectId) }));
 }
 
@@ -1653,7 +2706,8 @@ export function projectBreadcrumb(
 
   // Then up the org tree from whichever unit owns the topmost project
   const owningTeamId = (projectTrail[0] ?? project).teamId;
-  const teamTrail: { id: string; name: string; kind: "division" | "team" }[] = [];
+  const teamTrail: { id: string; name: string; kind: "division" | "team" }[] =
+    [];
   const seenTeams = new Set<string>();
   let currentTeam: string | null | undefined = owningTeamId;
   while (currentTeam && !seenTeams.has(currentTeam)) {
@@ -1683,8 +2737,8 @@ export function projectBreadcrumb(
 // ---------------------------------------------------------------------------
 
 export function projectDeliverables(projectId: string): Deliverable[] {
-  return live().deliverables
-    .filter((d) => d.projectId === projectId)
+  return live()
+    .deliverables.filter((d) => d.projectId === projectId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
@@ -1697,8 +2751,8 @@ export function myDeliverablesOn(
 }
 
 export function myDeliverables(memberId: string): Deliverable[] {
-  return live().deliverables
-    .filter((d) => d.ownerId === memberId)
+  return live()
+    .deliverables.filter((d) => d.ownerId === memberId)
     .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
 }
 
@@ -1930,7 +2984,9 @@ export function contributionInputsFor(
       .filter((pid) => getProject(pid)?.phase === "complete")
   );
 
-  const myUpdates = live().progressUpdates.filter((u) => u.memberId === memberId);
+  const myUpdates = live().progressUpdates.filter(
+    (u) => u.memberId === memberId
+  );
   const schedule = scheduleFor(memberId);
 
   return {
@@ -1950,7 +3006,8 @@ export function contributionInputsFor(
       (u) => u.status === "submitted" || u.status === "reviewed"
     ).length,
     updatesLate: myUpdates.filter((u) => u.status === "late").length,
-    reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId)).length,
+    reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId))
+      .length,
     projectsCommitted: committed.length,
   };
 }
@@ -1964,8 +3021,8 @@ export function committedProjectCount(memberId: string): number {
 
 /** Every project a member is on, with their role and responsibility. */
 export function myProjects(memberId: string) {
-  return live().projectMemberships
-    .filter((pm) => pm.memberId === memberId)
+  return live()
+    .projectMemberships.filter((pm) => pm.memberId === memberId)
     .map((pm) => ({
       membership: pm,
       project: getProject(pm.projectId)!,
@@ -2052,8 +3109,10 @@ export function recentWorkLogs(memberId: string, days = 14) {
 }
 
 export function hoursOnProject(memberId: string, projectId: string) {
-  return live().workLogs
-    .filter((w) => w.memberId === memberId && w.projectId === projectId)
+  return live()
+    .workLogs.filter(
+      (w) => w.memberId === memberId && w.projectId === projectId
+    )
     .reduce((sum, w) => sum + w.hours, 0);
 }
 
@@ -2080,8 +3139,8 @@ export function projectNotices(projectId: string) {
 }
 
 export function projectUpdateFeed(projectId: string) {
-  return live().progressUpdates
-    .filter((u) => u.submittedAt)
+  return live()
+    .progressUpdates.filter((u) => u.submittedAt)
     .flatMap((u) =>
       u.entries
         .filter((e) => e.projectId === projectId)
@@ -2143,8 +3202,8 @@ export function helpRequests() {
 }
 
 export function openBlockers() {
-  return live().progressUpdates
-    .filter((u) => u.submittedAt)
+  return live()
+    .progressUpdates.filter((u) => u.submittedAt)
     .flatMap((u) =>
       u.entries
         .filter((e) => e.blockers)
@@ -2212,15 +3271,15 @@ function daysBetween(a: string, b: string): number {
 
 /** Hours logged in the trailing 7 days — matches the dashboard's label. */
 export function hoursThisWeek(): number {
-  return live().workLogs
-    .filter((w) => daysBetween(w.workDate, today()) <= 7)
+  return live()
+    .workLogs.filter((w) => daysBetween(w.workDate, today()) <= 7)
     .reduce((sum, w) => sum + w.hours, 0);
 }
 
 /** Hours a member logged on one project in the trailing 7 days. */
 export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
-  return live().workLogs
-    .filter(
+  return live()
+    .workLogs.filter(
       (w) =>
         w.memberId === memberId &&
         w.projectId === projectId &&
@@ -2230,9 +3289,13 @@ export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
 }
 
 export function awaitingReview() {
-  return live().progressUpdates.filter((u) => u.status === "submitted" || u.status === "late");
+  return live().progressUpdates.filter(
+    (u) => u.status === "submitted" || u.status === "late"
+  );
 }
 
 export function atRiskProjects() {
-  return live().projects.filter((p) => p.health === "at_risk" || p.health === "blocked");
+  return live().projects.filter(
+    (p) => p.health === "at_risk" || p.health === "blocked"
+  );
 }

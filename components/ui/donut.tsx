@@ -50,10 +50,10 @@ export function Donut({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold leading-none text-ink">
+        <span className="text-ink text-2xl leading-none font-bold">
           {Math.round(clamped * 100)}%
         </span>
-        <span className="mt-1 text-xs text-ink-muted">{label}</span>
+        <span className="text-ink-muted mt-1 text-xs">{label}</span>
       </div>
     </div>
   );

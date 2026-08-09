@@ -61,8 +61,8 @@ export default async function SettingsPage() {
       <Card>
         <CardBody>
           <SectionLabel>My Profile</SectionLabel>
-          <h2 className="mt-2 text-2xl font-bold text-ink">Your details</h2>
-          <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
+          <h2 className="text-ink mt-2 text-2xl font-bold">Your details</h2>
+          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
             Everything here is optional except what you want people to see.
             Skills matter most — Find Work uses them to rank projects by where
             you&apos;d help.
@@ -78,14 +78,13 @@ export default async function SettingsPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <SectionLabel>Check-in Days</SectionLabel>
-              <h2 className="mt-2 text-2xl font-bold text-ink">
-                Twice a week
-              </h2>
-              <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
-                Two short check-ins beat one long one — they give you and your Lead
-                something concrete to talk about twice as often, which is the whole
-                point. Each one is pre-filled from your logged hours and open
-                deliverables, so it&apos;s usually a couple of sentences.
+              <h2 className="text-ink mt-2 text-2xl font-bold">Twice a week</h2>
+              <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                Two short check-ins beat one long one — they give you and your
+                Lead something concrete to talk about twice as often, which is
+                the whole point. Each one is pre-filled from your logged hours
+                and open deliverables, so it&apos;s usually a couple of
+                sentences.
               </p>
             </div>
             {isPaused ? <Badge tone="neutral">Paused</Badge> : null}
@@ -100,7 +99,7 @@ export default async function SettingsPage() {
           </div>
 
           {isPaused ? (
-            <p className="mt-4 text-sm text-ink-muted">
+            <p className="text-ink-muted mt-4 text-sm">
               Your schedule is paused until{" "}
               {new Date(schedule.pausedUntil!).toLocaleDateString("en-US", {
                 month: "long",
@@ -116,10 +115,10 @@ export default async function SettingsPage() {
       <Card>
         <CardBody>
           <SectionLabel>Academic Pause</SectionLabel>
-          <h2 className="mt-2 text-2xl font-bold text-ink">
+          <h2 className="text-ink mt-2 text-2xl font-bold">
             Heads-down on classes?
           </h2>
-          <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
+          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
             Pause your check-ins for a couple of weeks. Nothing counts against
             you, no reminder emails go out, and there&apos;s no backlog waiting
             when you come back. Give your Lead a heads-up too — pausing tells
@@ -127,14 +126,14 @@ export default async function SettingsPage() {
             while you&apos;re out.
           </p>
 
-          <div className="mt-5 rounded-tile bg-surface px-4 py-3.5">
-            <p className="flex items-start gap-2 text-sm text-ink-soft">
-              <Info className="mt-0.5 size-4 shrink-0 text-ink-muted" />
+          <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
+            <p className="text-ink-soft flex items-start gap-2 text-sm">
+              <Info className="text-ink-muted mt-0.5 size-4 shrink-0" />
               <span>
                 Please use this instead of going quiet. Midterms happen to
                 everyone, and we would much rather you pause for two weeks than
-                feel behind and drift away. Your Lead sees that you&apos;re paused,
-                not that you&apos;re missing.
+                feel behind and drift away. Your Lead sees that you&apos;re
+                paused, not that you&apos;re missing.
               </span>
             </p>
           </div>
@@ -165,14 +164,14 @@ export default async function SettingsPage() {
           {currentTerm ? (
             <>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <h3 className="text-[17px] font-bold text-ink">
+                <h3 className="text-ink text-[17px] font-bold">
                   {currentTerm.name}
                 </h3>
                 <Badge tone={inSession ? "ok" : "neutral"}>
                   {inSession ? "In session" : "No check-ins due"}
                 </Badge>
               </div>
-              <p className="mt-2 text-[15px] text-ink-soft">
+              <p className="text-ink-soft mt-2 text-[15px]">
                 {inSession
                   ? "Check-ins are running normally this term."
                   : "Nothing is due right now — check-ins pause automatically over finals, breaks and summer. Nobody accrues missed updates while the club is out of session."}
@@ -186,7 +185,7 @@ export default async function SettingsPage() {
               in September, it expired in June, and from then on no check-in is
               ever due again and the app just looks broken.
             */
-            <p className="mt-3 flex items-start gap-2 text-[15px] text-warn-fg">
+            <p className="text-warn-fg mt-3 flex items-start gap-2 text-[15px]">
               <TriangleAlert className="mt-1 size-4 shrink-0" />
               <span>
                 {calendarRunsOut
@@ -216,7 +215,7 @@ export default async function SettingsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[15px] font-bold text-ink">
+                          <span className="text-ink text-[15px] font-bold">
                             {term.name}
                           </span>
                           <Badge tone="neutral">
@@ -229,7 +228,7 @@ export default async function SettingsPage() {
                             <Badge tone="neutral">Paused</Badge>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-ink-muted">
+                        <p className="text-ink-muted mt-1 text-sm">
                           {termRange(term.startsOn, term.endsOn)}
                         </p>
                       </div>
@@ -242,7 +241,7 @@ export default async function SettingsPage() {
           ) : null}
 
           {mayEditCalendar ? (
-            <p className="mt-4 text-sm text-ink-muted">
+            <p className="text-ink-muted mt-4 text-sm">
               This table is what stops finals week generating a wall of missed
               check-ins for everyone. Keep it a year ahead.
             </p>
@@ -267,7 +266,7 @@ export default async function SettingsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <SectionLabel>Trainings Catalogue</SectionLabel>
-                <p className="mt-2 text-[15px] text-ink-soft">
+                <p className="text-ink-soft mt-2 text-[15px]">
                   Every site and machine the club is trained on. Adding one is
                   typing a name — it appears on everyone&apos;s profile straight
                   away, unearned.
@@ -282,20 +281,20 @@ export default async function SettingsPage() {
             <div className="mt-5 space-y-4">
               {catalogue.sections.map(({ section, items }) => (
                 <div key={section.id}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-ink">
+                  <p className="text-ink text-xs font-semibold tracking-wide uppercase">
                     {section.name}
                   </p>
                   <div className="mt-2 space-y-1.5">
                     {items.map((item) => (
                       <div
                         key={item.id}
-                        className={`rounded-tile border border-line px-3 py-2 ${
+                        className={`rounded-tile border-line border px-3 py-2 ${
                           item.isActive ? "" : "opacity-60"
                         }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-ink">
+                            <span className="text-ink text-sm font-semibold">
                               {item.name}
                             </span>
                             <Badge tone="neutral">
@@ -319,7 +318,7 @@ export default async function SettingsPage() {
               ))}
             </div>
 
-            <p className="mt-4 text-sm text-ink-muted">
+            <p className="text-ink-muted mt-4 text-sm">
               Set an expiry only if the clearance really lapses. When one does,
               it&apos;s cancelled and the member&apos;s Lead is told — there is
               no grace period, because a lapsed clearance that still reads as

@@ -130,7 +130,9 @@ async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
   return toResult(result, `Logged ${hours} hrs.`);
 }
 
-async function deleteHoursAction$impl(formData: FormData): Promise<ActionResult> {
+async function deleteHoursAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
   const viewer = await getViewer();
   const logId = String(formData.get("logId") ?? "");
 
@@ -215,6 +217,41 @@ async function reopenDeliverableAction$impl(
   return toResult(result, "Sent back with your note.");
 }
 
+/**
+ * Take a sign-off back. Only from ABOVE the project.
+ *
+ * Separate action from `reopenDeliverableAction` because it is a separate act:
+ * that one rejects a claim, this one overturns a colleague's approval and
+ * removes completed work from somebody's record. Different permission,
+ * different message, and the reason is not optional.
+ */
+async function withdrawSignOffAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const id = String(formData.get("deliverableId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+
+  if (!can.withdrawSignOff(viewer.actor, viewer.graph, projectId)) {
+    return denied(
+      "reject work that's already been signed off here — that needs an RE above this project, or its Division Lead"
+    );
+  }
+
+  const result = await ops.withdrawSignOff({
+    deliverableId: id,
+    reason,
+    actorId: viewer.member.id,
+    today: today(),
+  });
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    "Sign-off withdrawn. The owner and everyone above the project were told."
+  );
+}
+
 async function setDeliverableStatusAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -222,16 +259,17 @@ async function setDeliverableStatusAction$impl(
   const id = String(formData.get("deliverableId") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
   const status = String(formData.get("status") ?? "") as
-    | "open"
-    | "in_progress"
-    | "blocked";
+    "open" | "in_progress" | "blocked";
   const blockerNote = String(formData.get("blockerNote") ?? "");
 
   // The owner can move their own work along; so can an RE. Anyone else can't —
   // otherwise a passer-by could mark someone's work blocked.
   const deliverable = projectDeliverables(projectId).find((d) => d.id === id);
   const isOwner = deliverable?.ownerId === viewer.member.id;
-  if (!isOwner && !can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+  if (
+    !isOwner &&
+    !can.manageDeliverables(viewer.actor, viewer.graph, projectId)
+  ) {
     return denied("change this deliverable");
   }
 
@@ -251,9 +289,7 @@ async function inviteMemberAction$impl(
   if (!can.inviteMember(viewer.actor)) return denied("invite members");
 
   const globalRole = String(formData.get("globalRole") ?? "member") as
-    | "member"
-    | "lead"
-    | "co_lead";
+    "member" | "lead" | "co_lead";
 
   // Inviting somebody straight in as leadership is the same act as promoting
   // them, so it needs the same authority — otherwise a Team Lead could mint a
@@ -314,7 +350,10 @@ async function updateProfileAction$impl(
       // Comma-separated, because a tag widget is a lot of machinery for a
       // field people touch once. Splitting happens here so the operation takes
       // real data rather than a string it has to parse.
-      skills: skillsRaw.split(",").map((s) => s.trim()).filter(Boolean),
+      skills: skillsRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
     },
   });
 
@@ -328,9 +367,7 @@ async function setGlobalRoleAction$impl(
   const viewer = await getViewer();
   const memberId = String(formData.get("memberId") ?? "");
   const role = String(formData.get("role") ?? "") as
-    | "member"
-    | "lead"
-    | "co_lead";
+    "member" | "lead" | "co_lead";
 
   if (!can.setGlobalRole(viewer.actor, memberId)) {
     return denied("change roles");
@@ -394,9 +431,7 @@ async function setMemberStatusAction$impl(
   const viewer = await getViewer();
   const memberId = String(formData.get("memberId") ?? "");
   const status = String(formData.get("status") ?? "") as
-    | "active"
-    | "inactive"
-    | "alumni";
+    "active" | "inactive" | "alumni";
 
   if (!can.setMemberStatus(viewer.actor, viewer.graph, memberId)) {
     return denied("change their status");
@@ -404,7 +439,10 @@ async function setMemberStatusAction$impl(
 
   const result = await ops.setMemberStatus({ memberId, status });
   if (result.ok) refresh();
-  return toResult(result, status === "active" ? "Reactivated." : "Deactivated.");
+  return toResult(
+    result,
+    status === "active" ? "Reactivated." : "Deactivated."
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -590,7 +628,9 @@ async function setPauseAction$impl(formData: FormData): Promise<ActionResult> {
   if (result.ok) refresh();
   return toResult(
     result,
-    until ? `Paused until ${until}. No missed check-ins will build up.` : "Resumed."
+    until
+      ? `Paused until ${until}. No missed check-ins will build up.`
+      : "Resumed."
   );
 }
 
@@ -636,7 +676,10 @@ async function requestToJoinAction$impl(
   const project = getProject(projectId);
   if (!project) return { ok: false, error: "That project no longer exists." };
   if (!can.requestToJoin(viewer.actor, project)) {
-    return { ok: false, error: "This project isn't taking new people right now." };
+    return {
+      ok: false,
+      error: "This project isn't taking new people right now.",
+    };
   }
 
   const result = await ops.requestToJoin({
@@ -769,7 +812,9 @@ async function setProjectTeamAction$impl(
   return toResult(result, "Owning team set. It shows under that division now.");
 }
 
-async function createTeamAction$impl(formData: FormData): Promise<ActionResult> {
+async function createTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
   const viewer = await getViewer();
 
   if (!can.manageTeams(viewer.actor)) {
@@ -818,11 +863,39 @@ async function updateProjectAction$impl(
     return denied("edit this project");
   }
 
+  /*
+    Completing is a separate, narrower permission than editing.
+
+    The assigned RE runs the project and may change anything else about it —
+    name, dates, health, phase — but declaring it FINISHED is the review step,
+    and reviewing your own work isn't reviewing. Checked here rather than in
+    `ops.updateProject` because permissions live in `lib/permissions.ts` and the
+    store layer deliberately knows nothing about actors.
+
+    Only the crossing INTO complete. An RE reopening their own project needs no
+    permission from above: saying something isn't finished is always safe.
+  */
+  const phase = String(formData.get("phase") ?? "concept") as Project["phase"];
+  if (phase === "complete") {
+    const current = viewer.graph.getProject(projectId);
+    const alreadyComplete = current?.phase === "complete";
+    if (
+      !alreadyComplete &&
+      !can.completeProject(viewer.actor, viewer.graph, projectId)
+    ) {
+      return {
+        ok: false,
+        error:
+          "Only an RE above this project, or its Division Lead, can mark it complete. You're accountable for finishing it; they're accountable for agreeing it's done. Tell them it's ready.",
+      };
+    }
+  }
+
   const result = await ops.updateProject({
     projectId,
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || undefined,
-    phase: String(formData.get("phase") ?? "concept") as Project["phase"],
+    phase,
     health: String(formData.get("health") ?? "on_track") as Project["health"],
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     openRoles: String(formData.get("openRoles") ?? "") || undefined,
@@ -837,7 +910,10 @@ async function updateProjectAction$impl(
   // Say what the announcement did, rather than letting it happen invisibly.
   // Someone who marks a project complete should know it went somewhere.
   if (result.ok && result.value.phase === "complete") {
-    return { ok: true, message: "Marked complete. Everyone above it was told." };
+    return {
+      ok: true,
+      message: "Marked complete. Everyone above it was told.",
+    };
   }
   return toResult(result, "Project updated.");
 }
@@ -862,7 +938,9 @@ async function deleteProjectAction$impl(
   redirect("/projects");
 }
 
-async function updateTeamAction$impl(formData: FormData): Promise<ActionResult> {
+async function updateTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
   const viewer = await getViewer();
   if (!can.manageTeams(viewer.actor)) return denied("edit divisions");
 
@@ -883,7 +961,9 @@ async function updateTeamAction$impl(formData: FormData): Promise<ActionResult> 
   return toResult(result, "Saved.");
 }
 
-async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> {
+async function deleteTeamAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
   const viewer = await getViewer();
   if (!can.manageTeams(viewer.actor)) return denied("delete divisions");
 
@@ -935,11 +1015,18 @@ async function createEventAction$impl(
 
   if (!can.createEvent(viewer.actor, isOnProject)) {
     return projectId
-      ? { ok: false, error: "You're not on that project, so you can't run a session for it." }
+      ? {
+          ok: false,
+          error:
+            "You're not on that project, so you can't run a session for it.",
+        }
       : denied("create club-wide events");
   }
 
-  const attendeeIds = formData.getAll("attendeeIds").map(String).filter(Boolean);
+  const attendeeIds = formData
+    .getAll("attendeeIds")
+    .map(String)
+    .filter(Boolean);
   const importanceRaw = String(formData.get("importanceWeight") ?? "").trim();
 
   const result = await ops.createEvent({
@@ -1381,7 +1468,8 @@ async function createTermAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
-  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+  if (!can.manageTerms(viewer.actor))
+    return denied("edit the academic calendar");
 
   const result = await ops.createTerm({
     name: String(formData.get("name") ?? ""),
@@ -1399,7 +1487,8 @@ async function updateTermAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
-  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+  if (!can.manageTerms(viewer.actor))
+    return denied("edit the academic calendar");
 
   const result = await ops.updateTerm({
     termId: String(formData.get("termId") ?? ""),
@@ -1418,9 +1507,13 @@ async function deleteTermAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
-  if (!can.manageTerms(viewer.actor)) return denied("edit the academic calendar");
+  if (!can.manageTerms(viewer.actor))
+    return denied("edit the academic calendar");
 
-  const result = await ops.deleteTerm(String(formData.get("termId") ?? ""), today());
+  const result = await ops.deleteTerm(
+    String(formData.get("termId") ?? ""),
+    today()
+  );
   if (result.ok) refresh();
   return toResult(result, "Removed from the calendar.");
 }
@@ -1499,75 +1592,117 @@ async function withdrawJoinRequestAction$impl(
  * that only shows up when someone clicks the button in production.
  */
 
-export async function logHoursAction(formData: FormData): Promise<ActionResult> {
+export async function logHoursAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => logHoursAction$impl(formData));
 }
 
-export async function deleteHoursAction(formData: FormData): Promise<ActionResult> {
+export async function deleteHoursAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteHoursAction$impl(formData));
 }
 
-export async function createDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function createDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createDeliverableAction$impl(formData));
 }
 
-export async function submitDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function submitDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => submitDeliverableAction$impl(formData));
 }
 
-export async function confirmDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function confirmDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => confirmDeliverableAction$impl(formData));
 }
 
-export async function reopenDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function reopenDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => reopenDeliverableAction$impl(formData));
 }
 
-export async function setDeliverableStatusAction(formData: FormData): Promise<ActionResult> {
+export async function withdrawSignOffAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => withdrawSignOffAction$impl(formData));
+}
+
+export async function setDeliverableStatusAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setDeliverableStatusAction$impl(formData));
 }
 
-export async function inviteMemberAction(formData: FormData): Promise<ActionResult> {
+export async function inviteMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => inviteMemberAction$impl(formData));
 }
 
-export async function updateProfileAction(formData: FormData): Promise<ActionResult> {
+export async function updateProfileAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateProfileAction$impl(formData));
 }
 
-export async function setGlobalRoleAction(formData: FormData): Promise<ActionResult> {
+export async function setGlobalRoleAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setGlobalRoleAction$impl(formData));
 }
 
-export async function setMemberLeadAction(formData: FormData): Promise<ActionResult> {
+export async function setMemberLeadAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setMemberLeadAction$impl(formData));
 }
 
-export async function deleteMemberAction(formData: FormData): Promise<ActionResult> {
+export async function deleteMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteMemberAction$impl(formData));
 }
 
-export async function setMemberStatusAction(formData: FormData): Promise<ActionResult> {
+export async function setMemberStatusAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setMemberStatusAction$impl(formData));
 }
 
-export async function createProjectAction(formData: FormData): Promise<ActionResult> {
+export async function createProjectAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createProjectAction$impl(formData));
 }
 
-export async function addProjectMemberAction(formData: FormData): Promise<ActionResult> {
+export async function addProjectMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => addProjectMemberAction$impl(formData));
 }
 
-export async function setProjectREAction(formData: FormData): Promise<ActionResult> {
+export async function setProjectREAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setProjectREAction$impl(formData));
 }
 
-export async function submitCheckInAction(formData: FormData): Promise<ActionResult> {
+export async function submitCheckInAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => submitCheckInAction$impl(formData));
 }
 
-export async function setPauseAction(formData: FormData): Promise<ActionResult> {
+export async function setPauseAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setPauseAction$impl(formData));
 }
 
@@ -1577,151 +1712,225 @@ export async function setUpdateScheduleAction(
   return withRequestStore(() => setUpdateScheduleAction$impl(formData));
 }
 
-export async function markUpdateReviewedAction(formData: FormData): Promise<ActionResult> {
+export async function markUpdateReviewedAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => markUpdateReviewedAction$impl(formData));
 }
 
-export async function requestToJoinAction(formData: FormData): Promise<ActionResult> {
+export async function requestToJoinAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => requestToJoinAction$impl(formData));
 }
 
-export async function decideJoinRequestAction(formData: FormData): Promise<ActionResult> {
+export async function decideJoinRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => decideJoinRequestAction$impl(formData));
 }
 
-export async function setFollowingAction(formData: FormData): Promise<ActionResult> {
+export async function setFollowingAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setFollowingAction$impl(formData));
 }
 
-export async function removeProjectMemberAction(formData: FormData): Promise<ActionResult> {
+export async function removeProjectMemberAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => removeProjectMemberAction$impl(formData));
 }
 
-export async function deleteDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function deleteDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteDeliverableAction$impl(formData));
 }
 
-export async function deleteCheckInAction(formData: FormData): Promise<ActionResult> {
+export async function deleteCheckInAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteCheckInAction$impl(formData));
 }
 
-export async function setProjectTeamAction(formData: FormData): Promise<ActionResult> {
+export async function setProjectTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setProjectTeamAction$impl(formData));
 }
 
-export async function createTeamAction(formData: FormData): Promise<ActionResult> {
+export async function createTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createTeamAction$impl(formData));
 }
 
-export async function updateDeliverableAction(formData: FormData): Promise<ActionResult> {
+export async function updateDeliverableAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateDeliverableAction$impl(formData));
 }
 
-export async function updateProjectAction(formData: FormData): Promise<ActionResult> {
+export async function updateProjectAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateProjectAction$impl(formData));
 }
 
-export async function deleteProjectAction(formData: FormData): Promise<ActionResult> {
+export async function deleteProjectAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteProjectAction$impl(formData));
 }
 
-export async function updateTeamAction(formData: FormData): Promise<ActionResult> {
+export async function updateTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateTeamAction$impl(formData));
 }
 
-export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
+export async function deleteTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
 }
 
-export async function createEventAction(formData: FormData): Promise<ActionResult> {
+export async function createEventAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createEventAction$impl(formData));
 }
 
-export async function updateEventAction(formData: FormData): Promise<ActionResult> {
+export async function updateEventAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateEventAction$impl(formData));
 }
 
-export async function deleteEventAction(formData: FormData): Promise<ActionResult> {
+export async function deleteEventAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteEventAction$impl(formData));
 }
 
-export async function setEventAttendanceAction(formData: FormData): Promise<ActionResult> {
+export async function setEventAttendanceAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setEventAttendanceAction$impl(formData));
 }
 
-export async function requestCertificationAction(formData: FormData): Promise<ActionResult> {
+export async function requestCertificationAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => requestCertificationAction$impl(formData));
 }
 
-export async function verifyCertificationAction(formData: FormData): Promise<ActionResult> {
+export async function verifyCertificationAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => verifyCertificationAction$impl(formData));
 }
 
-export async function rejectCertificationAction(formData: FormData): Promise<ActionResult> {
+export async function rejectCertificationAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => rejectCertificationAction$impl(formData));
 }
 
-export async function revokeCertificationAction(formData: FormData): Promise<ActionResult> {
+export async function revokeCertificationAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => revokeCertificationAction$impl(formData));
 }
 
-export async function createTrainingSectionAction(formData: FormData): Promise<ActionResult> {
+export async function createTrainingSectionAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createTrainingSectionAction$impl(formData));
 }
 
-export async function createCatalogueItemAction(formData: FormData): Promise<ActionResult> {
+export async function createCatalogueItemAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createCatalogueItemAction$impl(formData));
 }
 
-export async function updateCatalogueItemAction(formData: FormData): Promise<ActionResult> {
+export async function updateCatalogueItemAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateCatalogueItemAction$impl(formData));
 }
 
-export async function setCatalogueItemActiveAction(formData: FormData): Promise<ActionResult> {
+export async function setCatalogueItemActiveAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => setCatalogueItemActiveAction$impl(formData));
 }
 
-export async function respondToUpdateEntryAction(formData: FormData): Promise<ActionResult> {
+export async function respondToUpdateEntryAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => respondToUpdateEntryAction$impl(formData));
 }
 
-export async function postHelpRequestAction(formData: FormData): Promise<ActionResult> {
+export async function postHelpRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => postHelpRequestAction$impl(formData));
 }
 
-export async function replyToHelpRequestAction(formData: FormData): Promise<ActionResult> {
+export async function replyToHelpRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => replyToHelpRequestAction$impl(formData));
 }
 
-export async function resolveHelpRequestAction(formData: FormData): Promise<ActionResult> {
+export async function resolveHelpRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => resolveHelpRequestAction$impl(formData));
 }
 
-export async function reopenHelpRequestAction(formData: FormData): Promise<ActionResult> {
+export async function reopenHelpRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => reopenHelpRequestAction$impl(formData));
 }
 
-export async function deleteHelpRequestAction(formData: FormData): Promise<ActionResult> {
+export async function deleteHelpRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteHelpRequestAction$impl(formData));
 }
 
-export async function createTermAction(formData: FormData): Promise<ActionResult> {
+export async function createTermAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => createTermAction$impl(formData));
 }
 
-export async function updateTermAction(formData: FormData): Promise<ActionResult> {
+export async function updateTermAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => updateTermAction$impl(formData));
 }
 
-export async function deleteTermAction(formData: FormData): Promise<ActionResult> {
+export async function deleteTermAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => deleteTermAction$impl(formData));
 }
 
-export async function archiveTeamAction(formData: FormData): Promise<ActionResult> {
+export async function archiveTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => archiveTeamAction$impl(formData));
 }
 
-export async function restoreTeamAction(formData: FormData): Promise<ActionResult> {
+export async function restoreTeamAction(
+  formData: FormData
+): Promise<ActionResult> {
   return withRequestStore(() => restoreTeamAction$impl(formData));
 }
 

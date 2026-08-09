@@ -171,7 +171,9 @@ export async function logHours(input: {
     return fail("Enter how many hours you worked.");
   }
   if (hours > MAX_HOURS_PER_ENTRY) {
-    return fail(`That's over ${MAX_HOURS_PER_ENTRY} hours in one go — is it a typo?`);
+    return fail(
+      `That's over ${MAX_HOURS_PER_ENTRY} hours in one go — is it a typo?`
+    );
   }
 
   const age = daysBetween(workDate, today);
@@ -333,6 +335,105 @@ export async function confirmDeliverable(
   });
 }
 
+/**
+ * An RE above says a signed-off deliverable wasn't actually done.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this isn't just `reopenDeliverable`
+ * ---------------------------------------------------------------------------
+ *
+ * `reopenDeliverable` handles a CLAIM being rejected — the owner said done, the
+ * RE disagrees, nothing ever counted. This handles an APPROVAL being withdrawn,
+ * which is a different and heavier thing:
+ *
+ *   - It takes a completed deliverable back off somebody's record. Delivered is
+ *     the primary contribution signal precisely because it can't be inflated,
+ *     so removing one is not a status edit — it's a correction to the club's
+ *     history, and it needs a reason attached in writing.
+ *   - It contradicts a named person's judgement, not the owner's. That's why
+ *     `can.withdrawSignOff` requires authority from ABOVE the project: the RE
+ *     who signed it cannot quietly un-sign it.
+ *   - **A complete project goes back to active with it.** "The engineering
+ *     doesn't meet requirements" and "the project is finished" cannot both be
+ *     true. Leaving the project complete would keep it out of `/find-work` and
+ *     in the club's record of what got built, with nobody assigned to fix the
+ *     thing that just failed — the exact hidden-work failure this app exists to
+ *     remove. A notice goes up the tree, same as any completion change, so the
+ *     people told it was done are told it isn't.
+ *
+ * Cascading here is deliberate and is NOT in tension with `updateProject`
+ * refusing to complete children on a parent's behalf. That refusal protects
+ * work from being signed off by someone who didn't review it. This runs the
+ * other way: it withdraws an approval, which is always the safe direction.
+ */
+export async function withdrawSignOff(input: {
+  deliverableId: string;
+  reason: string;
+  actorId: string;
+  today: string;
+}): Promise<Result<Deliverable>> {
+  const note = input.reason.trim();
+  if (!note) {
+    return fail<Deliverable>(
+      "Say what doesn't meet the requirement. Taking a sign-off back off someone's record without a reason is the worst version of this."
+    );
+  }
+
+  return guarded((store) => {
+    const d = store.deliverables.find((x) => x.id === input.deliverableId);
+    if (!d) return fail<Deliverable>("That deliverable no longer exists.");
+    if (d.status !== "done") {
+      return fail<Deliverable>(
+        "That isn't signed off, so there's nothing to take back. Send it back instead."
+      );
+    }
+
+    d.status = "in_progress";
+    d.completedAt = undefined;
+    d.submittedAt = undefined;
+    d.confirmedById = undefined;
+    d.blockerNote = note;
+
+    const project = store.projects.find((p) => p.id === d.projectId);
+    if (!project) return ok(d);
+
+    /*
+      Reopen the project if this rejection contradicts it being finished.
+
+      `phase` is a LIFECYCLE stage, not a status, and nothing here knows which
+      stage the work fell back to — the app never recorded where the project was
+      before it was completed. `testing` is a placeholder, chosen because it's
+      where "doesn't meet the requirement" is usually discovered, and the notice
+      says so out loud rather than letting a wrong stage sit there looking
+      authoritative. The RE corrects it in one edit.
+
+      `at_risk` rather than `blocked`: something needs redoing, which isn't the
+      same as being unable to proceed.
+    */
+    if (project.phase === "complete") {
+      project.phase = "testing";
+      project.health = "at_risk";
+
+      const actor = store.members.find((m) => m.id === input.actorId);
+      const who = actor?.preferredName || actor?.fullName || "Someone";
+
+      store.projectNotices.push({
+        id: newId("notice"),
+        projectId: project.id,
+        kind: "reopened",
+        body:
+          `${project.name} is back in the active list. ${who} rejected "${d.title}" — ${note} ` +
+          `It's been put back to testing as a placeholder; whoever picks this up should set the real phase.`,
+        createdById: input.actorId,
+        createdAt: input.today,
+        notifiedMemberIds: completionAudience(store, project, input.actorId),
+      });
+    }
+
+    return ok(d);
+  });
+}
+
 /** The RE disagrees — send it back with a reason. */
 export async function reopenDeliverable(
   deliverableId: string,
@@ -342,7 +443,9 @@ export async function reopenDeliverable(
   const note = reason.trim();
   if (!note) {
     // A bare rejection is the thing that makes people stop submitting.
-    return fail("Say what still needs doing — a rejection with no reason reads as a brush-off.");
+    return fail(
+      "Say what still needs doing — a rejection with no reason reads as a brush-off."
+    );
   }
 
   return updateOne(deliverableId, (d) => {
@@ -569,7 +672,10 @@ export async function setGlobalRole(input: {
 
     if (member.globalRole === "co_lead" && input.role !== "co_lead") {
       const others = store.members.filter(
-        (m) => m.globalRole === "co_lead" && m.id !== member.id && m.status === "active"
+        (m) =>
+          m.globalRole === "co_lead" &&
+          m.id !== member.id &&
+          m.status === "active"
       );
       if (others.length === 0) {
         return fail<Member>(
@@ -642,7 +748,10 @@ export async function setMemberStatus(input: {
 
     if (member.globalRole === "co_lead" && input.status !== "active") {
       const others = store.members.filter(
-        (m) => m.globalRole === "co_lead" && m.id !== member.id && m.status === "active"
+        (m) =>
+          m.globalRole === "co_lead" &&
+          m.id !== member.id &&
+          m.status === "active"
       );
       if (others.length === 0) {
         return fail<Member>("This is the only active Co-Lead.");
@@ -695,7 +804,10 @@ export async function createProject(input: {
 
   const { projects } = readStore();
   let slug = slugify(name);
-  if (projects.some((p) => p.slug === slug) || RESERVED_PROJECT_SLUGS.has(slug)) {
+  if (
+    projects.some((p) => p.slug === slug) ||
+    RESERVED_PROJECT_SLUGS.has(slug)
+  ) {
     // Slugs are the URL, so a collision would make one project unreachable —
     // whether it collides with another project or with a real page.
     slug = `${slug}-${projects.length + 1}`;
@@ -760,7 +872,8 @@ export async function addProjectMember(input: {
     if (existing) {
       existing.commitment = "committed";
       existing.role = input.asRE ? "re" : existing.role;
-      if (input.responsibility) existing.responsibility = input.responsibility.trim();
+      if (input.responsibility)
+        existing.responsibility = input.responsibility.trim();
     } else {
       store.projectMemberships.push({
         projectId: input.projectId,
@@ -1037,7 +1150,8 @@ export async function updateDeliverable(input: {
     const deliverable = store.deliverables.find(
       (d) => d.id === input.deliverableId
     );
-    if (!deliverable) return fail<Deliverable>("That deliverable no longer exists.");
+    if (!deliverable)
+      return fail<Deliverable>("That deliverable no longer exists.");
 
     deliverable.title = title;
     deliverable.dueDate = input.dueDate || undefined;
@@ -1272,11 +1386,69 @@ export async function updateProject(input: {
       }
     }
 
+    /*
+      A sub-project cannot be due after the thing it's part of.
+
+      The parent's date is a promise to whoever is above IT, and that promise is
+      only worth anything if the work underneath lands first. A child dated past
+      its parent isn't ambitious, it's arithmetic that doesn't close — and the
+      failure is silent, because both dates look reasonable on their own card.
+      You only notice at the parent's deadline, which is far too late.
+
+      No parent date means no constraint. An undated parent is deliberately
+      common: plenty of long-running projects have no end, and inventing one to
+      satisfy a rule would put a fake deadline in front of everybody.
+
+      Checked in BOTH directions, because the same mistake arrives two ways —
+      moving a child later, or pulling a parent earlier over children already
+      dated. Refused rather than cascaded, for the same reason completion is:
+      quietly rewriting dates on projects other REs own is how a schedule stops
+      being believed.
+    */
+    const newTarget = input.targetDate || undefined;
+
+    /*
+      Only when the date actually MOVES.
+
+      Every save posts the whole form, so an RE renaming a project resends its
+      existing date. Validating unconditionally would let one pre-existing
+      violation — a pair of dates entered before this rule, or seeded — freeze
+      the project: no edit to any field would ever save again, and the error
+      would name a date the person hadn't touched. Rules that block unrelated
+      work get worked around.
+    */
+    const targetMoved = newTarget !== project.targetDate;
+
+    if (targetMoved && newTarget && project.parentId) {
+      const parent = store.projects.find((p) => p.id === project.parentId);
+      if (parent?.targetDate && newTarget > parent.targetDate) {
+        return fail<Project>(
+          `${parent.name} is due ${parent.targetDate}, so this can't be due ${newTarget}. Move the parent's date first, or bring this one in.`
+        );
+      }
+    }
+
+    if (targetMoved && newTarget) {
+      const late = descendantProjects(store, project.id).filter(
+        (p) => p.targetDate && p.targetDate > newTarget
+      );
+      if (late.length > 0) {
+        const names = late
+          .slice(0, 3)
+          .map((p) => `${p.name} (${p.targetDate})`)
+          .join(", ");
+        const rest = late.length > 3 ? ` and ${late.length - 3} more` : "";
+        return fail<Project>(
+          `${late.length} sub-project${late.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${late.length === 1 ? "it" : "them"} in first — work inside this can't land after it does.`
+        );
+      }
+    }
+
     project.name = name;
     project.description = input.description?.trim() || undefined;
     project.phase = input.phase;
     project.health = input.health;
-    project.targetDate = input.targetDate || undefined;
+    project.targetDate = newTarget;
     project.openRoles = input.openRoles?.trim() || undefined;
 
     // Crossing into or out of `complete` is the only edit worth announcing.
@@ -1691,10 +1863,14 @@ export async function deleteMember(input: {
     if ((delivered > 0 || checkIns > 0) && !input.force) {
       const parts: string[] = [];
       if (delivered > 0) {
-        parts.push(`${delivered} signed-off deliverable${delivered === 1 ? "" : "s"}`);
+        parts.push(
+          `${delivered} signed-off deliverable${delivered === 1 ? "" : "s"}`
+        );
       }
       if (checkIns > 0) {
-        parts.push(`${checkIns} submitted check-in${checkIns === 1 ? "" : "s"}`);
+        parts.push(
+          `${checkIns} submitted check-in${checkIns === 1 ? "" : "s"}`
+        );
       }
       return fail<null>(
         `${member.fullName} has ${parts.join(" and ")} on record. Deactivate instead — that keeps the history. A Co-Lead can force a delete if this is a duplicate profile.`
@@ -1804,7 +1980,10 @@ export async function createEvent(input: {
   }
 
   return guarded((store) => {
-    if (input.projectId && !store.projects.some((p) => p.id === input.projectId)) {
+    if (
+      input.projectId &&
+      !store.projects.some((p) => p.id === input.projectId)
+    ) {
       return fail<ClubEvent>("That project no longer exists.");
     }
 
@@ -1960,7 +2139,8 @@ export async function requestCertification(input: {
 
   return guarded((store) => {
     const item = store.catalogueItems.find((i) => i.id === input.itemId);
-    if (!item) return fail<MemberCertification>("That training no longer exists.");
+    if (!item)
+      return fail<MemberCertification>("That training no longer exists.");
     if (!item.isActive) {
       return fail<MemberCertification>(
         `${item.name} has been retired — you don't need it any more.`
@@ -1973,7 +2153,9 @@ export async function requestCertification(input: {
 
     if (existing) {
       if (existing.status === "verified") {
-        return fail<MemberCertification>(`You're already cleared on ${item.name}.`);
+        return fail<MemberCertification>(
+          `You're already cleared on ${item.name}.`
+        );
       }
       if (existing.status === "requested") {
         return fail<MemberCertification>(
@@ -2035,7 +2217,8 @@ export async function verifyCertification(input: {
     const record = store.certifications.find(
       (c) => c.id === input.certificationId
     );
-    if (!record) return fail<MemberCertification>("That request no longer exists.");
+    if (!record)
+      return fail<MemberCertification>("That request no longer exists.");
 
     /*
       The second of the two checks — `can.verifyTraining` is the first. This is
@@ -2078,7 +2261,8 @@ export async function rejectCertification(input: {
     const record = store.certifications.find(
       (c) => c.id === input.certificationId
     );
-    if (!record) return fail<MemberCertification>("That request no longer exists.");
+    if (!record)
+      return fail<MemberCertification>("That request no longer exists.");
     if (record.memberId === input.verifierId) {
       return fail<MemberCertification>("You can't decide your own request.");
     }
@@ -2109,7 +2293,8 @@ export async function revokeCertification(input: {
     const record = store.certifications.find(
       (c) => c.id === input.certificationId
     );
-    if (!record) return fail<MemberCertification>("That record no longer exists.");
+    if (!record)
+      return fail<MemberCertification>("That record no longer exists.");
 
     record.status = "expired";
     record.expiresAt = input.today;
@@ -2162,7 +2347,9 @@ export async function createTrainingSection(input: {
         (s) => s.name.toLowerCase() === name.toLowerCase()
       )
     ) {
-      return fail<TrainingSection>(`There's already a section called "${name}".`);
+      return fail<TrainingSection>(
+        `There's already a section called "${name}".`
+      );
     }
 
     const section: TrainingSection = {
@@ -2172,7 +2359,9 @@ export async function createTrainingSection(input: {
       sortOrder:
         Math.max(
           0,
-          ...store.trainingSections.filter((s) => s.sortOrder < 99).map((s) => s.sortOrder)
+          ...store.trainingSections
+            .filter((s) => s.sortOrder < 99)
+            .map((s) => s.sortOrder)
         ) + 1,
     };
 
@@ -2197,7 +2386,9 @@ export async function createCatalogueItem(input: {
   }
 
   return guarded((store) => {
-    const section = store.trainingSections.find((s) => s.id === input.sectionId);
+    const section = store.trainingSections.find(
+      (s) => s.id === input.sectionId
+    );
     if (!section) return fail<CatalogueItem>("That section no longer exists.");
 
     if (
@@ -2207,9 +2398,7 @@ export async function createCatalogueItem(input: {
           i.name.toLowerCase() === name.toLowerCase()
       )
     ) {
-      return fail<CatalogueItem>(
-        `${section.name} already has "${name}".`
-      );
+      return fail<CatalogueItem>(`${section.name} already has "${name}".`);
     }
 
     const siblings = store.catalogueItems.filter(
@@ -2224,7 +2413,10 @@ export async function createCatalogueItem(input: {
       validityMonths: input.validityMonths,
       // Machines start at 10 so site access always sorts above them.
       sortOrder:
-        Math.max(input.kind === "machine" ? 9 : -1, ...siblings.map((i) => i.sortOrder)) + 1,
+        Math.max(
+          input.kind === "machine" ? 9 : -1,
+          ...siblings.map((i) => i.sortOrder)
+        ) + 1,
       isActive: true,
     };
 
@@ -2349,7 +2541,10 @@ export async function postHelpRequest(input: {
   }
 
   return guarded((store) => {
-    if (input.projectId && !store.projects.some((p) => p.id === input.projectId)) {
+    if (
+      input.projectId &&
+      !store.projects.some((p) => p.id === input.projectId)
+    ) {
       return fail<HelpRequest>("That project no longer exists.");
     }
 
@@ -2552,12 +2747,7 @@ export async function updateTerm(input: {
     const term = store.terms.find((t) => t.id === input.termId);
     if (!term) return fail<Term>("That term no longer exists.");
 
-    const clash = overlappingTerm(
-      store,
-      input.startsOn,
-      input.endsOn,
-      term.id
-    );
+    const clash = overlappingTerm(store, input.startsOn, input.endsOn, term.id);
     if (clash) {
       return fail<Term>(
         `That overlaps ${clash.name} (${clash.startsOn} to ${clash.endsOn}). Terms can't cover the same day.`
@@ -2825,7 +3015,8 @@ export async function withdrawJoinRequest(
   return guarded((store) => {
     const request = store.joinRequests.find((r) => r.id === requestId);
     if (!request) return fail<null>("That request no longer exists.");
-    if (request.memberId !== memberId) return fail<null>("That isn't your request.");
+    if (request.memberId !== memberId)
+      return fail<null>("That isn't your request.");
     request.status = "withdrawn";
     return ok(null);
   });
