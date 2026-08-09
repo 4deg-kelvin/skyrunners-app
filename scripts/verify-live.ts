@@ -71,6 +71,7 @@ const dataModules = {
   updates: await import("../lib/data/updates.ts"),
   settings: await import("../lib/data/settings.ts"),
   events: await import("../lib/data/events.ts"),
+  blockers: await import("../lib/data/blockers.ts"),
 };
 
 installLiveBackend(() => snap, async () => {});
@@ -120,6 +121,7 @@ await check("/dashboard      getDashboard", async () => dataModules.dashboard.ge
 await check("/updates        getUpdates", async () => dataModules.updates.getUpdates(actor));
 await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
 await check("/calendar       getUpcomingEvents", async () => dataModules.events.getUpcomingEvents());
+await check("/blockers       getBlockerBoard", async () => dataModules.blockers.getBlockerBoard(me.id));
 
 // The exact call shape the pages use. /members and /projects fire their data
 // functions in a Promise.all ALONGSIDE getViewer, so the read starts before the
