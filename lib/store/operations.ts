@@ -1104,17 +1104,30 @@ function ancestorProjects(store: StoreShape, projectId: string): Project[] {
 }
 
 /**
- * Who hears that a project finished, nearest first.
+ * Who hears that a project finished, nearest first — and it **stops at the
+ * Division Lead**.
  *
  * "Up the chain of command" for a project means the project tree, not the
  * reporting tree: the people accountable for the work above this are the REs of
- * its ancestors, then whoever leads the division it sits in, then the Co-Leads.
- * A member's own Lead is the right audience for a check-in and the wrong one
- * here — they may have nothing to do with this project.
+ * its ancestors, then the leads of the teams that own it, ending with whoever
+ * leads the division. A member's own Lead is the right audience for a check-in
+ * and the wrong one here — they may have nothing to do with this project.
  *
- * The person who pressed the button is dropped: telling somebody what they
- * just did is noise, and it's the fastest way to make an announcement feel
- * automatic in the bad sense.
+ * **Co-Leads are deliberately not on this list.** A Co-Lead is a manager of the
+ * organisation, not of the work: they configure divisions and appoint people,
+ * and a ping for every deliverable-set that finishes anywhere in the club is
+ * exactly the traffic that teaches somebody to stop reading their dashboard.
+ * The Division Lead is the last stop, because the division is the unit that
+ * owns delivery.
+ *
+ * The one exception is a division with no lead — then the announcement would go
+ * nowhere, so it falls through to the Co-Leads. That's a gap in the org chart
+ * showing up as the notice landing one level higher than it should, which is
+ * the right way for it to be visible.
+ *
+ * The person who pressed the button is dropped: telling somebody what they just
+ * did is noise, and it's the fastest way to make an announcement feel automatic
+ * in the bad sense.
  */
 function completionAudience(
   store: StoreShape,
@@ -1129,24 +1142,53 @@ function completionAudience(
     ordered.push(ancestor.primaryReId, ...ancestor.reIds);
   }
 
-  // Then up the org tree from whichever team owns this, to the division lead.
+  // Up the org tree from whichever team owns this, nearest sub-team first.
+  //
+  // The Division Lead is held back rather than pushed in sequence, because
+  // they are very often also an RE of a parent project — and a plain dedup
+  // would then keep their FIRST appearance and leave somebody else at the end
+  // of the list. They're the last stop by role, not by where they happen to
+  // turn up first.
+  let divisionLeadId: string | undefined;
   const seenTeams = new Set<string>();
   let teamId = project.teamId;
   while (teamId && !seenTeams.has(teamId)) {
     seenTeams.add(teamId);
     const team: Team | undefined = store.teams.find((t) => t.id === teamId);
     if (!team) break;
-    if (team.leadId) ordered.push(team.leadId);
+    // `parentId === null` is what makes a team a division.
+    if (team.leadId) {
+      if (team.parentId === null) divisionLeadId = team.leadId;
+      else ordered.push(team.leadId);
+    }
     teamId = team.parentId ?? undefined;
   }
 
+  const audience = [...new Set(ordered)].filter(
+    (id) => id && id !== actorId && id !== divisionLeadId
+  );
+
+  if (divisionLeadId && divisionLeadId !== actorId) {
+    audience.push(divisionLeadId);
+    return audience;
+  }
+
+  // No division lead to end on — either the division has none, or the division
+  // lead is the person who just pressed the button. Rather than let the
+  // announcement evaporate, hand it to the Co-Leads, who are also the people
+  // who can fill a vacant division lead.
   for (const member of store.members) {
-    if (member.globalRole === "co_lead" && member.status === "active") {
-      ordered.push(member.id);
+    if (
+      member.globalRole === "co_lead" &&
+      member.status === "active" &&
+      member.id !== actorId &&
+      !audience.includes(member.id)
+    ) {
+      audience.push(member.id);
     }
   }
 
-  return [...new Set(ordered)].filter((id) => id && id !== actorId);
+  return audience;
 }
 
 /**

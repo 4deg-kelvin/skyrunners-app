@@ -129,6 +129,7 @@ describe("graph construction", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" }), profileRow({ id: "p2" })],
       [projectRow({ id: "prj1" })],
+      [],
       []
     );
     assert.equal(graph.getMember("p1")?.id, "p1");
@@ -137,7 +138,7 @@ describe("graph construction", () => {
   });
 
   test("unknown ids return undefined, never throw", () => {
-    const graph = buildOrgGraphFromRows([], [], []);
+    const graph = buildOrgGraphFromRows([], [], [], []);
     assert.equal(graph.getMember("nope"), undefined);
     assert.equal(graph.getProject("nope"), undefined);
     assert.deepEqual(graph.directREs("nope"), []);
@@ -150,7 +151,8 @@ describe("graph construction", () => {
       [
         { project_id: "prj1", member_id: "p1" },
         { project_id: "prj1", member_id: "p2" },
-      ]
+      ],
+      []
     );
     assert.deepEqual(graph.directREs("prj1").sort(), ["p1", "p2"]);
   });
@@ -165,7 +167,8 @@ describe("graph construction", () => {
       [
         { project_id: "prj1", member_id: "p1" },
         { project_id: "prj2", member_id: "p2" },
-      ]
+      ],
+      []
     );
     assert.deepEqual(graph.directREs("prj1"), ["p1"]);
     assert.deepEqual(graph.directREs("prj2"), ["p2"]);
@@ -179,7 +182,8 @@ describe("graph construction", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" })],
       [projectRow({ id: "prj1", primary_re_id: "p1" })],
-      [] // no membership rows at all
+      [], // no membership rows at all
+      []
     );
     assert.deepEqual(graph.directREs("prj1"), ["p1"]);
   });
@@ -188,7 +192,8 @@ describe("graph construction", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" })],
       [projectRow({ id: "prj1", primary_re_id: "p1" })],
-      [{ project_id: "prj1", member_id: "p1" }]
+      [{ project_id: "prj1", member_id: "p1" }],
+      []
     );
     assert.deepEqual(graph.directREs("prj1"), ["p1"]);
   });
@@ -223,7 +228,10 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     [
       { project_id: PARENT_PRJ, member_id: LEAD },
       { project_id: CHILD_PRJ, member_id: MEMBER },
-    ]
+    ],
+    // No teams: this block is about RE and Lead authority resolving against
+    // real uuids. The Division-Lead rule gets its own fixture below.
+    []
   );
 
   test("a real uuid actually resolves — the regression that started this", () => {
@@ -278,6 +286,87 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     assert.equal(
       can.reviewJoinRequest({ id: LEAD, globalRole: "lead" }, graph, CHILD_PRJ),
       true
+    );
+  });
+});
+
+// --- the Division-Lead-is-a-top-RE rule, on Postgres-shaped rows ------------
+
+describe("a Division Lead is a top RE, resolved from real team rows", () => {
+  /*
+    The rule itself is exercised in `lib/permissions.test.ts` against a
+    hand-built graph. This block exists for the OTHER half — that
+    `buildOrgGraphFromRows` actually carries `teams` through into `getTeam`.
+
+    That wiring is the part that fails silently: the permission tests would
+    stay green with an empty team map, and the only symptom in the app would be
+    a Division Lead quietly unable to sign anything off.
+  */
+  const DIV_LEAD = "44444444-4444-4444-8444-444444444444";
+  const DIVISION = "55555555-5555-4555-8555-555555555555";
+  const SUB_TEAM = "66666666-6666-4666-8666-666666666666";
+  const OUTSIDER = "77777777-7777-4777-8777-777777777777";
+  const ROOT_PRJ = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const DEEP_PRJ = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+  const teamRow = (
+    id: string,
+    parent_id: string | null,
+    lead_id: string | null
+  ) => ({
+    id,
+    name: id,
+    slug: id,
+    parent_id,
+    lead_id,
+    is_active: true,
+  });
+
+  const graph = buildOrgGraphFromRows(
+    [
+      profileRow({ id: DIV_LEAD, global_role: "lead", lead_id: null }),
+      profileRow({ id: OUTSIDER, global_role: "lead", lead_id: null }),
+    ],
+    [
+      // The root carries the sub-team; the child carries no team of its own,
+      // which is the ordinary case for a sub-project.
+      projectRow({ id: ROOT_PRJ, primary_re_id: OUTSIDER, team_id: SUB_TEAM }),
+      projectRow({
+        id: DEEP_PRJ,
+        slug: "deep",
+        parent_id: ROOT_PRJ,
+        primary_re_id: OUTSIDER,
+      }),
+    ],
+    [],
+    [teamRow(DIVISION, null, DIV_LEAD), teamRow(SUB_TEAM, DIVISION, null)]
+  );
+
+  test("getTeam resolves, so the org tree is actually reachable", () => {
+    assert.equal(graph.getTeam(DIVISION)?.leadId, DIV_LEAD);
+    assert.equal(graph.getTeam(SUB_TEAM)?.parentId, DIVISION);
+    assert.equal(graph.getTeam("nope"), undefined);
+  });
+
+  const divLead = { id: DIV_LEAD, globalRole: "lead" as const };
+
+  test("they can manage a project their division owns", () => {
+    assert.equal(can.manageProject(divLead, graph, ROOT_PRJ), true);
+    assert.equal(can.manageDeliverables(divLead, graph, ROOT_PRJ), true);
+  });
+
+  test("and a sub-project that carries no team of its own", () => {
+    assert.equal(can.manageDeliverables(divLead, graph, DEEP_PRJ), true);
+    assert.equal(can.assignRE(divLead, graph, DEEP_PRJ), true);
+  });
+
+  test("someone outside that division still can't", () => {
+    const stranger = { id: OUTSIDER, globalRole: "lead" as const };
+    // OUTSIDER is the RE here, so check a member with no role at all instead.
+    assert.ok(stranger);
+    assert.equal(
+      can.manageProject({ id: "nobody", globalRole: "lead" }, graph, ROOT_PRJ),
+      false
     );
   });
 });

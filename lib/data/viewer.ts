@@ -24,6 +24,7 @@ import {
   directREs,
   getMember,
   getProject,
+  getTeam,
 } from "@/lib/mock-data";
 
 export interface Viewer {
@@ -46,7 +47,7 @@ export interface Viewer {
  * every row up front and closes over Maps.
  */
 function buildMockOrgGraph(): OrgGraph {
-  return { getMember, getProject, directREs };
+  return { getMember, getProject, directREs, getTeam };
 }
 
 /**

@@ -140,20 +140,40 @@ a render loop: harmless against arrays, a round trip per row against Postgres.
 Never check `globalRole` inline. The whole model is four questions:
 
 1. Are you a Co-Lead? → anything
-2. Are you an RE of this project **or any above it**? → you own this subtree
+2. Are you an RE of this project **or any above it**, or do you **lead a team that owns
+   any of them**? → you own this subtree
 3. Are you this member's Lead, **directly or anywhere up their chain**? → you oversee them
 4. Is it your own data? → you can manage it
 
-**Two inheritances running in opposite directions:** RE authority flows **down** the
-project tree, Lead authority flows **up** the reporting chain. That asymmetry is where
-bugs hide, which is why there are 33 tests on it.
+**Three inheritances, and they run in different directions:** RE authority flows **down**
+the project tree, Lead authority flows **up** the reporting chain, and team-lead authority
+flows **down** the org tree and then down the project tree. That asymmetry is where bugs
+hide, which is why there are 50+ tests on it.
+
+**A Division Lead is a top RE.** `leadsTeamAbove` folds into `isREofOrAbove`, so leading a
+division gives RE powers — deliverables, sign-off, join requests, appointing REs — on
+every project inside it, at any depth, including sub-projects that carry no `teamId` of
+their own. A sub-team lead gets the same over their own team's subtree and nothing
+sideways. It is deliberately **not** Co-Lead: a Division Lead still cannot read a
+member's personal report unless they're in that person's Lead chain.
+
+Depth is unbounded in both trees and always has been — an RE four projects up really does
+own everything beneath them. `projectChain`, `teamChain` and `leadChain` are all
+cycle-guarded, because `parent_id` / `lead_id` are plain columns and a loop would hang the
+request rather than fail it.
 
 Pages get `{ actor, graph, member }` from `getViewer()` and call `can.*`.
 
-**`OrgGraph`'s three lookups are synchronous, and that's load-bearing.** They're called in
-loops while walking both trees, so they must never each become a query. `lib/data/graph.ts`
-loads every profile, project and RE membership in three parallel queries and closes over
-Maps. Backing them with per-call queries turns one permission check into fifty.
+**`OrgGraph`'s four lookups are synchronous, and that's load-bearing.** They're called in
+loops while walking all three trees, so they must never each become a query.
+`lib/data/graph.ts` loads every profile, project, RE membership and team in four parallel
+queries and closes over Maps. Backing them with per-call queries turns one permission
+check into fifty.
+
+`buildOrgGraphFromRows` takes `teamRows` as a **required** argument, deliberately. A
+default of `[]` would make forgetting it compile, and the failure is invisible: no teams
+means no team leads, so every Division Lead silently loses authority over their own
+division — the same shape as the mock-data fallback in `docs/HANDOFF.md` §2.
 
 Argument order is `(actor, graph, projectId)` — the graph is always second.
 
