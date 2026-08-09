@@ -412,9 +412,17 @@ export default async function MyWorkPage() {
           {committed.length === 0 ? (
             <EmptyState
               className="mt-5 py-8"
-              message="You're not on a project yet. Browse everything the club is building, then ask the RE of anything that interests you."
-              actionLabel="Browse projects"
-              actionHref="/projects"
+              /*
+                Find Work, not the project tree.
+
+                Find Work ranks by where a member would actually help —
+                unstaffed and stuck first — which is the whole reason it
+                exists. The tree is sorted by org structure, so it puts a
+                newcomer in front of a hierarchy rather than an opportunity.
+              */
+              message="You're not on a project yet. Find Work lists everything the club is building, with the places that most need people first — pick one and ask to join."
+              actionLabel="Find something to work on"
+              actionHref="/find-work"
             />
           ) : liveProjects.length === 0 ? (
             <EmptyState

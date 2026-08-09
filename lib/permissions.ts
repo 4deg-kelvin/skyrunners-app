@@ -456,7 +456,7 @@ export const can = {
 
   submitOwnUpdate: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
-  /** Members choose their own three update days. */
+  /** Members choose which weekdays they check in on. */
   setOwnSchedule: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   /**

@@ -67,7 +67,7 @@ export default async function FindWorkPage() {
       <PageHeader
         label="Get Involved"
         title="Find work"
-        description="Everything the club is building, sorted by where you'd help most. Nobody needs to tell you what to work on — pick something and message the RE."
+        description="Sorted by where you'd help most — unstaffed and stuck work first. Nobody assigns you anything here: find something, ask to join, and the RE gets a tracked request rather than another email."
         action={<AskForHelpForm projects={askProjects} />}
       />
 
@@ -124,10 +124,25 @@ export default async function FindWorkPage() {
 
           <div className="mt-5 space-y-3">
             {available.length === 0 ? (
+              /*
+                Two very different states, and they used to share one message.
+
+                "You're already on everything that's open. Impressive." is true
+                and warm when there IS work. On a fresh club with no projects
+                at all — the exact state on the day members are invited — it
+                congratulated somebody for having done nothing, on the page
+                that is supposed to be the answer to "what do I do?".
+              */
               <EmptyState
-                message="You're already on everything that's open. Impressive."
-                actionLabel="See your work"
-                actionHref="/my-work"
+                message={
+                  counts.total === 0
+                    ? "Nothing to join yet — the club hasn't put any projects up. This page is where they'll appear, sorted by where you'd help most. Worth checking back in a day or two."
+                    : "You're already on everything that's open. Impressive."
+                }
+                actionLabel={
+                  counts.total === 0 ? "See the club" : "See your work"
+                }
+                actionHref={counts.total === 0 ? "/projects" : "/my-work"}
               />
             ) : (
               available.map((card) => {

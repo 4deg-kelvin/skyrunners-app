@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql
 
 
 -- ==========================================================================
@@ -3103,4 +3103,72 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0021_backfill_project_start_dates.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0022_delete_cascade_policies.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0022 — the two delete policies the cascades need
+--
+-- `deleteMember` and `deleteProject` are both Co-Lead operations that clear
+-- everything hanging off the row. `lib/store/supabase.ts` turns that into one
+-- DELETE per table, so every table in the cascade needs a policy the Co-Lead
+-- passes. Two didn't, and both features were therefore broken in live mode:
+--
+--   join_requests   had NO delete policy at all
+--   work_logs       had `member_id = auth.uid()`, so a Co-Lead could clear
+--                   their own hours and nobody else's
+--
+-- Since `persistDiff` now checks the affected-row count, these failed LOUDLY
+-- rather than silently — which is the only reason they were found. Before that
+-- change, `deleteProject` would have reported success, removed the project,
+-- and left orphaned rows behind.
+--
+-- This is the same shape as the `profiles` bug in 0019 and it will keep
+-- recurring: **RLS does not raise on a missing policy.** Any time an operation
+-- starts clearing a new table on cascade, check the policy covers whoever is
+-- allowed to trigger the cascade — the type checker cannot see this.
+-- ---------------------------------------------------------------------------
+
+-- --------------------------------------------------------------------------
+-- join_requests
+--
+-- Withdrawing is an UPDATE to `status = 'withdrawn'`, deliberately — a
+-- withdrawn ask stays on the record so the RE can see it happened rather than
+-- watching a row vanish from their queue. So this is ONLY for the cascade, and
+-- it's scoped to the people who can trigger one.
+-- --------------------------------------------------------------------------
+drop policy if exists join_requests_delete on join_requests;
+create policy join_requests_delete on join_requests
+  for delete to authenticated
+  using (auth_is_re_for(project_id) or auth_is_co_lead());
+
+-- --------------------------------------------------------------------------
+-- work_logs
+--
+-- Deliberately NOT widened to leadership. Hours are the raw material of the
+-- Commitment signal, and a Lead quietly deleting a report's logged time would
+-- change how that person is described with no record of it. A Co-Lead can,
+-- because they're the only ones who can delete a member or a project at all —
+-- and both of those operations already refuse to erase real history unless
+-- explicitly forced, and say what will be lost.
+--
+-- A member deleting their OWN mistyped entry is the existing
+-- `work_logs_write_own` policy and is untouched.
+-- --------------------------------------------------------------------------
+drop policy if exists work_logs_delete_co_lead on work_logs;
+create policy work_logs_delete_co_lead on work_logs
+  for delete to authenticated
+  using (auth_is_co_lead());
+
+insert into schema_migrations (version)
+values ('0022_delete_cascade_policies')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0022_delete_cascade_policies.sql
 -- ==========================================================================

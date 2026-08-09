@@ -293,6 +293,7 @@ export default async function ProjectDetailPage({
                   <AddDeliverableForm
                     projectId={project.id}
                     candidates={assignableMembers}
+                    projectTargetDate={project.targetDate}
                   />
                 ) : null}
               </div>
@@ -329,6 +330,7 @@ export default async function ProjectDetailPage({
                           isOwner={deliverable.ownerId === viewer.member.id}
                           canSignOff={mayManage}
                           canWithdrawSignOff={mayWithdrawSignOff}
+                          projectTargetDate={project.targetDate}
                           candidates={assignableMembers.map((m) => ({
                             id: m.id,
                             name: m.fullName,

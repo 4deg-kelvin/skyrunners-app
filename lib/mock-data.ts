@@ -1976,7 +1976,7 @@ export function inSession(date: string): boolean {
 // resolves it per member from the store instead.
 
 // ---------------------------------------------------------------------------
-// Updates — 3x per week cadence
+// Updates — twice a week by default (`UPDATES_PER_WEEK_DEFAULT`)
 // ---------------------------------------------------------------------------
 
 export const progressUpdates: ProgressUpdate[] = [

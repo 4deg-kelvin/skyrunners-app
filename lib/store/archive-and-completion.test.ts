@@ -1654,3 +1654,155 @@ describe("a new project records when it started", () => {
     }
   });
 });
+
+describe("a deliverable can't be due after its project", () => {
+  // p-wing-spar is due 2026-10-30 in the seed.
+  test("creating one past the target is refused", async () => {
+    const result = await ops.createDeliverable({
+      projectId: "p-wing-spar",
+      title: "Late report",
+      ownerId: "m-tyler",
+      dueDate: "2026-12-01",
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /2026-10-30/);
+      assert.match(result.error, /Wing Spar/i);
+    }
+  });
+
+  test("on the target date exactly is fine", async () => {
+    const result = await ops.createDeliverable({
+      projectId: "p-wing-spar",
+      title: "Right on time",
+      ownerId: "m-tyler",
+      dueDate: "2026-10-30",
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("no due date is unconstrained", async () => {
+    const result = await ops.createDeliverable({
+      projectId: "p-wing-spar",
+      title: "Whenever",
+      ownerId: "m-tyler",
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("a project with no target constrains nothing", async () => {
+    const parent = await ops.createProject({
+      name: "Open Ended Parent",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    assert.equal(parent.ok, true);
+    if (!parent.ok) return;
+
+    const result = await ops.createDeliverable({
+      projectId: parent.value.id,
+      title: "Far future",
+      ownerId: "m-anish",
+      dueDate: "2030-01-01",
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("moving an existing one past the target is refused", async () => {
+    const existing = disk
+      .readStore()
+      .deliverables.find((d) => d.projectId === "p-wing-spar")!;
+
+    const result = await ops.updateDeliverable({
+      deliverableId: existing.id,
+      title: existing.title,
+      dueDate: "2026-12-01",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(
+      disk.readStore().deliverables.find((d) => d.id === existing.id)?.dueDate,
+      existing.dueDate
+    );
+  });
+
+  test("renaming still saves when the dates already clash", async () => {
+    /*
+      The regression guard. Every save resends the existing date, so a
+      pre-existing violation would otherwise freeze the row — a rename failing
+      on a date the person never touched and cannot see.
+    */
+    const existing = disk
+      .readStore()
+      .deliverables.find((d) => d.projectId === "p-wing-spar")!;
+    // Reach past the operation to create the illegal state, as old data would.
+    disk.readStore().deliverables.find((d) => d.id === existing.id)!.dueDate =
+      "2026-12-25";
+
+    const result = await ops.updateDeliverable({
+      deliverableId: existing.id,
+      title: "Renamed anyway",
+      dueDate: "2026-12-25",
+      today: TODAY,
+    });
+    assert.equal(result.ok, true);
+  });
+
+  /**
+   * A project with no sub-projects, so the sub-project rule can't fire first
+   * and mask what these are testing.
+   */
+  async function projectWithDeliverable(due: string, target = "2026-11-30") {
+    const created = await ops.createProject({
+      name: `Standalone ${due}`,
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      targetDate: target,
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    if (!created.ok) throw new Error(created.error);
+
+    const d = await ops.createDeliverable({
+      projectId: created.value.id,
+      title: "The work",
+      ownerId: "m-anish",
+      dueDate: due,
+    });
+    if (!d.ok) throw new Error(d.error);
+    return { project: created.value, deliverable: d.value };
+  }
+
+  test("pulling the project's target in over open work is refused", async () => {
+    // The other direction. Without this, moving a target left would leave
+    // deliverables dated past it — the state creation refuses.
+    const { project } = await projectWithDeliverable("2026-11-20");
+    const result = await setTarget(project.id, "2026-10-01");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.error, /deliverable/i);
+      assert.match(result.error, /The work/);
+    }
+  });
+
+  test("…but work already signed off doesn't block it", async () => {
+    /*
+      Done work is history. Refusing a date change because something finished
+      after the new target would make a project whose schedule slipped
+      permanently uneditable — and the deliverable is finished, so there is
+      nothing left to bring in.
+    */
+    const { project, deliverable } = await projectWithDeliverable("2026-11-20");
+    await ops.confirmDeliverable(deliverable.id, "m-anish", TODAY);
+
+    const result = await setTarget(project.id, "2026-10-01");
+    assert.equal(result.ok, true);
+  });
+});

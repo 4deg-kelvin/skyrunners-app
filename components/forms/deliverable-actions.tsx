@@ -34,6 +34,7 @@ export function DeliverableActions({
   canSignOff,
   canWithdrawSignOff = false,
   candidates = [],
+  projectTargetDate,
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
@@ -48,6 +49,12 @@ export function DeliverableActions({
    * to false means a caller who forgets it loses the button, not the rule.
    */
   canWithdrawSignOff?: boolean;
+  /**
+   * The project's target, if it has one. Work inside a project can't be due
+   * after it — `updateDeliverable` refuses that, and this caps the picker so
+   * you find out before pressing the button rather than after.
+   */
+  projectTargetDate?: string;
   /**
    * Who this can be handed to. Everyone active, not just current project
    * members — reassigning is how somebody joins, same as being given a new
@@ -298,8 +305,14 @@ export function DeliverableActions({
                 type="date"
                 name="dueDate"
                 defaultValue={deliverable.dueDate ?? ""}
+                max={projectTargetDate}
                 className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               />
+              {projectTargetDate ? (
+                <span className="text-ink-muted mt-1 block text-xs">
+                  The project is due {projectTargetDate}.
+                </span>
+              ) : null}
             </label>
           </div>
 
@@ -395,11 +408,14 @@ export function DeliverableActions({
  * them as committed.
  */
 export function AddDeliverableForm({
+  projectTargetDate,
   projectId,
   candidates,
 }: {
   projectId: string;
   candidates: { id: string; fullName: string }[];
+  /** Caps the due-date picker. Work can't be due after its project. */
+  projectTargetDate?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -466,8 +482,14 @@ export function AddDeliverableForm({
           <input
             type="date"
             name="dueDate"
+            max={projectTargetDate}
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
+          {projectTargetDate ? (
+            <span className="text-ink-muted mt-1 block text-xs">
+              No later than {projectTargetDate} — when the project is due.
+            </span>
+          ) : null}
         </label>
       </div>
 

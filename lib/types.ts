@@ -419,7 +419,7 @@ export interface WorkLog {
 }
 
 // ---------------------------------------------------------------------------
-// Updates — 3x per week, on member-chosen weekdays
+// Updates — twice a week by default, on member-chosen weekdays
 // ---------------------------------------------------------------------------
 
 export type UpdateStatus =

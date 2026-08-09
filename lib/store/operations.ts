@@ -234,6 +234,36 @@ export async function deleteWorkLog(
 // Phase 4 — deliverables
 // ---------------------------------------------------------------------------
 
+/**
+ * A deliverable cannot be due after the project it belongs to.
+ *
+ * Same rule as a sub-project not outliving its parent, and the same reasoning:
+ * the project's target is a promise made to whoever is above it, and the
+ * promise only holds if the work inside it lands first. A deliverable dated
+ * past its project is arithmetic that doesn't close, and it's silent — both
+ * dates look fine on their own row, and you find out at the project's deadline.
+ *
+ * No project target means no constraint. Plenty of long-running projects have
+ * no end date, and inventing one to satisfy a rule would put a fake deadline in
+ * front of everybody.
+ *
+ * Returns the message rather than a Result so both the create and the update
+ * path can use it, and so the sentence naming the project and its date lives
+ * in exactly one place.
+ */
+function dueAfterProject(
+  store: StoreShape,
+  projectId: string,
+  dueDate?: string
+): string | null {
+  if (!dueDate) return null;
+  const project = store.projects.find((p) => p.id === projectId);
+  if (!project?.targetDate) return null;
+  if (dueDate <= project.targetDate) return null;
+
+  return `${project.name} is due ${project.targetDate}, so this can't be due ${dueDate}. Move the project's target first, or bring this in.`;
+}
+
 export async function createDeliverable(input: {
   projectId: string;
   title: string;
@@ -263,6 +293,13 @@ export async function createDeliverable(input: {
   };
 
   return guarded((store) => {
+    const tooLate = dueAfterProject(
+      store,
+      input.projectId,
+      deliverable.dueDate
+    );
+    if (tooLate) return fail<Deliverable>(tooLate);
+
     store.deliverables.push(deliverable);
 
     // Auto-add the owner to the project if they aren't on it.
@@ -1215,8 +1252,21 @@ export async function updateDeliverable(input: {
     if (!deliverable)
       return fail<Deliverable>("That deliverable no longer exists.");
 
+    /*
+      Checked only when the date MOVES, like the project rule it mirrors.
+
+      Every save resends the existing date, so validating unconditionally would
+      let one pre-existing violation freeze the row: renaming a deliverable
+      would fail on a date the person never touched and can't see.
+    */
+    const newDue = input.dueDate || undefined;
+    if (newDue !== deliverable.dueDate) {
+      const tooLate = dueAfterProject(store, deliverable.projectId, newDue);
+      if (tooLate) return fail<Deliverable>(tooLate);
+    }
+
     deliverable.title = title;
-    deliverable.dueDate = input.dueDate || undefined;
+    deliverable.dueDate = newDue;
 
     if (input.ownerId && input.ownerId !== deliverable.ownerId) {
       deliverable.ownerId = input.ownerId;
@@ -1486,6 +1536,35 @@ export async function updateProject(input: {
       if (parent?.targetDate && newTarget > parent.targetDate) {
         return fail<Project>(
           `${parent.name} is due ${parent.targetDate}, so this can't be due ${newTarget}. Move the parent's date first, or bring this one in.`
+        );
+      }
+    }
+
+    /*
+      …and the same check against this project's own deliverables.
+
+      The sub-project loop below catches nested PROJECTS. Without this, pulling
+      a target in would leave the project's own deliverables dated past it —
+      the exact state `createDeliverable` refuses, arriving from the other
+      direction.
+    */
+    if (targetMoved && newTarget) {
+      const lateWork = store.deliverables.filter(
+        (d) =>
+          d.projectId === project.id &&
+          d.status !== "done" &&
+          d.dueDate &&
+          d.dueDate > newTarget
+      );
+      if (lateWork.length > 0) {
+        const names = lateWork
+          .slice(0, 3)
+          .map((d) => `${d.title} (${d.dueDate})`)
+          .join(", ");
+        const rest =
+          lateWork.length > 3 ? ` and ${lateWork.length - 3} more` : "";
+        return fail<Project>(
+          `${lateWork.length} deliverable${lateWork.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${lateWork.length === 1 ? "it" : "them"} in first.`
         );
       }
     }

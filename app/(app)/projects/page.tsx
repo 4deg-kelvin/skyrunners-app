@@ -10,6 +10,7 @@ import {
   HideCompletedToggle,
 } from "@/components/ui/completed-filter";
 import { DivisionExtras } from "@/components/ui/division-extras";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DivisionProjectList } from "@/components/ui/project-tree";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getDivisionExtras } from "@/lib/data/deadlines";
@@ -73,7 +74,7 @@ export default async function ProjectsPage() {
         <PageHeader
           label="All Divisions"
           title="Projects"
-          description="Every project in SkyRunners, grouped by division. Join anything that interests you — no permission needed."
+          description="Everything the club is building, grouped by division. Follow anything to keep an eye on it; to actually join, ask the project's RE — they decide, and the ask is tracked."
           action={
             <div className="flex flex-wrap items-center gap-2">
               {/*
@@ -117,6 +118,55 @@ export default async function ProjectsPage() {
                   team so members can find them.
                 </span>
               </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {/*
+          The first screen of a brand-new club.
+
+          Without this the page rendered an empty div — no divisions, no
+          message, nothing to press. Whoever is setting the club up opens this
+          page first, so it has to say what a division IS and offer the button,
+          rather than looking broken.
+        */}
+        {tree.length === 0 ? (
+          <Card>
+            <CardBody>
+              {mayManageTeams ? (
+                /*
+                  The form itself, not a pointer to it.
+
+                  `EmptyState` requires a next action for good reason, and the
+                  honest action here is the button that fixes the emptiness —
+                  it's already in the page header, but a first-time Co-Lead is
+                  reading the middle of the page, not scanning the corner.
+                */
+                <>
+                  <SectionLabel>Nothing here yet</SectionLabel>
+                  <h2 className="text-ink mt-2 text-xl font-bold">
+                    Start with a division
+                  </h2>
+                  <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                    A division is a top-level part of the club — Airframe,
+                    Avionics, Autonomy — and every project lives inside one.
+                    Create the first, then add projects to it. Members will see
+                    them on Find Work straight away.
+                  </p>
+                  <div className="mt-4">
+                    <CreateTeamForm
+                      divisions={formOptions.divisions}
+                      people={formOptions.people}
+                    />
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  message="The club hasn't set up any divisions yet, so there are no projects to show. A Co-Lead does that, and everything appears here once they have."
+                  actionLabel="See what needs doing"
+                  actionHref="/find-work"
+                />
+              )}
             </CardBody>
           </Card>
         ) : null}
