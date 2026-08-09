@@ -13,16 +13,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
-import { getAllMemberIds, getMemberProfile } from "@/lib/data/members";
+import { getMemberProfile } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber, initials } from "@/lib/utils";
-
-export async function generateStaticParams() {
-  const ids = await getAllMemberIds();
-  return ids.map((id) => ({ id }));
-}
 
 export default async function MemberProfilePage({
   params,

@@ -10,6 +10,16 @@ import { getMyWork } from "@/lib/data/my-work";
  * `/login` when there isn't one — which is why `/login` and `/auth/*` sit
  * OUTSIDE this group.
  */
+/**
+ * Rendered per request, never prerendered.
+ *
+ * Every page in this group resolves a signed-in viewer and reads their club's
+ * live data. Prerendering any of it at build time would bake in whatever
+ * `readStore()` returned with no session — and would serve one person's page to
+ * everybody. There is nothing here that is the same for two users.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children,
 }: {
