@@ -437,6 +437,22 @@ export const can = {
   setProjectTeam: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
+  /**
+   * Editing a deliverable's title or date. Same authority as creating one.
+   */
+  editDeliverable: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /**
+   * Deleting a project.
+   *
+   * `isREofOrAbove` is doing the important work: an RE of a PARENT project can
+   * delete a child, because RE authority inherits down the project tree. An RE
+   * of a sibling cannot, and neither can a plain member.
+   */
+  deleteProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
   /** Divisions and sub-teams are the org's shape — Co-Leads only. */
   manageTeams: (actor: Actor) => isCoLead(actor),
 

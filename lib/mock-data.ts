@@ -1790,8 +1790,10 @@ export function contributionInputsFor(
     deliverablesOpen: mine.filter((d) => d.status !== "done").length,
     deliverablesOverdue: mine.filter(isOverdue).length,
     projectsCompleted: completedProjectIds.size,
-    hoursTotal: workLogs
-      .filter((w) => w.memberId === memberId)
+    // live(), not the seed array. Reading the seed here meant Hours/week sat
+    // at 0.0 no matter how much anyone logged — the same bug Find Work had.
+    hoursTotal: live()
+      .workLogs.filter((w) => w.memberId === memberId)
       .reduce((sum, w) => sum + w.hours, 0),
     updatesDue: myUpdates.length,
     updatesOnTime: myUpdates.filter(

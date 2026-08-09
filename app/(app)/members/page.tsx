@@ -63,7 +63,16 @@ export default async function MembersPage() {
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-sm font-bold text-cardinal-600">
-                      {initials(member.fullName)}
+                      {member.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.photoUrl}
+                    alt=""
+                    className="size-full rounded-full object-cover"
+                  />
+                ) : (
+                  initials(member.fullName)
+                )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">

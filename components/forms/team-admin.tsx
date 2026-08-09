@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 
-import { ActionForm } from "./action-form";
-import { createTeamAction, setProjectTeamAction } from "@/lib/actions";
+import { ActionButton, ActionForm } from "./action-form";
+import {
+  createTeamAction,
+  deleteTeamAction,
+  setProjectTeamAction,
+  updateTeamAction,
+} from "@/lib/actions";
 
 export interface TeamOption {
   id: string;
@@ -23,24 +28,50 @@ export interface TeamOption {
 export function ProjectTeamForm({
   projectId,
   currentTeamId,
+  currentDivisionName,
   teams,
 }: {
   projectId: string;
   currentTeamId?: string;
+  currentDivisionName?: string;
   teams: TeamOption[];
 }) {
+  // Collapsed once it's set. Which division a project belongs to is answered
+  // once and then almost never revisited, so it earns one line — not a card
+  // above the deliverables and the team, which are what people came for.
+  const [open, setOpen] = useState(!currentDivisionName);
+
+  if (!open) {
+    return (
+      <p className="text-sm text-ink-muted">
+        Division:{" "}
+        <span className="font-semibold text-ink">{currentDivisionName}</span>{" "}
+        <button
+          onClick={() => setOpen(true)}
+          className="font-semibold text-cardinal-600 hover:text-cardinal-700"
+        >
+          Change
+        </button>
+      </p>
+    );
+  }
+
   return (
-    <ActionForm
-      action={setProjectTeamAction}
-      submitLabel="Set owning team"
-      submittingLabel="Saving…"
-      className="mt-3"
-    >
-      <input type="hidden" name="projectId" value={projectId} />
-      <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-ink">
-          Owning team
-        </span>
+    <div className="rounded-tile border border-line bg-surface p-3">
+      {!currentDivisionName ? (
+        <p className="mb-2 text-sm text-warn-fg">
+          No division set, so this project doesn&apos;t appear on Projects or
+          Find Work.
+        </p>
+      ) : null}
+
+      <ActionForm
+        action={setProjectTeamAction}
+        submitLabel="Set division"
+        submittingLabel="Saving…"
+        onSuccess={() => setOpen(false)}
+      >
+        <input type="hidden" name="projectId" value={projectId} />
         <select
           name="teamId"
           defaultValue={currentTeamId ?? ""}
@@ -53,12 +84,11 @@ export function ProjectTeamForm({
             </option>
           ))}
         </select>
-      </label>
-      <p className="mb-2 text-xs text-ink-muted">
-        Which division this sits under. Members browse by division, so a project
-        without one is hard to find.
-      </p>
-    </ActionForm>
+        <p className="mb-2 text-xs text-ink-muted">
+          Members browse by division, so a project without one is hard to find.
+        </p>
+      </ActionForm>
+    </div>
   );
 }
 
@@ -139,5 +169,102 @@ export function CreateTeamForm({ divisions }: { divisions: TeamOption[] }) {
         Cancel
       </button>
     </ActionForm>
+  );
+}
+
+/**
+ * Rename a division, move it, or delete it. Co-Leads only.
+ *
+ * Delete is refused while anything still points at it — projects or sub-teams.
+ * Silently reparenting those would scatter work nobody is looking for, which is
+ * the failure this whole app exists to prevent.
+ */
+export function EditTeamForm({
+  team,
+  divisions,
+}: {
+  team: { id: string; name: string; parentId: string | null };
+  divisions: TeamOption[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+      >
+        Edit
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 w-full rounded-tile border border-line bg-surface p-3.5">
+      <ActionForm
+        action={updateTeamAction}
+        submitLabel="Save"
+        submittingLabel="Saving…"
+        onSuccess={() => setOpen(false)}
+      >
+        <input type="hidden" name="teamId" value={team.id} />
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-ink">
+              Name
+            </span>
+            <input
+              type="text"
+              name="name"
+              required
+              defaultValue={team.name}
+              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-ink">
+              Sits under
+            </span>
+            <select
+              name="parentId"
+              defaultValue={team.parentId ?? ""}
+              className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+            >
+              <option value="">Nothing — this is a division</option>
+              {divisions
+                .filter((d) => d.id !== team.id)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="ml-3 mt-3 text-sm font-semibold text-ink-muted hover:text-ink"
+        >
+          Cancel
+        </button>
+      </ActionForm>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+        <ActionButton
+          action={deleteTeamAction}
+          fields={{ teamId: team.id }}
+          label="Delete division"
+          pendingLabel="Deleting…"
+          tone="danger"
+        />
+        <span className="text-xs text-ink-muted">
+          Only once no projects or sub-teams point at it.
+        </span>
+      </div>
+    </div>
   );
 }

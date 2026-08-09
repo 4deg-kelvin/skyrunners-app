@@ -7,6 +7,7 @@ import { ActionButton, ActionForm } from "./action-form";
 import {
   confirmDeliverableAction,
   deleteDeliverableAction,
+  updateDeliverableAction,
   createDeliverableAction,
   reopenDeliverableAction,
   setDeliverableStatusAction,
@@ -36,6 +37,7 @@ export function DeliverableActions({
   canSignOff: boolean;
 }) {
   const [blocking, setBlocking] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [reopening, setReopening] = useState(false);
 
   const { id, projectId, status } = deliverable;
@@ -162,6 +164,76 @@ export function DeliverableActions({
     );
   }
 
+  if (editing) {
+    return (
+      <div className="rounded-tile border border-line bg-surface p-3">
+        <ActionForm
+          action={updateDeliverableAction}
+          submitLabel="Save"
+          submittingLabel="Saving…"
+          onSuccess={() => setEditing(false)}
+        >
+          <input type="hidden" name="deliverableId" value={id} />
+          <input type="hidden" name="projectId" value={projectId} />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-ink">
+                Title
+              </span>
+              <input
+                type="text"
+                name="title"
+                required
+                defaultValue={deliverable.title}
+                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-ink">
+                Due date
+              </span>
+              <input
+                type="date"
+                name="dueDate"
+                defaultValue={deliverable.dueDate ?? ""}
+                className="w-full rounded-tile border border-line bg-card px-3 py-2 text-sm text-ink"
+              />
+            </label>
+          </div>
+
+          <p className="mb-2.5 mt-2 text-xs text-ink-muted">
+            Leave the date empty for no deadline. Dates drive the project&apos;s
+            timeline, so a real one is worth more than a guessed one.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="ml-3 text-sm font-semibold text-ink-muted hover:text-ink"
+          >
+            Cancel
+          </button>
+        </ActionForm>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+          <ActionButton
+            action={deleteDeliverableAction}
+            fields={fields}
+            label="Delete this deliverable"
+            pendingLabel="Deleting…"
+            tone="danger"
+          />
+          <span className="text-xs text-ink-muted">
+            Signed-off work can&apos;t be deleted — it counts towards its
+            owner&apos;s record.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isOwner ? (
@@ -198,18 +270,17 @@ export function DeliverableActions({
       )}
 
       {/*
-        Deleting is the RE's call, and only before sign-off — once something is
-        done it counts towards its owner's record, and removing it would quietly
-        take away work they actually did. The operation refuses that too.
+        Edit rather than a bare Delete. Retitling and re-dating is the ordinary
+        upkeep, and deleting belongs behind it rather than one stray click away
+        from the buttons everybody uses. RE only.
       */}
       {canSignOff ? (
-        <ActionButton
-          action={deleteDeliverableAction}
-          fields={fields}
-          label="Delete"
-          pendingLabel="Deleting…"
-          tone="danger"
-        />
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-tile border border-line px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface"
+        >
+          Edit
+        </button>
       ) : null}
     </div>
   );

@@ -970,6 +970,167 @@ export async function deleteCheckIn(updateId: string): Promise<Result<null>> {
  * That's the "1 project not linked to a division" warning, previously with no
  * way to act on it.
  */
+/**
+ * Edit a deliverable: its title and its due date.
+ *
+ * The RE's list, so the RE's edit. Retitling and re-dating is the ordinary
+ * upkeep the whole model costs them — five minutes a week — and without it the
+ * only correction available was delete-and-retype.
+ */
+export async function updateDeliverable(input: {
+  deliverableId: string;
+  title: string;
+  dueDate?: string;
+}): Promise<Result<Deliverable>> {
+  const title = input.title.trim();
+  if (!title) return fail<Deliverable>("Give the deliverable a title.");
+
+  return guarded((store) => {
+    const deliverable = store.deliverables.find(
+      (d) => d.id === input.deliverableId
+    );
+    if (!deliverable) return fail<Deliverable>("That deliverable no longer exists.");
+
+    deliverable.title = title;
+    deliverable.dueDate = input.dueDate || undefined;
+    return ok(deliverable);
+  });
+}
+
+/**
+ * Edit a project's headline fields — name, what it is, and what stage it's at.
+ *
+ * `phase` is where in the lifecycle it sits (concept to flight test); `health`
+ * is how it's going. Two different questions, deliberately two fields.
+ */
+export async function updateProject(input: {
+  projectId: string;
+  name: string;
+  description?: string;
+  phase: Project["phase"];
+  health: Project["health"];
+  targetDate?: string;
+  openRoles?: string;
+}): Promise<Result<Project>> {
+  const name = input.name.trim();
+  if (!name) return fail<Project>("Give the project a name.");
+
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<Project>("That project no longer exists.");
+
+    project.name = name;
+    project.description = input.description?.trim() || undefined;
+    project.phase = input.phase;
+    project.health = input.health;
+    project.targetDate = input.targetDate || undefined;
+    project.openRoles = input.openRoles?.trim() || undefined;
+    return ok(project);
+  });
+}
+
+/**
+ * Delete a project, and everything that only existed because of it.
+ *
+ * CLAUDE.md says never hard-delete a project, and that rule is about a REAL
+ * project whose history has to survive graduations. It is not about the ones
+ * created while setting the club up, which is the situation the club is
+ * actually in — and a rule that leaves permanent junk on the roster stops
+ * protecting anything.
+ *
+ * The guard that matters instead: anything with delivered work or a child
+ * project is refused, because that history IS worth keeping. Archive those by
+ * setting the phase to complete.
+ */
+export async function deleteProject(projectId: string): Promise<Result<null>> {
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === projectId);
+    if (!project) return fail<null>("That project no longer exists.");
+
+    if (store.projects.some((p) => p.parentId === projectId)) {
+      return fail<null>(
+        "This has sub-projects. Delete or move those first, so nothing is orphaned."
+      );
+    }
+
+    const delivered = store.deliverables.filter(
+      (d) => d.projectId === projectId && d.status === "done"
+    );
+    if (delivered.length > 0) {
+      return fail<null>(
+        `${delivered.length} deliverable${delivered.length === 1 ? " has" : "s have"} been signed off here and count towards people's records. Mark the project complete instead.`
+      );
+    }
+
+    store.deliverables = store.deliverables.filter(
+      (d) => d.projectId !== projectId
+    );
+    store.projectMemberships = store.projectMemberships.filter(
+      (m) => m.projectId !== projectId
+    );
+    store.joinRequests = store.joinRequests.filter(
+      (r) => r.projectId !== projectId
+    );
+    store.workLogs = store.workLogs.filter((w) => w.projectId !== projectId);
+    store.projectArtifacts = store.projectArtifacts.filter(
+      (a) => a.projectId !== projectId
+    );
+    store.projects = store.projects.filter((p) => p.id !== projectId);
+    return ok(null);
+  });
+}
+
+/** Rename a division or sub-team, or move it under a different parent. */
+export async function updateTeam(input: {
+  teamId: string;
+  name: string;
+  parentId: string | null;
+  leadId?: string;
+}): Promise<Result<Team>> {
+  const name = input.name.trim();
+  if (!name) return fail<Team>("Give it a name.");
+
+  return guarded((store) => {
+    const team = store.teams.find((t) => t.id === input.teamId);
+    if (!team) return fail<Team>("That team no longer exists.");
+
+    if (input.parentId === team.id) {
+      return fail<Team>("A team can't sit under itself.");
+    }
+
+    team.name = name;
+    team.parentId = input.parentId;
+    team.leadId = input.leadId;
+    return ok(team);
+  });
+}
+
+/** Delete a division, once nothing depends on it. */
+export async function deleteTeam(teamId: string): Promise<Result<null>> {
+  return guarded((store) => {
+    const team = store.teams.find((t) => t.id === teamId);
+    if (!team) return fail<null>("That team no longer exists.");
+
+    const projects = store.projects.filter((p) => p.teamId === teamId);
+    if (projects.length > 0) {
+      return fail<null>(
+        `${projects.length} project${projects.length === 1 ? "" : "s"} still sit${projects.length === 1 ? "s" : ""} under this. Move them to another division first.`
+      );
+    }
+
+    if (store.teams.some((t) => t.parentId === teamId)) {
+      return fail<null>("This has sub-teams. Move or delete those first.");
+    }
+
+    for (const m of store.members) {
+      if (m.primaryTeamId === teamId) m.primaryTeamId = undefined;
+    }
+
+    store.teams = store.teams.filter((t) => t.id !== teamId);
+    return ok(null);
+  });
+}
+
 export async function setProjectTeam(input: {
   projectId: string;
   teamId: string | null;

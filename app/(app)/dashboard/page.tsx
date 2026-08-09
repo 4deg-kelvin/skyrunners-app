@@ -109,7 +109,7 @@ export default async function DashboardPage() {
                     Cycle summary
                   </h2>
                   <p className="mt-2 text-[15px] text-ink-soft">
-                    Compliance, effort and project health for the{" "}
+                    Compliance, effort and project health for you and the{" "}
                     {counts.peopleOverseen}{" "}
                     {counts.peopleOverseen === 1 ? "person" : "people"} you
                     oversee — not the whole club.
@@ -301,7 +301,7 @@ export default async function DashboardPage() {
                   Today&apos;s check-in
                 </h3>
                 <p className="mt-1.5 text-sm text-ink-soft">
-                  Members submit three updates a week on the days they choose.
+                  Members submit twice a week on the days they choose.
                   This window closes at 11:59 PM.
                 </p>
 

@@ -53,6 +53,15 @@ export interface ProjectTreeNode {
   /** Committed members only — following doesn't count as staffing. */
   memberCount: number;
   progress: ReturnType<typeof projectProgress>;
+  /**
+   * Deliverables somebody has marked blocked.
+   *
+   * Separate from `project.health`, which is the RE's own judgement and only
+   * changes when they update it. Someone marking their work blocked is a fact,
+   * and it needs to reach the page people browse — otherwise the person who
+   * could unblock them never finds out.
+   */
+  blockedCount: number;
   children: ProjectTreeNode[];
 }
 
@@ -70,6 +79,9 @@ function buildNode(project: Project): ProjectTreeNode {
       (pm) => pm.commitment === "committed"
     ).length,
     progress: projectProgress(project.id),
+    blockedCount: projectDeliverables(project.id).filter(
+      (d) => d.status === "blocked"
+    ).length,
     children: childProjects(project.id).map(buildNode),
   };
 }

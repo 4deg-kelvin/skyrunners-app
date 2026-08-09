@@ -68,7 +68,16 @@ export default async function MemberProfilePage({
 
             <div className="mt-5 flex items-center gap-4">
               <span className="flex size-[72px] shrink-0 items-center justify-center rounded-full bg-cardinal-50 text-2xl font-bold text-cardinal-600">
-                {initials(member.fullName)}
+                {member.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.photoUrl}
+                    alt=""
+                    className="size-full rounded-full object-cover"
+                  />
+                ) : (
+                  initials(member.fullName)
+                )}
               </span>
               <ContactLink member={member} />
             </div>

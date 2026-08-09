@@ -160,6 +160,17 @@ export async function getDashboard(
 
   const overseenIds = new Set(overseen.map((m) => m.id));
 
+  /**
+   * The same people, plus you.
+   *
+   * `overseen` deliberately excludes the viewer — it answers "who do I look
+   * after". But the operational numbers below are about the team's week, and
+   * leaving yourself out of them meant a Co-Lead who was the only person
+   * logging hours saw 0.0 hours and an empty check-in panel. It read as broken,
+   * and it was wrong: you're part of the team you run.
+   */
+  const countedIds = new Set([...overseenIds, actor.id]);
+
   // Reports written to the viewer personally — their direct reports only. A
   // Lead two levels up sees the escalation instead, not the raw report, so the
   // obligation stays with exactly one person.
@@ -221,7 +232,7 @@ export async function getDashboard(
 
   // Compliance across the people the viewer oversees. Counting the whole club
   // would tell a Lead nothing about whether THEIR people are keeping up.
-  const scopedUpdates = progressUpdates.filter((u) => overseenIds.has(u.memberId));
+  const scopedUpdates = progressUpdates.filter((u) => countedIds.has(u.memberId));
   const onTime = scopedUpdates.filter(
     (u) => u.status === "submitted" || u.status === "reviewed"
   ).length;
@@ -235,7 +246,7 @@ export async function getDashboard(
 
   const weekStart = startOfWeek(today());
   const hoursThisWeek = workLogs
-    .filter((w) => overseenIds.has(w.memberId) && w.workDate >= weekStart)
+    .filter((w) => countedIds.has(w.memberId) && w.workDate >= weekStart)
     .reduce((sum, w) => sum + w.hours, 0);
 
   const flaggedProjects: FlaggedProject[] = atRiskProjects().map((project) => ({
