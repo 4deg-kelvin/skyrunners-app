@@ -260,20 +260,44 @@ export default async function MyWorkPage() {
         <CardBody>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <SectionLabel>Update Due</SectionLabel>
+              <SectionLabel>
+                {currentUpdate.inSession ? "Update Due" : "Out Of Session"}
+              </SectionLabel>
               <h2 className="mt-2 text-2xl font-bold text-ink">
-                {dueDate.toLocaleDateString("en-US", { weekday: "long" })}{" "}
-                check-in
+                {currentUpdate.inSession
+                  ? `${dueDate.toLocaleDateString("en-US", { weekday: "long" })} check-in`
+                  : "Nothing due right now"}
               </h2>
+              {/*
+                Saying WHY matters. A page that just shows no obligation reads
+                as broken; "no check-ins during Winter break" reads as the club
+                working as intended. Same reasoning as the academic pause.
+              */}
               <p className="mt-2 max-w-2xl text-[15px] text-ink-soft">
-                {currentUpdate.updatesPerWeek} a week, on the days you picked.
-                Your hours and open deliverables are already filled in — write a
-                line under each project so your RE knows where things stand.
+                {currentUpdate.inSession ? (
+                  <>
+                    {currentUpdate.updatesPerWeek} a week, on the days you
+                    picked. Your hours and open deliverables are already filled
+                    in — write a line under each project so your RE knows where
+                    things stand.
+                  </>
+                ) : (
+                  <>
+                    No check-ins are generated during{" "}
+                    {currentUpdate.termName ?? "this period"} — nothing counts
+                    against you and there&apos;s no backlog waiting. You can
+                    still log hours and write one if you want to.
+                  </>
+                )}
               </p>
             </div>
-            <Badge tone={UPDATE_STATUS_TONES[currentUpdate.update.status]}>
-              {UPDATE_STATUS_LABELS[currentUpdate.update.status]}
-            </Badge>
+            {currentUpdate.inSession ? (
+              <Badge tone={UPDATE_STATUS_TONES[currentUpdate.update.status]}>
+                {UPDATE_STATUS_LABELS[currentUpdate.update.status]}
+              </Badge>
+            ) : (
+              <Badge tone="neutral">Paused</Badge>
+            )}
           </div>
 
           <div className="mt-6 space-y-3">

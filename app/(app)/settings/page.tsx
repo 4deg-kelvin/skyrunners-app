@@ -1,27 +1,43 @@
-import { Info } from "lucide-react";
+import { Info, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
+import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
 import { getSettings } from "@/lib/data/settings";
 import { getViewer } from "@/lib/data/viewer";
+import { TERM_KIND_LABELS } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 
 export const metadata = {
   title: "Settings · SkyRunners HQ",
 };
 
+/** "Sep 21 – Dec 4, 2026" — parsed as UTC so the day never shifts by timezone. */
+function termRange(startsOn: string, endsOn: string): string {
+  const fmt = (iso: string, withYear: boolean) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(withYear ? { year: "numeric" as const } : {}),
+      timeZone: "UTC",
+    });
+  return `${fmt(startsOn, false)} – ${fmt(endsOn, true)}`;
+}
+
 export default async function SettingsPage() {
   const viewer = await getViewer();
   const view = await getSettings(viewer.member.id);
-  const { schedule, currentTerm, inSession } = view;
+  const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
   const mayEdit = can.setOwnSchedule(viewer.actor, viewer.member.id);
+  const mayEditCalendar = can.manageTerms(viewer.actor);
   const isPaused = !!schedule.pausedUntil;
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -128,10 +144,14 @@ export default async function SettingsPage() {
         </CardBody>
       </Card>
 
-      {/* Academic calendar context */}
+      {/* Academic calendar */}
       <Card>
         <CardBody>
-          <SectionLabel>Academic Calendar</SectionLabel>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionLabel>Academic Calendar</SectionLabel>
+            {mayEditCalendar ? <AddTermForm /> : null}
+          </div>
+
           {currentTerm ? (
             <>
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -149,11 +169,74 @@ export default async function SettingsPage() {
               </p>
             </>
           ) : (
-            <p className="mt-3 text-[15px] text-ink-soft">
-              No term is set for today. A Co-Lead needs to add the academic
-              calendar before check-ins start generating.
+            /*
+              Two different nothings, and they need different messages.
+              An empty calendar is a club that hasn't been set up. A calendar
+              that has RUN OUT is the quiet failure: somebody entered the year
+              in September, it expired in June, and from then on no check-in is
+              ever due again and the app just looks broken.
+            */
+            <p className="mt-3 flex items-start gap-2 text-[15px] text-warn-fg">
+              <TriangleAlert className="mt-1 size-4 shrink-0" />
+              <span>
+                {calendarRunsOut
+                  ? "The calendar has run out — the last period ended before today, so no check-ins are being generated for anyone."
+                  : "No period covers today, so no check-ins are being generated."}{" "}
+                {mayEditCalendar
+                  ? "Add the quarters, finals weeks and breaks below."
+                  : "A Co-Lead needs to add the academic calendar."}
+              </span>
             </p>
           )}
+
+          {terms.length > 0 ? (
+            <div className="mt-5 space-y-2.5">
+              {terms.map((term) => {
+                const isNow =
+                  term.startsOn <= todayIso && todayIso <= term.endsOn;
+                const isPast = term.endsOn < todayIso;
+
+                return (
+                  <div
+                    key={term.id}
+                    className={`rounded-tile border px-4 py-3 ${
+                      isNow ? "border-cardinal-600" : "border-line"
+                    } ${isPast ? "opacity-60" : ""}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[15px] font-bold text-ink">
+                            {term.name}
+                          </span>
+                          <Badge tone="neutral">
+                            {TERM_KIND_LABELS[term.kind]}
+                          </Badge>
+                          {isNow ? <Badge tone="cardinal">Now</Badge> : null}
+                          {term.generatesObligations ? (
+                            <Badge tone="ok">Check-ins run</Badge>
+                          ) : (
+                            <Badge tone="neutral">Paused</Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-ink-muted">
+                          {termRange(term.startsOn, term.endsOn)}
+                        </p>
+                      </div>
+                      {mayEditCalendar ? <EditTermForm term={term} /> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {mayEditCalendar ? (
+            <p className="mt-4 text-sm text-ink-muted">
+              This table is what stops finals week generating a wall of missed
+              check-ins for everyone. Keep it a year ahead.
+            </p>
+          ) : null}
         </CardBody>
       </Card>
     </div>

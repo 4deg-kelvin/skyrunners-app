@@ -68,6 +68,7 @@ const liveSnapshot = {
   events: [],
   projectArtifacts: [],
   projectNotices: [],
+  helpRequests: [],
 };
 
 describe("mutate resolves the backend inside the request", () => {

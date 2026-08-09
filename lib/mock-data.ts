@@ -1759,14 +1759,25 @@ export function currentUpdateFor(memberId: string): ProgressUpdate {
   const latest = [...mine].sort((a, b) => b.dueAt.localeCompare(a.dueAt))[0];
   if (latest) return latest;
 
-  // Nothing on record — a brand-new member on a clean database. Synthesise a
-  // pending obligation so My Work renders and the composer has somewhere to
-  // write, rather than crashing on an empty club.
+  /*
+    Nothing on record — a brand-new member, or a clean database.
+
+    Synthesise a pending obligation so My Work renders and the composer has
+    somewhere to write. But ONLY in session: outside a quarter this is the line
+    that would invent a check-in obligation over winter break, for every member
+    with no history, on a day the club has explicitly paused. The terms table
+    exists to prevent exactly that, and it can't if the fallback ignores it.
+
+    Out of session the obligation is `reviewed` rather than `pending`: it's a
+    placeholder the UI can render, and nothing about it is owed.
+  */
+  const dueToday = inSession(today());
+
   return {
     id: `pending-${memberId}`,
     memberId,
     dueAt: `${today()}T23:59`,
-    status: "pending",
+    status: dueToday ? "pending" : "reviewed",
     entries: [],
     hoursThisPeriod: 0,
   };
@@ -1960,6 +1971,17 @@ export function projectUpdateFeed(projectId: string) {
 }
 
 /** Blockers across a member's projects — what a Lead most needs to see. */
+export function helpRequestById(id: string) {
+  return live().helpRequests.find((h) => h.id === id);
+}
+
+/** Every free-form ask, newest first. The board re-sorts by age. */
+export function helpRequests() {
+  return [...live().helpRequests].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
+}
+
 export function openBlockers() {
   return live().progressUpdates
     .filter((u) => u.submittedAt)

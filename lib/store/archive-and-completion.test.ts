@@ -578,3 +578,365 @@ describe("check-in days can be any day of the week", () => {
     assert.equal((await pick(1, 1)).ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 — the academic calendar
+// ---------------------------------------------------------------------------
+
+describe("the academic calendar", () => {
+  /*
+    The seed calendar, for reference:
+      Summer 2026    2026-06-15 → 2026-09-20   no obligations
+      Autumn 2026    2026-09-21 → 2026-12-04   obligations
+      Autumn finals  2026-12-05 → 2026-12-12   no obligations
+      Winter break   2026-12-13 → 2027-01-04   no obligations
+      Winter 2027    2027-01-05 → 2027-03-19   obligations
+  */
+  function termNamed(name: string) {
+    return disk.readStore().terms.find((t) => t.name === name);
+  }
+
+  /** Same lookup, but for the cases that would be meaningless if it missed. */
+  function requireTerm(name: string) {
+    const found = termNamed(name);
+    if (!found) throw new Error(`No such term in the seed: ${name}`);
+    return found;
+  }
+
+  test("a quarter generates obligations by default", async () => {
+    const result = await ops.createTerm({
+      name: "Spring 2027",
+      kind: "quarter",
+      startsOn: "2027-03-29",
+      endsOn: "2027-06-09",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Spring 2027")?.generatesObligations, true);
+  });
+
+  test("finals, breaks and summer do not", async () => {
+    const kinds = [
+      ["finals", "Spring finals"],
+      ["break", "Spring break"],
+      ["summer", "Summer 2027"],
+    ] as const;
+
+    // The mistake this default exists to prevent is a finals week that still
+    // generates check-ins — nudges landing on students mid-finals.
+    let cursor = 20;
+    for (const [kind, name] of kinds) {
+      const result = await ops.createTerm({
+        name,
+        kind,
+        startsOn: `2027-06-${cursor}`,
+        endsOn: `2027-06-${cursor + 2}`,
+      });
+      assert.equal(result.ok, true, name);
+      assert.equal(termNamed(name)?.generatesObligations, false, name);
+      cursor += 4;
+    }
+  });
+
+  test("the default can be overridden deliberately", async () => {
+    const result = await ops.createTerm({
+      name: "Summer build",
+      kind: "summer",
+      startsOn: "2027-07-01",
+      endsOn: "2027-08-31",
+      generatesObligations: true,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Summer build")?.generatesObligations, true);
+  });
+
+  test("overlapping periods are refused, and the message names the clash", async () => {
+    // `termFor(date)` returns the FIRST match, so two periods covering one day
+    // would make "are check-ins due today" depend on insertion order.
+    const result = await ops.createTerm({
+      name: "Overlaps autumn",
+      kind: "quarter",
+      startsOn: "2026-12-01",
+      endsOn: "2026-12-20",
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /Autumn/i);
+  });
+
+  test("touching but not overlapping is fine", async () => {
+    // Winter 2027 ends 2027-03-19. Starting on the 20th must be allowed, or
+    // the calendar can never be filled in without gaps.
+    const result = await ops.createTerm({
+      name: "Day after winter",
+      kind: "break",
+      startsOn: "2027-03-20",
+      endsOn: "2027-03-28",
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("an end before the start is refused", async () => {
+    const result = await ops.createTerm({
+      name: "Backwards",
+      kind: "quarter",
+      startsOn: "2027-05-01",
+      endsOn: "2027-04-01",
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("a nameless period is refused", async () => {
+    const result = await ops.createTerm({
+      name: "   ",
+      kind: "quarter",
+      startsOn: "2027-05-01",
+      endsOn: "2027-06-01",
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("editing a period can keep its own dates", async () => {
+    // The overlap check has to ignore the row being edited, or renaming a term
+    // without touching its dates would fail against itself.
+    const autumn = requireTerm("Autumn 2026");
+    const result = await ops.updateTerm({
+      termId: autumn.id,
+      name: "Autumn Quarter 2026",
+      kind: "quarter",
+      startsOn: autumn.startsOn,
+      endsOn: autumn.endsOn,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(termNamed("Autumn Quarter 2026")?.startsOn, autumn.startsOn);
+  });
+
+  test("editing into somebody else's dates is still refused", async () => {
+    const autumn = requireTerm("Autumn 2026");
+    const result = await ops.updateTerm({
+      termId: autumn.id,
+      name: "Autumn 2026",
+      kind: "quarter",
+      startsOn: "2026-12-01",
+      endsOn: "2026-12-31", // runs over finals and into the break
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("the period covering today cannot be deleted", async () => {
+    // Removing it would move everyone's obligations with no visible cause.
+    const summer = requireTerm("Summer 2026");
+    const result = await ops.deleteTerm(summer.id, "2026-08-10");
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /covers today/i);
+  });
+
+  test("any other period can be", async () => {
+    const winter = requireTerm("Winter 2027");
+    assert.equal((await ops.deleteTerm(winter.id, "2026-08-10")).ok, true);
+    assert.equal(termNamed("Winter 2027"), undefined);
+  });
+
+  test("an unknown id fails rather than throwing", async () => {
+    assert.equal((await ops.deleteTerm("nope", "2026-08-10")).ok, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 — the blocker board
+// ---------------------------------------------------------------------------
+
+describe("asking for help", () => {
+  const ASKER = "m-tyler";
+  const HELPER = "m-sofia";
+
+  async function ask(title = "Need an Onshape hand", projectId?: string) {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title,
+      detail: "Mate constraints keep over-defining.",
+      projectId,
+      today: TODAY,
+    });
+    if (!result.ok) throw new Error(result.error);
+    return result.value;
+  }
+
+  function stored(id: string) {
+    return disk.readStore().helpRequests.find((h) => h.id === id);
+  }
+
+  test("anyone can post one, with no project", async () => {
+    // The case the board exists for: a member waiting on a join request has
+    // nowhere else to put a question.
+    const request = await ask();
+    assert.equal(stored(request.id)?.title, "Need an Onshape hand");
+    assert.equal(stored(request.id)?.projectId, undefined);
+  });
+
+  test("it can be attached to a project", async () => {
+    const request = await ask("CFD question", "p-wing-spar");
+    assert.equal(stored(request.id)?.projectId, "p-wing-spar");
+  });
+
+  test("a project that doesn't exist is refused", async () => {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "Question",
+      projectId: "not-a-project",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("an empty title is refused", async () => {
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "   ",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("a title longer than a line is refused", async () => {
+    // The title is what people scan on the board; past a line it stops being
+    // scannable and the detail field is right there.
+    const result = await ops.postHelpRequest({
+      memberId: ASKER,
+      title: "x".repeat(161),
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("somebody else can answer it", async () => {
+    const request = await ask();
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "Fully define the sketch first.",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(stored(request.id)?.replies.length, 1);
+    assert.equal(stored(request.id)?.replies[0].memberId, HELPER);
+  });
+
+  test("an empty answer is refused", async () => {
+    const request = await ask();
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "  ",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("resolving records who and how", async () => {
+    const request = await ask();
+    const result = await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      note: "Sofia walked me through it.",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, true);
+    const saved = stored(request.id);
+    assert.equal(saved?.resolvedAt, TODAY);
+    assert.equal(saved?.resolvedById, HELPER);
+    assert.equal(saved?.resolutionNote, "Sofia walked me through it.");
+  });
+
+  test("a resolved ask is kept, not deleted", async () => {
+    // The note on how it got sorted is the useful half — it's how the next
+    // person with the same problem finds the answer.
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+    assert.ok(stored(request.id), "the row must survive being resolved");
+  });
+
+  test("answering a sorted one is refused", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+
+    const result = await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "One more thing",
+      today: TODAY,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("resolving twice is refused", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      today: TODAY,
+    });
+    const again = await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: ASKER,
+      today: TODAY,
+    });
+    assert.equal(again.ok, false);
+  });
+
+  test("reopening clears the resolution", async () => {
+    const request = await ask();
+    await ops.resolveHelpRequest({
+      requestId: request.id,
+      resolvedById: HELPER,
+      note: "Sorted",
+      today: TODAY,
+    });
+
+    assert.equal((await ops.reopenHelpRequest(request.id)).ok, true);
+    const saved = stored(request.id);
+    assert.equal(saved?.resolvedAt, undefined);
+    assert.equal(saved?.resolvedById, undefined);
+    assert.equal(saved?.resolutionNote, undefined);
+  });
+
+  test("deleting takes the replies with it", async () => {
+    const request = await ask();
+    await ops.replyToHelpRequest({
+      requestId: request.id,
+      memberId: HELPER,
+      body: "Try this",
+      today: TODAY,
+    });
+
+    assert.equal((await ops.deleteHelpRequest(request.id)).ok, true);
+    assert.equal(stored(request.id), undefined);
+  });
+
+  test("unknown ids fail rather than throwing", async () => {
+    assert.equal((await ops.reopenHelpRequest("nope")).ok, false);
+    assert.equal((await ops.deleteHelpRequest("nope")).ok, false);
+    assert.equal(
+      (
+        await ops.resolveHelpRequest({
+          requestId: "nope",
+          resolvedById: HELPER,
+          today: TODAY,
+        })
+      ).ok,
+      false
+    );
+  });
+});

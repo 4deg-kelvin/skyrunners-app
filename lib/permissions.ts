@@ -544,6 +544,41 @@ export const can = {
 
   /** Co-Leads manage the academic calendar that gates all obligations. */
   manageTerms: (actor: Actor) => isCoLead(actor),
+
+  // --- The blocker board ------------------------------------------------
+
+  /**
+   * Post an ask, or answer somebody else's.
+   *
+   * Unconditional for a signed-in member, like `followProject`. The board
+   * exists BECAUSE membership is RE-controlled: it's the route to being useful
+   * that doesn't wait on one person's inbox. Gating who may answer would
+   * rebuild that bottleneck one level up, and "anyone can answer, not just
+   * leadership" is the phase's stated point.
+   */
+  postHelpRequest: () => true,
+  replyToHelpRequest: () => true,
+
+  /**
+   * Mark an ask sorted.
+   *
+   * The asker, whoever replied to it, or leadership. Not "anyone", because a
+   * passer-by closing somebody's open question makes the board lie — but
+   * restricting it to the asker alone strands every ask from someone who got
+   * their answer elsewhere and never came back.
+   */
+  resolveHelpRequest: (
+    actor: Actor,
+    askerId: string,
+    replierIds: string[]
+  ) =>
+    isSelf(actor, askerId) ||
+    replierIds.includes(actor.id) ||
+    isCoLead(actor),
+
+  /** Your own ask, or a Co-Lead clearing up. */
+  deleteHelpRequest: (actor: Actor, askerId: string) =>
+    isSelf(actor, askerId) || isCoLead(actor),
 };
 
 /**

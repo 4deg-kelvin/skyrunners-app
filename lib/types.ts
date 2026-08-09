@@ -235,6 +235,62 @@ export interface ProjectNotice {
 }
 
 // ---------------------------------------------------------------------------
+// Asking for help — the blocker board
+// ---------------------------------------------------------------------------
+
+/**
+ * A free-form "I need help with this" post.
+ *
+ * The blocker board is mostly automatic: a deliverable marked blocked, or a
+ * blocker written in a check-in, appears there without anyone posting. This is
+ * the third source — the ask that fits neither, and the one that matters most
+ * now that joining a project goes through an RE.
+ *
+ * Without it, a member whose join request is sitting unanswered has exactly one
+ * route to being useful and it waits on one person's inbox. "Does anyone know
+ * Onshape well enough to look at this?" needs somewhere to go that isn't a
+ * project they haven't been added to.
+ *
+ * **Anyone can answer**, deliberately, not just leadership. The whole point is
+ * a second route; routing it back through the same people would rebuild the
+ * bottleneck one level up.
+ */
+export interface HelpRequest {
+  id: string;
+  /** Who is stuck. */
+  memberId: string;
+  title: string;
+  detail?: string;
+  /** Optional — plenty of asks aren't about a specific project. */
+  projectId?: string;
+  createdAt: string;
+  /** Set when it stops needing attention. Kept, not deleted. */
+  resolvedAt?: string;
+  /** Who marked it resolved. May be the asker or whoever helped. */
+  resolvedById?: string;
+  /** How it got unstuck, in a line. The part worth reading later. */
+  resolutionNote?: string;
+  replies: HelpReply[];
+}
+
+export interface HelpReply {
+  id: string;
+  requestId: string;
+  memberId: string;
+  body: string;
+  createdAt: string;
+}
+
+/**
+ * An ask older than this is failing, whoever it belongs to.
+ *
+ * Same reasoning as `JOIN_REQUEST_STALE_DAYS` and the review escalation: age,
+ * not count. "Nobody has answered Kenji in 6 days" names one person and is
+ * actionable; "14 open blockers" is a number you learn to scroll past.
+ */
+export const HELP_REQUEST_STALE_DAYS = 3;
+
+// ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------
 

@@ -35,9 +35,19 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { COLLECTIONS } from "./mapping.ts";
+import {
+  COLLECTIONS,
+  HELP_REPLY_COLUMNS,
+  helpReplyFromRow,
+  helpReplyToRow,
+} from "./mapping.ts";
 import type { StoreShape } from "./disk.ts";
-import type { ProgressUpdate, UpdateEntry } from "../types.ts";
+import type {
+  HelpReply,
+  HelpRequest,
+  ProgressUpdate,
+  UpdateEntry,
+} from "../types.ts";
 
 /** Columns for the entries table, which has no collection of its own. */
 const ENTRY_COLUMNS =
@@ -80,6 +90,7 @@ export async function loadSnapshot(
   const results = await Promise.all([
     ...COLLECTIONS.map((c) => supabase.from(c.table).select(c.columns)),
     supabase.from("update_entries").select(ENTRY_COLUMNS),
+    supabase.from("help_replies").select(HELP_REPLY_COLUMNS),
   ]);
 
   const failed = results.find((r) => r.error);
@@ -110,6 +121,23 @@ export async function loadSnapshot(
   }
   for (const update of snapshot.progressUpdates as ProgressUpdate[]) {
     update.entries = entriesByUpdate.get(update.id) ?? [];
+  }
+
+  // --- and the same for a help request's replies ---------------------------
+  const replyRows = (results[COLLECTIONS.length + 1].data ??
+    []) as Record<string, unknown>[];
+  const repliesByRequest = new Map<string, HelpReply[]>();
+  for (const row of replyRows) {
+    const reply = helpReplyFromRow(row);
+    const list = repliesByRequest.get(reply.requestId);
+    if (list) list.push(reply);
+    else repliesByRequest.set(reply.requestId, [reply]);
+  }
+  for (const request of snapshot.helpRequests as HelpRequest[]) {
+    // Oldest first: a thread reads top to bottom.
+    request.replies = (repliesByRequest.get(request.id) ?? []).sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt)
+    );
   }
 
   // --- derive project.reIds from memberships -------------------------------
@@ -238,6 +266,39 @@ export async function persistDiff(
       .in("id", goneEntries);
     if (error) {
       throw new Error(`Deleting update_entries failed: ${error.message}`);
+    }
+  }
+
+  // --- help replies --------------------------------------------------------
+  //
+  // Same shape as update entries: carried inline on the request, stored in
+  // their own table, so they diff flat.
+  const wasReplies = new Map(
+    before.helpRequests.flatMap((h) => h.replies.map((r) => [r.id, r]))
+  );
+  const nowReplies = new Map(
+    after.helpRequests.flatMap((h) => h.replies.map((r) => [r.id, r]))
+  );
+
+  const replyUpserts = [...nowReplies.values()].filter((r) => {
+    const prev = wasReplies.get(r.id);
+    return !prev || !sameRow(helpReplyToRow(prev), helpReplyToRow(r));
+  });
+  if (replyUpserts.length > 0) {
+    const { error } = await supabase
+      .from("help_replies")
+      .upsert(replyUpserts.map(helpReplyToRow));
+    if (error) throw new Error(`Saving help_replies failed: ${error.message}`);
+  }
+
+  const goneReplies = [...wasReplies.keys()].filter((id) => !nowReplies.has(id));
+  if (goneReplies.length > 0) {
+    const { error } = await supabase
+      .from("help_replies")
+      .delete()
+      .in("id", goneReplies);
+    if (error) {
+      throw new Error(`Deleting help_replies failed: ${error.message}`);
     }
   }
 
