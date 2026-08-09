@@ -1769,7 +1769,7 @@ export function contributionInputsFor(
   activeWeeks = 10
 ): ContributionInputs {
   const mine = myDeliverables(memberId);
-  const committed = projectMemberships.filter(
+  const committed = live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
   );
 
@@ -1780,7 +1780,7 @@ export function contributionInputsFor(
       .filter((pid) => getProject(pid)?.phase === "complete")
   );
 
-  const myUpdates = progressUpdates.filter((u) => u.memberId === memberId);
+  const myUpdates = live().progressUpdates.filter((u) => u.memberId === memberId);
   const schedule = scheduleFor(memberId);
 
   return {
@@ -1939,17 +1939,18 @@ export function openBlockers() {
  * here first.
  */
 export function updateCompliance() {
-  const onTime = progressUpdates.filter(
+  const all = live().progressUpdates;
+  const onTime = all.filter(
     (u) => u.status === "submitted" || u.status === "reviewed"
   ).length;
-  const late = progressUpdates.filter((u) => u.status === "late").length;
-  const missed = progressUpdates.filter((u) => u.status === "missed").length;
-  const pending = progressUpdates.filter((u) => u.status === "pending").length;
+  const late = all.filter((u) => u.status === "late").length;
+  const missed = all.filter((u) => u.status === "missed").length;
+  const pending = all.filter((u) => u.status === "pending").length;
 
   const resolved = onTime + late + missed;
 
   return {
-    total: progressUpdates.length,
+    total: all.length,
     resolved,
     onTime,
     late,

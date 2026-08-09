@@ -79,7 +79,8 @@ Start here, in this order:
 
 | Doc | What it's for |
 |---|---|
-| **[`docs/STATUS.md`](docs/STATUS.md)** | **What's built, what's blocked. Read this first** |
+| **[`docs/HANDOFF.md`](docs/HANDOFF.md)** | **Start here — state, hard-won gotchas, what's next** |
+| [`docs/STATUS.md`](docs/STATUS.md) | What's built and what's blocked |
 | [`CLAUDE.md`](CLAUDE.md) | Architecture and the traps most likely to bite you |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setup, git workflow, the seven rules |
 | [`docs/PHASE_PLAN.md`](docs/PHASE_PLAN.md) | Roadmap, and what's deliberately not planned |

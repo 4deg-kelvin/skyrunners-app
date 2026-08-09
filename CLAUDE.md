@@ -17,7 +17,8 @@ those three.
 | Doc | Contents |
 |---|---|
 | `CONTRIBUTING.md` | Setup, git workflow, the seven rules |
-| `docs/STATUS.md` | **What is built, what is blocked, and on exactly what. Read first** |
+| `docs/HANDOFF.md` | **Start here. Current state, the bugs that cost most, what's next** |
+| `docs/STATUS.md` | What is built and what is blocked |
 | `docs/PHASE_PLAN.md` | Roadmap and what is deliberately not planned |
 | `docs/INFRA.md` | **Everything server/database/deploy — the doc for Kelvin and his agent** |
 | `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |

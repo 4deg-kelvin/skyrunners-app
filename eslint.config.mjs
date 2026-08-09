@@ -24,6 +24,11 @@ const config = [
       ".claude/**",
       "next-env.d.ts",
       "supabase/**",
+      // Dev tooling run directly by node, not part of the app build. It talks
+      // to Postgres through `pg`, a --no-save install with no types, so the
+      // app's strictness would only produce noise here. Also excluded from
+      // tsconfig for the same reason.
+      "scripts/**",
     ],
   },
   {
