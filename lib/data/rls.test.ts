@@ -116,3 +116,92 @@ describe("cascade deletes have a policy behind them", () => {
     assert.match(sql, /create policy \w+ on profiles\s+for delete/);
   });
 });
+
+/**
+ * The other half of the same problem, and the half that keeps recurring.
+ *
+ * A missing policy is one failure. The commoner one is a policy that was
+ * CORRECT when it was written and got left behind when the feature grew a new
+ * audience — `events_write` said `auth_is_leadership()` from 0007, when the
+ * calendar was a leadership noticeboard, and stayed that way through 0018
+ * making it something members create and RSVP to. Three app-permitted actions
+ * were refused by the database, and only one of them had ever been clicked.
+ *
+ * There is no general way to check a policy's condition against
+ * `lib/permissions.ts` from here — they're different languages expressing
+ * different shapes. What IS checkable is the specific places we know members
+ * act, which is where the mismatch has actually bitten.
+ */
+describe("members can do the member-facing things", () => {
+  const sql = allMigrationSql();
+
+  /**
+   * Policies that can write to a table, with their conditions.
+   *
+   * Note the doubled backslashes: this is a template literal, and `\b` in one
+   * is a BACKSPACE character rather than a word boundary. Written singly the
+   * pattern matches nothing, every assertion below fails, and the obvious
+   * conclusion — "the policies are missing" — is wrong.
+   */
+  function writePolicies(table: string): string {
+    return [
+      ...sql.matchAll(
+        new RegExp(
+          `create policy \\w+ on ${table}\\s+for (all|insert|update)\\b([\\s\\S]*?);`,
+          "g"
+        )
+      ),
+    ]
+      .map((m) => m[0])
+      .join("\n");
+  }
+
+  test("RSVP isn't leadership-only", () => {
+    /*
+      The reported bug: a member pressed "I'll be there" and got "Saving events
+      changed nothing". Attendance is a column on the event row, so RSVP is an
+      UPDATE — and the only update policy required leadership.
+    */
+    const policies = writePolicies("events");
+    assert.match(
+      policies,
+      /is_open/,
+      "events needs an update policy keyed on is_open, or nobody but leadership can RSVP"
+    );
+  });
+
+  test("…and the RSVP policy is fenced by the column guard", () => {
+    /*
+      That policy is deliberately broad — RLS is per-row, so anything letting a
+      member touch attendee_ids lets them touch the title too. The trigger is
+      what makes it safe, so losing it silently would be worse than the
+      original bug.
+    */
+    assert.match(sql, /create trigger events_rsvp_guard/);
+    assert.match(sql, /events_rsvp_only_touches_attendance/);
+  });
+
+  test("a member can create their own event", () => {
+    const policies = writePolicies("events");
+    assert.match(
+      policies,
+      /created_by = auth\.uid\(\)/,
+      "a member scheduling a session for their project is an INSERT they must be allowed"
+    );
+  });
+
+  test("a member can log and delete their own hours", () => {
+    const policies = writePolicies("work_logs");
+    assert.match(policies, /member_id = auth\.uid\(\)/);
+  });
+
+  test("a member can file and withdraw their own join request", () => {
+    const policies = writePolicies("join_requests");
+    assert.match(policies, /member_id = auth\.uid\(\)/);
+  });
+
+  test("a member can write their own check-in", () => {
+    const policies = writePolicies("progress_updates");
+    assert.match(policies, /member_id = auth\.uid\(\)/);
+  });
+});

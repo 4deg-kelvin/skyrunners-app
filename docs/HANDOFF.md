@@ -223,7 +223,29 @@ rows that already exist go out as `UPDATE`, only genuinely new rows insert.
 the first time an RE answered somebody's section.
 
 **The general lesson:** if you add a `for update` policy, an upsert will never
-reach it. `lib/store/persist-diff.test.ts` pins the verb rather than the data,
+reach it.
+
+**And its bigger sibling, which has now happened four times:** a policy that was
+CORRECT when written and got left behind when the feature grew a new audience.
+`events_write` said `auth_is_leadership()` from 0007, when the calendar was a
+leadership noticeboard — and stayed that way through 0018 turning it into
+something members create sessions on and RSVP to. Three app-permitted actions
+were refused by Postgres and only one had ever been clicked, so only one was
+reported. **Widening who can act in `lib/permissions.ts` does not widen it in
+the database.** When a feature grows an audience, re-read its policies.
+
+`lib/data/rls.test.ts` now checks both halves: every cascade has a delete
+policy, and the member-facing writes (RSVP, own hours, own join request, own
+check-in, own event) aren't leadership-gated.
+
+One follow-up left deliberately undone: **attendance should be an
+`event_attendees` join table.** It's a `uuid[]` on the event row, so RSVP is an
+UPDATE of the whole row — RLS is per-row, so any policy permitting RSVP also
+permits renaming the event, and a BEFORE UPDATE trigger (`events_rsvp_guard`,
+migration 0024) is what closes that. The trigger is correct and tested, but the
+join table would make the whole problem disappear. `ClubEvent.attendeeIds`
+justifies the array as "write-once, read-whole, never queried by attendee" —
+which stopped being true the moment attendees started writing to it. `lib/store/persist-diff.test.ts` pins the verb rather than the data,
 because asserting on the resulting rows passes either way.
 
 Both this and the `profiles` delete bug (#8's cousin, migration `0019`) have the
