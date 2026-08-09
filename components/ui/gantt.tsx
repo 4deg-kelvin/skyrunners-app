@@ -124,13 +124,24 @@ export function Gantt({
                     compact ? "h-3.5" : "h-5"
                   }`}
                 >
-                  {bar.kind === "deliverable" || bar.widthPct === 0 ? (
-                    /* A due date is a point, not a span — the deliverable
-                       model has one owner, one date, and no duration. */
+                  {bar.kind !== "project" || bar.widthPct === 0 ? (
+                    /*
+                      A point, not a span. Deliverables are a diamond (one
+                      owner, one due date, no duration); events are a round dot
+                      (a thing that happens at a time). Two shapes rather than
+                      two colours, because the tones already carry health and
+                      overloading them would make neither readable.
+                    */
                     <span
-                      className={`absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 ${MARKER_TONES[bar.tone]}`}
+                      className={`absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 ${MARKER_TONES[bar.tone]} ${
+                        bar.kind === "event" ? "rounded-full" : "rotate-45"
+                      }`}
                       style={{ left: `${bar.leftPct}%` }}
-                      title={bar.end ? `Due ${bar.end}` : bar.name}
+                      title={
+                        bar.end
+                          ? `${bar.kind === "event" ? "" : "Due "}${bar.end}`
+                          : bar.name
+                      }
                     />
                   ) : (
                     <div

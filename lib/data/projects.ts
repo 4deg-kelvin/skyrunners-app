@@ -31,6 +31,7 @@ import {
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import type {
+  ClubEvent,
   Deliverable,
   JoinRequest,
   Member,
@@ -179,6 +180,16 @@ export interface DeliverableRowData {
   overdue: boolean;
 }
 
+/** One scheduled session on a project, with everything the row needs. */
+export interface ProjectEventRow {
+  event: ClubEvent;
+  attendees: Member[];
+  organiser?: Member;
+  isAttending: boolean;
+  /** The organiser, or leadership. Same rule as the calendar. */
+  canManage: boolean;
+}
+
 export interface ProjectDetailView {
   project: Project;
   breadcrumb: BreadcrumbNode[];
@@ -198,6 +209,20 @@ export interface ProjectDetailView {
    * the projects under a hundred diamonds.
    */
   timeline: GanttChart | null;
+  /**
+   * Sessions and reviews scheduled for this project, soonest first.
+   *
+   * The other half of the calendar link. An event already carried a
+   * `projectId` and the calendar already linked BACK to the project — but
+   * nothing went the other way, so somebody reading a project had no idea a
+   * build session for it was on Thursday. That is exactly the "I can't find
+   * something to do" problem the app exists to remove, arriving on the page
+   * where the work is described.
+   *
+   * Past events are dropped. A project page is about what happens next; the
+   * calendar is the record.
+   */
+  events: ProjectEventRow[];
   /** The whole task model: one flat list, one owner each. */
   deliverables: DeliverableRowData[];
   /** The project's engineering record — mostly links, not uploads. */
@@ -259,7 +284,9 @@ export interface ProjectDetailView {
 
 export async function getProjectBySlug(
   slug: string,
-  viewerId: string
+  viewerId: string,
+  /** Whether the viewer may manage anyone's event here. Same rule as the calendar. */
+  viewerIsLeadership = false
 ): Promise<ProjectDetailView | null> {
   // Ensure the live snapshot exists before any synchronous read.
   //
@@ -287,6 +314,7 @@ export async function getProjectBySlug(
     children: childProjects(project.id).map(buildNode),
     parent: project.parentId ? getProject(project.parentId) : undefined,
     timeline: projectTimeline(project),
+    events: upcomingEventsFor(project.id, viewerId, viewerIsLeadership),
     deliverables: projectDeliverables(project.id).map((d) => ({
       deliverable: d,
       owner: getMember(d.ownerId),
@@ -492,6 +520,7 @@ export async function getArchivedDivisions(): Promise<ArchivedDivision[]> {
  */
 function projectTimeline(project: Project): GanttChart | null {
   const now = today();
+  const store = readStore();
   const rows: Parameters<typeof buildGantt>[0] = [];
   const seen = new Set<string>();
 
@@ -540,6 +569,35 @@ function projectTimeline(project: Project): GanttChart | null {
       });
     }
 
+    /*
+      Sessions and reviews scheduled for this project, alongside its
+      deliverables.
+
+      This is the calendar link made visible where the work is. A build session
+      on Thursday is a date about this project in exactly the way a deliverable
+      due date is, and the chart's whole job is showing that things land near
+      each other — a design review the day before a deliverable is due is worth
+      seeing, and no list sorted by type would show it.
+
+      Only upcoming ones. Past sessions would drag the window months backwards
+      and squash everything that hasn't happened yet into the right-hand edge.
+    */
+    for (const event of store.events) {
+      if (event.projectId !== p.id) continue;
+      if (event.startsAt.slice(0, 10) < now) continue;
+      rows.push({
+        id: event.id,
+        name: event.title,
+        end: event.startsAt.slice(0, 10),
+        depth: depth + 1,
+        // Deliberately neutral. Tone carries HEALTH everywhere else on this
+        // chart, and a session is neither on track nor at risk — colouring it
+        // would make the other rows' colours mean less.
+        tone: "neutral",
+        kind: "event",
+      });
+    }
+
     for (const child of childProjects(p.id)) addProject(child, depth + 1);
   };
 
@@ -549,4 +607,34 @@ function projectTimeline(project: Project): GanttChart | null {
   // nameless bar on it tells you less than the empty space would.
   if (!rows.some((r) => r.start || r.end)) return null;
   return buildGantt(rows, now);
+}
+
+/**
+ * This project's upcoming sessions, soonest first.
+ *
+ * Closed events still appear. The time IS taken and the calendar shows it to
+ * everyone for that reason — hiding an invite-only design review from the
+ * project it's about would make the project page quietly less true than the
+ * calendar. What a non-attendee can't do is join it.
+ */
+function upcomingEventsFor(
+  projectId: string,
+  viewerId: string,
+  isLeadership: boolean
+): ProjectEventRow[] {
+  const store = readStore();
+  const now = today();
+
+  return store.events
+    .filter((e) => e.projectId === projectId && e.startsAt.slice(0, 10) >= now)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    .map((event) => ({
+      event,
+      attendees: event.attendeeIds
+        .map((id) => getMember(id))
+        .filter((m): m is Member => Boolean(m)),
+      organiser: event.createdBy ? getMember(event.createdBy) : undefined,
+      isAttending: event.attendeeIds.includes(viewerId),
+      canManage: isLeadership || event.createdBy === viewerId,
+    }));
 }

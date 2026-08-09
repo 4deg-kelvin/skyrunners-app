@@ -318,3 +318,189 @@ describe("hours logged to misc", () => {
     assert.equal(result.ok, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Invite-only events, and the link to a project
+// ---------------------------------------------------------------------------
+
+describe("an invite-only event has a list nobody can add themselves to", () => {
+  async function closedEvent() {
+    const created = await ops.createEvent({
+      title: "Sponsor visit",
+      kind: "company_visit",
+      startsAt: `${TODAY}T14:00`,
+      createdBy: ORGANISER,
+      isOpen: false,
+    });
+    if (!created.ok) throw new Error(created.error);
+    return created.value;
+  }
+
+  test("the organiser is on it from the start", async () => {
+    const event = await closedEvent();
+    assert.deepEqual(event.attendeeIds, [ORGANISER]);
+    assert.equal(event.isOpen, false);
+  });
+
+  test("somebody else cannot join it", async () => {
+    const event = await closedEvent();
+    const result = await ops.setEventAttendance({
+      eventId: event.id,
+      memberId: OTHER,
+      attending: true,
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("but the organiser can put them on the list", async () => {
+    /*
+      The gap this closes. `setEventAttendance` refuses a closed event by
+      design, so before `setEventGuestList` existed an invite-only event's list
+      was frozen at creation — the organiser had to cancel and rebuild it,
+      losing the event.
+    */
+    const event = await closedEvent();
+    const result = await ops.setEventGuestList({
+      eventId: event.id,
+      memberIds: [OTHER],
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.value.attendeeIds.includes(OTHER));
+      // And the organiser stays on regardless of what was submitted — an event
+      // whose creator isn't listed reads as somebody else's.
+      assert.ok(result.value.attendeeIds.includes(ORGANISER));
+    }
+  });
+
+  test("clearing the list still leaves the organiser", async () => {
+    const event = await closedEvent();
+    await ops.setEventGuestList({ eventId: event.id, memberIds: [OTHER] });
+    const result = await ops.setEventGuestList({
+      eventId: event.id,
+      memberIds: [],
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.deepEqual(result.value.attendeeIds, [ORGANISER]);
+  });
+
+  test("somebody off the roster is refused rather than silently dropped", async () => {
+    const event = await closedEvent();
+    const result = await ops.setEventGuestList({
+      eventId: event.id,
+      memberIds: ["m-nobody"],
+    });
+    assert.equal(result.ok, false);
+  });
+
+  test("closing an open event does not evict whoever already joined", async () => {
+    /*
+      Somebody who turned up to an open session and then finds themselves
+      un-invited by an edit they never saw is worse than a guest list with one
+      extra name on it. The organiser removes them explicitly if they mean to.
+    */
+    const created = await ops.createEvent({
+      title: "Open build night",
+      kind: "build_session",
+      startsAt: `${TODAY}T18:00`,
+      createdBy: ORGANISER,
+    });
+    if (!created.ok) throw new Error(created.error);
+    await ops.setEventAttendance({
+      eventId: created.value.id,
+      memberId: OTHER,
+      attending: true,
+    });
+
+    const closed = await ops.updateEvent({
+      eventId: created.value.id,
+      title: created.value.title,
+      kind: created.value.kind,
+      startsAt: created.value.startsAt,
+      isOpen: false,
+    });
+
+    assert.equal(closed.ok, true);
+    if (closed.ok) {
+      assert.equal(closed.value.isOpen, false);
+      assert.ok(closed.value.attendeeIds.includes(OTHER));
+    }
+  });
+});
+
+describe("linking an event to a project", () => {
+  async function unlinkedEvent() {
+    const created = await ops.createEvent({
+      title: "Design review",
+      kind: "design_review",
+      startsAt: `${TODAY}T16:00`,
+      createdBy: ORGANISER,
+    });
+    if (!created.ok) throw new Error(created.error);
+    return created.value;
+  }
+
+  test("an event can be pointed at a project after the fact", async () => {
+    const event = await unlinkedEvent();
+    assert.equal(event.projectId, undefined);
+
+    const result = await ops.updateEvent({
+      eventId: event.id,
+      title: event.title,
+      kind: event.kind,
+      startsAt: event.startsAt,
+      projectId: "p-wing-spar",
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.value.projectId, "p-wing-spar");
+  });
+
+  test("an empty string unlinks it, undefined leaves it alone", async () => {
+    /*
+      The two have to be distinguishable, or an edit form that doesn't render
+      the field would silently unlink every event it saved.
+    */
+    const event = await unlinkedEvent();
+    await ops.updateEvent({
+      eventId: event.id,
+      title: event.title,
+      kind: event.kind,
+      startsAt: event.startsAt,
+      projectId: "p-wing-spar",
+    });
+
+    const untouched = await ops.updateEvent({
+      eventId: event.id,
+      title: "Renamed",
+      kind: event.kind,
+      startsAt: event.startsAt,
+    });
+    assert.equal(untouched.ok, true);
+    if (untouched.ok) assert.equal(untouched.value.projectId, "p-wing-spar");
+
+    const cleared = await ops.updateEvent({
+      eventId: event.id,
+      title: event.title,
+      kind: event.kind,
+      startsAt: event.startsAt,
+      projectId: null,
+    });
+    assert.equal(cleared.ok, true);
+    if (cleared.ok) assert.equal(cleared.value.projectId, undefined);
+  });
+
+  test("a project that no longer exists is refused", async () => {
+    const event = await unlinkedEvent();
+    const result = await ops.updateEvent({
+      eventId: event.id,
+      title: event.title,
+      kind: event.kind,
+      startsAt: event.startsAt,
+      projectId: "p-nope",
+    });
+    assert.equal(result.ok, false);
+  });
+});

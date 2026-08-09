@@ -81,6 +81,16 @@ export interface CalendarView {
   days: CalendarDay[];
   /** Projects the viewer is committed to — what they can run a session for. */
   myProjects: { id: string; name: string }[];
+  /**
+   * Every live project, for the EDIT form only.
+   *
+   * Editing is already gated on being the organiser or leadership, and the
+   * commonest reason to touch the link is attaching a session created
+   * club-wide to the work it turned out to be about — which is very often not
+   * a project the organiser is on. Creating still offers `myProjects`, because
+   * that membership is what gives a plain member the right to schedule at all.
+   */
+  allProjects: { id: string; name: string }[];
   /** Everyone active, for naming who you're working with. */
   people: { id: string; fullName: string }[];
   canCreateClubEvent: boolean;
@@ -215,6 +225,10 @@ export async function getCalendar(input: {
       .map((m) => getProject(m.projectId))
       .filter((p): p is Project => Boolean(p) && p!.phase !== "complete")
       .map((p) => ({ id: p.id, name: p.name })),
+    allProjects: store.projects
+      .filter((p) => p.phase !== "complete")
+      .map((p) => ({ id: p.id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     people: store.members
       .filter((m) => m.status === "active" && m.id !== input.memberId)
       .map((m) => ({ id: m.id, fullName: m.fullName }))

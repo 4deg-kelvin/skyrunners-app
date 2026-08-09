@@ -6,6 +6,7 @@ import {
   AttendToggle,
   CancelEventButton,
   EditEventForm,
+  GuestListForm,
   CreateEventForm,
 } from "@/components/forms/event-actions";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getCalendar, type CalendarEvent } from "@/lib/data/events";
 import { getViewer } from "@/lib/data/viewer";
+import { can } from "@/lib/permissions";
 import { EVENT_KIND_LABELS } from "@/lib/labels";
 
 export const metadata = {
@@ -70,7 +72,12 @@ export default async function CalendarPage() {
     isLeadership: viewer.actor.globalRole !== "member",
   });
 
-  const { days, myProjects, people, canCreateClubEvent, today } = view;
+  const { days, myProjects, allProjects, people, canCreateClubEvent, today } =
+    view;
+
+  // Narrower than creating a club-wide event: an open calendar is the point of
+  // this feature, so closing one off is a Co-Lead's call.
+  const canCloseEvent = can.createClosedEvent(viewer.actor);
 
   return (
     <div className="space-y-6">
@@ -83,6 +90,7 @@ export default async function CalendarPage() {
             myProjects={myProjects}
             people={people}
             canCreateClubEvent={canCreateClubEvent}
+            canCloseEvent={canCloseEvent}
             today={today}
           />
         }
@@ -122,6 +130,9 @@ export default async function CalendarPage() {
                     key={row.event.id}
                     row={row}
                     canSetImportance={canCreateClubEvent}
+                    canCloseEvent={canCloseEvent}
+                    projects={allProjects}
+                    people={people}
                   />
                 ))}
 
@@ -170,9 +181,16 @@ export default async function CalendarPage() {
 function EventRow({
   row,
   canSetImportance,
+  canCloseEvent,
+  projects,
+  people,
 }: {
   row: CalendarEvent;
   canSetImportance: boolean;
+  canCloseEvent: boolean;
+  /** Every project, for re-pointing an event at the work it turned out to be. */
+  projects: { id: string; name: string }[];
+  people: { id: string; fullName: string }[];
 }) {
   const { event, project, attendees, organiser, isAttending, canManage } = row;
 
@@ -259,7 +277,27 @@ function EventRow({
       */}
       {canManage ? (
         <div className="border-line mt-2.5 flex flex-wrap items-center gap-4 border-t pt-2.5">
-          <EditEventForm event={event} canSetImportance={canSetImportance} />
+          <EditEventForm
+            event={event}
+            canSetImportance={canSetImportance}
+            canCloseEvent={canCloseEvent}
+            projects={projects}
+          />
+          {/*
+            The only way a closed event's list can ever change.
+
+            `setEventAttendance` refuses an invite-only event by design, so
+            without this the guest list would be frozen at creation and the
+            organiser would have to cancel and rebuild it. Open events don't
+            need it — people add themselves.
+          */}
+          {!event.isOpen ? (
+            <GuestListForm
+              eventId={event.id}
+              attendeeIds={event.attendeeIds}
+              people={people}
+            />
+          ) : null}
           <CancelEventButton eventId={event.id} title={event.title} />
         </div>
       ) : null}

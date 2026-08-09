@@ -59,7 +59,15 @@ export interface GanttRow {
   tone: GanttTone;
   /** 0–1, drawn as a fill inside the bar. Undefined draws none. */
   progress?: number;
-  kind: "project" | "deliverable";
+  /**
+   * A span or a point.
+   *
+   * `project` is a span. `deliverable` and `event` are both single dates — a
+   * deliverable has one owner and one due date by design, and a build session
+   * happens at a time. Giving either a width would invent a duration the model
+   * doesn't have.
+   */
+  kind: "project" | "deliverable" | "event";
 }
 
 export interface GanttBar extends GanttRow {
@@ -161,14 +169,14 @@ export function buildGantt(
       where it began. That one opens at the window edge with `hasStart: false`,
       and the component renders the edge open so it reads as unknown.
     */
-    const startMs =
-      r.kind === "deliverable"
-        ? hasEnd
-          ? utc(r.end!)
-          : min
-        : hasStart
-          ? utc(r.start!)
-          : min;
+    const isPoint = r.kind !== "project";
+    const startMs = isPoint
+      ? hasEnd
+        ? utc(r.end!)
+        : min
+      : hasStart
+        ? utc(r.start!)
+        : min;
     const endMs = hasEnd ? utc(r.end!) : hasStart ? max : min;
 
     const left = clamp(pct(Math.min(startMs, endMs)));

@@ -8,6 +8,7 @@ import {
   createEventAction,
   deleteEventAction,
   setEventAttendanceAction,
+  setEventGuestListAction,
   updateEventAction,
 } from "@/lib/actions";
 import { EVENT_KIND_LABELS } from "@/lib/labels";
@@ -48,11 +49,20 @@ export function CreateEventForm({
   myProjects,
   people,
   canCreateClubEvent,
+  canCloseEvent = false,
   today,
 }: {
   myProjects: { id: string; name: string }[];
   people: { id: string; fullName: string }[];
   canCreateClubEvent: boolean;
+  /**
+   * May create an event nobody can join. Co-Lead only.
+   *
+   * Narrower than `canCreateClubEvent` deliberately: an open calendar is the
+   * point of this feature, and every closed event is a small subtraction from
+   * it. See `can.createClosedEvent`.
+   */
+  canCloseEvent?: boolean;
   today: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -243,6 +253,33 @@ export function CreateEventForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
+
+        {/*
+          Invite-only. Co-Leads only, and off by default.
+
+          A 1:1 is already closed by its kind, so the box would be a no-op
+          there and is hidden rather than shown ticked and inert.
+        */}
+        {canCloseEvent && kind !== "one_on_one" ? (
+          <label className="rounded-tile border-line bg-card flex items-start gap-2.5 border px-3 py-2.5 sm:col-span-2">
+            <input
+              type="checkbox"
+              name="inviteOnly"
+              value="yes"
+              className="accent-cardinal-600 mt-0.5 size-4"
+            />
+            <span>
+              <span className="text-ink block text-sm font-semibold">
+                Invite only
+              </span>
+              <span className="text-ink-muted block text-xs">
+                Nobody can add themselves — you set the list, and only you can
+                change it. It still shows on everyone&apos;s calendar so the
+                time reads as taken.
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
 
       <p className="text-ink-muted mt-3 mb-2.5 text-xs">
@@ -300,6 +337,8 @@ export function AttendToggle({
 export function EditEventForm({
   event,
   canSetImportance,
+  canCloseEvent = false,
+  projects = [],
 }: {
   event: {
     id: string;
@@ -310,9 +349,21 @@ export function EditEventForm({
     location?: string;
     notes?: string;
     importanceWeight: number;
+    projectId?: string;
+    isOpen: boolean;
   };
   /** Leadership. Gates the wider kind list and the importance dial. */
   canSetImportance: boolean;
+  /** Co-Lead. May open or close the event - see `can.createClosedEvent`. */
+  canCloseEvent?: boolean;
+  /**
+   * Every project, not just the organiser's.
+   *
+   * Editing is already gated on being the organiser or leadership, and the
+   * commonest reason to touch this field is attaching a session somebody
+   * created club-wide to the work it turned out to be about.
+   */
+  projects?: { id: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -390,6 +441,33 @@ export function EditEventForm({
           />
         </label>
 
+        {/*
+          The link to the work.
+
+          Always rendered, so an empty value is a deliberate unlink - the
+          action distinguishes "field absent" from "field cleared" for exactly
+          this reason. Attaching a session to its project is what makes it show
+          up on that project's page and its timeline.
+        */}
+        <label className="block">
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Project{" "}
+            <span className="text-ink-muted font-normal">(optional)</span>
+          </span>
+          <select
+            name="projectId"
+            defaultValue={event.projectId ?? ""}
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+          >
+            <option value="">Not about a specific project</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {/* Stored as local wall time with no zone, so it drops straight into a
             datetime-local field. Slicing guards against a stored seconds part. */}
         <label className="block">
@@ -448,6 +526,28 @@ export function EditEventForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
+
+        {canCloseEvent && event.kind !== "one_on_one" ? (
+          <label className="rounded-tile border-line bg-card flex items-start gap-2.5 border px-3 py-2.5 sm:col-span-2">
+            <input
+              type="checkbox"
+              name="inviteOnly"
+              value="yes"
+              defaultChecked={!event.isOpen}
+              className="accent-cardinal-600 mt-0.5 size-4"
+            />
+            <span>
+              <span className="text-ink block text-sm font-semibold">
+                Invite only
+              </span>
+              <span className="text-ink-muted block text-xs">
+                Closing it doesn&apos;t remove anyone who already said
+                they&apos;d come - take them off the list explicitly if you mean
+                to.
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
 
       <p className="text-ink-muted mt-3 mb-2.5 text-xs">
@@ -503,5 +603,84 @@ export function CancelEventButton({
         Keep it
       </button>
     </span>
+  );
+}
+
+/**
+ * Who is on a closed event. The organiser's list, not the attendee's choice.
+ *
+ * The counterpart to `AttendToggle`, and the reason `isOpen: false` is usable
+ * at all: `setEventAttendance` refuses a closed event by design, so before
+ * this there was no way to change an invite-only guest list after creation -
+ * the organiser had to cancel and recreate, losing the event.
+ *
+ * A multi-select rather than an add/remove list because the whole point of a
+ * closed event is that the list is a SET somebody decided, not a queue that
+ * accumulated. You edit it as one thing and save it as one thing.
+ */
+export function GuestListForm({
+  eventId,
+  attendeeIds,
+  people,
+}: {
+  eventId: string;
+  attendeeIds: string[];
+  people: { id: string; fullName: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
+      >
+        Who&apos;s coming
+      </button>
+    );
+  }
+
+  return (
+    <ActionForm
+      action={setEventGuestListAction}
+      submitLabel="Save the list"
+      submittingLabel="Saving..."
+      onSuccess={() => setOpen(false)}
+      className="rounded-tile border-line bg-surface mt-2 w-full border p-3.5 text-left"
+    >
+      <input type="hidden" name="eventId" value={eventId} />
+
+      <label className="block">
+        <span className="text-ink mb-1 block text-sm font-semibold">
+          On this event
+        </span>
+        <select
+          name="attendeeIds"
+          multiple
+          size={8}
+          defaultValue={attendeeIds}
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+        >
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.fullName}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-ink-muted mt-2 mb-2.5 text-xs">
+        Hold Cmd or Ctrl to pick several. You stay on it either way - an event
+        whose organiser isn&apos;t listed reads as somebody else&apos;s.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
+      >
+        Cancel
+      </button>
+    </ActionForm>
   );
 }

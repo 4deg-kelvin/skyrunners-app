@@ -2082,6 +2082,14 @@ export async function updateEvent(input: {
   location?: string;
   notes?: string;
   importanceWeight?: number;
+  /**
+   * Which project this belongs to. `null` clears it, `undefined` leaves it —
+   * the two have to be distinguishable or an edit form that doesn't render the
+   * field would silently unlink every event it saved.
+   */
+  projectId?: string | null;
+  /** `false` makes it invite-only. Undefined leaves it as it is. */
+  isOpen?: boolean;
 }): Promise<Result<ClubEvent>> {
   const title = input.title.trim();
   if (!title) return fail<ClubEvent>("Give it a name.");
@@ -2106,6 +2114,26 @@ export async function updateEvent(input: {
     event.location = input.location?.trim() || undefined;
     event.notes = input.notes?.trim() || undefined;
     event.importanceWeight = importance;
+
+    if (input.projectId !== undefined) {
+      if (
+        input.projectId &&
+        !store.projects.some((p) => p.id === input.projectId)
+      ) {
+        return fail<ClubEvent>("That project no longer exists.");
+      }
+      event.projectId = input.projectId || undefined;
+    }
+
+    /*
+      Closing an event does NOT drop whoever already said they'd come.
+
+      Somebody who turned up to an open session and then finds themselves
+      un-invited by an edit they never saw is a worse outcome than a guest list
+      with one extra name on it, and the organiser can remove them explicitly.
+    */
+    if (input.isOpen !== undefined) event.isOpen = input.isOpen;
+
     return ok(event);
   });
 }
@@ -3220,5 +3248,46 @@ export async function updateClubTiers(input: {
     };
     store.clubSettings = [next];
     return ok(next);
+  });
+}
+
+/**
+ * Set exactly who is on an event. The organiser's call, not the attendee's.
+ *
+ * `setEventAttendance` is the OTHER direction — a member adding or removing
+ * themselves from something open. This one is for a closed event, where the
+ * whole point is that the list is fixed and nobody can put themselves on it:
+ * a leadership meeting, a sponsor visit with a headcount, an interview panel.
+ *
+ * Without it, `isOpen: false` was a dead end. `setEventAttendance` refuses a
+ * closed event by design, so once one existed there was no way to change who
+ * was on it — the organiser had to cancel and recreate, losing the event.
+ *
+ * The organiser stays on regardless, same as at creation: an event whose
+ * creator isn't on it reads as somebody else's, and nothing else would put
+ * them back.
+ */
+export async function setEventGuestList(input: {
+  eventId: string;
+  memberIds: string[];
+}): Promise<Result<ClubEvent>> {
+  return guarded((store) => {
+    const event = store.events.find((e) => e.id === input.eventId);
+    if (!event) return fail<ClubEvent>("That event no longer exists.");
+
+    const known = new Set(store.members.map((m) => m.id));
+    const unknown = input.memberIds.filter((id) => id && !known.has(id));
+    if (unknown.length > 0) {
+      return fail<ClubEvent>("One of those people is no longer on the roster.");
+    }
+
+    event.attendeeIds = [
+      ...new Set(
+        [event.createdBy, ...input.memberIds].filter((id): id is string =>
+          Boolean(id)
+        )
+      ),
+    ];
+    return ok(event);
   });
 }

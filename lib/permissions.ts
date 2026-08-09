@@ -612,6 +612,32 @@ export const can = {
   /** Deliberately not scope-limited: leadership can invite anyone, anywhere. */
   inviteToEvent: (actor: Actor) => actor.globalRole !== "member",
 
+  /**
+   * Creating an event nobody can join — a fixed guest list.
+   *
+   * Co-Lead only, and narrower than `createEvent` on purpose. An open calendar
+   * is the point of this feature: `/find-work` and the calendar exist so a
+   * member can plug into the club's work without asking permission, and every
+   * closed event is a small subtraction from that. The cases that genuinely
+   * need one — a sponsor visit with a headcount, an interview panel, a
+   * leadership sit-down — are all things a Co-Lead is arranging anyway.
+   *
+   * A 1:1 is closed too, and needs none of this: it's closed by its KIND
+   * rather than by a choice, because two people sitting down together is
+   * definitionally not something a third can drop into.
+   */
+  createClosedEvent: (actor: Actor) => isCoLead(actor),
+
+  /**
+   * Deciding who is ON an event, as opposed to joining one yourself.
+   *
+   * The organiser, or a Co-Lead. This is what makes a closed event work at
+   * all — `setEventAttendance` refuses one by design, so without this an
+   * invite-only event's list could never change after it was created.
+   */
+  manageEventGuestList: (actor: Actor, createdBy?: string) =>
+    isCoLead(actor) || (!!createdBy && createdBy === actor.id),
+
   recordAttendance: (actor: Actor) => actor.globalRole !== "member",
 
   /** Anyone can propose a 1:1 with anyone. */

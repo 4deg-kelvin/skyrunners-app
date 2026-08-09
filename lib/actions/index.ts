@@ -1053,6 +1053,18 @@ async function createEventAction$impl(
     attendeeIds,
     notes: String(formData.get("notes") ?? ""),
     importanceWeight: importanceRaw ? Number(importanceRaw) : undefined,
+    /*
+      Invite-only, and Co-Lead only.
+
+      Checked against the actor rather than trusted from the form: a Server
+      Action is a POST endpoint the moment it exists, so a member could
+      otherwise close a session and quietly remove it from the calendar
+      everyone else can join. Undefined falls through to `createEvent`'s
+      default, which closes 1:1s and opens everything else.
+    */
+    isOpen: can.createClosedEvent(viewer.actor)
+      ? formData.get("inviteOnly") !== "yes"
+      : undefined,
   });
 
   if (result.ok) refresh();
@@ -1072,6 +1084,17 @@ async function updateEventAction$impl(
   }
 
   const importanceRaw = String(formData.get("importanceWeight") ?? "").trim();
+
+  /*
+    Only Co-Leads may close an event, so a non-Co-Lead's submission leaves
+    `isOpen` alone rather than being refused — the field isn't rendered for
+    them, and a hand-crafted POST shouldn't be able to shut a session either.
+    `undefined` means "don't touch it".
+  */
+  const isOpen = can.createClosedEvent(viewer.actor)
+    ? formData.get("inviteOnly") !== "yes"
+    : undefined;
+
   const result = await ops.updateEvent({
     eventId,
     title: String(formData.get("title") ?? ""),
@@ -1081,6 +1104,11 @@ async function updateEventAction$impl(
     location: String(formData.get("location") ?? ""),
     notes: String(formData.get("notes") ?? ""),
     importanceWeight: importanceRaw ? Number(importanceRaw) : undefined,
+    // The form always sends the field, so "" is a deliberate unlink.
+    projectId: formData.has("projectId")
+      ? String(formData.get("projectId") ?? "") || null
+      : undefined,
+    isOpen,
   });
 
   if (result.ok) refresh();
@@ -1843,6 +1871,40 @@ export async function updateClubTiersAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => updateClubTiersAction$impl(formData));
+}
+
+/**
+ * Set who is on an event. The organiser's list, not the attendee's choice.
+ *
+ * Distinct from `setEventAttendanceAction`, which is a member adding
+ * themselves to something open. This is the only way a CLOSED event's list can
+ * ever change, since the attendance operation refuses those by design.
+ */
+async function setEventGuestListAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const eventId = String(formData.get("eventId") ?? "");
+
+  const existing = getEvent(eventId);
+  if (!existing) return { ok: false, error: "That event no longer exists." };
+  if (!can.manageEventGuestList(viewer.actor, existing.createdBy)) {
+    return denied("change who's on this event");
+  }
+
+  const result = await ops.setEventGuestList({
+    eventId,
+    memberIds: formData.getAll("attendeeIds").map(String).filter(Boolean),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Guest list updated.");
+}
+
+export async function setEventGuestListAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setEventGuestListAction$impl(formData));
 }
 
 export async function updateEventAction(

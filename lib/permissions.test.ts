@@ -764,3 +764,44 @@ describe("withdrawing a sign-off needs the same authority", () => {
     assert.equal(can.withdrawSignOff(actor("worker"), graph, "leaf"), false);
   });
 });
+
+describe("closing an event off is narrower than creating one", () => {
+  test("a Co-Lead can make an invite-only event", () => {
+    assert.equal(can.createClosedEvent(actor("coLead")), true);
+  });
+
+  test("a Lead cannot, even though they can create club-wide events", () => {
+    /*
+      An open calendar is the point of the feature — /find-work and the
+      calendar exist so a member can plug into the club's work without asking
+      permission, and every closed event subtracts from that. The cases that
+      need one (a sponsor visit with a headcount, an interview panel) are
+      things a Co-Lead is arranging anyway.
+    */
+    assert.equal(can.createEvent(actor("lead1")), true);
+    assert.equal(can.createClosedEvent(actor("lead1")), false);
+  });
+
+  test("a member cannot", () => {
+    assert.equal(can.createClosedEvent(actor("worker")), false);
+  });
+
+  test("the organiser owns the guest list, whoever they are", () => {
+    // The only route by which a closed event's list can ever change —
+    // `setEventAttendance` refuses those by design.
+    assert.equal(can.manageEventGuestList(actor("worker"), "worker"), true);
+    assert.equal(can.manageEventGuestList(actor("worker"), "lead1"), false);
+  });
+
+  test("a Co-Lead can fix anybody's list", () => {
+    assert.equal(can.manageEventGuestList(actor("coLead"), "worker"), true);
+  });
+
+  test("a Lead cannot take over somebody else's guest list", () => {
+    // Deliberately tighter than `manageEvent`, which lets any leadership
+    // cancel a stale event. Rewriting who is invited to somebody else's
+    // meeting is a different act from tidying the calendar.
+    assert.equal(can.manageEvent(actor("lead1"), "worker"), true);
+    assert.equal(can.manageEventGuestList(actor("lead1"), "worker"), false);
+  });
+});

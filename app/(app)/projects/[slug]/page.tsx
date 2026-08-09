@@ -31,6 +31,8 @@ import { ArtifactList } from "@/components/ui/artifact-list";
 import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Gantt } from "@/components/ui/gantt";
+import { AttendToggle } from "@/components/forms/event-actions";
+import { EVENT_KIND_LABELS } from "@/lib/labels";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -51,7 +53,11 @@ export default async function ProjectDetailPage({
 }) {
   const { slug } = await params;
   const viewer = await getViewer();
-  const view = await getProjectBySlug(slug, viewer.member.id);
+  const view = await getProjectBySlug(
+    slug,
+    viewer.member.id,
+    viewer.actor.globalRole !== "member"
+  );
 
   if (!view) notFound();
 
@@ -706,6 +712,86 @@ export default async function ProjectDetailPage({
                     caption="Diamonds are deliverable due dates. The red line is today."
                   />
                 </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            What's scheduled for this project.
+
+            The other half of the calendar link. An event has carried a
+            projectId since the calendar shipped, and the calendar linked BACK
+            to the project — but nothing came the other way, so somebody
+            reading a project had no idea a build session for it was on
+            Thursday. That's the "I can't find something to do" problem
+            arriving on the page where the work is described.
+
+            Turning up is offered right here. Making somebody go to the
+            calendar to press a button about the thing they're already looking
+            at is the navigation tax this app keeps removing.
+          */}
+          {view.events.length > 0 ? (
+            <Card className="h-fit">
+              <CardBody>
+                <SectionLabel>Coming Up</SectionLabel>
+                <div className="mt-4 space-y-3">
+                  {view.events.map(({ event, attendees, isAttending }) => (
+                    <div
+                      key={event.id}
+                      className="rounded-tile border-line border px-3.5 py-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <span className="text-ink text-sm font-bold">
+                          {event.title}
+                        </span>
+                        <Badge tone="neutral">
+                          {EVENT_KIND_LABELS[event.kind]}
+                        </Badge>
+                      </div>
+
+                      <p className="text-ink-muted mt-1 text-sm">
+                        {new Date(
+                          `${event.startsAt.slice(0, 10)}T00:00:00Z`
+                        ).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          timeZone: "UTC",
+                        })}
+                        {event.location ? ` · ${event.location}` : ""}
+                      </p>
+
+                      {attendees.length > 0 ? (
+                        <p className="text-ink-muted mt-1 text-xs">
+                          {attendees.map((a) => a.fullName).join(", ")}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-2.5">
+                        {event.isOpen ? (
+                          <AttendToggle
+                            eventId={event.id}
+                            attending={isAttending}
+                          />
+                        ) : (
+                          /*
+                            Closed events still show. The time IS taken, and
+                            hiding an invite-only review from the project it's
+                            about would make this page quietly less true than
+                            the calendar. What you can't do is add yourself.
+                          */
+                          <span className="text-ink-muted text-xs">
+                            Invite only — the organiser sets who&apos;s on it.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-ink-muted mt-3 text-xs">
+                  Anything open, you can turn up to — you don&apos;t have to be
+                  on the project.
+                </p>
               </CardBody>
             </Card>
           ) : null}
