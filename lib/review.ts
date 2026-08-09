@@ -30,7 +30,12 @@
  * changing depending on when it renders.
  */
 
-import type { Deliverable, Member, ProgressUpdate } from "./types.ts";
+import type {
+  Deliverable,
+  Member,
+  ProgressUpdate,
+  UpdateEntry,
+} from "./types.ts";
 
 /**
  * Grace period before an unread report escalates.
@@ -199,6 +204,68 @@ export function pendingSignOffs(
         escalated: ageDays >= REVIEW_GRACE_DAYS,
       };
     })
+    .sort((a, b) => b.ageDays - a.ageDays);
+}
+
+export interface UnansweredSection {
+  entry: UpdateEntry;
+  author?: Member;
+  projectId: string;
+  ageDays: number;
+  escalated: boolean;
+}
+
+/**
+ * Check-in sections nobody has replied to, on projects this RE owns.
+ *
+ * The counterpart to `unreadReportsFor`, and the reason both exist: reading a
+ * check-in and answering it are two obligations belonging to two different
+ * people. A Lead marks the whole thing read — that's about the person. An RE
+ * answers one project's section — that's about the work, and a member on three
+ * projects needs three answers from three people.
+ *
+ * Only sections with something to answer. A section that says "made progress,
+ * no blockers" needs no reply, and putting it in a queue would train the RE to
+ * clear the queue rather than read it — the same failure the 15-minute design
+ * target is guarding against everywhere else.
+ *
+ * `projectIds` is the RE's whole subtree: authority inherits down, so an RE of
+ * a parent is on the hook for a child's sections too.
+ */
+export function unansweredSectionsFor(
+  updates: ProgressUpdate[],
+  projectIds: string[],
+  members: Member[],
+  today: string
+): UnansweredSection[] {
+  const scope = new Set(projectIds);
+
+  return updates
+    .filter((u) => u.submittedAt)
+    .flatMap((update) =>
+      update.entries
+        .filter(
+          (entry) =>
+            scope.has(entry.projectId) &&
+            !entry.response &&
+            // Worth answering: a blocker, or an explicit next step to confirm.
+            // Progress alone is a status line, not a question.
+            (entry.blockers?.trim() || entry.nextSteps?.trim())
+        )
+        .map((entry) => {
+          const ageDays = Math.max(
+            0,
+            daysBetween(update.submittedAt!, today)
+          );
+          return {
+            entry,
+            author: members.find((m) => m.id === update.memberId),
+            projectId: entry.projectId,
+            ageDays,
+            escalated: ageDays >= REVIEW_GRACE_DAYS,
+          };
+        })
+    )
     .sort((a, b) => b.ageDays - a.ageDays);
 }
 

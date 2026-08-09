@@ -16,6 +16,7 @@ import {
   RemoveMemberButton,
   WithdrawRequestButton,
 } from "@/components/forms/project-actions";
+import { EntryResponse } from "@/components/forms/entry-response";
 import { ProjectEditForm } from "@/components/forms/project-edit";
 import {
   AddProjectMemberForm,
@@ -577,7 +578,7 @@ export default async function ProjectDetailPage({
                   />
                   )
                 ) : (
-                  updateFeed.map(({ entry, author, submittedAt }) => (
+                  updateFeed.map(({ entry, author, submittedAt, responder }) => (
                     <div
                       key={entry.id}
                       className="rounded-tile border border-line px-4 py-3.5"
@@ -608,6 +609,21 @@ export default async function ProjectDetailPage({
                           Next: {entry.nextSteps}
                         </p>
                       ) : null}
+
+                      {/*
+                        The RE answers here, on the project, where the context
+                        is. A Lead marking the whole check-in read is a
+                        different obligation belonging to a different person —
+                        that one lives on /updates.
+                      */}
+                      <EntryResponse
+                        entryId={entry.id}
+                        projectId={project.id}
+                        authorName={author?.preferredName ?? author?.fullName ?? "them"}
+                        existing={entry.response}
+                        responderName={responder?.fullName}
+                        canRespond={mayManage}
+                      />
                     </div>
                   ))
                 )}

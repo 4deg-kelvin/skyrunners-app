@@ -39,7 +39,16 @@ import {
 import { readStore } from "@/lib/store/disk";
 import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
-import { escalationsFor, unreadReportsFor, type LeadEscalation } from "@/lib/review";
+import {
+  escalationsFor,
+  pendingSignOffs,
+  unansweredSectionsFor,
+  unreadReportsFor,
+  type LeadEscalation,
+  type PendingSignOff,
+  type UnansweredSection,
+} from "@/lib/review";
+import { isREofOrAbove } from "@/lib/permissions";
 import type {
   Member,
   Project,
@@ -126,6 +135,43 @@ export interface DashboardView {
     actor?: Member;
     ageDays: number;
   }[];
+  /**
+   * The RE half of the exception feed — what's waiting on YOU as an RE.
+   *
+   * Separate from `reviewQueue`, which is the Lead half. Two obligations, two
+   * different people, and a dashboard that merged them would tell a Lead who
+   * is also an RE that they owe "seven things" without saying which hat.
+   */
+  reQueue: {
+    /** Finished work no RE has signed off. `pendingSignOffs`. */
+    signOffs: PendingSignOff[];
+    /** Check-in sections with a blocker or a next step and no reply. */
+    unanswered: UnansweredSection[];
+  };
+  /**
+   * People in scope who logged nothing this week while holding open work.
+   *
+   * The quiet failure the club actually loses people to: not a missed
+   * check-in, which is visible, but somebody who simply stops and whose
+   * absence nothing reports. Deliberately not a score or a flag on their
+   * record — it's a prompt to have a conversation.
+   */
+  goneQuiet: { member: Member; openDeliverables: number; lastLoggedAt?: string }[];
+  /**
+   * Per-Lead roll-up. Populated for Co-Leads only, empty for everyone else.
+   *
+   * Derived rather than written. A roll-up somebody has to compose by hand is
+   * a chore that gets skipped in week three, and the numbers already exist —
+   * the scarce resource is leadership *reading*, not leadership typing.
+   */
+  rollUp: {
+    lead: Member;
+    reports: number;
+    unread: number;
+    worstUnreadDays: number;
+    hoursThisWeek: number;
+    quietCount: number;
+  }[];
   today: string;
   maxBackdateDays: number;
 }
@@ -171,15 +217,16 @@ function startOfWeek(today: string): string {
 }
 
 /**
- * `_graph` is unused today because the chain is walked over the in-memory
- * `members` array. It's in the signature because the Postgres version must
- * resolve the chain through `v_lead_chain`, and adding a parameter later would
- * mean touching every caller — the same reason every function here is already
- * `async` against a synchronous mock.
+ * `graph` was a placeholder parameter for years — the reporting chain is walked
+ * over the in-memory `members` array, so nothing needed it. It's load-bearing
+ * now: the RE queue resolves the viewer's project subtree through
+ * `isREofOrAbove`, which is the only thing that knows RE authority inherits
+ * DOWN the project tree and that a Division Lead is a top RE. Matching `reIds`
+ * directly would miss both and silently under-report what somebody owes.
  */
 export async function getDashboard(
   actor: Actor,
-  _graph: OrgGraph,
+  graph: OrgGraph,
   /**
    * Co-Leads only: widen the numbers from "people I look after" to the club.
    *
@@ -311,6 +358,103 @@ export async function getDashboard(
       .filter((m): m is Member => m !== undefined),
   }));
 
+  // --- the RE half of the exception feed -----------------------------------
+  //
+  // The viewer's RE subtree, resolved through the permission module rather
+  // than by matching `reIds` directly: authority inherits DOWN the project
+  // tree, and a Division Lead is a top RE. Matching ids would miss both and
+  // silently under-report what somebody actually owes.
+  const store = readStore();
+  const myProjectIds = store.projects
+    .filter((p) => isREofOrAbove(actor, graph, p.id))
+    .map((p) => p.id);
+
+  const reQueue = {
+    signOffs: pendingSignOffs(
+      store.deliverables,
+      myProjectIds,
+      everyone,
+      today()
+    ),
+    // Your own sections are dropped: an RE writes check-ins on their own
+    // projects too, and "Tyler Brooks is waiting on an answer" shown to Tyler
+    // is noise that makes the whole panel read as generated rather than owed.
+    // If a second RE should answer it, it's still in THEIR queue.
+    unanswered: unansweredSectionsFor(
+      progressUpdates,
+      myProjectIds,
+      everyone,
+      today()
+    ).filter((section) => section.author?.id !== actor.id),
+  };
+
+  // --- who has gone quiet --------------------------------------------------
+  //
+  // Zero hours this week while still holding open work. Not a missed check-in
+  // — that's already visible — but the person who simply stopped, which is
+  // what the club actually loses people to.
+  const goneQuiet = overseen
+    .map((member) => {
+      const hours = workLogs
+        .filter((w) => w.memberId === member.id && w.workDate >= weekStart)
+        .reduce((sum, w) => sum + w.hours, 0);
+      if (hours > 0) return null;
+
+      const openDeliverables = store.deliverables.filter(
+        (d) => d.ownerId === member.id && d.status !== "done"
+      ).length;
+      // No open work means nothing to be quiet about — they may simply be
+      // between projects, which `/find-work` is the answer to, not this.
+      if (openDeliverables === 0) return null;
+
+      const lastLog = workLogs
+        .filter((w) => w.memberId === member.id)
+        .sort((a, b) => b.workDate.localeCompare(a.workDate))[0];
+
+      return {
+        member,
+        openDeliverables,
+        lastLoggedAt: lastLog?.workDate,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    .sort((a, b) => (a.lastLoggedAt ?? "").localeCompare(b.lastLoggedAt ?? ""));
+
+  // --- the roll-up, for Co-Leads -------------------------------------------
+  const rollUp = isCoLead(actor)
+    ? everyone
+        .filter((m) => m.globalRole !== "member" && m.status === "active")
+        .map((lead) => {
+          const theirReports = everyone.filter(
+            (m) => m.leadId === lead.id && m.status === "active"
+          );
+          const unread = unreadReportsFor(
+            lead.id,
+            progressUpdates,
+            theirReports,
+            today()
+          );
+          const reportIds = new Set(theirReports.map((m) => m.id));
+
+          return {
+            lead,
+            reports: theirReports.length,
+            unread: unread.length,
+            worstUnreadDays: unread[0]?.ageDays ?? 0,
+            hoursThisWeek: workLogs
+              .filter(
+                (w) => reportIds.has(w.memberId) && w.workDate >= weekStart
+              )
+              .reduce((sum, w) => sum + w.hours, 0),
+            quietCount: goneQuiet.filter((q) => reportIds.has(q.member.id))
+              .length,
+          };
+        })
+        // Leads with nobody under them are noise in a roll-up about oversight.
+        .filter((row) => row.reports > 0)
+        .sort((a, b) => b.worstUnreadDays - a.worstUnreadDays)
+    : [];
+
   return {
     club,
     isLeadOfNobody: overseen.length === 0,
@@ -356,6 +500,9 @@ export async function getDashboard(
         actor: getMember(notice.createdById),
         ageDays: daysSince(notice.createdAt),
       })),
+    reQueue,
+    goneQuiet,
+    rollUp,
     today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,

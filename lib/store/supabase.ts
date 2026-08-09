@@ -51,7 +51,7 @@ import type {
 
 /** Columns for the entries table, which has no collection of its own. */
 const ENTRY_COLUMNS =
-  "id, update_id, project_id, progress, blockers, next_steps, hours";
+  "id, update_id, project_id, progress, blockers, next_steps, hours, response, responded_by, responded_at";
 
 function entryFromRow(r: Record<string, unknown>): UpdateEntry {
   return {
@@ -62,6 +62,9 @@ function entryFromRow(r: Record<string, unknown>): UpdateEntry {
     blockers: (r.blockers as string) ?? undefined,
     nextSteps: (r.next_steps as string) ?? undefined,
     hours: Number(r.hours ?? 0),
+    response: (r.response as string) ?? undefined,
+    respondedBy: (r.responded_by as string) ?? undefined,
+    respondedAt: (r.responded_at as string) ?? undefined,
   };
 }
 
@@ -74,6 +77,9 @@ function entryToRow(e: UpdateEntry) {
     blockers: e.blockers ?? null,
     next_steps: e.nextSteps ?? null,
     hours: e.hours,
+    response: e.response ?? null,
+    responded_by: e.respondedBy ?? null,
+    responded_at: e.respondedAt ?? null,
   };
 }
 

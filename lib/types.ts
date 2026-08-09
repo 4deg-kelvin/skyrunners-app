@@ -477,6 +477,23 @@ export interface UpdateEntry {
   nextSteps?: string;
   /** Hours on this project during the period. Auto-filled from work_logs. */
   hours: number;
+  /**
+   * The RE's answer to THIS project's section.
+   *
+   * **The RE responds, not the Lead**, and that split is the point. A Lead
+   * marks the whole check-in read — that's an obligation about a person. The
+   * useful reply to "the vacuum pump seal is leaking" comes from whoever is
+   * accountable for that project, and a member on three projects needs three
+   * different people, not one person guessing at three contexts.
+   *
+   * One response per section rather than a thread: this is an answer, not a
+   * conversation. A conversation belongs on the blocker board or in a message,
+   * and threading here would turn a 15-minute weekly obligation into an inbox.
+   */
+  response?: string;
+  /** Which RE answered. Snapshotted — REs change over a project's life. */
+  respondedBy?: string;
+  respondedAt?: string;
 }
 
 export interface ProgressUpdate {

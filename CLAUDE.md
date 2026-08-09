@@ -341,8 +341,14 @@ its project.
 next, with a step-by-step plan in `docs/PHASE_1_KICKOFF.md`.
 
 Explicitly **not** planned: critical-path Gantt, a composite engagement score, a
-leaderboard, self-enrollment, a project commitment cap. Each was considered and rejected —
-read the reasoning in `DECISIONS.md` and `PRODUCT_REVIEW.md` before re-opening any of them.
+leaderboard, self-enrollment, a project commitment cap, and the **quarterly
+re-enrollment sweep**. Each was considered and rejected — read the reasoning in
+`DECISIONS.md` and `PRODUCT_REVIEW.md` before re-opening any of them.
+
+The sweep is the newest of those (dropped 2026-08-08): a 35-person club where every
+member has a named Lead doesn't need memberships auto-closing at quarter start, and
+silently dropping somebody is worse than a Lead glancing at their roster. Keeping the
+roster honest is that Lead's job.
 
 
 ## Phase 1 starting points
