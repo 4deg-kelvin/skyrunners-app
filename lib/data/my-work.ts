@@ -10,6 +10,7 @@
 import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
   contributionInputsFor,
+  daysUntil,
   getMember,
   getProject,
   hoursOnProject,
@@ -65,6 +66,15 @@ export interface MyProjectCard {
   myDeliverables: Deliverable[];
   overdueCount: number;
   progress: ReturnType<typeof projectProgress>;
+  /**
+   * Whole days until the project's target date. Negative once it's passed,
+   * undefined when no target is set.
+   *
+   * Computed here rather than in the card so the page renders identically
+   * whenever it renders — the same reason `today` is passed through this view
+   * model instead of the components calling `Date.now()`.
+   */
+  daysToTarget?: number;
 }
 
 /** A section of the current update, tied to a specific project. */
@@ -174,6 +184,7 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
         myDeliverables: mine,
         overdueCount: mine.filter(isOverdue).length,
         progress: projectProgress(project.id),
+        daysToTarget: daysUntil(project.targetDate),
       };
     }
   );
