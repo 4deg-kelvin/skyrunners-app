@@ -30,6 +30,7 @@ export function ActionForm({
   /** Render your own trigger instead of the default button. */
   renderSubmit,
   onSuccess,
+  disabled,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   children?: React.ReactNode;
@@ -39,6 +40,8 @@ export function ActionForm({
   resetOnSuccess?: boolean;
   renderSubmit?: (pending: boolean) => React.ReactNode;
   onSuccess?: () => void;
+  /** Blocks submit while the form is incomplete. */
+  disabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -67,7 +70,7 @@ export function ActionForm({
       ) : (
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || disabled}
           className="inline-flex items-center justify-center gap-2 rounded-tile bg-cardinal-600 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors hover:bg-cardinal-700 disabled:opacity-60"
         >
           {pending ? (

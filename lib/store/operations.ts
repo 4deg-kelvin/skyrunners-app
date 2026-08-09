@@ -894,6 +894,49 @@ export async function submitCheckIn(input: {
  * without facing a record of failure, which is the single most important
  * retention behaviour in the app.
  */
+/**
+ * Which weekdays a member submits their check-ins on.
+ *
+ * Members pick their own days — the obligation is the cadence, not a schedule
+ * somebody imposed. Spacing is nudged in the UI rather than enforced here: two
+ * on consecutive days is a worse check-in, not an invalid one.
+ */
+export async function setUpdateSchedule(input: {
+  memberId: string;
+  weekdays: number[];
+}): Promise<Result<number[]>> {
+  const weekdays = [...new Set(input.weekdays)].sort((a, b) => a - b);
+
+  if (weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 5)) {
+    return fail("Check-in days have to be weekdays.");
+  }
+
+  return guarded((store) => {
+    const existing = store.updateSchedules.find(
+      (u) => u.memberId === input.memberId
+    );
+
+    if (!existing) {
+      store.updateSchedules.push({
+        memberId: input.memberId,
+        weekdays,
+        updatesPerWeek: weekdays.length || 2,
+        dueTime: "23:59",
+      });
+      return ok(weekdays);
+    }
+
+    if (weekdays.length !== existing.updatesPerWeek) {
+      return fail<number[]>(
+        `Pick exactly ${existing.updatesPerWeek} day${existing.updatesPerWeek === 1 ? "" : "s"}.`
+      );
+    }
+
+    existing.weekdays = weekdays;
+    return ok(weekdays);
+  });
+}
+
 export async function setCheckInPause(input: {
   memberId: string;
   /** ISO date to pause until, or null to resume now. */

@@ -29,6 +29,7 @@ export default async function MyWorkPage() {
   const view = await getMyWork(viewer.member.id);
   const {
     me,
+    lead: myLead,
     committed,
     following,
     currentUpdate,
@@ -312,6 +313,7 @@ export default async function MyWorkPage() {
                 dueLabel={dueDate.toLocaleDateString("en-US", {
                   weekday: "long",
                 })}
+                readerName={myLead?.preferredName ?? myLead?.fullName}
               />
               <ButtonLink href="/updates" variant="secondary">
                 Past check-ins

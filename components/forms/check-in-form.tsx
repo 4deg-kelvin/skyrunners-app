@@ -33,9 +33,17 @@ export interface CheckInSection {
 export function CheckInForm({
   sections,
   dueLabel,
+  readerName,
 }: {
   sections: CheckInSection[];
   dueLabel: string;
+  /**
+   * Who actually reads this. Undefined when the member has nobody above them
+   * — Co-Leads are at the top of the chain, so their check-ins go sideways to
+   * the other Co-Leads rather than up. Saying "your Lead" to someone with no
+   * Lead is the kind of small lie that makes people stop trusting the app.
+   */
+  readerName?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -64,13 +72,15 @@ export function CheckInForm({
         </button>
       </div>
       <p className="mb-4 text-sm text-ink-muted">
-        A line per project is enough. Your Lead reads this to start a
-        conversation, not to grade you.
+        A line per project is enough.{" "}
+        {readerName
+          ? `${readerName} reads this to start a conversation, not to grade you.`
+          : "You're at the top of the reporting chain, so this goes to the other Co-Leads — same cadence as everyone else."}
       </p>
 
       <ActionForm
         action={submitCheckInAction}
-        submitLabel="Send to my Lead"
+        submitLabel={readerName ? "Send to my Lead" : "Send to the Co-Leads"}
         submittingLabel="Sending…"
         className="space-y-4"
       >
