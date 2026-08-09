@@ -51,7 +51,10 @@ for (const spec of COLLECTIONS) {
   const { rows } = await c.query(`select ${spec.columns} from ${spec.table}`);
   snap[spec.key] = rows.map((r: any) => spec.fromRow(r));
 }
-const ent = await c.query("select id, update_id, project_id, progress, blockers, next_steps, hours from update_entries");
+// Mirror ENTRY_COLUMNS in lib/store/supabase.ts, including the RE response
+// columns added in 0016 — a harness that reads fewer columns than the app
+// passes on data the app would choke on.
+const ent = await c.query("select id, update_id, project_id, progress, blockers, next_steps, hours, response, responded_by, responded_at from update_entries");
 for (const u of snap.progressUpdates) u.entries = ent.rows.filter((e: any) => e.update_id === u.id);
 const reBy = new Map<string, string[]>();
 for (const m of snap.projectMemberships) if (m.role === "re") reBy.set(m.projectId, [...(reBy.get(m.projectId) ?? []), m.memberId]);
@@ -72,6 +75,8 @@ const dataModules = {
   settings: await import("../lib/data/settings.ts"),
   events: await import("../lib/data/events.ts"),
   blockers: await import("../lib/data/blockers.ts"),
+  trainings: await import("../lib/data/trainings.ts"),
+  deadlines: await import("../lib/data/deadlines.ts"),
 };
 
 installLiveBackend(() => snap, async () => {});
@@ -122,6 +127,9 @@ await check("/updates        getUpdates", async () => dataModules.updates.getUpd
 await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
 await check("/calendar       getUpcomingEvents", async () => dataModules.events.getUpcomingEvents());
 await check("/blockers       getBlockerBoard", async () => dataModules.blockers.getBlockerBoard(me.id));
+await check("/trainings      getTrainings", async () => dataModules.trainings.getTrainings(me.id));
+await check("/trainings      getClearanceIndex", async () => dataModules.trainings.getClearanceIndex());
+await check("/deadlines      getDeadlines", async () => dataModules.deadlines.getDeadlines());
 
 // The exact call shape the pages use. /members and /projects fire their data
 // functions in a Promise.all ALONGSIDE getViewer, so the read starts before the
