@@ -28,6 +28,7 @@ those three.
 | `docs/DECISIONS.md` | Locked decisions, infrastructure notes |
 | `lib/data/README.md` | Why the data layer exists and how to extend it |
 | `docs/TWO_TRACK_DEPLOY.md` | Shipping to the club while still building |
+| `docs/INTEGRATIONS.md` | Email invites and Discord — what to set up, and what's worth sending |
 | `supabase/README.md` | Migrations, views, RLS plan |
 
 ## Team
