@@ -29,6 +29,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getViewer } from "@/lib/data/viewer";
@@ -46,6 +47,7 @@ import {
 import * as ops from "@/lib/store/operations";
 import type { Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
+import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
 import { after } from "next/server";
 import { sendDiscordDM, discordMessages } from "@/lib/notify/discord";
 
@@ -2002,6 +2004,39 @@ async function updateClubIdentityAction$impl(
 
   if (result.ok) refresh();
   return toResult(result, "Saved.");
+}
+
+/**
+ * Light or dark. Nobody's permission required — it's how one person's screen
+ * looks, and it changes nothing anybody else sees.
+ *
+ * Doesn't go through `withRequestStore` or touch the store at all: there is no
+ * data here, only a cookie. `revalidatePath` is what makes the change appear —
+ * the class lives on <html>, rendered by the root layout, so the whole tree has
+ * to re-render for the new value to take.
+ */
+export async function setThemeAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const choice = String(formData.get("theme") ?? "");
+  if (!isThemeChoice(choice)) {
+    return { ok: false, error: "That isn't a theme." };
+  }
+
+  (await cookies()).set(THEME_COOKIE, choice, {
+    maxAge: THEME_COOKIE_MAX_AGE,
+    path: "/",
+    sameSite: "lax",
+    // Readable by the server only. Nothing client-side needs it, since the
+    // class is rendered rather than applied by script.
+    httpOnly: true,
+  });
+
+  refresh();
+  return {
+    ok: true,
+    message: choice === "dark" ? "Dark mode on." : "Light mode on.",
+  };
 }
 
 export async function updateClubIdentityAction(

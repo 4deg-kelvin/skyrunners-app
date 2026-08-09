@@ -81,3 +81,79 @@ h3 {
   outline: 2px solid var(--color-cardinal-600);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   Dark mode
+   ==========================================================================
+
+   Every token above, re-stated. Nothing else in the app changes, because
+   nothing else in the app names a colour — `--color-*` is referenced by every
+   utility Tailwind generates, including the `/25` opacity variants, so
+   overriding the variables here flips all of it at once. That is the entire
+   payoff of "never hardcode hex codes in components", and it's the reason this
+   was a small change rather than a rewrite.
+
+   (`app/global-error.tsx` is the one exception and stays light. It renders its
+   own <html> for the case where the app failed badly enough that the
+   stylesheet may not have loaded, so it cannot depend on any of this.)
+
+   Applied by a class on <html>, set server-side from a cookie in the root
+   layout — see `lib/theme.ts`. Not `prefers-color-scheme` alone, because the
+   point is that a member can override their OS.
+
+   ---------------------------------------------------------------------------
+   Two things that needed real thought
+   ---------------------------------------------------------------------------
+
+   1. **The neutrals are warm, not grey.** The light theme is off-white
+      (#f7f5f3), not white, and a neutral-grey dark theme next to it reads as a
+      different product. These are warm near-blacks for the same reason.
+
+   2. **Cardinal has to work as text AND as a button fill.** #8c1515 on a
+      near-black background is unreadable — around 2.8:1 — but lighten it far
+      enough for comfortable link text and white-on-cardinal buttons start
+      failing instead. #d4544d is the value where both directions clear ~4.2:1:
+      readable as a link, and still safely carrying white bold text. It is
+      visibly lighter than the light-mode cardinal, which is correct — the same
+      ink looks darker on paper than on a screen at night.
+   ========================================================================== */
+
+.dark {
+  /* Cardinal, lifted so it survives a dark background — see note 2 above. */
+  --color-cardinal-50: #2a1413;
+  --color-cardinal-100: #3a1a18;
+  --color-cardinal-200: #52211f;
+  --color-cardinal-500: #c1443e;
+  --color-cardinal-600: #d4544d;
+  --color-cardinal-700: #e2726c;
+  --color-cardinal-800: #ef8f89;
+
+  /* Warm near-blacks, mirroring the warm off-whites. */
+  --color-surface: #14110f;
+  --color-card: #1c1917;
+  --color-line: #322c28;
+  --color-line-soft: #26221f;
+
+  /* Text, inverted through the same warm ramp. */
+  --color-ink: #f4f1ee;
+  --color-ink-soft: #b5aea8;
+  --color-ink-muted: #8a837d;
+
+  /*
+    Status: the FG values get lighter and the BG values get darker, so a badge
+    keeps the same relationship it has in daylight — a tinted pill with legible
+    text on it — rather than inverting into a solid block.
+  */
+  --color-ok-bg: #16301b;
+  --color-ok-fg: #74c47f;
+  --color-warn-bg: #33260f;
+  --color-warn-fg: #dba94b;
+  --color-risk-bg: #3a1817;
+  --color-risk-fg: #ef8a85;
+  --color-neutral-bg: #26221f;
+  --color-neutral-fg: #b5aea8;
+  --color-info-bg: #15253a;
+  --color-info-fg: #86b4e4;
+
+  color-scheme: dark;
+}

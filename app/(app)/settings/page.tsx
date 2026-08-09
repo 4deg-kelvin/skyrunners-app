@@ -6,6 +6,7 @@ import { ProfileForm } from "@/components/forms/profile-form";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { TierAdminForm } from "@/components/forms/tier-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
+import { ThemeToggle } from "@/components/forms/theme-toggle";
 import {
   AddCatalogueItemForm,
   AddSectionForm,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
+import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
 import { TIER_LABELS } from "@/lib/contribution";
 import { can } from "@/lib/permissions";
@@ -44,6 +46,7 @@ function termRange(startsOn: string, endsOn: string): string {
 
 export default async function SettingsPage() {
   const viewer = await getViewer();
+  const theme = await getThemeChoice();
   const [view, catalogue, tiers, identity] = await Promise.all([
     getSettings(viewer.member.id),
     getCatalogue(),
@@ -225,6 +228,23 @@ export default async function SettingsPage() {
               ? "Changing these updates /how-we-lead and every contribution panel immediately. It renames tiers; it doesn't recalculate anybody's hours."
               : "Co-Leads set these. The full rubric is published at /how-we-lead."}
           </p>
+        </CardBody>
+      </Card>
+
+      {/*
+        Appearance. Near the top because it's the only setting on this page a
+        member is likely to come looking for on purpose, rather than one they
+        set once and forget.
+      */}
+      <Card>
+        <CardBody>
+          <SectionLabel>Appearance</SectionLabel>
+          <h3 className="text-ink mt-2 text-[17px] font-bold">Light or dark</h3>
+          <p className="text-ink-soft mt-1 mb-4 text-[15px]">
+            Dark mode for late nights in the lab. It applies the moment you
+            switch, on every page.
+          </p>
+          <ThemeToggle theme={theme} />
         </CardBody>
       </Card>
 
