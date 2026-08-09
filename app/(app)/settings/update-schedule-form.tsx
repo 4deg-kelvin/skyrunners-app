@@ -4,7 +4,12 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 
 import { ActionForm } from "@/components/forms/action-form";
-import { SELECTABLE_UPDATE_DAYS, WEEKDAY_NAMES, WEEKDAY_SHORT } from "@/lib/labels";
+import {
+  byWeekOrder,
+  SELECTABLE_UPDATE_DAYS,
+  WEEKDAY_NAMES,
+  WEEKDAY_SHORT,
+} from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { setUpdateScheduleAction } from "@/lib/actions";
 
@@ -24,7 +29,11 @@ export function UpdateScheduleForm({
   initialWeekdays: number[];
   disabled?: boolean;
 }) {
-  const [selected, setSelected] = useState<number[]>(initialWeekdays);
+  // Week order throughout, not numeric — Sunday is 0, so sorting by value puts
+  // a weekend pair on screen as "Sunday and Saturday".
+  const [selected, setSelected] = useState<number[]>(
+    [...initialWeekdays].sort(byWeekOrder)
+  );
 
   function toggle(day: number) {
     setSelected((current) => {
@@ -34,21 +43,31 @@ export function UpdateScheduleForm({
       if (current.length >= updatesPerWeek) {
         // At the limit: replace the earliest pick rather than refusing the
         // click. Silently doing nothing feels broken.
-        const [, ...rest] = [...current].sort((a, b) => a - b);
-        return [...rest, day].sort((a, b) => a - b);
+        const [, ...rest] = [...current].sort(byWeekOrder);
+        return [...rest, day].sort(byWeekOrder);
       }
-      return [...current, day].sort((a, b) => a - b);
+      return [...current, day].sort(byWeekOrder);
     });
   }
 
   const complete = selected.length === updatesPerWeek;
 
-  // Flag picks with no working days between them — two updates on Mon and Tue
-  // technically satisfies the rule and defeats its purpose.
+  /*
+    Flag picks with no day between them — two updates on Mon and Tue satisfies
+    the rule and defeats its purpose.
+
+    The gap is measured AROUND the week, not along the number line. Sunday is 0
+    and Saturday is 6, so a plain subtraction calls that pair six days apart
+    when they're consecutive — the one case a straight comparison gets exactly
+    backwards, and the reason this isn't `Math.abs(a - b) < 2` any more.
+  */
   const tooClose =
     complete &&
     selected.length === 2 &&
-    Math.abs(selected[1] - selected[0]) < 2;
+    (() => {
+      const diff = Math.abs(selected[1] - selected[0]);
+      return Math.min(diff, 7 - diff) < 2;
+    })();
 
   return (
     <div>

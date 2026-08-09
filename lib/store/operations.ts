@@ -1609,8 +1609,11 @@ export async function setUpdateSchedule(input: {
 }): Promise<Result<number[]>> {
   const weekdays = [...new Set(input.weekdays)].sort((a, b) => a - b);
 
-  if (weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 5)) {
-    return fail("Check-in days have to be weekdays.");
+  // 0 = Sunday through 6 = Saturday, matching `Date.getDay()` and the DB.
+  // All seven are allowed: the deadline follows when somebody actually works,
+  // and for a student with a full class week that's often the weekend.
+  if (weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
+    return fail("Pick a real day of the week.");
   }
 
   return guarded((store) => {
