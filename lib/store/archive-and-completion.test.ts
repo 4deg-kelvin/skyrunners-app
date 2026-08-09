@@ -1203,4 +1203,28 @@ describe("deleting a member record", () => {
     });
     assert.equal(result.ok, false);
   });
+
+  test("a refused delete leaves reporting lines untouched", async () => {
+    /*
+      The primary-RE check used to run AFTER the reparenting loop, so a delete
+      that was then refused had already rewritten everybody's Lead. A failed
+      operation with a permanent side effect is the worst kind — the caller
+      sees an error and reasonably assumes nothing changed.
+    */
+    disk.readStore().members.find((m) => m.id === "m-sofia")!.leadId = "m-tyler";
+
+    // m-tyler is the primary RE of p-wing-spar, so this is refused.
+    const result = await ops.deleteMember({
+      memberId: "m-tyler",
+      actorId: CO_LEAD,
+      force: true,
+    });
+    assert.equal(result.ok, false);
+
+    // Still reporting to Tyler, not silently moved up to his Lead.
+    assert.equal(
+      disk.readStore().members.find((m) => m.id === "m-sofia")?.leadId,
+      "m-tyler"
+    );
+  });
 });

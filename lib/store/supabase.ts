@@ -233,9 +233,33 @@ export async function persistDiff(
               if (col.endsWith("_id")) query = query.eq(col, val as string);
             }
           }
-          const { error } = await query;
+          /*
+            `.select()` so the delete reports what it actually removed.
+
+            Without it, a missing RLS DELETE policy is SILENT. RLS doesn't
+            raise on a policy that isn't there — the row is simply invisible to
+            the statement, so the delete matches nothing, PostgREST returns
+            success, and the app cheerfully reports "Record deleted." while the
+            row sits exactly where it was. That is what happened to
+            `profiles` (no delete policy until 0019) and it is the most
+            expensive shape of RLS bug there is, because the symptom is
+            "nothing happened" with no error anywhere.
+
+            Zero rows back when we meant to remove one is therefore a failure,
+            and it names the likely cause rather than making the next person
+            rediscover it.
+          */
+          const { data, error } = await query.select();
           if (error) {
             throw new Error(`Deleting from ${spec.table} failed: ${error.message}`);
+          }
+          if (!data || data.length === 0) {
+            throw new Error(
+              `Deleting from ${spec.table} removed nothing. The row is almost ` +
+                `certainly there but hidden from the delete by row-level ` +
+                `security — check that ${spec.table} has a DELETE policy ` +
+                `covering this user.`
+            );
           }
         }
       });

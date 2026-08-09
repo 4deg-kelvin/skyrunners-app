@@ -1702,6 +1702,22 @@ export async function deleteMember(input: {
     }
 
     /*
+      Every refusal happens BEFORE the first mutation. Order matters here.
+
+      This check used to sit after the reparenting loop below, which meant a
+      delete that was then refused had already rewritten everybody's reporting
+      line — a failed operation with a permanent side effect, and the worst
+      kind, since the caller sees an error and reasonably assumes nothing
+      changed.
+    */
+    const owned = store.projects.filter((p) => p.primaryReId === member.id);
+    if (owned.length > 0) {
+      return fail<null>(
+        `${member.fullName} is the primary RE of ${owned.map((p) => p.name).join(", ")}. Hand those over first — a project with no RE is the one state the model can't hold.`
+      );
+    }
+
+    /*
       Anyone reporting to them is reparented to THEIR lead, not orphaned.
 
       A member with `leadId` pointing at a deleted row has nobody reading their
@@ -1710,16 +1726,6 @@ export async function deleteMember(input: {
     */
     for (const other of store.members) {
       if (other.leadId === member.id) other.leadId = member.leadId;
-    }
-
-    // Projects they were the primary RE of would be left pointing at nothing,
-    // which is the one state the project model can't represent. Refuse rather
-    // than guess a replacement.
-    const owned = store.projects.filter((p) => p.primaryReId === member.id);
-    if (owned.length > 0) {
-      return fail<null>(
-        `${member.fullName} is the primary RE of ${owned.map((p) => p.name).join(", ")}. Hand those over first — a project with no RE is the one state the model can't hold.`
-      );
     }
 
     store.projectMemberships = store.projectMemberships.filter(
