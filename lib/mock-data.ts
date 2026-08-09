@@ -10,9 +10,12 @@ import {
   JOIN_REQUEST_STALE_DAYS,
   RE_SILENT_DAYS,
   UPDATES_PER_WEEK_DEFAULT,
+  type CatalogueItem,
+  type CatalogueItemKind,
   type ClubEvent,
   type JoinRequest,
   type Deliverable,
+  type TrainingSection,
   type Member,
   type Project,
   type ProjectAttentionFlag,
@@ -1113,6 +1116,75 @@ export const deliverables: Deliverable[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Trainings and facility access — the club's real catalogue
+// ---------------------------------------------------------------------------
+
+/**
+ * The actual sites and machines, from Anish on 2026-08-08.
+ *
+ * This is a SEED, not a schema. Every row here is editable from the app and
+ * Co-Leads will add to it — the whole point of the design is that a new
+ * machine is a row, not a deploy. If you're reading this because the club has
+ * a machine the list doesn't, add it in the UI rather than here.
+ */
+export const seedTrainingSections: TrainingSection[] = [
+  { id: "sec-robotics", name: "Robotics Room", sortOrder: 1 },
+  { id: "sec-lab64", name: "Lab 64", sortOrder: 2 },
+  { id: "sec-prl", name: "PRL", sortOrder: 3 },
+  { id: "sec-chip", name: "CHIP", sortOrder: 4 },
+  // The catch-all. Anything that belongs to no site — an online course, a
+  // flight-safety briefing — lands here rather than forcing a fake site.
+  { id: "sec-misc", name: "Misc", sortOrder: 99 },
+];
+
+const item = (
+  id: string,
+  sectionId: string,
+  name: string,
+  kind: CatalogueItemKind,
+  sortOrder: number
+): CatalogueItem => ({ id, sectionId, name, kind, sortOrder, isActive: true });
+
+export const seedCatalogueItems: CatalogueItem[] = [
+  // --- site access: can you get in the door --------------------------------
+  item("acc-robotics", "sec-robotics", "Robotics Room", "site_access", 0),
+  item("acc-lab64", "sec-lab64", "Lab 64", "site_access", 0),
+  // Separate from ordinary Lab 64 access, deliberately — it's a different
+  // clearance, not a property of the first one.
+  item("acc-lab64-24", "sec-lab64", "Lab 64 — 24 hour", "site_access", 1),
+  item("acc-prl", "sec-prl", "PRL", "site_access", 0),
+  item("acc-chip", "sec-chip", "CHIP", "site_access", 0),
+
+  // --- Robotics Room machines ----------------------------------------------
+  item("tr-rr-3dp", "sec-robotics", "3D printers", "machine", 10),
+  item("tr-rr-h2d", "sec-robotics", "H2D Printer", "machine", 11),
+  item("tr-rr-makera", "sec-robotics", "Makera desktop CNC", "machine", 12),
+  item("tr-rr-battery", "sec-robotics", "Battery handling and soldering", "machine", 13),
+
+  // --- Lab 64 machines ------------------------------------------------------
+  item("tr-l64-prusa", "sec-lab64", "PRUSA 3D Printing", "machine", 10),
+  item("tr-l64-trotec", "sec-lab64", "Trotec laser cutter", "machine", 11),
+  item("tr-l64-fablight", "sec-lab64", "Fablight metal laser cutter", "machine", 12),
+  item("tr-l64-solder", "sec-lab64", "Soldering", "machine", 13),
+  item("tr-l64-machining", "sec-lab64", "Machining tools", "machine", 14),
+  item("tr-l64-vapor", "sec-lab64", "Vapor Phase One", "machine", 15),
+  item("tr-l64-reflow", "sec-lab64", "Reflow oven", "machine", 16),
+  item("tr-l64-vacform", "sec-lab64", "Vacuum former", "machine", 17),
+
+  // --- PRL -----------------------------------------------------------------
+  //
+  // Anish: "PRL has CNCs which require PRL training, else you only need to get
+  // site access." So one machine entry, and everything else at PRL is covered
+  // by the door.
+  item("tr-prl-cnc", "sec-prl", "CNC machines", "machine", 10),
+
+  // --- CHIP machines --------------------------------------------------------
+  item("tr-chip-3dp", "sec-chip", "3D printers", "machine", 10),
+  item("tr-chip-laser", "sec-chip", "Laser cutter", "machine", 11),
+  item("tr-chip-electronics", "sec-chip", "Electronic equipment", "machine", 12),
+];
+
+// ---------------------------------------------------------------------------
 // Academic calendar
 // ---------------------------------------------------------------------------
 
@@ -1971,6 +2043,21 @@ export function projectUpdateFeed(projectId: string) {
 }
 
 /** Blockers across a member's projects — what a Lead most needs to see. */
+/** Sections in display order. Manual, because the shop isn't alphabetical. */
+export function trainingSections() {
+  return [...live().trainingSections].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function catalogueItemsFor(sectionId: string) {
+  return live()
+    .catalogueItems.filter((i) => i.sectionId === sectionId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+
+export function certificationsFor(memberId: string) {
+  return live().certifications.filter((c) => c.memberId === memberId);
+}
+
 export function helpRequestById(id: string) {
   return live().helpRequests.find((h) => h.id === id);
 }

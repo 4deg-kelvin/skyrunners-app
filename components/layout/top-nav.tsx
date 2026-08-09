@@ -18,6 +18,8 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },
+  { href: "/trainings", label: "Trainings" },
+  { href: "/deadlines", label: "Deadlines" },
   { href: "/calendar", label: "Calendar" },
 ];
 

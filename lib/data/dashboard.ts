@@ -58,6 +58,10 @@ import type {
   WorkLog,
 } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
+import {
+  getTrainingQueue,
+  type TrainingQueueItem,
+} from "@/lib/data/trainings";
 
 /**
  * How long a completion stays news on the dashboard.
@@ -172,6 +176,18 @@ export interface DashboardView {
     hoursThisWeek: number;
     quietCount: number;
   }[];
+  /**
+   * Trainings waiting on the viewer to verify, and clearances that lapsed.
+   *
+   * The in-app half of "the Lead is notified" when a certification expires.
+   * There is deliberately no email — only join requests and review escalations
+   * do that — so this is the notification, and it has to be somewhere a Lead
+   * already looks rather than a page they'd have to remember to open.
+   */
+  trainings: {
+    pending: TrainingQueueItem[];
+    expired: TrainingQueueItem[];
+  };
   today: string;
   maxBackdateDays: number;
 }
@@ -351,6 +367,10 @@ export async function getDashboard(
     .filter((w) => countedIds.has(w.memberId) && w.workDate >= weekStart)
     .reduce((sum, w) => sum + w.hours, 0);
 
+  // Trainings this viewer is the verifier for. `overseen` is their reporting
+  // subtree, which is exactly who `can.verifyTraining` covers.
+  const trainings = await getTrainingQueue(overseen.map((m) => m.id));
+
   const flaggedProjects: FlaggedProject[] = atRiskProjects().map((project) => ({
     project,
     res: project.reIds
@@ -512,6 +532,7 @@ export async function getDashboard(
     reQueue,
     goneQuiet,
     rollUp,
+    trainings,
     today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,

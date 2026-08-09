@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContactLink } from "@/components/ui/contact-link";
+import { VerifyControls } from "@/components/forms/training-actions";
 import { Donut } from "@/components/ui/donut";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -39,6 +40,7 @@ export default async function DashboardPage({
     reQueue,
     goneQuiet,
     rollUp,
+    trainings,
   } = view;
 
   /**
@@ -296,6 +298,78 @@ export default async function DashboardPage({
                   Answer these on the project page — the reply lands in its
                   update feed where everyone can see it.
                 </p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            Trainings waiting on you, and clearances that lapsed.
+
+            This IS the notification for an expiry — there's no email, per the
+            standing decision that only join requests and review escalations
+            send one. So it has to be somewhere a Lead already looks, not a
+            page they'd have to remember to open.
+          */}
+          {trainings.pending.length + trainings.expired.length > 0 ? (
+            <Card>
+              <CardBody>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <SectionLabel>Trainings To Verify</SectionLabel>
+                  <Link
+                    href="/trainings"
+                    className="text-sm font-semibold text-cardinal-600 hover:text-cardinal-700"
+                  >
+                    The catalogue
+                  </Link>
+                </div>
+
+                {trainings.pending.length > 0 ? (
+                  <div className="mt-4 space-y-2.5">
+                    {trainings.pending.map(({ record, member, item, sectionName }) => (
+                      <div
+                        key={record.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-tile border border-line px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/members/${member.id}`}
+                            className="text-[15px] font-bold text-ink hover:text-cardinal-600"
+                          >
+                            {member.fullName}
+                          </Link>
+                          <p className="mt-0.5 text-sm text-ink-muted">
+                            {item?.name ?? "A training"}
+                            {sectionName ? ` · ${sectionName}` : ""}
+                          </p>
+                        </div>
+                        <VerifyControls
+                          certificationId={record.id}
+                          memberId={member.id}
+                          memberName={member.fullName}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {trainings.expired.length > 0 ? (
+                  <div className="mt-4 rounded-tile border border-risk-fg/25 bg-risk-bg px-4 py-3">
+                    <p className="flex items-start gap-2 text-sm text-risk-fg">
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                      <span>
+                        <span className="font-semibold">
+                          {trainings.expired.length} clearance
+                          {trainings.expired.length === 1 ? " has" : "s have"}{" "}
+                          lapsed:
+                        </span>{" "}
+                        {trainings.expired
+                          .map((t) => `${t.member.fullName} — ${t.item?.name ?? "a training"}`)
+                          .join("; ")}
+                        . They&apos;re no longer cleared until it&apos;s redone.
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
               </CardBody>
             </Card>
           ) : null}

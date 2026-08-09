@@ -8,6 +8,7 @@
 
 import {
   activeMembers,
+  certificationsFor,
   committedProjectCount,
   contributionInputsFor,
   getMember,
@@ -29,6 +30,7 @@ import {
 import type {
   Deliverable,
   Member,
+  MemberCertification,
   ProgressUpdate,
   Project,
   ProjectMembership,
@@ -178,6 +180,21 @@ export interface MemberProfileView {
    * yourself, anyone up your chain, or a Co-Lead.
    */
   checkIns: MemberCheckIn[];
+  /**
+   * What they're cleared on. **Public**, unlike everything else gated by
+   * `canViewEffort` — knowing who can run a machine is how you find the person
+   * to ask, and `PUBLIC_TO_ALL_MEMBERS` has always listed trainings.
+   *
+   * Split three ways because they read differently: what they hold, what's
+   * waiting on a verifier, and what has lapsed. A lapsed clearance shown next
+   * to a valid one, in the same grey, is how somebody ends up on a machine
+   * they're no longer cleared for.
+   */
+  certifications: {
+    held: { record: MemberCertification; itemName: string }[];
+    pending: { record: MemberCertification; itemName: string }[];
+    lapsed: { record: MemberCertification; itemName: string }[];
+  };
 }
 
 /** One submitted check-in, with each project entry resolved. */
@@ -253,6 +270,23 @@ export async function getMemberProfile(
             })),
           }))
       : [],
+    certifications: (() => {
+      // Resolved once into a map — a lookup per record would rescan the whole
+      // catalogue for every row.
+      const names = new Map(
+        readStore().catalogueItems.map((i) => [i.id, i.name])
+      );
+      const rows = certificationsFor(memberId).map((record) => ({
+        record,
+        itemName: names.get(record.itemId) ?? "A retired training",
+      }));
+
+      return {
+        held: rows.filter((r) => r.record.status === "verified"),
+        pending: rows.filter((r) => r.record.status === "requested"),
+        lapsed: rows.filter((r) => r.record.status === "expired"),
+      };
+    })(),
   };
 }
 

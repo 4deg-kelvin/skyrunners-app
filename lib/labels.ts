@@ -18,9 +18,8 @@ import type {
   ProjectHealth,
   ProjectPhase,
   ProjectRole,
+  CertificationStatus,
   TermKind,
-  TrainingCategory,
-  TrainingStatus,
   UpdateStatus,
 } from "./types";
 import type { CommitmentTier } from "./contribution";
@@ -138,28 +137,37 @@ export const KEY_EVENT_WEIGHT = 4;
 // Trainings
 // ---------------------------------------------------------------------------
 
-export const TRAINING_CATEGORY_LABELS: Record<TrainingCategory, string> = {
-  machine_shop: "Machine Shop",
-  lab_equipment: "Lab Equipment",
-  safety: "Safety",
-  software: "Software",
-  online_course: "Online Course",
-  flight: "Flight",
-};
+/**
+ * No category labels here on purpose.
+ *
+ * Sections ("Robotics Room", "Lab 64") are ROWS in `training_sections`, not a
+ * union type — a Co-Lead adds a site from the UI and it appears for everyone.
+ * A label map keyed by category would have to be edited and deployed every
+ * time, which is precisely the coupling the data-driven catalogue removes.
+ * Render `section.name` straight through.
+ */
 
-export const TRAINING_STATUS_LABELS: Record<TrainingStatus, string> = {
+export const CERTIFICATION_STATUS_LABELS: Record<CertificationStatus, string> = {
   requested: "Awaiting verification",
   verified: "Verified",
   expired: "Expired",
   rejected: "Not approved",
 };
 
-export const TRAINING_STATUS_TONES: Record<TrainingStatus, BadgeTone> = {
+export const CERTIFICATION_STATUS_TONES: Record<CertificationStatus, BadgeTone> = {
   requested: "warn",
   verified: "ok",
+  // Red, not grey. An expired clearance that reads as merely "inactive" is how
+  // somebody ends up on a machine they're no longer cleared for.
   expired: "risk",
   rejected: "neutral",
 };
+
+/** Site access versus machine clearance — the only enum in this feature. */
+export const CATALOGUE_KIND_LABELS = {
+  site_access: "Site access",
+  machine: "Machine training",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Deliverables

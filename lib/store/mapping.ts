@@ -13,12 +13,14 @@
  */
 
 import type {
+  CatalogueItem,
   ClubEvent,
   Deliverable,
   HelpReply,
   HelpRequest,
   JoinRequest,
   Member,
+  MemberCertification,
   ProgressUpdate,
   Project,
   ProjectArtifact,
@@ -26,6 +28,7 @@ import type {
   ProjectNotice,
   Team,
   Term,
+  TrainingSection,
   UpdateSchedule,
   WorkLog,
 } from "../types.ts";
@@ -556,6 +559,85 @@ export function helpReplyToRow(reply: HelpReply) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Trainings and facility access
+// ---------------------------------------------------------------------------
+
+const trainingSections: CollectionSpec<TrainingSection> = {
+  key: "trainingSections",
+  table: "training_sections",
+  columns: "id, name, sort_order",
+  identify: (s) => s.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    sortOrder: Number(r.sort_order ?? 0),
+  }),
+  toRow: (s) => ({ id: s.id, name: s.name, sort_order: s.sortOrder }),
+};
+
+const catalogueItems: CollectionSpec<CatalogueItem> = {
+  key: "catalogueItems",
+  table: "catalogue_items",
+  columns:
+    "id, section_id, name, kind, validity_months, sort_order, is_active",
+  identify: (i) => i.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    sectionId: r.section_id as string,
+    name: r.name as string,
+    kind: r.kind as CatalogueItem["kind"],
+    validityMonths: opt(r.validity_months as number),
+    sortOrder: Number(r.sort_order ?? 0),
+    isActive: r.is_active as boolean,
+  }),
+  toRow: (i) => ({
+    id: i.id,
+    section_id: i.sectionId,
+    name: i.name,
+    kind: i.kind,
+    validity_months: nul(i.validityMonths),
+    sort_order: i.sortOrder,
+    is_active: i.isActive,
+  }),
+  dependsOn: ["trainingSections"],
+};
+
+const certifications: CollectionSpec<MemberCertification> = {
+  key: "certifications",
+  table: "member_certifications",
+  columns:
+    "id, member_id, item_id, status, completed_at, expires_at, certificate_url, verified_by, verified_at, note, requested_at",
+  identify: (c) => c.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    memberId: r.member_id as string,
+    itemId: r.item_id as string,
+    status: r.status as MemberCertification["status"],
+    completedAt: r.completed_at as string,
+    expiresAt: opt(r.expires_at as string),
+    certificateUrl: opt(r.certificate_url as string),
+    verifiedById: opt(r.verified_by as string),
+    verifiedAt: opt(r.verified_at as string),
+    note: opt(r.note as string),
+    requestedAt: r.requested_at as string,
+  }),
+  toRow: (c) => ({
+    id: c.id,
+    member_id: c.memberId,
+    item_id: c.itemId,
+    status: c.status,
+    completed_at: c.completedAt,
+    expires_at: nul(c.expiresAt),
+    certificate_url: nul(c.certificateUrl),
+    verified_by: nul(c.verifiedById),
+    verified_at: nul(c.verifiedAt),
+    note: nul(c.note),
+    requested_at: c.requestedAt,
+  }),
+  dependsOn: ["members", "catalogueItems"],
+};
+
 /**
  * Order matters: inserts run top to bottom, deletes bottom to top, so a row is
  * never written before what it references or deleted while still referenced.
@@ -575,6 +657,9 @@ export const COLLECTIONS = [
   progressUpdates,
   projectNotices,
   helpRequests,
+  trainingSections,
+  catalogueItems,
+  certifications,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

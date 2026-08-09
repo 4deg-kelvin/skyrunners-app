@@ -855,6 +855,176 @@ async function deleteTeamAction$impl(formData: FormData): Promise<ActionResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Trainings and facility access
+// ---------------------------------------------------------------------------
+
+async function requestCertificationAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.requestTraining(viewer.actor, viewer.member.id)) {
+    return denied("request trainings");
+  }
+
+  const result = await ops.requestCertification({
+    // From the session, never the form. A safety record that could be filed
+    // under somebody else's name is worse than no record.
+    memberId: viewer.member.id,
+    itemId: String(formData.get("itemId") ?? ""),
+    completedAt: String(formData.get("completedAt") ?? today()),
+    certificateUrl: String(formData.get("certificateUrl") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Sent to your Lead to verify.");
+}
+
+async function verifyCertificationAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const certificationId = String(formData.get("certificationId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
+    return denied("verify this");
+  }
+
+  const result = await ops.verifyCertification({
+    certificationId,
+    verifierId: viewer.member.id,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Verified.");
+}
+
+async function rejectCertificationAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
+    return denied("decide this");
+  }
+
+  const result = await ops.rejectCertification({
+    certificationId: String(formData.get("certificationId") ?? ""),
+    verifierId: viewer.member.id,
+    note: String(formData.get("note") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Sent back with your note.");
+}
+
+async function revokeCertificationAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
+    return denied("withdraw this clearance");
+  }
+
+  const result = await ops.revokeCertification({
+    certificationId: String(formData.get("certificationId") ?? ""),
+    verifierId: viewer.member.id,
+    note: String(formData.get("note") ?? ""),
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Clearance withdrawn.");
+}
+
+async function createTrainingSectionAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTrainingCatalogue(viewer.actor)) {
+    return denied("edit the trainings catalogue");
+  }
+
+  const result = await ops.createTrainingSection({
+    name: String(formData.get("name") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Section added.");
+}
+
+/** Blank means "never expires", which is every item in the club's list today. */
+function validityFrom(formData: FormData): number | undefined {
+  const raw = String(formData.get("validityMonths") ?? "").trim();
+  return raw ? Number(raw) : undefined;
+}
+
+async function createCatalogueItemAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTrainingCatalogue(viewer.actor)) {
+    return denied("edit the trainings catalogue");
+  }
+
+  const kind =
+    String(formData.get("kind") ?? "") === "site_access"
+      ? "site_access"
+      : "machine";
+
+  const result = await ops.createCatalogueItem({
+    sectionId: String(formData.get("sectionId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    kind,
+    validityMonths: validityFrom(formData),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Added — it's on everyone's list now.");
+}
+
+async function updateCatalogueItemAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTrainingCatalogue(viewer.actor)) {
+    return denied("edit the trainings catalogue");
+  }
+
+  const result = await ops.updateCatalogueItem({
+    itemId: String(formData.get("itemId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    validityMonths: validityFrom(formData),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved.");
+}
+
+async function setCatalogueItemActiveAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTrainingCatalogue(viewer.actor)) {
+    return denied("edit the trainings catalogue");
+  }
+
+  const isActive = String(formData.get("isActive") ?? "") === "yes";
+  const result = await ops.setCatalogueItemActive({
+    itemId: String(formData.get("itemId") ?? ""),
+    isActive,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, isActive ? "Back on the list." : "Retired.");
+}
+
+// ---------------------------------------------------------------------------
 // Phase 7 — the RE answers a check-in section
 // ---------------------------------------------------------------------------
 
@@ -1275,6 +1445,38 @@ export async function updateTeamAction(formData: FormData): Promise<ActionResult
 
 export async function deleteTeamAction(formData: FormData): Promise<ActionResult> {
   return withRequestStore(() => deleteTeamAction$impl(formData));
+}
+
+export async function requestCertificationAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => requestCertificationAction$impl(formData));
+}
+
+export async function verifyCertificationAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => verifyCertificationAction$impl(formData));
+}
+
+export async function rejectCertificationAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => rejectCertificationAction$impl(formData));
+}
+
+export async function revokeCertificationAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => revokeCertificationAction$impl(formData));
+}
+
+export async function createTrainingSectionAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createTrainingSectionAction$impl(formData));
+}
+
+export async function createCatalogueItemAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => createCatalogueItemAction$impl(formData));
+}
+
+export async function updateCatalogueItemAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => updateCatalogueItemAction$impl(formData));
+}
+
+export async function setCatalogueItemActiveAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => setCatalogueItemActiveAction$impl(formData));
 }
 
 export async function respondToUpdateEntryAction(formData: FormData): Promise<ActionResult> {

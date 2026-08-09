@@ -69,6 +69,9 @@ const liveSnapshot = {
   projectArtifacts: [],
   projectNotices: [],
   helpRequests: [],
+  trainingSections: [],
+  catalogueItems: [],
+  certifications: [],
 };
 
 describe("mutate resolves the backend inside the request", () => {
