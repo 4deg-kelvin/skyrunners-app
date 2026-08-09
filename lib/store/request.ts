@@ -14,6 +14,7 @@
  * person's page render. That's the bug this file exists to prevent.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cache } from "react";
 
 import { hasLiveSnapshot, installLiveBackend, type StoreShape } from "./disk";
@@ -29,10 +30,35 @@ interface Holder {
 }
 
 /**
- * One holder per request. `cache()` guarantees the same object for every caller
- * within a request and a fresh one for the next.
+ * One holder per request — in renders AND in Server Actions.
+ *
+ * `cache()` alone is not enough, and this is the bug that made every write fail
+ * while every page read fine. React memoizes a cached function for the duration
+ * of a RENDER. A Server Action doesn't run inside one, so `cache()` there hands
+ * back a brand-new object on every call: `getViewer()` loaded the database into
+ * one throwaway holder, and the write that followed asked a second, empty one.
+ * Reads worked because pages do run inside a render.
+ *
+ * So the holder is anchored to the async execution context instead, which both
+ * a render and an action have. `enterWith` is what makes that possible without
+ * wrapping every action — it binds the store for the rest of the current
+ * context, so a callee can establish the scope its caller will keep seeing.
+ *
+ * Still one per request: concurrent requests are separate context trees, so
+ * nobody sees anybody else's unsaved writes — the property this file exists
+ * for. The `cache()` call is kept as the seed so the render path is unchanged.
  */
-const holder = cache((): Holder => ({ snapshot: null, original: null }));
+const store = new AsyncLocalStorage<Holder>();
+const cachedHolder = cache((): Holder => ({ snapshot: null, original: null }));
+
+function holder(): Holder {
+  const existing = store.getStore();
+  if (existing) return existing;
+
+  const fresh = cachedHolder();
+  store.enterWith(fresh);
+  return fresh;
+}
 
 /**
  * Load the database for this request.
