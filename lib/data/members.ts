@@ -9,6 +9,7 @@
 import {
   activeMembers,
   certificationsFor,
+  daysUntil,
   committedProjectCount,
   contributionInputsFor,
   getMember,
@@ -154,6 +155,8 @@ export interface MemberProjectRow {
   hoursLogged: number;
   /** What this person owns here — concrete, not a text field. */
   deliverables: Deliverable[];
+  /** Days until the project's target. Negative once passed, undefined if unset. */
+  daysToTarget?: number;
 }
 
 export interface MemberProfileView {
@@ -241,6 +244,7 @@ export async function getMemberProfile(
           deliverables: myDeliverables(memberId).filter(
             (d) => d.projectId === pm.project!.id
           ),
+          daysToTarget: daysUntil(pm.project.targetDate),
         },
       ];
     }),

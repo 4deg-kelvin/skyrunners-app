@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
+import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -160,6 +161,7 @@ export default async function MemberProfilePage({
                       breadcrumb,
                       hoursLogged,
                       deliverables,
+                      daysToTarget,
                     }) => (
                       <div
                         key={project.id}
@@ -207,12 +209,25 @@ export default async function MemberProfilePage({
                           </p>
                         ) : null}
 
-                        {canViewEffort ? (
-                          <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
-                            <Clock className="size-3.5" />
-                            {formatNumber(hoursLogged, 1)} hrs logged
-                          </p>
-                        ) : null}
+                        {/*
+                          Hours are gated on `canViewEffort`; the countdown
+                          isn't. When a project is due is a fact about the
+                          project, and the whole club can already read it on
+                          the project page — hiding it here would be privacy
+                          theatre that costs the page its point.
+                        */}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-muted">
+                          {canViewEffort ? (
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="size-3.5" />
+                              {formatNumber(hoursLogged, 1)} hrs logged
+                            </span>
+                          ) : null}
+                          <DueCountdown
+                            daysLeft={daysToTarget}
+                            done={project.phase === "complete"}
+                          />
+                        </div>
                       </div>
                     )
                   )

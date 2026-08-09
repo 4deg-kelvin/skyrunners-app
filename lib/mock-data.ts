@@ -2066,6 +2066,23 @@ export function certificationsFor(memberId: string) {
   return live().certifications.filter((c) => c.memberId === memberId);
 }
 
+/**
+ * Whole days from today until an ISO date. Negative once it has passed.
+ *
+ * Both sides are truncated to their date part first, and that's load-bearing.
+ * JavaScript parses `"2026-09-30"` as UTC midnight but a bare
+ * `"2026-09-30T18:00"` as *local* time, so mixing the two silently loses a day
+ * in Pacific — which is the difference between "1 day left" and "due today".
+ * Same reasoning as `daysBetween` in `lib/review.ts`.
+ */
+export function daysUntil(iso: string | undefined): number | undefined {
+  if (!iso) return undefined;
+  const target = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  const now = Date.parse(`${today()}T00:00:00Z`);
+  if (Number.isNaN(target)) return undefined;
+  return Math.round((target - now) / 86_400_000);
+}
+
 export function getEvent(id: string) {
   return live().events.find((e) => e.id === id);
 }

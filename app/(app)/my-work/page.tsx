@@ -19,6 +19,7 @@ import {
   DeliverableRow,
   ProgressBar,
 } from "@/components/ui/deliverable-row";
+import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -561,6 +562,15 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
           <Clock className="size-3.5" />
           {formatNumber(hoursLogged, 1)} hrs logged
         </span>
+        {/*
+          Days, right beside the hours. The two together answer "how much have
+          I put in, and how long have I got" — which the target date alone
+          never did, because a date needs arithmetic before it means anything.
+        */}
+        <DueCountdown
+          daysLeft={card.daysToTarget}
+          done={project.phase === "complete"}
+        />
         {project.timeCommitment ? <span>{project.timeCommitment}</span> : null}
       </div>
 
