@@ -357,18 +357,49 @@ Full reasoning in `docs/DECISIONS.md` and `docs/PRODUCT_REVIEW.md`.
 answered them all in chat on 2026-08-08, and everything in those answers is now
 built. Phases 5–8 shipped on 2026-08-08/09.
 
-**The one open piece of scope: mini Gantt charts per project**, under the
-deadlines strip on `/projects`. Anish asked for this on 2026-08-09 and asked to
-scope it in a follow-up conversation before it's built — **do not start it
-without going through the questions with him.**
+### Mini Gantt charts — scoped with Anish 2026-08-09, not yet built
 
-It matters that this is *not* the critical-path Gantt in the "don't
-re-litigate" list. That one was rejected because a dependency graph costs an RE
-an hour a week and is wrong the day after it's entered. This is a read-only
-picture of dates that already exist — project targets and the new
-parent-constrains-child rule — with no dependencies and nothing new to maintain.
-Keep it that way; the moment it needs its own upkeep it has become the thing
-that was rejected.
+The one open piece of scope. It matters that this is **not** the critical-path
+Gantt in the "don't re-litigate" list. That one was rejected because a
+dependency graph costs an RE an hour a week and is wrong the day after it's
+entered. This is a read-only picture of dates that already exist, with no
+dependencies and nothing new to maintain. Keep it that way — the moment it
+needs its own upkeep it has become the thing that was rejected.
+
+Decided:
+
+| Question | Answer |
+|---|---|
+| What's a bar | **One per project.** Start date → target date. Not deliverables |
+| Time window | **Auto-fit to the dates present** in that division. Nothing falls off the edge, and a division with one December project doesn't render a mostly-empty chart |
+| On the bar | Health colour, progress fill from deliverables done, and a **today marker** |
+| Placement | **Under each division**, always visible — not behind the deadlines toggle |
+| Also | Each project gets **a small chart of its own on the side** (project detail page) |
+| Depth | **Render at most two levels of sub-project.** Below that it stops being readable |
+
+That last one is a real constraint, not a nicety — the project tree is
+unbounded and `p-layup` already sits three deep. Whatever is cut off must be
+*said*, not silently dropped: a chart that looks complete and isn't is worse
+than one that admits its limit.
+
+**Groundwork already done** (2026-08-09), so don't redo it:
+
+- `createProject` now sets `startDate`, defaulting to today. It never did, so
+  every project made through the app had no left edge for a bar. Clamped to the
+  target date when that's in the past, because `0001_core_schema.sql` has
+  `check (target_date >= start_date)` and demo mode would have accepted a row
+  that failed on insert.
+- `datesOverridden` is set properly. It means **"derive this project's dates
+  from its children"** — a parent with no date of its own spans whatever its
+  sub-projects span, which is most of the roll-up logic the chart needs, and it
+  was hard-coded `false` so a hand-typed target looked derived.
+- A sub-project can't be due after its parent, enforced on create and update.
+  So bars nest without crossing their parent's right edge.
+
+**Still open before building:** projects created before today have no
+`startDate`. Decide whether to render those as a point at the target date, bar
+them from the division's earliest date, or ask REs to fill them in. There are
+only a handful, and the club's real data is young.
 
 ### Explicitly not planned — read the reasoning before reopening
 
