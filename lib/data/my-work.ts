@@ -193,16 +193,64 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
   const following = cards.filter((c) => c.membership.commitment === "following");
   const projects = committed;
 
-  // Only include sections whose project still resolves — a member could have
-  // left a project after the draft was seeded.
   const currentUpdate = currentUpdateFor(memberId);
-  const sections: UpdateDraftSection[] = currentUpdate.entries.flatMap((entry) => {
-    const card = projects.find((p) => p.project.id === entry.projectId);
-    if (!card) return [];
-    return [
-      { entry, project: card.project, breadcrumb: card.breadcrumb },
-    ];
+
+  /*
+    One section per COMMITTED PROJECT, not per pre-existing entry.
+
+    This used to map over `currentUpdate.entries`, which meant the composer
+    only offered a box for a project that already had a draft row — and those
+    rows are seeded from logged hours. So a member who was on three projects
+    and hadn't logged anything this period saw "no project sections to fill in"
+    and could write nothing at all.
+
+    That got it exactly backwards. The check-in most worth reading is the one
+    from somebody who did NOTHING and needs to say why — blocked, waiting on a
+    part, buried in midterms. Requiring hours before you can report is
+    requiring progress before you can report a lack of it.
+
+    Hours and open deliverables AUTO-FILL a section; they don't create it.
+    Being on the project creates it.
+  */
+  const existingByProject = new Map(
+    currentUpdate.entries.map((entry) => [entry.projectId, entry])
+  );
+
+  const sections: UpdateDraftSection[] = projects.map((card) => {
+    const existing = existingByProject.get(card.project.id);
+    return {
+      // A synthetic entry when there's no draft row yet. It carries the
+      // project's real id, so submitting writes against the right project —
+      // `submitCheckIn` keys on `projectId`, never on this id.
+      entry: existing ?? {
+        id: `draft-${currentUpdate.id}-${card.project.id}`,
+        updateId: currentUpdate.id,
+        projectId: card.project.id,
+        progress: "",
+        hours: card.hoursLogged,
+      },
+      project: card.project,
+      breadcrumb: card.breadcrumb,
+    };
   });
+
+  /*
+    Entries for projects they've since LEFT still render, at the end.
+
+    Dropping them would silently discard something already written — and it's
+    usually the handover note explaining why they left, which is the one part
+    of that check-in anybody needs.
+  */
+  for (const entry of currentUpdate.entries) {
+    if (projects.some((p) => p.project.id === entry.projectId)) continue;
+    const project = getProject(entry.projectId);
+    if (!project) continue;
+    sections.push({
+      entry,
+      project,
+      breadcrumb: projectBreadcrumb(project.id),
+    });
+  }
 
   return {
     me,

@@ -86,9 +86,15 @@ export function CheckInForm({
       >
         {sections.length === 0 ? (
           <p className="rounded-tile bg-surface px-3.5 py-3 text-sm text-ink-soft">
-            You haven&apos;t logged hours on anything this period, so there are no
-            project sections to fill in. You can still leave a general note
-            below.
+            {/*
+              Now only reachable when somebody is on NO projects at all.
+              It used to appear whenever you hadn't logged hours, which meant
+              the person with most to report — blocked, stuck, waiting on a
+              part — was the one told they had nothing to say.
+            */}
+            You&apos;re not on any projects yet, so there&apos;s nothing
+            project-specific to report. Leave a general note below, or find
+            something to join.
           </p>
         ) : (
           sections.map((s) => (

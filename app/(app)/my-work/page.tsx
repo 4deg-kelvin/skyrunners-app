@@ -318,9 +318,9 @@ export default async function MyWorkPage() {
           <div className="mt-6 space-y-3">
             {currentUpdate.sections.length === 0 ? (
               <EmptyState
-                message="No hours logged yet this period, so there's nothing to report on."
-                actionLabel="Browse projects"
-                actionHref="/projects"
+                message="You're not on any projects yet, so there's nothing project-specific to report."
+                actionLabel="Find something to join"
+                actionHref="/find-work"
               />
             ) : (
               currentUpdate.sections.map(({ entry, project, breadcrumb }) => (
