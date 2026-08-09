@@ -41,6 +41,21 @@ for (const m of snap.projectMemberships) if (m.role === "re") reBy.set(m.project
 for (const p of snap.projects) { const ids = reBy.get(p.id) ?? []; if (p.primaryReId && !ids.includes(p.primaryReId)) ids.unshift(p.primaryReId); p.reIds = ids; }
 await c.end();
 
+// Import the data modules BEFORE installing our backend. `lib/store/request.ts`
+// installs its own at module scope, so loading it afterwards would silently
+// replace ours — and every call would then try to build a Supabase client and
+// die on `cookies` outside a request scope.
+const dataModules = {
+  myWork: await import("../lib/data/my-work.ts"),
+  findWork: await import("../lib/data/find-work.ts"),
+  members: await import("../lib/data/members.ts"),
+  projects: await import("../lib/data/projects.ts"),
+  dashboard: await import("../lib/data/dashboard.ts"),
+  updates: await import("../lib/data/updates.ts"),
+  settings: await import("../lib/data/settings.ts"),
+  events: await import("../lib/data/events.ts"),
+};
+
 installLiveBackend(() => snap, async () => {});
 console.log(`loaded: ${snap.members.length} members, ${snap.projects.length} projects, ${snap.teams.length} teams\n`);
 
@@ -54,14 +69,26 @@ async function check(name: string, fn: () => Promise<unknown>) {
   catch (e) { console.log("  ✗ " + name + "  →  " + (e as Error).message.split("\n")[0].slice(0, 90)); }
 }
 
-await check("/my-work        getMyWork", async () => (await import("../lib/data/my-work.ts")).getMyWork(me.id));
-await check("/find-work      getFindWork", async () => (await import("../lib/data/find-work.ts")).getFindWork(me.id, me.skills ?? []));
-await check("/members        getRoster", async () => (await import("../lib/data/members.ts")).getRoster());
-await check("/members        getRosterOptions", async () => (await import("../lib/data/members.ts")).getRosterOptions());
-await check("/members/[id]   getMemberProfile", async () => (await import("../lib/data/members.ts")).getMemberProfile(me.id, true));
-await check("/projects       getProjectTree", async () => (await import("../lib/data/projects.ts")).getProjectTree());
-await check("/projects       getProjectFormOptions", async () => (await import("../lib/data/projects.ts")).getProjectFormOptions());
-await check("/dashboard      getDashboard", async () => (await import("../lib/data/dashboard.ts")).getDashboard(actor, graph));
-await check("/updates        getUpdates", async () => (await import("../lib/data/updates.ts")).getUpdates(actor));
-await check("/settings       getSettings", async () => (await import("../lib/data/settings.ts")).getSettings(me.id));
-await check("/calendar       getUpcomingEvents", async () => (await import("../lib/data/events.ts")).getUpcomingEvents());
+await check("/my-work        getMyWork", async () => dataModules.myWork.getMyWork(me.id));
+await check("/find-work      getFindWork", async () => dataModules.findWork.getFindWork(me.id, me.skills ?? []));
+await check("/members        getRoster", async () => dataModules.members.getRoster());
+await check("/members        getRosterOptions", async () => dataModules.members.getRosterOptions());
+await check("/members/[id]   getMemberProfile", async () => dataModules.members.getMemberProfile(me.id, true));
+await check("/projects       getProjectTree", async () => dataModules.projects.getProjectTree());
+await check("/projects       getProjectFormOptions", async () => dataModules.projects.getProjectFormOptions());
+await check("/dashboard      getDashboard", async () => dataModules.dashboard.getDashboard(actor, graph));
+await check("/updates        getUpdates", async () => dataModules.updates.getUpdates(actor));
+await check("/settings       getSettings", async () => dataModules.settings.getSettings(me.id));
+await check("/calendar       getUpcomingEvents", async () => dataModules.events.getUpcomingEvents());
+
+// The exact call shape the pages use. /members and /projects fire their data
+// functions in a Promise.all ALONGSIDE getViewer, so the read starts before the
+// preload finishes — which is what broke every page but My Work and Dashboard.
+console.log("");
+console.log("page-shaped calls (Promise.all racing the preload):");
+const m = dataModules.members;
+const pr = dataModules.projects;
+await check("/members   roster + options in parallel", async () =>
+  Promise.all([m.getRoster(), m.getRosterOptions()]));
+await check("/projects  tree + orphans + options in parallel", async () =>
+  Promise.all([pr.getProjectTree(), pr.getOrphanedProjects(), pr.getProjectFormOptions()]));

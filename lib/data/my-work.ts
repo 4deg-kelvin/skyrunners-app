@@ -38,6 +38,7 @@ import type {
   ProgressUpdate,
   UpdateEntry,
 } from "@/lib/types";
+import { preloadLiveStore } from "@/lib/store/request";
 
 export interface BreadcrumbNode {
   id: string;
@@ -113,6 +114,14 @@ export interface MyWorkView {
 }
 
 export async function getMyWork(memberId: string): Promise<MyWorkView> {
+  // Ensure the live snapshot exists before any synchronous read.
+  //
+  // Idempotent and free once loaded. It's here rather than left to the caller
+  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
+  // which starts the read BEFORE getViewer has preloaded, and every such page
+  // then died on "Live store not loaded". Guarding at the boundary means call
+  // order stops mattering.
+  await preloadLiveStore();
   const me = getMember(memberId);
   if (!me) throw new Error(`Member not found: ${memberId}`);
 

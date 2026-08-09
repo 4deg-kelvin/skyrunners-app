@@ -16,7 +16,7 @@
 
 import { cache } from "react";
 
-import { installLiveBackend, type StoreShape } from "./disk";
+import { hasLiveSnapshot, installLiveBackend, type StoreShape } from "./disk";
 import { loadSnapshot, persistDiff, snapshotCopy } from "./supabase";
 import { createClient } from "@/lib/supabase/server";
 import { isLiveMode } from "@/lib/env";
@@ -46,6 +46,11 @@ const holder = cache((): Holder => ({ snapshot: null, original: null }));
  */
 export async function preloadLiveStore(): Promise<void> {
   if (!isLiveMode()) return;
+
+  // Already loaded — by this request, or by a script that installed its own
+  // backend. Check before touching `createClient`, which calls `cookies()` and
+  // throws outside a request scope.
+  if (hasLiveSnapshot()) return;
 
   const h = holder();
   if (h.snapshot) return;

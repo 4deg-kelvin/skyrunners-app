@@ -232,6 +232,19 @@ type LivePersister = (mutated: StoreShape) => Promise<void>;
 let liveResolver: LiveResolver | null = null;
 let livePersister: LivePersister | null = null;
 
+/**
+ * Is a live snapshot available right now, from whatever backend is installed?
+ *
+ * Lets `preloadLiveStore()` bail out before it constructs a Supabase client —
+ * which matters because building one calls `cookies()`, and that throws outside
+ * a request scope. Without this, any caller that already has a snapshot (a
+ * verification script, a second call within the same request) pays for a client
+ * it doesn't need, or crashes.
+ */
+export function hasLiveSnapshot(): boolean {
+  return liveResolver?.() != null;
+}
+
 export function installLiveBackend(
   resolver: LiveResolver,
   persister: LivePersister
