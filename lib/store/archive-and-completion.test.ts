@@ -1512,3 +1512,72 @@ describe("withdrawing a sign-off", () => {
     assert.equal(result.ok, false);
   });
 });
+
+describe("a new sub-project can't be created past its parent's date", () => {
+  test("refused on the way in", async () => {
+    const result = await ops.createProject({
+      name: "Late Sub",
+      parentId: "p-wing-spar", // due 2026-10-30
+      primaryReId: "m-tyler",
+      targetDate: "2026-12-01",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /2026-10-30/);
+  });
+
+  test("on or before the parent's date is fine", async () => {
+    const result = await ops.createProject({
+      name: "On Time Sub",
+      parentId: "p-wing-spar",
+      primaryReId: "m-tyler",
+      targetDate: "2026-10-30",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    assert.equal(result.ok, true);
+  });
+
+  test("no date, or no parent date, is unconstrained", async () => {
+    assert.equal(
+      (
+        await ops.createProject({
+          name: "Undated Sub",
+          parentId: "p-wing-spar",
+          primaryReId: "m-tyler",
+          createdBy: "m-anish",
+          today: TODAY,
+        })
+      ).ok,
+      true
+    );
+    // An undated parent promises nothing, so there's nothing to be late for.
+    const undated = await ops.createProject({
+      name: "Open Ended",
+      parentId: null,
+      teamId: "div-evtol",
+      primaryReId: "m-anish",
+      createdBy: "m-anish",
+      today: TODAY,
+    });
+    assert.equal(undated.ok, true);
+    if (!undated.ok) return;
+    assert.equal(undated.value.targetDate, undefined);
+
+    assert.equal(
+      (
+        await ops.createProject({
+          name: "Far Future Sub",
+          parentId: undated.value.id,
+          primaryReId: "m-anish",
+          targetDate: "2030-01-01",
+          createdBy: "m-anish",
+          today: TODAY,
+        })
+      ).ok,
+      true
+    );
+  });
+});

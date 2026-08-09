@@ -20,6 +20,7 @@ import { EntryResponse } from "@/components/forms/entry-response";
 import { ProjectEditForm } from "@/components/forms/project-edit";
 import {
   AddProjectMemberForm,
+  CreateProjectForm,
   REControls,
 } from "@/components/forms/project-admin";
 import { Badge } from "@/components/ui/badge";
@@ -201,6 +202,34 @@ export default async function ProjectDetailPage({
                       canComplete={mayComplete}
                       parentTargetDate={view.parent?.targetDate}
                       incompleteDescendants={view.incompleteDescendants}
+                    />
+                  ) : null}
+                  {/*
+                    Breaking work down, from the project it belongs under.
+
+                    `can.createProject` has always allowed an RE to create a
+                    sub-project of something they own — and the form has always
+                    had the `parentId` prop for it — but it was only ever
+                    mounted on /projects, where the button is Lead-and-above.
+                    So a plain-member RE had the right and no door, and anyone
+                    else had to create the project at top level and reparent it.
+
+                    Not offered on a complete project: a live child under a
+                    finished parent is the state `updateProject` exists to
+                    prevent.
+                  */}
+                  {mayManage && project.phase !== "complete" ? (
+                    <CreateProjectForm
+                      parents={[]}
+                      divisions={[]}
+                      people={assignableMembers.map((m) => ({
+                        id: m.id,
+                        name: m.fullName,
+                      }))}
+                      defaultReId={viewer.member.id}
+                      parentId={project.id}
+                      parentTargetDate={project.targetDate}
+                      label="Add a sub-project"
                     />
                   ) : null}
                 </div>

@@ -803,6 +803,20 @@ export async function createProject(input: {
   }
 
   const { projects } = readStore();
+
+  // Same nesting rule as `updateProject`. Enforced on the way in as well, or
+  // the constraint is one edit away from being bypassed: create the child with
+  // a late date and it simply sits there, since the update path only checks
+  // when a date MOVES.
+  if (input.parentId && input.targetDate) {
+    const parent = projects.find((p) => p.id === input.parentId);
+    if (parent?.targetDate && input.targetDate > parent.targetDate) {
+      return fail<Project>(
+        `${parent.name} is due ${parent.targetDate}, so work inside it can't be due ${input.targetDate}.`
+      );
+    }
+  }
+
   let slug = slugify(name);
   if (
     projects.some((p) => p.slug === slug) ||

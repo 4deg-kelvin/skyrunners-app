@@ -32,6 +32,7 @@ export function CreateProjectForm({
   people,
   defaultReId,
   parentId,
+  parentTargetDate,
   label = "New project",
 }: {
   parents: Option[];
@@ -40,6 +41,12 @@ export function CreateProjectForm({
   defaultReId: string;
   /** Fixed parent — used for "add a sub-project" on a project page. */
   parentId?: string;
+  /**
+   * The fixed parent's target date, if it has one. Work inside a project
+   * can't be due after it, and `createProject` refuses that — this caps the
+   * picker so you find out before pressing the button rather than after.
+   */
+  parentTargetDate?: string;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -121,8 +128,14 @@ export function CreateProjectForm({
           <input
             type="date"
             name="targetDate"
+            max={parentTargetDate}
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
+          {parentTargetDate ? (
+            <span className="text-ink-muted mt-1 block text-xs">
+              No later than {parentTargetDate} — when the project above is due.
+            </span>
+          ) : null}
         </label>
       </div>
 
