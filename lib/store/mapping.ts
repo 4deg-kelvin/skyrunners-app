@@ -14,6 +14,7 @@
 
 import type {
   CatalogueItem,
+  DeliverableTodo,
   ClubSettings,
   ClubEvent,
   Deliverable,
@@ -698,6 +699,35 @@ const clubSettings: CollectionSpec<ClubSettings> = {
   }),
 };
 
+const deliverableTodos: CollectionSpec<DeliverableTodo> = {
+  key: "deliverableTodos",
+  table: "deliverable_todos",
+  columns:
+    "id, deliverable_id, title, done, done_at, done_by, sort_order, created_by",
+  identify: (t) => t.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    deliverableId: r.deliverable_id as string,
+    title: r.title as string,
+    done: Boolean(r.done),
+    doneAt: opt(r.done_at as string),
+    doneBy: opt(r.done_by as string),
+    sortOrder: Number(r.sort_order ?? 0),
+    createdBy: opt(r.created_by as string),
+  }),
+  toRow: (t) => ({
+    id: t.id,
+    deliverable_id: t.deliverableId,
+    title: t.title,
+    done: t.done,
+    done_at: nul(t.doneAt),
+    done_by: nul(t.doneBy),
+    sort_order: t.sortOrder,
+    created_by: nul(t.createdBy),
+  }),
+  dependsOn: ["deliverables"],
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -717,6 +747,7 @@ export const COLLECTIONS = [
   catalogueItems,
   certifications,
   clubSettings,
+  deliverableTodos,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

@@ -17,6 +17,7 @@ import {
   inSession,
   isOverdue,
   joinRequestsAwaitingMe,
+  deliverableTodos,
   lastEntryForProject,
   myDeliverablesOn,
   myJoinRequests,
@@ -36,6 +37,7 @@ import {
 } from "@/lib/contribution";
 import type {
   Deliverable,
+  DeliverableTodo,
   JoinRequest,
   Member,
   Project,
@@ -121,8 +123,18 @@ export interface MyWorkView {
     /** The period covering today, for saying WHY nothing is due. */
     termName?: string;
   };
-  /** Everything they own across all projects, soonest due first. */
-  myDeliverables: { deliverable: Deliverable; project: Project }[];
+  /**
+   * Everything they own across all projects, soonest due first.
+   *
+   * `todos` rides along because this is where the owner actually works from —
+   * the checklist is theirs to write and tick, and making them open the
+   * project page to find it would leave the lists unmaintained.
+   */
+  myDeliverables: {
+    deliverable: Deliverable;
+    project: Project;
+    todos: DeliverableTodo[];
+  }[];
   /** Their own record — always visible to them. */
   contribution: ContributionRecord;
   /**
@@ -305,7 +317,11 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     },
     myDeliverables: cards
       .flatMap((c) =>
-        c.myDeliverables.map((d) => ({ deliverable: d, project: c.project }))
+        c.myDeliverables.map((d) => ({
+          deliverable: d,
+          project: c.project,
+          todos: deliverableTodos(d.id),
+        }))
       )
       .filter((x) => x.deliverable.status !== "done")
       .sort((a, b) =>

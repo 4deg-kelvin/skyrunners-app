@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionForm } from "./action-form";
+import { DiscordIdField } from "./discord-id-field";
 import { Avatar } from "@/components/ui/avatar";
 import { updateProfileAction } from "@/lib/actions";
 import type { Member } from "@/lib/types";
@@ -20,9 +21,17 @@ import type { Member } from "@/lib/types";
  */
 export function ProfileForm({
   member,
+  botLive,
   editingSomeoneElse = false,
 }: {
   member: Member;
+  /**
+   * Whether the club has a Discord bot configured.
+   *
+   * Passed in rather than read here: `discordIsConfigured()` looks at a
+   * server-only env var, and this is a Client Component.
+   */
+  botLive: boolean;
   /** A Co-Lead fixing another person's details. Changes the copy only. */
   editingSomeoneElse?: boolean;
 }) {
@@ -72,37 +81,18 @@ export function ProfileForm({
       </div>
 
       {/*
-        Discord. Optional, and the field explains what to paste.
+        Discord, with its own verify button and badge — see `DiscordIdField`.
 
-        Almost everybody's first attempt is their username, which looks
-        plausible and would silently never receive anything — so the hint
-        names the exact clicks rather than saying "your Discord ID".
+        Not a plain input, and not optional in practice: every notification the
+        app sends goes through Discord, so an unconnected member is one the
+        club cannot reach. It's the only field here that carries proof.
       */}
-      <label className="mt-3 block">
-        <span className="text-ink mb-1 block text-sm font-semibold">
-          Discord ID{" "}
-          <span className="text-ink-muted font-normal">(optional)</span>
-        </span>
-        <input
-          type="text"
-          name="discordUserId"
-          inputMode="numeric"
-          defaultValue={member.discordUserId ?? ""}
-          placeholder="461208577118896129"
-          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-        />
-        <span className="text-ink-muted mt-1 block text-xs">
-          Lets the club bot message you directly when you&apos;re added to
-          something or an ask of yours is answered — nothing else. It&apos;s a
-          long number, not your username: in Discord turn on{" "}
-          <span className="text-ink font-semibold">
-            Settings → Advanced → Developer Mode
-          </span>
-          , then right-click your own name and{" "}
-          <span className="text-ink font-semibold">Copy User ID</span>. Leave it
-          blank and nothing changes.
-        </span>
-      </label>
+      <DiscordIdField
+        discordUserId={member.discordUserId}
+        verifiedAt={member.discordVerifiedAt}
+        botLive={botLive}
+        editingSomeoneElse={editingSomeoneElse}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">

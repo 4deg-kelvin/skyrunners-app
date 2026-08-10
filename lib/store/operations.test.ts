@@ -369,6 +369,180 @@ describe("sign-off: the owner claims, the RE decides", () => {
   });
 });
 
+describe("checklists under a deliverable", () => {
+  async function withTodos(titles: string[]) {
+    const created = await ops.createDeliverable({
+      projectId: PROJECT,
+      title: "Spar layup",
+      ownerId: MEMBER,
+    });
+    if (!created.ok) throw new Error("setup failed");
+
+    const ids: string[] = [];
+    for (const title of titles) {
+      const todo = await ops.addDeliverableTodo({
+        deliverableId: created.value.id,
+        title,
+        actorId: MEMBER,
+      });
+      if (!todo.ok) throw new Error(`setup failed: ${todo.error}`);
+      ids.push(todo.value.id);
+    }
+    return { deliverableId: created.value.id, todoIds: ids };
+  }
+
+  test("items append in the order they were written", async () => {
+    const { deliverableId } = await withTodos(["First", "Second", "Third"]);
+    const list = disk
+      .readStore()
+      .deliverableTodos.filter((t) => t.deliverableId === deliverableId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((t) => t.title);
+    assert.deepEqual(list, ["First", "Second", "Third"]);
+  });
+
+  test("a blank title is refused", async () => {
+    const { deliverableId } = await withTodos([]);
+    const r = await ops.addDeliverableTodo({
+      deliverableId,
+      title: "   ",
+      actorId: MEMBER,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  /*
+    The rule the whole feature exists for. Both halves are asserted, because
+    gating only the RE would put the wall in front of the person who didn't
+    write the list.
+  */
+  test("the owner can't claim done while an item is open", async () => {
+    const { deliverableId } = await withTodos(["Move the jig"]);
+    const r = await ops.submitDeliverable(deliverableId, MEMBER, TODAY);
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.error, /Move the jig/);
+  });
+
+  test("an RE can't sign off while an item is open", async () => {
+    const { deliverableId } = await withTodos(["Move the jig"]);
+    const r = await ops.confirmDeliverable(deliverableId, "m-priya", TODAY);
+    assert.equal(r.ok, false);
+  });
+
+  test("ticking everything off unblocks sign-off", async () => {
+    const { deliverableId, todoIds } = await withTodos(["A", "B"]);
+    for (const todoId of todoIds) {
+      await ops.setDeliverableTodoDone({
+        todoId,
+        done: true,
+        actorId: MEMBER,
+        now: TODAY,
+      });
+    }
+
+    assert.equal(
+      (await ops.submitDeliverable(deliverableId, MEMBER, TODAY)).ok,
+      true
+    );
+    assert.equal(
+      (await ops.confirmDeliverable(deliverableId, "m-priya", TODAY)).ok,
+      true
+    );
+  });
+
+  /*
+    Deleting is a legitimate way to clear the gate — unlike a deliverable, a
+    todo counts towards nothing, so "it turned out not to be needed" must not
+    force a false tick into the record.
+  */
+  test("deleting the last open item unblocks sign-off too", async () => {
+    const { deliverableId, todoIds } = await withTodos(["Not needed"]);
+    assert.equal((await ops.deleteDeliverableTodo(todoIds[0])).ok, true);
+    assert.equal(
+      (await ops.submitDeliverable(deliverableId, MEMBER, TODAY)).ok,
+      true
+    );
+  });
+
+  test("unticking clears the timestamp, not just the flag", async () => {
+    const { todoIds } = await withTodos(["A"]);
+    await ops.setDeliverableTodoDone({
+      todoId: todoIds[0],
+      done: true,
+      actorId: MEMBER,
+      now: TODAY,
+    });
+
+    const ticked = disk
+      .readStore()
+      .deliverableTodos.find((t) => t.id === todoIds[0]);
+    assert.equal(ticked?.doneAt, TODAY);
+    assert.equal(ticked?.doneBy, MEMBER);
+
+    await ops.setDeliverableTodoDone({
+      todoId: todoIds[0],
+      done: false,
+      actorId: MEMBER,
+      now: TODAY,
+    });
+
+    /*
+      Postgres has a CHECK that `done` and `done_at` agree (migration 0028). A
+      stale timestamp would be rejected live and pass silently in demo mode,
+      which is the worst kind of divergence between the two backends.
+    */
+    const unticked = disk
+      .readStore()
+      .deliverableTodos.find((t) => t.id === todoIds[0]);
+    assert.equal(unticked?.doneAt, undefined);
+    assert.equal(unticked?.doneBy, undefined);
+  });
+
+  test("nothing can be added to work that's already signed off", async () => {
+    const { deliverableId } = await withTodos([]);
+    await ops.submitDeliverable(deliverableId, MEMBER, TODAY);
+    await ops.confirmDeliverable(deliverableId, "m-priya", TODAY);
+
+    const r = await ops.addDeliverableTodo({
+      deliverableId,
+      title: "Too late",
+      actorId: MEMBER,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  test("renaming keeps the tick", async () => {
+    const { todoIds } = await withTodos(["Typo"]);
+    await ops.setDeliverableTodoDone({
+      todoId: todoIds[0],
+      done: true,
+      actorId: MEMBER,
+      now: TODAY,
+    });
+    const r = await ops.renameDeliverableTodo({
+      todoId: todoIds[0],
+      title: "Fixed",
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.equal(r.value.title, "Fixed");
+      assert.equal(r.value.done, true);
+    }
+  });
+
+  test("a deleted deliverable takes its checklist with it", async () => {
+    const { deliverableId, todoIds } = await withTodos(["A", "B"]);
+    assert.equal((await ops.deleteDeliverable(deliverableId)).ok, true);
+
+    // The cascade is `on delete cascade` live; demo mode must match, or the
+    // store fills with orphans that no page can ever reach.
+    const left = disk
+      .readStore()
+      .deliverableTodos.filter((t) => todoIds.includes(t.id));
+    assert.equal(left.length, 0);
+  });
+});
+
 describe("blocking", () => {
   test("blocked requires a reason — otherwise nobody can clear it", async () => {
     const created = await ops.createDeliverable({

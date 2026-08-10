@@ -16,6 +16,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
+import { DeliverableTodos } from "@/components/forms/deliverable-todos";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -255,7 +256,7 @@ export default async function MyWorkPage() {
                 actionHref="/projects"
               />
             ) : (
-              myDeliverables.map(({ deliverable, project }) => (
+              myDeliverables.map(({ deliverable, project, todos }) => (
                 <div key={deliverable.id}>
                   <Link
                     href={`/projects/${project.slug}`}
@@ -271,6 +272,18 @@ export default async function MyWorkPage() {
                       !!deliverable.dueDate &&
                       new Date(deliverable.dueDate) < new Date()
                     }
+                  />
+                  {/*
+                    Writable here, not just readable. This list is the owner's
+                    working copy — everything on this page is theirs — and a
+                    checklist you have to open another page to tick is a
+                    checklist nobody keeps.
+                  */}
+                  <DeliverableTodos
+                    deliverableId={deliverable.id}
+                    projectId={project.id}
+                    todos={todos}
+                    canManage
                   />
                 </div>
               ))

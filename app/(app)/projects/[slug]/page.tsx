@@ -14,6 +14,7 @@ import {
   AddDeliverableForm,
   DeliverableActions,
 } from "@/components/forms/deliverable-actions";
+import { DeliverableTodos } from "@/components/forms/deliverable-todos";
 import {
   AskToJoinButton,
   FollowToggle,
@@ -376,31 +377,50 @@ export default async function ProjectDetailPage({
                     actionHref="/my-work"
                   />
                 ) : (
-                  deliverables.map(({ deliverable, owner, overdue }) => (
-                    <div
-                      key={deliverable.id}
-                      className="rounded-tile border-line border px-3.5 py-3"
-                    >
-                      <DeliverableRow
-                        deliverable={deliverable}
-                        owner={owner}
-                        overdue={overdue}
-                      />
-                      <div className="mt-2.5">
-                        <DeliverableActions
+                  deliverables.map(({ deliverable, owner, overdue, todos }) => {
+                    const isOwner = deliverable.ownerId === viewer.member.id;
+                    return (
+                      <div
+                        key={deliverable.id}
+                        className="rounded-tile border-line border px-3.5 py-3"
+                      >
+                        <DeliverableRow
                           deliverable={deliverable}
-                          isOwner={deliverable.ownerId === viewer.member.id}
-                          canSignOff={mayManage}
-                          canWithdrawSignOff={mayWithdrawSignOff}
-                          projectTargetDate={project.targetDate}
-                          candidates={assignableMembers.map((m) => ({
-                            id: m.id,
-                            name: m.fullName,
-                          }))}
+                          owner={owner}
+                          overdue={overdue}
                         />
+
+                        {/*
+                          Checklist above the buttons, because it's the reason
+                          one of them may be missing. See `DeliverableTodos` —
+                          the owner writes these as much as the RE does, which
+                          is why `canManage` is wider here than `mayManage`.
+                        */}
+                        <DeliverableTodos
+                          deliverableId={deliverable.id}
+                          projectId={project.id}
+                          todos={todos}
+                          canManage={isOwner || mayManage}
+                          locked={deliverable.status === "done"}
+                        />
+
+                        <div className="mt-2.5">
+                          <DeliverableActions
+                            deliverable={deliverable}
+                            isOwner={isOwner}
+                            canSignOff={mayManage}
+                            canWithdrawSignOff={mayWithdrawSignOff}
+                            projectTargetDate={project.targetDate}
+                            openTodos={todos.filter((t) => !t.done).length}
+                            candidates={assignableMembers.map((m) => ({
+                              id: m.id,
+                              name: m.fullName,
+                            }))}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardBody>

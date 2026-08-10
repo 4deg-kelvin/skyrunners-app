@@ -48,6 +48,7 @@ import type {
   ClubEvent,
   Deliverable,
   DeliverableStatus,
+  DeliverableTodo,
   GlobalRole,
   HelpReply,
   HelpRequest,
@@ -351,6 +352,31 @@ export async function createDeliverable(input: {
 }
 
 /**
+ * "There are still 3 things ticked off on this", or null if there aren't.
+ *
+ * The one rule the checklist enforces, in the one place both callers can see
+ * it. A deliverable with an open item on its own list is, by the list's own
+ * account, not finished — so neither the owner's claim nor the RE's sign-off
+ * can go through while one is open.
+ *
+ * Blocking the owner's claim as well as the RE's approval is deliberate. If
+ * only sign-off were gated, the wall would land in front of the RE, who is the
+ * busier person and not the one who knows whether the item is really
+ * outstanding. This way whoever wrote the list is the one told about it.
+ */
+function openTodoBlock(store: StoreShape, deliverableId: string): string | null {
+  const open = store.deliverableTodos.filter(
+    (t) => t.deliverableId === deliverableId && !t.done
+  );
+  if (open.length === 0) return null;
+
+  const first = open[0].title;
+  return open.length === 1
+    ? `The checklist still has "${first}" open. Tick it off, or delete it if it turned out not to be needed.`
+    : `The checklist still has ${open.length} items open, starting with "${first}". Tick them off, or delete the ones that turned out not to be needed.`;
+}
+
+/**
  * The owner says it's finished. This does NOT complete it.
  *
  * See `DeliverableStatus` — `submitted` is a claim, `done` is the RE agreeing,
@@ -361,11 +387,17 @@ export async function submitDeliverable(
   actorId: string,
   now: string
 ): Promise<Result<Deliverable>> {
-  return updateOne(deliverableId, (d) => {
+  return guarded((store) => {
+    const d = store.deliverables.find((x) => x.id === deliverableId);
+    if (!d) return fail<Deliverable>("That deliverable no longer exists.");
+
     if (d.ownerId !== actorId) {
       return fail<Deliverable>("Only the owner can mark this done.");
     }
     if (d.status === "done") return fail<Deliverable>("Already signed off.");
+
+    const blocked = openTodoBlock(store, deliverableId);
+    if (blocked) return fail<Deliverable>(blocked);
 
     d.status = "submitted";
     d.submittedAt = now;
@@ -379,8 +411,18 @@ export async function confirmDeliverable(
   reId: string,
   now: string
 ): Promise<Result<Deliverable>> {
-  return updateOne(deliverableId, (d) => {
+  return guarded((store) => {
+    const d = store.deliverables.find((x) => x.id === deliverableId);
+    if (!d) return fail<Deliverable>("That deliverable no longer exists.");
     if (d.status === "done") return fail<Deliverable>("Already signed off.");
+
+    /*
+      An RE can clear this themselves — ticking an item is a right they have —
+      so this isn't a dead end for them, it's a prompt to look at the list
+      before putting their name on the work.
+    */
+    const blocked = openTodoBlock(store, deliverableId);
+    if (blocked) return fail<Deliverable>(blocked);
 
     d.status = "done";
     d.completedAt = now;
@@ -389,6 +431,119 @@ export async function confirmDeliverable(
     d.confirmedById = reId;
     d.blockerNote = undefined;
     return ok(d);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Checklists under a deliverable
+//
+// Deliberately thin. A todo has a title and a tick and nothing else — see
+// `DeliverableTodo` for why adding an owner or a date to one is the wrong move.
+//
+// None of these check permission: `can.manageDeliverableTodos` does, in the
+// action layer, because the answer depends on the org graph and this file
+// never sees it.
+// ---------------------------------------------------------------------------
+
+export async function addDeliverableTodo(input: {
+  deliverableId: string;
+  title: string;
+  actorId: string;
+}): Promise<Result<DeliverableTodo>> {
+  const title = input.title.trim();
+  if (!title) return fail<DeliverableTodo>("Give the item a name.");
+  if (title.length > 200) {
+    return fail<DeliverableTodo>(
+      "That's long for a checklist item — if it needs a paragraph, it's probably a deliverable."
+    );
+  }
+
+  return guarded((store) => {
+    const parent = store.deliverables.find((d) => d.id === input.deliverableId);
+    if (!parent) {
+      return fail<DeliverableTodo>("That deliverable no longer exists.");
+    }
+    if (parent.status === "done") {
+      return fail<DeliverableTodo>(
+        "That deliverable is signed off. Adding to its checklist now wouldn't change anything — reopen it first if the work isn't actually finished."
+      );
+    }
+
+    const siblings = store.deliverableTodos.filter(
+      (t) => t.deliverableId === input.deliverableId
+    );
+    // Appended, never inserted. A checklist is read top to bottom.
+    const sortOrder =
+      siblings.reduce((max, t) => Math.max(max, t.sortOrder), -1) + 1;
+
+    const todo: DeliverableTodo = {
+      id: newId("todo"),
+      deliverableId: input.deliverableId,
+      title,
+      done: false,
+      sortOrder,
+      createdBy: input.actorId,
+    };
+    store.deliverableTodos.push(todo);
+    return ok(todo);
+  });
+}
+
+export async function setDeliverableTodoDone(input: {
+  todoId: string;
+  done: boolean;
+  actorId: string;
+  now: string;
+}): Promise<Result<DeliverableTodo>> {
+  return guarded((store) => {
+    const todo = store.deliverableTodos.find((t) => t.id === input.todoId);
+    if (!todo) return fail<DeliverableTodo>("That item no longer exists.");
+
+    todo.done = input.done;
+    /*
+      Cleared on untick, not just set on tick. The database has a CHECK
+      constraint that `done` and `done_at` agree (migration 0028) — leaving a
+      stale timestamp behind would be rejected by Postgres and pass silently in
+      demo mode, which is the worst kind of divergence between the two.
+    */
+    todo.doneAt = input.done ? input.now : undefined;
+    todo.doneBy = input.done ? input.actorId : undefined;
+    return ok(todo);
+  });
+}
+
+export async function renameDeliverableTodo(input: {
+  todoId: string;
+  title: string;
+}): Promise<Result<DeliverableTodo>> {
+  const title = input.title.trim();
+  if (!title) return fail<DeliverableTodo>("Give the item a name.");
+
+  return guarded((store) => {
+    const todo = store.deliverableTodos.find((t) => t.id === input.todoId);
+    if (!todo) return fail<DeliverableTodo>("That item no longer exists.");
+    todo.title = title;
+    return ok(todo);
+  });
+}
+
+/**
+ * Deleting is allowed, and unlike a deliverable there's no record to protect.
+ *
+ * That asymmetry is the point: `deleteDeliverable` refuses signed-off work
+ * because it counts towards somebody's Delivered signal. A todo counts towards
+ * nothing, so "that turned out not to be needed" is a perfectly good reason to
+ * remove one, and requiring it be ticked instead would put a false tick in the
+ * record.
+ */
+export async function deleteDeliverableTodo(
+  todoId: string
+): Promise<Result<{ id: string }>> {
+  return guarded((store) => {
+    const index = store.deliverableTodos.findIndex((t) => t.id === todoId);
+    if (index === -1) return fail<{ id: string }>("That item no longer exists.");
+    store.deliverableTodos.splice(index, 1);
+    return ok({ id: todoId });
   });
 }
 
@@ -1295,8 +1450,29 @@ export async function deleteDeliverable(
     store.deliverables = store.deliverables.filter(
       (d) => d.id !== deliverableId
     );
+    cascadeTodos(store);
     return ok(null);
   });
+}
+
+/**
+ * Drop checklist items whose deliverable is gone.
+ *
+ * Postgres does this itself — `deliverable_id` is `on delete cascade` in
+ * migration 0028 — so this exists to keep demo mode telling the same story.
+ * Without it the store fills with todos no page can reach and no delete can
+ * ever remove, and the two backends disagree about what's in it.
+ *
+ * A sweep rather than a targeted filter, because deliverables disappear from
+ * three different places: deleting one, deleting its project, and hard-deleting
+ * the member who owned it. A sweep is correct in all three and stays correct
+ * when a fourth appears.
+ */
+function cascadeTodos(store: StoreShape): void {
+  const alive = new Set(store.deliverables.map((d) => d.id));
+  store.deliverableTodos = store.deliverableTodos.filter((t) =>
+    alive.has(t.deliverableId)
+  );
 }
 
 /**
@@ -1776,6 +1952,7 @@ export async function deleteProject(
     store.deliverables = store.deliverables.filter(
       (d) => d.projectId !== projectId
     );
+    cascadeTodos(store);
     store.projectMemberships = store.projectMemberships.filter(
       (m) => m.projectId !== projectId
     );
@@ -2171,6 +2348,7 @@ export async function deleteMember(input: {
     store.deliverables = store.deliverables.filter(
       (d) => d.ownerId !== member.id
     );
+    cascadeTodos(store);
     // Division leadership is a pointer, not a record — clear it rather than
     // leaving a division led by a row that no longer exists.
     for (const team of store.teams) {

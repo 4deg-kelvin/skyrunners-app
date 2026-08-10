@@ -150,7 +150,7 @@ export default async function GettingStartedPage() {
                     Settings → My Profile
                   </Link>
                   {canVerify
-                    ? " Then press Send a test message — if it arrives, you're done."
+                    ? " and save. A Verify now button appears beside the field — press it, and if the message arrives you get a Verified badge and this banner goes away."
                     : " That's it. The club's bot isn't switched on yet, so there's nothing to test against; it'll start reaching you once it is."}
                 </Step>
               </ol>

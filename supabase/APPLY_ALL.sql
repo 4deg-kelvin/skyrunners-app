@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql
 
 
 -- ==========================================================================
@@ -3496,4 +3496,105 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0027_checkin_reminders.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0028_deliverable_todos.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0028 — checklists under a deliverable
+--
+-- ---------------------------------------------------------------------------
+-- This is NOT sub-tasks, and the distinction is the whole design
+-- ---------------------------------------------------------------------------
+--
+-- `CLAUDE.md` says the deliverable IS the task model: one flat list, one owner,
+-- one date, no dependencies, no sub-tasks. That still holds, and this doesn't
+-- break it — because a todo is deliberately not a unit of work.
+--
+-- The problem it solves: "move the parts from Trudy's office to the robotics
+-- room" was being entered as a deliverable, because it was a thing that needed
+-- doing and a deliverable was the only place to put it. But a deliverable
+-- COUNTS — it's the Delivered signal, the one contribution measure that can't
+-- be inflated — and a fifteen-minute errand sitting next to a spar redesign
+-- makes that number meaningless. Ten errands and somebody looks twice as
+-- productive as the person who shipped the airframe.
+--
+-- So todos carry no owner, no date, no credit, and never appear in any count.
+-- They exist to be ticked. What they DO carry is a gate: a deliverable can't be
+-- signed off while any of its todos are open, which is what makes writing them
+-- down worth doing rather than a second place to keep a list nobody reads.
+--
+-- If you find yourself wanting an owner or a due date on one of these, it isn't
+-- a todo — it's a deliverable, and it should be one.
+-- ---------------------------------------------------------------------------
+
+create table if not exists deliverable_todos (
+  id            uuid primary key default gen_random_uuid(),
+  deliverable_id uuid not null references deliverables(id) on delete cascade,
+  title         text not null check (length(trim(title)) > 0),
+  done          boolean not null default false,
+  -- Who ticked it and when. Not for credit — for answering "who said this was
+  -- handled?" three weeks later, which is the only question anybody asks.
+  done_at       timestamptz,
+  done_by       uuid references profiles(id) on delete set null,
+  sort_order    integer not null default 0,
+  created_by    uuid references profiles(id) on delete set null,
+  created_at    timestamptz not null default now(),
+
+  -- `done` and `done_at` must agree, or "3 of 5 done" and the list disagree.
+  constraint todo_done_has_timestamp check (
+    (done and done_at is not null) or (not done and done_at is null)
+  )
+);
+
+-- Always read as "the todos for this deliverable", never across deliverables.
+create index if not exists deliverable_todos_parent_idx
+  on deliverable_todos (deliverable_id, sort_order);
+
+alter table deliverable_todos enable row level security;
+
+-- Public to read, like the deliverables they hang off. Seeing what's left on a
+-- piece of work is how somebody spots that they could pick one up.
+drop policy if exists deliverable_todos_read on deliverable_todos;
+create policy deliverable_todos_read on deliverable_todos
+  for select to authenticated using (true);
+
+-- --------------------------------------------------------------------------
+-- Written by the deliverable's OWNER or any RE of its project.
+--
+-- Wider than `deliverables_manage`, which is REs only. The owner is the person
+-- actually doing the work and the one who discovers what it turns out to
+-- involve — making them ask an RE to add "book the CNC" would guarantee the
+-- list stays empty and the feature goes unused.
+--
+-- `auth_is_re_for` already includes Co-Leads.
+-- --------------------------------------------------------------------------
+drop policy if exists deliverable_todos_write on deliverable_todos;
+create policy deliverable_todos_write on deliverable_todos
+  for all to authenticated
+  using (
+    exists (
+      select 1 from deliverables d
+      where d.id = deliverable_todos.deliverable_id
+        and (d.owner_id = auth.uid() or auth_is_re_for(d.project_id))
+    )
+  )
+  with check (
+    exists (
+      select 1 from deliverables d
+      where d.id = deliverable_todos.deliverable_id
+        and (d.owner_id = auth.uid() or auth_is_re_for(d.project_id))
+    )
+  );
+
+insert into schema_migrations (version)
+values ('0028_deliverable_todos')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0028_deliverable_todos.sql
 -- ==========================================================================

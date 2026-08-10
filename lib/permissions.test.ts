@@ -454,13 +454,17 @@ describe("training verification", () => {
 });
 
 describe("membership is RE-controlled, with no cap", () => {
-  const open = project("open", null, []);
-  const closed = { ...project("closed", null, []), isOpenToJoin: false };
-
   test("anyone can follow anything — visibility is never gated", () => {
     assert.equal(can.followProject(), true);
   });
 
+  /*
+    `requestToJoin` takes no arguments on purpose, which is why the open/closed
+    project fixtures that used to sit here are gone. "Not looking for anyone
+    new" is a signal to read before asking, not a lock on the ask — a project
+    that has stopped recruiting still has to be askable, or the flag quietly
+    recreates the dead end `join_requests` exists to remove.
+  */
   test("a member can ask to join, but cannot add themselves", () => {
     assert.equal(can.requestToJoin(), true);
     assert.equal(can.addProjectMember(actor("worker"), graph, "leaf"), false);
@@ -544,6 +548,47 @@ describe("deliverables", () => {
   test("only REs and Co-Leads shape the list itself", () => {
     assert.equal(can.manageDeliverables(actor("reLeaf"), graph, "leaf"), true);
     assert.equal(can.manageDeliverables(actor("worker"), graph, "leaf"), false);
+  });
+
+  /*
+    The checklist is the one place the OWNER gets a right their RE-only
+    neighbours don't. Safe because a todo counts towards nothing — the only
+    thing it can do is hold up a sign-off, and the RE can clear it themselves.
+  */
+  test("the owner keeps their own checklist, even though they can't shape the list", () => {
+    assert.equal(
+      can.manageDeliverables(actor("worker"), graph, "leaf"),
+      false,
+      "precondition: the owner is not an RE here"
+    );
+    assert.equal(
+      can.manageDeliverableTodos(actor("worker"), graph, "leaf", "worker"),
+      true
+    );
+  });
+
+  test("an RE of the project can too", () => {
+    assert.equal(
+      can.manageDeliverableTodos(actor("reLeaf"), graph, "leaf", "worker"),
+      true
+    );
+  });
+
+  test("and an RE above it, since authority inherits down the tree", () => {
+    assert.equal(
+      can.manageDeliverableTodos(actor("reRoot"), graph, "leaf", "worker"),
+      true
+    );
+  });
+
+  test("a passer-by cannot — owning nothing here grants nothing", () => {
+    // The rule reads `ownerId` as the DELIVERABLE's owner, which is why the
+    // action layer takes it from the stored row rather than the form. Claiming
+    // to be the owner has to buy nothing, or the wider rule becomes a hole.
+    assert.equal(
+      can.manageDeliverableTodos(actor("outsider"), graph, "leaf", "worker"),
+      false
+    );
   });
 });
 

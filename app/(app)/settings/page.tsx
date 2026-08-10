@@ -7,7 +7,6 @@ import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { TierAdminForm } from "@/components/forms/tier-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
 import { ThemeToggle } from "@/components/forms/theme-toggle";
-import { DiscordConnect } from "@/components/forms/discord-connect";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import {
   AddCatalogueItemForm,
@@ -93,7 +92,10 @@ export default async function SettingsPage() {
             you&apos;d help.
           </p>
           <div className="mt-5">
-            <ProfileForm member={viewer.member} />
+            <ProfileForm
+              member={viewer.member}
+              botLive={discordIsConfigured()}
+            />
           </div>
         </CardBody>
       </Card>
@@ -234,23 +236,13 @@ export default async function SettingsPage() {
       </Card>
 
       {/*
-        Discord, immediately under the profile that holds the ID field.
-
-        Only shown when a bot exists. The status is the point — an ID that has
-        never been proven to reach anybody looks identical to one that has, and
-        that false confidence is the whole reason verification exists.
+        Discord used to have its own card here, holding the status and the test
+        button while the ID itself lived on the profile form above. Two places
+        for one value, and the commonest question it produced — "I pasted my
+        ID, why does it still say I'm not connected?" — was answered two inches
+        further down the page, where nobody looked. Badge and button now sit on
+        the field. See `DiscordIdField`.
       */}
-      <Card>
-        <CardBody>
-          <SectionLabel>Discord</SectionLabel>
-          <DiscordConnect
-            discordUserId={viewer.member.discordUserId}
-            verifiedAt={viewer.member.discordVerifiedAt}
-            canVerify={discordIsConfigured()}
-          />
-        </CardBody>
-      </Card>
-
       {/*
         Appearance. Near the top because it's the only setting on this page a
         member is likely to come looking for on purpose, rather than one they

@@ -35,10 +35,20 @@ export function DeliverableActions({
   canWithdrawSignOff = false,
   candidates = [],
   projectTargetDate,
+  openTodos = 0,
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
   canSignOff: boolean;
+  /**
+   * Unticked checklist items. Zero unless somebody wrote a list.
+   *
+   * `submitDeliverable` and `confirmDeliverable` both refuse while any are
+   * open, so this is here to say so BEFORE the click rather than after. A
+   * button that always fails is worse than one that explains itself — and the
+   * fix is one chevron away, in the checklist directly above these controls.
+   */
+  openTodos?: number;
   /**
    * May overturn a sign-off that already happened.
    *
@@ -197,13 +207,21 @@ export function DeliverableActions({
 
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <ActionButton
-          action={confirmDeliverableAction}
-          fields={fields}
-          label="Sign off"
-          pendingLabel="Signing…"
-          tone="primary"
-        />
+        {openTodos > 0 ? (
+          <BlockedByChecklist
+            count={openTodos}
+            what="Sign off"
+            why="Tick them off above — you can, or send it back."
+          />
+        ) : (
+          <ActionButton
+            action={confirmDeliverableAction}
+            fields={fields}
+            label="Sign off"
+            pendingLabel="Signing…"
+            tone="primary"
+          />
+        )}
         <button
           onClick={() => setReopening(true)}
           className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
@@ -350,13 +368,21 @@ export function DeliverableActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isOwner ? (
-        <ActionButton
-          action={submitDeliverableAction}
-          fields={{ deliverableId: id }}
-          label="Mark done"
-          pendingLabel="Sending…"
-          tone="primary"
-        />
+        openTodos > 0 ? (
+          <BlockedByChecklist
+            count={openTodos}
+            what="Mark done"
+            why="Tick them off above, or remove the ones that turned out not to be needed."
+          />
+        ) : (
+          <ActionButton
+            action={submitDeliverableAction}
+            fields={{ deliverableId: id }}
+            label="Mark done"
+            pendingLabel="Sending…"
+            tone="primary"
+          />
+        )
       ) : null}
 
       {status === "open" ? (
@@ -396,6 +422,34 @@ export function DeliverableActions({
         </button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The button you would have pressed, saying why it isn't there.
+ *
+ * Deliberately not a disabled version of the real button. A greyed-out "Sign
+ * off" invites clicking it to find out why, and the answer has to fit in a
+ * tooltip nobody opens on a phone. This states the reason in the same space.
+ */
+function BlockedByChecklist({
+  count,
+  what,
+  why,
+}: {
+  count: number;
+  /** The action that's held up, so the sentence names it. */
+  what: string;
+  why: string;
+}) {
+  return (
+    <p className="text-ink-soft text-sm">
+      <span className="text-warn-fg font-semibold">
+        {what} is held: {count} checklist {count === 1 ? "item" : "items"} still
+        open.
+      </span>{" "}
+      {why}
+    </p>
   );
 }
 
