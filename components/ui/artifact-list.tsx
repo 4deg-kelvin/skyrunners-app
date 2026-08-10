@@ -14,6 +14,7 @@ import { Badge } from "./badge";
 import { EmptyState } from "./empty-state";
 import { ARTIFACT_KIND_LABELS, ARTIFACT_KIND_ORDER } from "@/lib/labels";
 import type { ArtifactKind, Member, ProjectArtifact } from "@/lib/types";
+import { formatDay } from "@/lib/dates";
 
 const KIND_ICONS: Record<ArtifactKind, typeof FileText> = {
   presentation: Presentation,
@@ -112,13 +113,7 @@ export function ArtifactList({
 
                     <p className="text-ink-muted mt-1.5 text-sm">
                       {uploadedBy?.fullName ?? "Unknown"} ·{" "}
-                      {new Date(artifact.createdAt).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        }
-                      )}
+                      {formatDay(artifact.createdAt)}
                     </p>
                   </a>
                 );

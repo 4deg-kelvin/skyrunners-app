@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
+import { DiscordStatus } from "@/components/ui/discord-status";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -27,6 +28,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
+import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MemberProfilePage({
   params,
@@ -104,7 +106,17 @@ export default async function MemberProfilePage({
                 photoUrl={member.photoUrl}
                 className="size-[72px] text-2xl"
               />
-              <ContactLink member={member} />
+              <div className="min-w-0">
+                <ContactLink member={member} />
+                {/*
+                  Next to the phone number, because it belongs to the same
+                  question: how do I reach this person. Public for the same
+                  reason trainings are — see `DiscordStatus`.
+                */}
+                <div className="mt-2">
+                  <DiscordStatus verifiedAt={member.discordVerifiedAt} />
+                </div>
+              </div>
             </div>
 
             <div className="mt-5">
@@ -125,7 +137,7 @@ export default async function MemberProfilePage({
               <DetailRow label="Projects">{projects.length}</DetailRow>
               <CardDivider />
               <DetailRow label="Joined">
-                {new Date(member.joinedAt).toLocaleDateString("en-US", {
+                {formatDay(member.joinedAt, {
                   month: "long",
                   year: "numeric",
                 })}
@@ -286,9 +298,7 @@ export default async function MemberProfilePage({
                         >
                           <div className="flex flex-wrap items-baseline justify-between gap-2">
                             <p className="text-ink text-sm font-bold">
-                              {new Date(
-                                update.submittedAt ?? update.dueAt
-                              ).toLocaleDateString("en-US", {
+                              {formatDay(update.submittedAt ?? update.dueAt, {
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
@@ -485,8 +495,9 @@ function MemberProjectCard({
               showOwner={false}
               overdue={
                 d.status !== "done" &&
+                d.status !== "submitted" &&
                 !!d.dueDate &&
-                new Date(d.dueDate) < new Date()
+                d.dueDate < todayInClubTime()
               }
             />
           ))}

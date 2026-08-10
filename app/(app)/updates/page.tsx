@@ -12,11 +12,18 @@ import { getUpdates, type UpdateCard } from "@/lib/data/updates";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { formatNumber } from "@/lib/utils";
+import { formatDay } from "@/lib/dates";
 
 export const metadata = { title: "Check-ins" };
 
+/**
+ * `dueAt` names a Pacific calendar day, so it is formatted as one.
+ *
+ * `new Date(iso)` on a bare date parses UTC midnight and then renders the day
+ * before in California. See `lib/dates.ts`.
+ */
 function formatDue(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+  return formatDay(iso, {
     weekday: "short",
     month: "short",
     day: "numeric",

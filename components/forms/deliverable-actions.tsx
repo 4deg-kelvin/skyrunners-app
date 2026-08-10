@@ -15,6 +15,7 @@ import {
   submitDeliverableAction,
 } from "@/lib/actions";
 import type { Deliverable } from "@/lib/types";
+import { formatDay } from "@/lib/dates";
 
 /**
  * The controls on one deliverable.
@@ -83,10 +84,7 @@ export function DeliverableActions({
 
   if (status === "done") {
     const signedOn = deliverable.completedAt
-      ? ` ${new Date(deliverable.completedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        })}`
+      ? ` ${formatDay(deliverable.completedAt)}`
       : "";
 
     /*

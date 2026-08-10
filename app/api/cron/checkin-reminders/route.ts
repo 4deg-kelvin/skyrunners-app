@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendDiscordDM, discordIsConfigured } from "@/lib/notify/discord";
+import { formatDay, todayInClubTime } from "@/lib/dates";
 
 /**
  * ============================================================================
@@ -208,7 +209,10 @@ export async function GET(request: Request) {
       .in("member_id", memberIds),
   ]);
 
-  const today = now.toISOString().slice(0, 10);
+  // The pause is a Pacific calendar date, so it has to be compared against
+  // one. In UTC this job treats a pause ending today as already over from 5pm
+  // the day before.
+  const today = todayInClubTime(now);
   const pausedUntil = new Map(
     (schedules ?? []).map((s) => [
       s.member_id as string,
@@ -272,10 +276,9 @@ export async function GET(request: Request) {
 
   let chased = 0;
   for (const row of lateRows) {
-    const when = new Date(row.due_at).toLocaleDateString("en-US", {
-      weekday: "long",
-      timeZone: "UTC",
-    });
+    // Named from the Pacific day the obligation belongs to. `due_at` is 23:59
+    // of that day stored as UTC, so it is already UTC-anchored.
+    const when = formatDay(row.due_at, { weekday: "long" });
     const ok = await deliver(
       row,
       "late_notice_sent_at",
