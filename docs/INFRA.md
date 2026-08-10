@@ -199,6 +199,22 @@ minutes later, with no error pointing anywhere near the cause.
 |---|---|
 | 7 | Transactional email via Resend: missed check-in nudges, invites |
 | 7 | Vercel Cron for scheduled jobs — **only fire when `in_session()` is true**, or students get "you missed your update" emails during finals |
+
+### Vercel Cron on the Hobby plan: once a day, or nothing deploys
+
+`vercel.json` declares one cron, `/api/cron/checkin-reminders` at `30 19 * * *`.
+It ran `0 * * * *` for four commits and **every deployment failed** — Hobby
+allows at most one run per day, and Vercel rejects the whole deploy rather than
+just the cron. The symptom is "my change isn't live", which points nowhere near
+`vercel.json`; the giveaway is a red *Vercel* commit status on GitHub saying
+"Deployment failed" while CI is green.
+
+Daily is genuinely enough: every check-in is due at 23:59 UTC, so one run at
+19:30 with a five-hour window covers the whole club. If a future job really
+needs to be more frequent, that's a Pro-plan conversation, not a schedule edit.
+
+The route needs `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` set in Vercel, and
+refuses to run without them — see the header of `app/api/cron/checkin-reminders/route.ts`.
 | 9 | Supabase Storage buckets for certificates and engineering artifacts, with per-object access control |
 
 ---

@@ -527,11 +527,21 @@ export interface ProgressUpdate {
   /**
    * When the "due in a few hours" nudge went out, if it did.
    *
-   * The whole idempotency mechanism for the reminder cron: it runs hourly over
-   * a four-hour window, so without this every member would get four identical
-   * nudges per check-in. See `app/api/cron/checkin-reminders/route.ts`.
+   * Half of the idempotency mechanism for the reminder cron: the job claims
+   * this column before sending, so a retry or an overlapping invocation
+   * updates zero rows and gives up rather than sending twice. See
+   * `app/api/cron/checkin-reminders/route.ts`.
    */
   reminderSentAt?: string;
+  /**
+   * When the "this is still open" follow-up went out, if it did.
+   *
+   * The other half, and the reason a late member gets exactly one chase rather
+   * than one every morning. Separate from `reminderSentAt` because they answer
+   * different questions — was she warned in time, was she chased afterwards —
+   * and fire under opposite conditions.
+   */
+  lateNoticeSentAt?: string;
   submittedAt?: string;
   status: UpdateStatus;
   /** One entry per project worked on. Auto-seeded from logged hours. */

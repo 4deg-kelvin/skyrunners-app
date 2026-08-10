@@ -455,13 +455,14 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
   key: "progressUpdates",
   table: "progress_updates",
   columns:
-    "id, member_id, due_at, reminder_sent_at, submitted_at, status, general_note, hours_this_period, lead_id_at_submission, reviewed_at, reviewed_by",
+    "id, member_id, due_at, reminder_sent_at, late_notice_sent_at, submitted_at, status, general_note, hours_this_period, lead_id_at_submission, reviewed_at, reviewed_by",
   identify: (u) => u.id,
   fromRow: (r) => ({
     id: r.id as string,
     memberId: r.member_id as string,
     dueAt: r.due_at as string,
     reminderSentAt: opt(r.reminder_sent_at as string),
+    lateNoticeSentAt: opt(r.late_notice_sent_at as string),
     submittedAt: opt(r.submitted_at as string),
     status: r.status as ProgressUpdate["status"],
     entries: [],
@@ -476,6 +477,7 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     member_id: u.memberId,
     due_at: u.dueAt,
     reminder_sent_at: nul(u.reminderSentAt),
+    late_notice_sent_at: nul(u.lateNoticeSentAt),
     submitted_at: nul(u.submittedAt),
     status: u.status,
     general_note: nul(u.generalNote),
