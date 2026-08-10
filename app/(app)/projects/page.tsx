@@ -22,6 +22,7 @@ import {
 } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
+import { todayInClubTime } from "@/lib/dates";
 import type { ProjectTreeNode } from "@/lib/data/projects";
 
 /** Completed projects anywhere in a division's tree, not just at the top. */
@@ -62,7 +63,9 @@ export default async function ProjectsPage() {
   */
   const mayCreate = isCoLead(viewer.actor) || formOptions.divisions.length > 0;
   const mayManageTeams = can.manageTeams(viewer.actor);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Pacific, not UTC — otherwise the Gantt's today-line jumps a day ahead at
+  // 5pm, which is exactly when people are looking at it.
+  const todayIso = todayInClubTime();
   const completedCount = tree.reduce(
     (total, { roots }) => total + countCompleted(roots),
     0

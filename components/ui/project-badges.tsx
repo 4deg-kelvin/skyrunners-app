@@ -1,6 +1,7 @@
 import { Badge } from "./badge";
 import { HEALTH_LABELS, HEALTH_TONES, PHASE_LABELS } from "@/lib/labels";
 import type { Project } from "@/lib/types";
+import { todayInClubTime } from "@/lib/dates";
 
 /**
  * Phase + health badges for a project.
@@ -30,10 +31,12 @@ export function ProjectBadges({
     attention flag — annotating the contradiction without offering a way to
     close it would just be a tidier lie.
   */
+  // Pacific, not UTC. `toISOString()` here meant a project stopped being
+  // "on time" at 5pm the day before its target date. See `lib/dates.ts`.
   const overdue =
     project.phase !== "complete" &&
     !!project.targetDate &&
-    project.targetDate < new Date().toISOString().slice(0, 10);
+    project.targetDate < todayInClubTime();
 
   return (
     <div className={className}>

@@ -349,6 +349,15 @@ its project.
   them inside `lib/data/*`** — don't let snake_case leak into components
 - Snapshot values that change over time (`lead_id_at_submission`, `weights_version`)
 - **Never hardcode colors.** Tokens live in `app/globals.css`
+- **Dates go through `lib/dates.ts`.** The club runs on Pacific time and Vercel
+  runs on UTC, so `new Date().toISOString().slice(0, 10)` means the app rolls
+  over to tomorrow at 5pm California time — every evening this club is in the
+  lab. `todayInClubTime()` for "what day is it"; `formatDay()` for a
+  `YYYY-MM-DD` calendar date; `formatMoment()` for a real instant. Never
+  `toLocaleDateString` without an explicit `timeZone` — the server renders in
+  UTC and the browser doesn't, which is both a wrong date and a hydration
+  mismatch. Compare dates as **strings** (`dueDate < today`), never by
+  constructing two `Date`s
 - Mobile-responsive from the start — hours get logged in the lab, on phones
 - Empty states use `EmptyState`, which requires a next action
 - Auth: Google OAuth, `@stanford.edu` enforced. No passwords.

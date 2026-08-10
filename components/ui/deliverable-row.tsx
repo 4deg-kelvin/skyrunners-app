@@ -8,6 +8,7 @@ import {
 } from "@/lib/labels";
 import type { Deliverable, Member } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { formatDay } from "@/lib/dates";
 
 /**
  * One line of a project's deliverable list.
@@ -67,22 +68,14 @@ export function DeliverableRow({
         ) : null}
         {deliverable.dueDate ? (
           <span>
-            {done ? "Was due" : "Due"}{" "}
-            {new Date(deliverable.dueDate).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}
+            {done ? "Was due" : "Due"} {formatDay(deliverable.dueDate)}
           </span>
         ) : (
           <span>No date set</span>
         )}
         {deliverable.completedAt ? (
           <span className="text-ok-fg">
-            Done{" "}
-            {new Date(deliverable.completedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}
+            Done {formatDay(deliverable.completedAt)}
           </span>
         ) : null}
       </div>

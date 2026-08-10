@@ -33,6 +33,7 @@ import {
 } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
+import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MyWorkPage() {
   const viewer = await getViewer();
@@ -205,14 +206,7 @@ export default async function MyWorkPage() {
                       </Link>
                     ) : null}
                     <p className="text-ink-muted mt-0.5 text-sm">
-                      Asked{" "}
-                      {new Date(request.requestedAt).toLocaleDateString(
-                        "en-US",
-                        {
-                          month: "short",
-                          day: "numeric",
-                        }
-                      )}
+                      Asked {formatDay(request.requestedAt)}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -267,10 +261,18 @@ export default async function MyWorkPage() {
                   <DeliverableRow
                     deliverable={deliverable}
                     showOwner={false}
+                    /*
+                      Plain string compare against the PACIFIC day, and
+                      `submitted` is not overdue — the same rule as
+                      `isOverdue`. `new Date(dueDate) < new Date()` parsed the
+                      bare date as UTC midnight, so work due today started
+                      reading "Overdue" from 5pm the day before.
+                    */
                     overdue={
                       deliverable.status !== "done" &&
+                      deliverable.status !== "submitted" &&
                       !!deliverable.dueDate &&
-                      new Date(deliverable.dueDate) < new Date()
+                      deliverable.dueDate < today
                     }
                   />
                   {/*
@@ -561,8 +563,9 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
                 showOwner={false}
                 overdue={
                   d.status !== "done" &&
+                  d.status !== "submitted" &&
                   !!d.dueDate &&
-                  new Date(d.dueDate) < new Date()
+                  d.dueDate < todayInClubTime()
                 }
               />
             ))}

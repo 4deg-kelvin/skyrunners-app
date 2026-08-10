@@ -34,6 +34,7 @@ import {
   type TierThresholds,
 } from "./contribution.ts";
 import { readStore } from "./store/disk.ts";
+import { todayInClubTime } from "./dates.ts";
 import { isLiveMode } from "./env.ts";
 
 // ---------------------------------------------------------------------------
@@ -3443,7 +3444,10 @@ export function updateCompliance() {
  * and the tests stay deterministic.
  */
 export function today(): string {
-  if (isLiveMode()) return new Date().toISOString().slice(0, 10);
+  // Pacific, NOT UTC. Vercel runs in UTC, so `toISOString()` here meant the
+  // app rolled over to tomorrow at 5pm California time — every evening this
+  // club is actually in the lab. See `lib/dates.ts`.
+  if (isLiveMode()) return todayInClubTime();
   return DEMO_TODAY;
 }
 

@@ -28,6 +28,7 @@ import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
 import { TIER_LABELS } from "@/lib/contribution";
 import { can } from "@/lib/permissions";
+import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export const metadata = {
   title: "Settings",
@@ -61,7 +62,7 @@ export default async function SettingsPage() {
   const mayEditCatalogue = can.manageTrainingCatalogue(viewer.actor);
   const mayEditTiers = can.manageEngagementWeights(viewer.actor);
   const isPaused = !!schedule.pausedUntil;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayInClubTime();
 
   return (
     <div className="space-y-6">
@@ -128,7 +129,7 @@ export default async function SettingsPage() {
           {isPaused ? (
             <p className="text-ink-muted mt-4 text-sm">
               Your schedule is paused until{" "}
-              {new Date(schedule.pausedUntil!).toLocaleDateString("en-US", {
+              {formatDay(schedule.pausedUntil!, {
                 month: "long",
                 day: "numeric",
               })}

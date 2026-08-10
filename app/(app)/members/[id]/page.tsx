@@ -27,6 +27,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
+import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MemberProfilePage({
   params,
@@ -125,7 +126,7 @@ export default async function MemberProfilePage({
               <DetailRow label="Projects">{projects.length}</DetailRow>
               <CardDivider />
               <DetailRow label="Joined">
-                {new Date(member.joinedAt).toLocaleDateString("en-US", {
+                {formatDay(member.joinedAt, {
                   month: "long",
                   year: "numeric",
                 })}
@@ -286,9 +287,7 @@ export default async function MemberProfilePage({
                         >
                           <div className="flex flex-wrap items-baseline justify-between gap-2">
                             <p className="text-ink text-sm font-bold">
-                              {new Date(
-                                update.submittedAt ?? update.dueAt
-                              ).toLocaleDateString("en-US", {
+                              {formatDay(update.submittedAt ?? update.dueAt, {
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
@@ -485,8 +484,9 @@ function MemberProjectCard({
               showOwner={false}
               overdue={
                 d.status !== "done" &&
+                d.status !== "submitted" &&
                 !!d.dueDate &&
-                new Date(d.dueDate) < new Date()
+                d.dueDate < todayInClubTime()
               }
             />
           ))}

@@ -52,6 +52,7 @@ import {
 } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
+import { formatDay } from "@/lib/dates";
 
 export default async function ProjectDetailPage({
   params,
@@ -261,12 +262,7 @@ export default async function ProjectDetailPage({
                 <StatTile
                   label="Target"
                   value={
-                    project.targetDate
-                      ? new Date(project.targetDate).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric" }
-                        )
-                      : "—"
+                    project.targetDate ? formatDay(project.targetDate) : "—"
                   }
                 />
                 <StatTile
@@ -740,11 +736,8 @@ export default async function ProjectDetailPage({
                             {author?.fullName ?? "Unknown member"}
                           </p>
                           <span className="text-ink-muted text-xs">
-                            {new Date(submittedAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}{" "}
-                            · {formatNumber(entry.hours, 1)} hrs
+                            {formatDay(submittedAt)} ·{" "}
+                            {formatNumber(entry.hours, 1)} hrs
                           </span>
                         </div>
                         <p className="text-ink-soft mt-1.5 text-sm">

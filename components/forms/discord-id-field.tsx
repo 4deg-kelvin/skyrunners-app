@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { BadgeCheck, CircleAlert, Loader2 } from "lucide-react";
 
 import { verifyDiscordAction } from "@/lib/actions";
+import { formatMoment } from "@/lib/dates";
 
 /**
  * The Discord ID input, with proof attached to it.
@@ -99,9 +100,7 @@ export function DiscordIdField({
             className="bg-ok-bg text-ok-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
             title={
               verifiedAt
-                ? `Last message delivered ${new Date(
-                    verifiedAt
-                  ).toLocaleDateString("en-US", {
+                ? `Last message delivered ${formatMoment(verifiedAt, {
                     month: "long",
                     day: "numeric",
                   })}`

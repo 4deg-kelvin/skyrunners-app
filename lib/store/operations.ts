@@ -41,6 +41,7 @@
  */
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
+import { todayInClubTime } from "../dates.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
   CatalogueItem,
@@ -335,7 +336,7 @@ export async function createDeliverable(input: {
         projectId: input.projectId,
         memberId: input.ownerId,
         role: "contributor",
-        joinedAt: new Date().toISOString().slice(0, 10),
+        joinedAt: todayInClubTime(),
         commitment: "committed",
       });
     } else {
@@ -1882,7 +1883,7 @@ export async function updateProject(input: {
     if (nowComplete !== wasComplete && input.actorId) {
       const actor = store.members.find((m) => m.id === input.actorId);
       const audience = completionAudience(store, project, input.actorId);
-      const when = input.today ?? new Date().toISOString().slice(0, 10);
+      const when = input.today ?? todayInClubTime();
       const who = actor?.preferredName || actor?.fullName || "Someone";
       const doneCount = store.deliverables.filter(
         (d) => d.projectId === project.id && d.status === "done"
