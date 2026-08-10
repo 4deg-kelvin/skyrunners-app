@@ -191,6 +191,7 @@ export default async function SettingsPage() {
               <ClubIdentityForm
                 name={identity.name}
                 description={identity.description}
+                discordInviteUrl={identity.discordInviteUrl}
               />
             </div>
             <h3 className="text-ink mt-3 text-[17px] font-bold">

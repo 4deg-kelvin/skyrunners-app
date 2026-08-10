@@ -3180,11 +3180,17 @@ export function contributionInputsFor(
  * Falls back to the shipped literal, so an un-edited club reads exactly as it
  * always has and this needed no data migration.
  */
-export function clubIdentity(): { name: string; description: string } {
+export function clubIdentity(): {
+  name: string;
+  description: string;
+  /** Undefined until a Co-Lead pastes one in. Nothing renders a dead link. */
+  discordInviteUrl?: string;
+} {
   const row = live().clubSettings?.[0];
   return {
     name: row?.clubName?.trim() || club.name,
     description: row?.clubDescription?.trim() || club.description,
+    discordInviteUrl: row?.discordInviteUrl?.trim() || undefined,
   };
 }
 

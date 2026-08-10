@@ -105,6 +105,7 @@ export async function getClubTiers(): Promise<TierThresholds> {
 export async function getClubIdentity(): Promise<{
   name: string;
   description: string;
+  discordInviteUrl?: string;
 }> {
   await preloadLiveStore();
   return clubIdentity();

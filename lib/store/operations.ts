@@ -3749,12 +3749,33 @@ export async function setEventGuestList(input: {
 export async function updateClubIdentity(input: {
   name: string;
   description: string;
+  discordInviteUrl: string;
   actorId: string;
 }): Promise<Result<ClubSettings>> {
   const name = input.name.trim();
   if (!name) return fail<ClubSettings>("The club needs a name.");
   if (name.length > 80) {
     return fail<ClubSettings>("That name is too long for the header.");
+  }
+
+  /*
+    The invite renders as a link in a banner shown to every member, aimed
+    squarely at the newest people — the ones most likely to click whatever
+    they're told to. So it is restricted to Discord's own two invite hosts:
+    a typo is then harmless, and the worst a mistake can do is point at the
+    wrong server. Migration 0030 has the same rule as a CHECK, because a
+    validation that lives only in the app is one `psql` away from not existing.
+  */
+  const invite = input.discordInviteUrl.trim();
+  if (
+    invite &&
+    !/^https:\/\/(discord\.gg|discord\.com\/invite)\/[A-Za-z0-9-]+$/.test(
+      invite
+    )
+  ) {
+    return fail<ClubSettings>(
+      "That doesn't look like a Discord invite. It should start https://discord.gg/ — in Discord, right-click the channel, Invite People, then Edit invite link and set it to never expire."
+    );
   }
 
   return guarded((store) => {
@@ -3767,6 +3788,7 @@ export async function updateClubIdentity(input: {
 
     row.clubName = name;
     row.clubDescription = input.description.trim() || undefined;
+    row.discordInviteUrl = invite || undefined;
     row.updatedAt = new Date().toISOString();
     row.updatedBy = input.actorId;
     return ok(row);

@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql
 
 
 -- ==========================================================================
@@ -3651,4 +3651,59 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0029_checkin_late_notice.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0030_discord_invite_url.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0030 — the club's Discord invite link
+--
+-- ---------------------------------------------------------------------------
+-- Data, not a constant, for the same reason the club's name is
+-- ---------------------------------------------------------------------------
+--
+-- An invite link is not permanent by nature. Discord's default expires after
+-- seven days, anybody with Manage Server can revoke one, and a server that
+-- gets raided regenerates all of them. Hard-coding it means the day it stops
+-- working is a deploy, and in the meantime every new member follows a dead
+-- link on the page whose entire job is getting them set up.
+--
+-- So a Co-Lead pastes the current one into Settings and it appears everywhere
+-- at once — the getting-started guide and the "you haven't connected Discord"
+-- banner. Same reasoning as `club_name` (0023), the trainings catalogue and
+-- the commitment tiers: the club changes faster than anyone ships.
+--
+-- ---------------------------------------------------------------------------
+-- Why the CHECK is not paranoia
+-- ---------------------------------------------------------------------------
+--
+-- This value renders as a link in a banner on every page, for every member,
+-- and specifically to the people who are newest and most likely to click
+-- whatever they are told to. A typo is harmless; a pasted phishing URL is not.
+-- The constraint keeps it to Discord's own two invite hosts, so the worst a
+-- mistake can do is point at the wrong server.
+-- ---------------------------------------------------------------------------
+
+alter table club_settings
+  add column if not exists discord_invite_url text;
+
+alter table club_settings
+  drop constraint if exists club_settings_discord_invite_url_check;
+
+alter table club_settings
+  add constraint club_settings_discord_invite_url_check check (
+    discord_invite_url is null
+    or discord_invite_url ~ '^https://(discord\.gg|discord\.com/invite)/[A-Za-z0-9-]+$'
+  );
+
+insert into schema_migrations (version)
+values ('0030_discord_invite_url')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0030_discord_invite_url.sql
 -- ==========================================================================

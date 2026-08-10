@@ -839,6 +839,20 @@ export interface ClubSettings {
    */
   clubName?: string;
   clubDescription?: string;
+  /**
+   * The club's Discord invite, e.g. `https://discord.gg/abc123`.
+   *
+   * Editable rather than hard-coded because an invite link is not permanent by
+   * nature: Discord's default expires in seven days, and anyone with Manage
+   * Server can revoke one. A constant means the day it dies is a deploy, and
+   * until then every new member follows a dead link from the page whose whole
+   * job is getting them set up.
+   *
+   * Validated to Discord's own invite hosts in the operation AND by a CHECK in
+   * migration 0030 — it renders as a link in a banner shown to every member,
+   * so a pasted phishing URL is the failure worth designing against.
+   */
+  discordInviteUrl?: string;
   coreHours: number;
   committedHours: number;
   contributingHours: number;
