@@ -19,12 +19,34 @@ import { sendDiscordDM, discordIsConfigured } from "@/lib/notify/discord";
  * rule is what separates a reminder people tolerate from one they mute.
  *
  * ---------------------------------------------------------------------------
+ * Once a day, at 19:30 UTC — and do NOT make it hourly
+ * ---------------------------------------------------------------------------
+ *
+ * It was hourly for four commits and **every deployment failed**. Vercel's
+ * Hobby plan allows cron jobs that run at most once a day, and it doesn't
+ * reject the cron — it rejects the whole deploy. So an unrelated schedule
+ * string silently stopped the site updating, and the symptom was "my change
+ * isn't live", which points nowhere near `vercel.json`. If you make this more
+ * frequent, check the plan first.
+ *
+ * Daily is enough, and always was. Every check-in is due at **23:59 UTC** —
+ * `operations.ts` writes `${today}T23:59` and the database is UTC — so one run
+ * at 19:30 with a five-hour window catches every obligation in the club with
+ * margin on both sides. Hourly was doing the same work twenty-three extra
+ * times a day and finding nothing.
+ *
+ * The margin is the point of the odd numbers: a Vercel cron can fire late but
+ * never early, so 19:30 + 5h covers 23:59 even if the run slips half an hour.
+ * The message quotes the real gap it computes, so it still reads "due in about
+ * 4 hours".
+ *
+ * ---------------------------------------------------------------------------
  * Why this can't run in a Server Action
  * ---------------------------------------------------------------------------
  *
  * Nothing triggers it. Every other notification in the app hangs off somebody
  * pressing a button; this one has to happen because time passed, which means a
- * scheduler — Vercel Cron, hourly, configured in `vercel.json`.
+ * scheduler — Vercel Cron, configured in `vercel.json`.
  *
  * A cron has no signed-in user, so `auth.uid()` is null and no RLS policy can
  * grant it anything: a normal client would read zero rows and cheerfully report
@@ -35,15 +57,22 @@ import { sendDiscordDM, discordIsConfigured } from "@/lib/notify/discord";
  * Sending twice is the failure mode to design against
  * ---------------------------------------------------------------------------
  *
- * The job runs hourly and the window is four hours wide, so without a memory
- * every member would get four identical nudges per check-in. `reminder_sent_at`
- * (migration 0027) is that memory, and it's written BEFORE the DM rather than
- * after: a crash between the two costs one missed reminder, where the other
- * order costs a duplicate on every retry. Missing one is much cheaper.
+ * A daily job needs this less than an hourly one did, but it still needs it: a
+ * retry, a manual invocation while debugging, or a future schedule change would
+ * all re-nudge people who were already told. `reminder_sent_at` (migration
+ * 0027) is that memory, and it's written BEFORE the DM rather than after — a
+ * crash between the two costs one missed reminder, where the other order costs
+ * a duplicate on every retry. Missing one is much cheaper.
  */
 
-/** How far ahead of the deadline to nudge. */
-const HOURS_BEFORE = 4;
+/**
+ * How far ahead of the deadline to look.
+ *
+ * Five, not four, because the run is daily and fixed: the window has to reach
+ * 23:59 UTC from a 19:30 start even if Vercel fires the job late. The DM quotes
+ * the gap it actually measures, so people still read "about 4 hours".
+ */
+const HOURS_BEFORE = 5;
 
 export async function GET(request: Request) {
   /*
