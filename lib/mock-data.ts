@@ -3366,6 +3366,18 @@ export function divisionForProject(projectId: string): Team | undefined {
  * anyway, so a longer list would be a wall of rows with no available action.
  * The point of showing it is correcting a mistake, not browsing a history.
  */
+/**
+ * Has this person EVER logged hours — not "recently".
+ *
+ * `recentWorkLogs` is windowed to a fortnight, so it can't answer this: a
+ * member who logged once in September and nothing since looks identical to one
+ * who has never logged at all, and those two need completely different prompts.
+ * One needs reminding, the other has never been shown the habit exists.
+ */
+export function hasLoggedAnyHours(memberId: string): boolean {
+  return live().workLogs.some((w) => w.memberId === memberId);
+}
+
 export function recentWorkLogs(memberId: string, days = 14) {
   const cutoff = new Date(`${today()}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - days);

@@ -18,6 +18,7 @@ import {
   isOverdue,
   joinRequestsAwaitingMe,
   deliverableTodos,
+  hasLoggedAnyHours,
   lastEntryForProject,
   myDeliverablesOn,
   myJoinRequests,
@@ -152,6 +153,16 @@ export interface MyWorkView {
     project?: Project;
     locked: boolean;
   }[];
+  /**
+   * Whether they have ever logged a single hour.
+   *
+   * Not "recently" — see `hasLoggedAnyHours`. Somebody who has never logged has
+   * never met the habit the whole app is built on: check-ins pre-fill from
+   * hours, the commitment tier is hours/week, and their profile shows zero
+   * effort no matter how much work they've actually done. That is a different
+   * problem from being behind, and it needs saying once, plainly.
+   */
+  hasEverLoggedHours: boolean;
   /** Requests they've sent, so an ask is never invisible. */
   myRequests: {
     request: JoinRequest;
@@ -332,6 +343,7 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     contribution: buildContributionRecord(contributionInputsFor(memberId)),
     myRequests: myJoinRequests(memberId),
     requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
+    hasEverLoggedHours: hasLoggedAnyHours(memberId),
     recentHours: recentWorkLogs(memberId).map((log) => ({
       log,
       project: log.projectId ? getProject(log.projectId) : undefined,

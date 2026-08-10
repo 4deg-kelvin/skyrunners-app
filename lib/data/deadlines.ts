@@ -35,7 +35,7 @@ import {
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { preloadLiveStore } from "@/lib/store/request";
-import { buildGantt, projectTone, type GanttChart } from "@/lib/gantt";
+import { projectTone, type GanttRow } from "@/lib/gantt";
 import type { Member, Project, Team } from "@/lib/types";
 
 /** A project target date, or a deliverable due date. Same shape either way. */
@@ -86,20 +86,20 @@ export interface DivisionExtrasData {
    * land on top of each other", which a date-ordered list cannot, and the list
    * stays as the precise readout. Null when the division has no dated work —
    * an empty axis is worse than nothing.
+   *
+   * ROWS, not a built chart. The division chart lets the reader open the window
+   * on a date of their choosing, and the whole layout has to be recomputed
+   * against the new span — the window auto-fits the dates present, so it isn't
+   * something a component can nudge after the fact. `buildGantt` is pure maths
+   * over a handful of rows, so the client calls it on each change and there is
+   * no round trip.
    */
-  timeline: GanttChart | null;
+  timelineRows: GanttRow[] | null;
   /**
-   * The same chart with finished projects dropped.
-   *
-   * Two charts rather than one filtered on the client, because the window
-   * auto-fits the dates PRESENT — remove a project and the remaining bars have
-   * to be re-laid-out against a narrower span, which is `buildGantt`'s job and
-   * not something a component should re-derive. It's pure maths over a handful
-   * of rows, so computing both costs nothing.
-   *
-   * Null when hiding completed work would leave nothing to draw.
+   * The same rows with finished projects dropped, for the page's Hide-completed
+   * switch. Null when hiding completed work would leave nothing to draw.
    */
-  timelineLive: GanttChart | null;
+  timelineLiveRows: GanttRow[] | null;
   blocked: {
     projectId: string;
     projectSlug: string;
@@ -135,8 +135,8 @@ export async function getDivisionExtras(): Promise<
     out[division.id] = {
       deadlines: items,
       blocked: [],
-      timeline: timelineFor(division.id, store.projects, now),
-      timelineLive: timelineFor(division.id, store.projects, now, true),
+      timelineRows: timelineFor(division.id, store.projects, now),
+      timelineLiveRows: timelineFor(division.id, store.projects, now, true),
     };
   }
 
@@ -333,7 +333,7 @@ function timelineFor(
    * nothing.
    */
   liveOnly = false
-): GanttChart | null {
+): GanttRow[] | null {
   let mine = allProjects.filter(
     (p) => divisionForProject(p.id)?.id === divisionId
   );
@@ -362,7 +362,7 @@ function timelineFor(
     else byParent.set(parentId, [p]);
   }
 
-  const rows: Parameters<typeof buildGantt>[0] = [];
+  const rows: GanttRow[] = [];
   const seen = new Set<string>();
 
   const walk = (parentId: string | null, depth: number) => {
@@ -398,16 +398,5 @@ function timelineFor(
 
   // Nothing dated at all draws an axis with no information on it.
   if (!rows.some((r) => r.start || r.end)) return null;
-  /*
-    Starts at today, so the whole width goes to what this division still has to
-    deliver. A division six months in otherwise spends most of its chart on
-    finished work and squeezes everything live into the last inch — the part
-    somebody can act on gets the least room.
-
-    Anything overdue drags the window back far enough to show itself, so the one
-    thing nobody may miss is the one thing clipping can't hide. See
-    `clipToToday`. The project detail chart deliberately does NOT do this: its
-    question is "how has my work gone", and its own history is half the answer.
-  */
-  return buildGantt(rows, now, { clipToToday: true });
+  return rows;
 }
