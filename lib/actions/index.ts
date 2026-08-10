@@ -45,7 +45,7 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
-import type { Project } from "@/lib/types";
+import type { Deliverable, Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
 import { after } from "next/server";
@@ -328,6 +328,117 @@ async function setDeliverableStatusAction$impl(
   const result = await ops.setDeliverableStatus(id, status, blockerNote);
   if (result.ok) refresh();
   return toResult(result, "Updated.");
+}
+
+// ---------------------------------------------------------------------------
+// Checklists under a deliverable
+//
+// All four share one permission question, asked by `todoGate` below: are you
+// the deliverable's owner, an RE of or above its project, or a Co-Lead? Wider
+// than the deliverable itself, and `can.manageDeliverableTodos` explains why.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the parent deliverable and check the caller may touch its checklist.
+ *
+ * Returns the deliverable on success and an `ActionResult` on refusal, so each
+ * action is three lines instead of ten copies of the same lookup. The project
+ * id comes off the form, but the OWNER is read from the stored row rather than
+ * trusted from the client — the whole point of the wider rule is that being the
+ * owner grants a right, so accepting the caller's word for it would hand that
+ * right to anybody who can edit a hidden input.
+ */
+async function todoGate(
+  formData: FormData,
+  what: string
+): Promise<{ deliverable: Deliverable } | { refusal: ActionResult }> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+  const deliverableId = String(formData.get("deliverableId") ?? "");
+
+  const deliverable = projectDeliverables(projectId).find(
+    (d) => d.id === deliverableId
+  );
+  if (!deliverable) {
+    return { refusal: { ok: false, error: "That deliverable no longer exists." } };
+  }
+
+  if (
+    !can.manageDeliverableTodos(
+      viewer.actor,
+      viewer.graph,
+      projectId,
+      deliverable.ownerId
+    )
+  ) {
+    return { refusal: denied(what) };
+  }
+
+  return { deliverable };
+}
+
+async function addDeliverableTodoAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const gate = await todoGate(formData, "add to this checklist");
+  if ("refusal" in gate) return gate.refusal;
+
+  const viewer = await getViewer();
+  const result = await ops.addDeliverableTodo({
+    deliverableId: gate.deliverable.id,
+    title: String(formData.get("title") ?? ""),
+    actorId: viewer.member.id,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Added.");
+}
+
+async function setDeliverableTodoDoneAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const gate = await todoGate(formData, "tick items off this checklist");
+  if ("refusal" in gate) return gate.refusal;
+
+  const viewer = await getViewer();
+  const result = await ops.setDeliverableTodoDone({
+    todoId: String(formData.get("todoId") ?? ""),
+    done: String(formData.get("done") ?? "") === "true",
+    actorId: viewer.member.id,
+    now: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Updated.");
+}
+
+async function renameDeliverableTodoAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const gate = await todoGate(formData, "edit this checklist");
+  if ("refusal" in gate) return gate.refusal;
+
+  const result = await ops.renameDeliverableTodo({
+    todoId: String(formData.get("todoId") ?? ""),
+    title: String(formData.get("title") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Renamed.");
+}
+
+async function deleteDeliverableTodoAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const gate = await todoGate(formData, "remove items from this checklist");
+  if ("refusal" in gate) return gate.refusal;
+
+  const result = await ops.deleteDeliverableTodo(
+    String(formData.get("todoId") ?? "")
+  );
+
+  if (result.ok) refresh();
+  return toResult(result, "Removed.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1803,6 +1914,30 @@ export async function setDeliverableStatusAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setDeliverableStatusAction$impl(formData));
+}
+
+export async function addDeliverableTodoAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => addDeliverableTodoAction$impl(formData));
+}
+
+export async function setDeliverableTodoDoneAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setDeliverableTodoDoneAction$impl(formData));
+}
+
+export async function renameDeliverableTodoAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => renameDeliverableTodoAction$impl(formData));
+}
+
+export async function deleteDeliverableTodoAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => deleteDeliverableTodoAction$impl(formData));
 }
 
 export async function inviteMemberAction(

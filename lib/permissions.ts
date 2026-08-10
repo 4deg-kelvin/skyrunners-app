@@ -663,6 +663,34 @@ export const can = {
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
   /**
+   * The checklist under a deliverable — add, tick, rename, remove.
+   *
+   * Deliberately WIDER than `manageDeliverables`, and this is the only rule in
+   * the file where the owner of a row gets a right their RE-only neighbours
+   * don't. The person doing the work is the one who discovers what it turns out
+   * to involve — book the CNC, chase the vendor, get the fixture back off
+   * Trudy — and making them ask an RE to write each of those down guarantees
+   * the list stays empty and the feature goes unused.
+   *
+   * It's safe to be wide because a todo is worth nothing. It carries no owner,
+   * no date and no credit, and it appears in no count; the only thing it can do
+   * is hold up a sign-off, and the RE can clear it themselves. Compare
+   * `manageDeliverables`, which is RE-only precisely because a deliverable DOES
+   * count.
+   *
+   * `ownerId` is the deliverable's owner, not the todo's — todos have no owner.
+   */
+  manageDeliverableTodos: (
+    actor: Actor,
+    graph: OrgGraph,
+    projectId: string,
+    ownerId: string
+  ) =>
+    isCoLead(actor) ||
+    isSelf(actor, ownerId) ||
+    isREofOrAbove(actor, graph, projectId),
+
+  /**
    * Challenging work that has ALREADY been signed off.
    *
    * Signing off stays with the RE at the project's own level — that's their

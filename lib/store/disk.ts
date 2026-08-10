@@ -39,6 +39,7 @@ import type {
   ProjectMembership,
   CatalogueItem,
   ClubSettings,
+  DeliverableTodo,
   HelpRequest,
   MemberCertification,
   ProjectNotice,
@@ -130,6 +131,10 @@ export interface StoreShape {
    * everything else and the Postgres diff needs no special case.
    */
   clubSettings: ClubSettings[];
+  /**
+   * Checklists under deliverables. Not sub-tasks — see `DeliverableTodo`.
+   */
+  deliverableTodos: DeliverableTodo[];
 }
 
 /**
@@ -140,7 +145,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 9;
+const STORE_VERSION = 10;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -182,6 +187,8 @@ function seed(): StoreShape {
     certifications: [],
     // The defaults the tiers were hard-coded to, so seeding changes nothing
     // anybody sees until a Co-Lead edits them.
+    // Nothing to seed: a todo only exists because somebody wrote one.
+    deliverableTodos: [],
     clubSettings: [
       {
         id: "1",

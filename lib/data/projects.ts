@@ -13,6 +13,7 @@ import {
   artifactsFor,
   childProjects,
   childTeams,
+  deliverableTodos,
   divisionForProject,
   getMember,
   getProject,
@@ -34,6 +35,7 @@ import { readStore } from "@/lib/store/disk";
 import type {
   ClubEvent,
   Deliverable,
+  DeliverableTodo,
   JoinRequest,
   Member,
   Project,
@@ -196,6 +198,15 @@ export interface DeliverableRowData {
   deliverable: Deliverable;
   owner?: Member;
   overdue: boolean;
+  /**
+   * The checklist under it, already ordered.
+   *
+   * Joined here rather than fetched by the row component, for the same reason
+   * everything else on this page is: a lookup inside the render loop is
+   * harmless against an array and one round trip per deliverable against
+   * Postgres.
+   */
+  todos: DeliverableTodo[];
 }
 
 /** One scheduled session on a project, with everything the row needs. */
@@ -358,6 +369,7 @@ export async function getProjectBySlug(
       deliverable: d,
       owner: getMember(d.ownerId),
       overdue: isOverdue(d),
+      todos: deliverableTodos(d.id),
     })),
     artifacts: artifactsFor(project.id).map((a) => ({
       artifact: a,

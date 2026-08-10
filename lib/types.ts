@@ -837,3 +837,40 @@ export interface ClubSettings {
   updatedAt?: string;
   updatedBy?: string;
 }
+
+
+// ---------------------------------------------------------------------------
+// Checklists under a deliverable
+// ---------------------------------------------------------------------------
+
+/**
+ * One tickable item on a deliverable. NOT a sub-task.
+ *
+ * The deliverable is still the whole task model — one owner, one date, no
+ * dependencies. A todo is deliberately none of those things: no owner, no due
+ * date, no credit, and it never appears in any count.
+ *
+ * It exists because "move the parts from Trudy's office" was being entered as a
+ * DELIVERABLE, since that was the only place to put a thing that needed doing.
+ * But deliverables feed the Delivered signal — the one contribution measure
+ * that can't be inflated — and a fifteen-minute errand sitting beside a spar
+ * redesign makes that number mean nothing.
+ *
+ * What a todo does carry is a gate: `confirmDeliverable` refuses while any are
+ * open. That's what makes writing them down worth the keystrokes instead of
+ * being a second list nobody maintains.
+ *
+ * **If you want to give one an owner or a date, it isn't a todo.** It's a
+ * deliverable, and it should be one.
+ */
+export interface DeliverableTodo {
+  id: string;
+  deliverableId: string;
+  title: string;
+  done: boolean;
+  /** Set iff `done`. Answers "who said this was handled?", not who gets credit. */
+  doneAt?: string;
+  doneBy?: string;
+  sortOrder: number;
+  createdBy?: string;
+}

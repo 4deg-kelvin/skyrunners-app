@@ -15,6 +15,7 @@ import {
   type ClubEvent,
   type JoinRequest,
   type Deliverable,
+  type DeliverableTodo,
   type TrainingSection,
   type Member,
   type Project,
@@ -2744,6 +2745,24 @@ export function projectDeliverables(projectId: string): Deliverable[] {
   return live()
     .deliverables.filter((d) => d.projectId === projectId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/**
+ * The checklist under one deliverable, in the order it was written.
+ *
+ * Not sub-tasks — see `DeliverableTodo`. Ordered by `sortOrder` and never by
+ * done-ness: a list that reshuffles as you tick things loses the reader's place
+ * mid-pass, which is the one thing a checklist must not do.
+ */
+export function deliverableTodos(deliverableId: string): DeliverableTodo[] {
+  return live()
+    .deliverableTodos.filter((t) => t.deliverableId === deliverableId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/** How many items are still open. Zero is what unlocks sign-off. */
+export function openTodoCount(deliverableId: string): number {
+  return deliverableTodos(deliverableId).filter((t) => !t.done).length;
 }
 
 /** What one person owns on one project — the "what am I responsible for" answer. */

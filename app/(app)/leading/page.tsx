@@ -185,9 +185,36 @@ export default async function LeadingPage() {
               trustworthy &ldquo;projects completed&rdquo;, and an honest
               timeline.
             </Rule>
+            <Rule can title="Keep the checklist under a deliverable">
+              Small things that have to happen but aren&apos;t worth their own
+              deliverable — move the jig back to the robotics room, book the
+              mill, chase the order. Add, tick, rename or delete them, and{" "}
+              <span className="text-ink font-semibold">
+                so can the deliverable&apos;s owner
+              </span>
+              . That&apos;s the one place in the app where the person doing the
+              work has a right their RE-only neighbours don&apos;t, and
+              it&apos;s deliberate: they&apos;re the one who finds out what the
+              job actually involves.
+            </Rule>
             <Rule can title="Sign work off, or send it back">
               The owner claims done; you agree or you don&apos;t. Send-backs
               need a reason — a bare rejection is what stops people submitting.
+            </Rule>
+            <Rule title="Sign off while a checklist item is still open">
+              Neither can the owner mark it done. The list says the work
+              isn&apos;t finished, so the app takes it at its word. You can
+              clear it yourself — tick the items, or delete the ones that turned
+              out not to be needed. Deleting is fine: a todo counts towards
+              nothing, so removing one falsifies no record.
+            </Rule>
+            <Rule title="Give a checklist item an owner or a due date">
+              There&apos;s deliberately nowhere to put them. If something needs
+              a name and a date against it, it isn&apos;t a checklist item —
+              it&apos;s a deliverable, and it should be one. Errands entered as
+              deliverables are what makes &ldquo;projects completed&rdquo; stop
+              meaning anything: ten of them and somebody outranks the person who
+              shipped the airframe.
             </Rule>
             <Rule can title="Answer what people wrote about your project">
               Per-project check-in entries are public, and you can reply to them
