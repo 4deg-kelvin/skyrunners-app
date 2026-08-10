@@ -75,7 +75,10 @@ export function DeliverableTodos({
   // Nothing written and nobody who could write anything: show nothing at all.
   if (todos.length === 0 && (!canManage || locked)) return null;
 
-  function run(action: (fd: FormData) => Promise<{ ok: boolean; error?: string }>, fields: Record<string, string>) {
+  function run(
+    action: (fd: FormData) => Promise<{ ok: boolean; error?: string }>,
+    fields: Record<string, string>
+  ) {
     setError(null);
     const data = new FormData();
     data.set("deliverableId", deliverableId);
@@ -107,9 +110,7 @@ export function DeliverableTodos({
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-xs font-bold",
-                left > 0
-                  ? "bg-warn-bg text-warn-fg"
-                  : "bg-ok-bg text-ok-fg"
+                left > 0 ? "bg-warn-bg text-warn-fg" : "bg-ok-bg text-ok-fg"
               )}
             >
               {left > 0 ? `${left} left` : `${done} done`}

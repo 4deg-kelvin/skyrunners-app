@@ -52,7 +52,10 @@ beginner. Revisit only if real analytics/ML work appears.
 
 ```bash
 npm run dev            # local dev server (demo mode unless .env.local has keys)
-npm run check          # typecheck + lint + dead-control sweep + tests
+npm run check          # everything CI runs except the build: typecheck, lint,
+                       # Prettier, dead-control sweep, tests. If this passes and
+                       # CI still fails, THIS command is missing a step — fix it
+                       # here rather than remembering to run the extra one
 npm run sweep          # just the sweep: exports nothing renders or calls
 npm run build:check    # verify it compiles WITHOUT killing a running dev server
 npm run db:check       # are the Supabase migrations actually applied?

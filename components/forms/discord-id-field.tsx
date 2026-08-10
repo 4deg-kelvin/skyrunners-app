@@ -99,10 +99,12 @@ export function DiscordIdField({
             className="bg-ok-bg text-ok-fg inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold"
             title={
               verifiedAt
-                ? `Last message delivered ${new Date(verifiedAt).toLocaleDateString(
-                    "en-US",
-                    { month: "long", day: "numeric" }
-                  )}`
+                ? `Last message delivered ${new Date(
+                    verifiedAt
+                  ).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                  })}`
                 : undefined
             }
           >
@@ -183,8 +185,8 @@ export function DiscordIdField({
           </span>
         ) : (
           <span>
-            Verifying sends you a real DM. If it doesn&apos;t arrive
-            you&apos;ll be told exactly why.{" "}
+            Verifying sends you a real DM. If it doesn&apos;t arrive you&apos;ll
+            be told exactly why.{" "}
           </span>
         )}
         It&apos;s a long number, not your username: in Discord turn on{" "}
