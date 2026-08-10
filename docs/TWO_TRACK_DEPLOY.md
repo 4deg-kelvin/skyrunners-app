@@ -10,14 +10,20 @@ and nobody's data gets destroyed by a half-finished feature.
 ## The shape of it
 
 ```
-main   ──────●────────●────────●─────▶   skyrunners.vercel.app     the club
+main   ──────●────────●────────●─────▶   skyrunners-app.vercel.app  the club
              ▲        ▲        ▲          production Supabase
              │ merge  │        │
-dev    ──●───●──●──●──●──●──●──●─────▶   dev-skyrunners.vercel.app  us
+dev    ──●───●──●──●──●──●──●──●─────▶   (not set up yet)           us
          ▲                                staging Supabase
          │
       feature branches
 ```
+
+**The production host is `skyrunners-app.vercel.app`.** This said
+`skyrunners.vercel.app` for weeks, which is a real site belonging to somebody
+else — it redirects `/` to `/en`, which this app has no route for. Probing it
+to check whether a deploy had landed gave a confident, entirely wrong answer.
+The dev host doesn't exist yet; `dev-skyrunners.vercel.app` is unregistered.
 
 One rule: **`main` is what the club is using right now.** Nothing lands there
 that hasn't been used by a human first.
