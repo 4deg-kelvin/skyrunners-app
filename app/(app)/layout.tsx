@@ -119,7 +119,6 @@ export default async function AppLayout({
         <DiscordBanner
           hasId={Boolean(viewer.member.discordUserId)}
           botLive={discordIsConfigured()}
-          inviteUrl={identity.discordInviteUrl}
         />
       ) : null}
       <TopNav

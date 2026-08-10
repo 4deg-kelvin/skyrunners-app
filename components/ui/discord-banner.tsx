@@ -24,21 +24,10 @@ import { MessageSquareWarning } from "lucide-react";
 export function DiscordBanner({
   hasId,
   botLive,
-  inviteUrl,
 }: {
   hasId: boolean;
   /** Whether the club has a bot yet — decides whose move it is. */
   botLive: boolean;
-  /**
-   * The club's Discord invite, if a Co-Lead has set one.
-   *
-   * Shown only in the no-ID state, because that's the one where the reader may
-   * not be in the server yet — and joining is a prerequisite the bot cannot
-   * work around: Discord refuses a DM between two accounts that share no
-   * server. Telling somebody to connect without telling them where is the
-   * dead end this banner is supposed to close.
-   */
-  inviteUrl?: string;
 }) {
   /*
     Three states, because the reader's next action is different in each. The
@@ -76,25 +65,23 @@ export function DiscordBanner({
                 : "We haven't proved a message actually reaches you — one click does it."}
           </span>
         </p>
+        {/*
+          The invite link is deliberately NOT here.
+
+          This banner renders on every page, so putting it here would publish
+          the server link club-wide, permanently, to everybody — including the
+          thirty people already in the server who don't need it. It lives in
+          exactly two places instead: the new-member guide, which is where
+          somebody who has to join is reading, and Settings, which is where
+          somebody who has lost it goes looking. Both are one click from here.
+        */}
         {waitingOnUs ? null : (
-          <span className="flex flex-wrap items-center gap-x-3">
-            {!hasId && inviteUrl ? (
-              <a
-                href={inviteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
-              >
-                Join the server →
-              </a>
-            ) : null}
-            <Link
-              href="/settings"
-              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
-            >
-              {hasId ? "Confirm it now →" : "Connect it →"}
-            </Link>
-          </span>
+          <Link
+            href="/settings"
+            className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
+          >
+            {hasId ? "Confirm it now →" : "Connect it →"}
+          </Link>
         )}
       </div>
     </div>

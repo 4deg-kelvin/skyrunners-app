@@ -96,6 +96,7 @@ export default async function SettingsPage() {
             <ProfileForm
               member={viewer.member}
               botLive={discordIsConfigured()}
+              inviteUrl={identity.discordInviteUrl}
             />
           </div>
         </CardBody>
