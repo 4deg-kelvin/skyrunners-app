@@ -48,11 +48,16 @@ export default async function AppLayout({
     so a failure here is a bare 500 on every route. A menu item is never worth
     that.
   */
-  let leadershipRoles = { isRE: false, divisionsLed: [] as string[] };
+  let leadershipRoles = {
+    isRE: false,
+    divisionsLed: [] as string[],
+    hasReports: false,
+  };
   try {
     leadershipRoles = await getLeadershipRoles(viewer.member.id);
   } catch {
-    leadershipRoles = { isRE: false, divisionsLed: [] };
+    // Fail closed: a link that isn't there is a smaller problem than a 500.
+    leadershipRoles = { isRE: false, divisionsLed: [], hasReports: false };
   }
 
   /*
@@ -116,7 +121,16 @@ export default async function AppLayout({
       <TopNav
         memberId={viewer.member.id}
         userName={viewer.member.fullName}
-        isLeadership={viewer.member.globalRole !== "member"}
+        /*
+          Drives the Dashboard link, and it has to be the same question
+          `/dashboard` redirects on — "do you oversee anybody", not "is your
+          role string leadership". A Lead with no reports would otherwise see a
+          link that bounces them back, and a member who has been given reports
+          would see none for a page they're entitled to.
+        */
+        isLeadership={
+          viewer.member.globalRole === "co_lead" || leadershipRoles.hasReports
+        }
         showLeadingGuide={
           viewer.member.globalRole !== "member" || leadershipRoles.isRE
         }

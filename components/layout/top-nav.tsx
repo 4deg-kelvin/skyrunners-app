@@ -29,6 +29,14 @@ export function TopNav({
 }: {
   memberId: string;
   userName: string;
+  /**
+   * Whether to show the Dashboard link.
+   *
+   * "Oversees at least one person, or is a Co-Lead" — the same question
+   * `/dashboard` itself redirects on. Not `globalRole !== "member"`: a Lead
+   * with no reports has nothing to look at there, and a member who has been
+   * given reports does.
+   */
   isLeadership: boolean;
   isDemo: boolean;
   /** Leads, Co-Leads, and anyone who is an RE of something. */

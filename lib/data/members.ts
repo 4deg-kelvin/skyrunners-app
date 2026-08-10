@@ -392,6 +392,18 @@ export async function getLeadershipRoles(memberId: string): Promise<{
   isRE: boolean;
   /** Names of divisions they lead — top-level teams only. */
   divisionsLed: string[];
+  /**
+   * At least one person reports to them directly.
+   *
+   * Decides whether the Dashboard link appears in the nav, and it is the SAME
+   * fact `/dashboard` redirects on — `can.viewLeadershipDashboard`. The nav
+   * used to key off `globalRole !== "member"` instead, which got it wrong in
+   * both directions: a `lead` with no reports saw a link that bounced them
+   * straight back, and a plain member who had been given reports saw no link
+   * for a page they were entitled to. Reporting lines are a fact about the org
+   * tree, not about a role string.
+   */
+  hasReports: boolean;
 }> {
   await preloadLiveStore();
   const store = readStore();
@@ -401,5 +413,8 @@ export async function getLeadershipRoles(memberId: string): Promise<{
     divisionsLed: teamsLedBy(memberId)
       .filter((t) => t.isDivision)
       .map((t) => t.name),
+    hasReports: store.members.some(
+      (m) => m.leadId === memberId && m.status === "active"
+    ),
   };
 }
