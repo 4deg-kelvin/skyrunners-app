@@ -147,7 +147,12 @@ export async function getProjectTree(): Promise<DivisionProjects[]> {
   // then died on "Live store not loaded". Guarding at the boundary means call
   // order stops mattering.
   await preloadLiveStore();
-  const roots = readStore().projects.filter((p) => p.parentId === null);
+  /*
+    `childProjects(null)` rather than filtering the store by hand: it's the
+    same set, and it comes back alphabetical. Divisions and every level of
+    sub-project sort the same way, from one comparator in `mock-data.ts`.
+  */
+  const roots = childProjects(null);
 
   return divisions().map((division) => ({
     division,
@@ -451,7 +456,10 @@ export async function getProjectFormOptions(actor?: {
         (p) =>
           p.phase !== "complete" && divisionForProject(p.id)?.isActive !== false
       )
-      .map((p) => ({ id: p.id, name: p.name })),
+      .map((p) => ({ id: p.id, name: p.name }))
+      // Alphabetical, like every other list of projects. A dropdown ordered by
+      // whatever the database felt like is one you have to read end to end.
+      .sort((a, b) => a.name.localeCompare(b.name)),
     /*
       Only divisions this person may actually file work into.
 

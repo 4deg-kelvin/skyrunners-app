@@ -2644,8 +2644,28 @@ export function directREs(projectId: string) {
  * let somebody file new work into a division that isn't shown anywhere.
  * `archivedDivisions()` is the deliberate way to ask for the other set.
  */
+/**
+ * Alphabetical, for anything the club browses by name.
+ *
+ * Without this the order is whatever Postgres hands back, which is not merely
+ * arbitrary — it is **not stable**. Two loads of /projects could list the
+ * divisions differently, and somebody looking for Airframe would have to read
+ * the whole page every time rather than going where it was last time. A page
+ * whose job is discoverability cannot move its own furniture around.
+ *
+ * `localeCompare` rather than `<`, so "Åstrom" doesn't sort after "Zhang" and
+ * a lowercase title doesn't get exiled below every capitalised one — real
+ * project names are typed by thirty different people and half of them don't
+ * capitalise.
+ */
+function byName<T extends { name: string }>(a: T, b: T): number {
+  return a.name.localeCompare(b.name);
+}
+
 export function divisions() {
-  return live().teams.filter((t) => t.parentId === null && t.isActive);
+  return live()
+    .teams.filter((t) => t.parentId === null && t.isActive)
+    .sort(byName);
 }
 
 /** Retired divisions, most recently archived first. The club's own record. */
@@ -2656,11 +2676,23 @@ export function archivedDivisions() {
 }
 
 export function childTeams(parentId: string) {
-  return live().teams.filter((t) => t.parentId === parentId);
+  return live()
+    .teams.filter((t) => t.parentId === parentId)
+    .sort(byName);
 }
 
+/**
+ * Alphabetical at every depth, because the tree recurses through here.
+ *
+ * `parentId: null` gives the roots, so sorting once covers the top level and
+ * every nest below it. Pages that want a different order — /find-work ranks by
+ * where a member would help most — sort afterwards, and now do it on top of a
+ * deterministic base instead of an accidental one.
+ */
 export function childProjects(parentId: string | null) {
-  return live().projects.filter((p) => p.parentId === parentId);
+  return live()
+    .projects.filter((p) => p.parentId === parentId)
+    .sort(byName);
 }
 
 export function projectMembers(projectId: string) {
