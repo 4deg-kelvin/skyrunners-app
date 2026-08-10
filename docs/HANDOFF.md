@@ -1,14 +1,19 @@
 # Handoff — read this first
 
-**Written 2026-08-08, last revised 2026-08-09.** Everything a fresh session
+**Written 2026-08-08, last revised 2026-08-10.** Everything a fresh session
 needs. Written for someone with no memory of how any of this came to be.
+
+**Start with "Session log — 2026-08-10" near the bottom** if you're picking up
+where the last session stopped. It has the three outstanding items.
 
 ---
 
 ## Where things actually are
 
-The app is **live on Supabase**. Real Google sign-in, real Postgres, migrations
-`0001`–`0019` applied. **Phases 0–8 are built** — my work, find work, projects,
+The app is **live on Supabase** at `skyrunners-app.vercel.app` — note the
+`-app`; `skyrunners.vercel.app` is somebody else's site and probing it to check
+a deploy gives a confident wrong answer. Real Google sign-in, real Postgres,
+migrations `0001`–`0030` applied. **Phases 0–8 are built** — my work, find work, projects,
 members, deliverables and sign-off, check-ins and review, terms, trainings and
 facility access, and the calendar. There is no phase 9+ scoped yet beyond the
 one item under "What's next".
@@ -460,3 +465,187 @@ Reasoning lives in `docs/DECISIONS.md` and `docs/PRODUCT_REVIEW.md`.
 - `lib/mock-data.ts` is ~2,000 lines and only seeds demo mode now.
   `lib/store/operations.test.ts` pins rules against specific mock records, so
   gutting it means rewriting those tests.
+
+---
+
+# Session log — 2026-08-10
+
+Written at the end of the session, for the next one. **The three outstanding
+items are at the bottom of this section.** Everything above them shipped, is
+merged to `main`, deployed, and covered by tests (539 passing).
+
+## The two hours spent on nothing, and how not to repeat them
+
+Both were "my change isn't live", and neither was a code problem. `git rev-list
+--left-right --count main...origin/main` reading `0 0` is **necessary but not
+sufficient** — pushed code sat undeployed twice, for two different reasons.
+Check both of these before saying anything about the live site. No Vercel access
+required; the repo is public:
+
+```bash
+curl -s "https://api.github.com/repos/4deg-kelvin/skyrunners-app/actions/runs?per_page=3"
+curl -s "https://api.github.com/repos/4deg-kelvin/skyrunners-app/deployments?per_page=3"
+curl -s "https://api.github.com/repos/4deg-kelvin/skyrunners-app/commits/SHA/status"
+```
+
+The last one is the useful one: it carries a `Vercel` context whose state is
+`success`, `pending` or `failure`. **A red Vercel status next to a green CI check
+is the signature of both bugs below.**
+
+### 1. CI was red on Prettier, which `npm run check` did not run
+
+CI runs `format:check`; `npm run check` didn't. So the pre-push gate said green
+while the gate that actually blocks a deploy said red. **Fixed by putting
+Prettier into `npm run check`** — remembering to also run a second command is not
+a fix. If `npm run check` ever passes and CI fails again, the bug is that `check`
+is missing a step. Fix it there.
+
+### 2. An hourly cron made every deployment fail
+
+`vercel.json` declared `0 * * * *`. **Vercel's Hobby plan allows cron jobs that
+run at most once a day, and it rejects the whole deployment over it — not just
+the cron.** A schedule string in a file nobody was looking at silently stopped
+the site updating for four commits, and the symptom pointed nowhere near it.
+
+Now `30 19 * * *`, and daily is genuinely enough: every check-in is due at 23:59
+UTC, so one run with a five-hour window catches the whole club. If a future job
+needs to be more frequent, that's a Pro-plan conversation, not a schedule edit.
+Written up in `docs/INFRA.md`.
+
+### 3. An env-var edit dropped the site into demo mode
+
+Adding the Discord variables removed or unscoped a `NEXT_PUBLIC_SUPABASE_*` one,
+and the app **silently fell back to sample data with no login** — by design, so a
+fresh clone runs, which is exactly why nothing errored. Rolling back fixed it.
+
+Diagnosing this without Vercel access: `/my-work` returns `307 -> /login` in live
+mode and `200` in demo mode, because `updateSession` no-ops when
+`supabaseConfig()` is null. That one request tells you which mode production is
+in.
+
+## What shipped
+
+### Deliverable checklists (migration 0028)
+
+A collapsible checklist under every deliverable, on the project page and My Work.
+**Not sub-tasks** — a todo has no owner, no date, no credit, and appears in no
+count. It exists because errands were being entered as deliverables, and a
+deliverable feeds the Delivered signal, so ten of them made somebody outrank the
+person who shipped the airframe.
+
+The gate: **neither the owner's "Mark done" nor the RE's "Sign off" goes through
+while an item is open.** Gating only sign-off would put the wall in front of the
+RE, who didn't write the list. Deleting an item is a legitimate way to clear it —
+a todo counts towards nothing, so "it turned out not to be needed" must not force
+a false tick.
+
+`can.manageDeliverableTodos` is the one rule in `permissions.ts` where owning a
+row grants a right RE-only neighbours don't have. Deliberate: the person doing
+the work discovers what it involves, and making them ask an RE to write down
+"book the CNC" guarantees the list stays empty.
+
+### Pacific time (`lib/dates.ts`)
+
+**This was a live bug.** `today()` was `new Date().toISOString().slice(0, 10)` —
+the UTC date — and Vercel runs UTC, so **from 5pm Pacific the app believed it was
+tomorrow.** Every evening this club is in the lab. Invisible locally, because a
+laptop in California agrees with UTC until 5pm.
+
+The second half was rendering: `new Date("2026-08-09")` parses as UTC midnight
+and formats as *Aug 8* in California. Nine files did that. It also rendered
+differently on the server and in the browser, so React was logging a hydration
+mismatch nobody had connected to it.
+
+Everything now goes through `lib/dates.ts`. The rule is in CLAUDE.md; the short
+version is that **calendar dates and instants are different things**, dates are
+compared as strings, and day arithmetic happens in UTC because a Pacific day is
+23 or 25 hours twice a year.
+
+### Discord, end to end
+
+The bot works — Kelvin verified. What exists:
+
+| Trigger | Recipient |
+|---|---|
+| Added to a project | the person added |
+| Join request approved / declined | whoever asked |
+| Check-in submitted | that member's Lead |
+| Deliverable or project marked **blocked** | see `blockerAudience` below |
+| Check-in due in ~4 hours | the member (daily cron) |
+| Check-in still open the next day | the member, **once** |
+| "Send a test message" from Settings | themselves |
+
+`blockerAudience(projectId, raiserId)` is the interesting one: the project's REs
+minus the raiser, climbing **one level** if that empties the list. Deliberately
+not the whole chain like `completionAudience` — a blocker is a request for one
+named person to act, and telling five produces the bystander effect. The
+escalation is the point: an RE stuck on their own deliverable would otherwise be
+DMed about their own blocker, so the case that most needs escalating would be the
+only one nobody heard about.
+
+Verification lives on the ID field itself (badge plus "Verify now"), and the badge
+records *which* ID was proven, so it can't survive the number changing. A public
+`DiscordStatus` badge is on the member profile — **profile only, not the
+roster**, per Anish after seeing both.
+
+The invite link is a Co-Lead setting (migration 0030), validated to Discord's own
+hosts in the operation and by a CHECK constraint. It appears in **exactly two
+places**: the new-member guide and beside the Discord ID field in Settings. Not
+the club-wide banner — that would publish the server link permanently to thirty
+people already in the server.
+
+### Admitting members
+
+The flow already existed (link, Stanford sign-in, a trigger creates an inactive
+profile, **Admit** on the roster) but was **broken for Leads**: a person who signs
+in without an invite has no Lead, so `isLeadOfOrAbove` was false for everybody and
+only Co-Leads could admit. The panel showed the button to all five Leads and
+refused every press.
+
+`can.admitMember` is now any Lead or Co-Lead. Admitting also **assigns a Lead**,
+defaulting to whoever clicked — a member with no Lead is invisible to the half of
+the app that runs on the reporting chain, and a separate "now assign a Lead" step
+would get skipped with silent consequences for weeks.
+
+### Smaller
+
+- **Alphabetical divisions and projects**, at every depth, from one comparator in
+  `mock-data.ts`. The order was whatever Postgres returned, which is not just
+  arbitrary but *unstable* between loads.
+- **The Dashboard nav link** now asks the same question `/dashboard` redirects on.
+  It keyed off `globalRole`, so a Lead with no reports saw a link that bounced
+  them back, and a member who had been given reports saw none.
+- **The cron route was behind the auth middleware** and answered `307 -> /login`.
+  Vercel Cron sends a bearer token and no cookie, so the job would never have run
+  — and the only symptom would have been reminders quietly never arriving.
+  `api/cron` is excluded from the matcher; the route still authenticates itself.
+- **Division Gantt clips the past** to today, unless something has slipped, with a
+  "Show history" control that re-lays-out client-side. Project charts are
+  unchanged, deliberately.
+- **A "you haven't logged any hours" banner**, from their second day until their
+  first log. No cron — it's a `joinedAt` versus today comparison, so the delay
+  starts applying on its own.
+
+## Outstanding — start here
+
+1. **Rotate the Supabase database password.** It has been in plaintext in a chat
+   transcript all session, along with the pooler connection string. Anish deferred
+   this to "once everything else is done". It is now.
+2. **Five of seven people have no verified Discord.** Julia, Kevin, Khush, Michael
+   and Jonathan get no notifications at all, including check-in reminders — and
+   check-in alerts if they lead anyone. Nothing to build; each of them presses
+   Verify now in Settings.
+3. **Nobody has logged hours yet.** 2 work logs, 1 check-in, 7 deliverables across
+   4 projects. Every downstream number — the four contribution signals, tier
+   placement, the review queue, reliability — reads empty until people start.
+   Don't judge whether any of it works before one real week of use.
+
+Two things offered but not done:
+
+- **Fold the behavioural design rules into `docs/DESIGN_SYSTEM.md`.** The dates
+  rule, the no-dead-controls rule, and "replace a dead button with a sentence
+  saying why" are enforced in review and written nowhere.
+- **Warn when the academic calendar is about to run out.** There are 9 terms and a
+  `calendarRunsOut` value already computed in the settings view, surfaced nowhere.
+  When the calendar ends, check-ins silently stop generating with no symptom — the
+  same shape as the bug that banner already exists to prevent.

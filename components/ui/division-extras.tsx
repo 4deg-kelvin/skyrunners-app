@@ -6,7 +6,7 @@ import { CalendarDays, TriangleAlert } from "lucide-react";
 
 import { Badge } from "./badge";
 import type { DeadlineItem } from "@/lib/data/deadlines";
-import type { GanttChart } from "@/lib/gantt";
+import { buildGantt, type GanttRow } from "@/lib/gantt";
 import { Gantt } from "./gantt";
 import { useHideCompleted } from "./completed-filter";
 
@@ -33,8 +33,8 @@ import { useHideCompleted } from "./completed-filter";
  */
 export function DivisionExtras({
   deadlines,
-  timeline,
-  timelineLive,
+  timelineRows,
+  timelineLiveRows,
   blocked,
   today,
 }: {
@@ -47,9 +47,9 @@ export function DivisionExtras({
    * toggle on every division card of an already dense page. The chart shows
    * that four things land in the same fortnight; the list says which days.
    */
-  timeline: GanttChart | null;
-  /** The same chart without finished work, for when the page toggle is on. */
-  timelineLive: GanttChart | null;
+  timelineRows: GanttRow[] | null;
+  /** The same rows without finished work, for when the page toggle is on. */
+  timelineLiveRows: GanttRow[] | null;
   /** Projects in this division with blocked work or an unanswered blocker. */
   blocked: {
     projectId: string;
@@ -62,10 +62,35 @@ export function DivisionExtras({
   today: string;
 }) {
   const hideCompleted = useHideCompleted();
-  const shownTimeline = hideCompleted ? timelineLive : timeline;
+  const rows = hideCompleted ? timelineLiveRows : timelineRows;
 
   const [showDeadlines, setShowDeadlines] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
+  /*
+    How far back the reader wants to look. `null` is the default view — today
+    forward, dragged back only far enough to show anything overdue.
+
+    Laid out here rather than on the server because the window auto-fits the
+    dates present, so moving the left edge re-lays-out every bar. `buildGantt`
+    is pure maths over a handful of rows; recomputing it on a keystroke is
+    cheaper than a round trip, and the control stays instant.
+  */
+  const [historyFrom, setHistoryFrom] = useState<string | null>(null);
+  const [pickingHistory, setPickingHistory] = useState(false);
+
+  const shownTimeline = rows
+    ? buildGantt(
+        rows,
+        today,
+        historyFrom ? { from: historyFrom } : { clipToToday: true }
+      )
+    : null;
+
+  /** The earliest date anywhere in this division — the floor for "all time". */
+  const earliest = rows
+    ?.flatMap((r) => [r.start, r.end])
+    .filter((d): d is string => Boolean(d))
+    .sort()[0];
 
   const live = deadlines.filter((d) => !d.done);
   const overdue = live.filter((d) => d.overdue).length;
@@ -107,11 +132,72 @@ export function DivisionExtras({
                   <Gantt
                     chart={shownTimeline}
                     caption={
-                      hideCompleted
-                        ? "Live projects in this division. The red line is today."
-                        : "Every project in this division. The red line is today."
+                      historyFrom
+                        ? `${hideCompleted ? "Live projects" : "Every project"} in this division from ${historyFrom}. The red line is today.`
+                        : hideCompleted
+                          ? "Live projects in this division, from today on. The red line is today."
+                          : "Every project in this division, from today on. The red line is today."
                     }
                   />
+
+                  {/*
+                    History is opt-in, and the default is deliberate.
+
+                    The chart's question is "what is this division about to have
+                    to deliver", so it opens at today and gives the whole width
+                    to work somebody can still act on. But a Lead writing a
+                    roll-up needs the other view, and a slipped date needs
+                    context — so the window is theirs to move, from a control
+                    that stays out of the way until asked for.
+                  */}
+                  <div className="border-line mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t pt-2.5">
+                    {pickingHistory ? (
+                      <>
+                        <label className="flex items-center gap-2">
+                          <span className="text-ink-muted text-xs font-semibold">
+                            Show from
+                          </span>
+                          <input
+                            type="date"
+                            value={historyFrom ?? today}
+                            max={today}
+                            min={earliest}
+                            onChange={(e) =>
+                              setHistoryFrom(e.target.value || null)
+                            }
+                            className="rounded-tile border-line bg-card text-ink border px-2 py-1 text-xs"
+                          />
+                        </label>
+                        {earliest && earliest < today ? (
+                          <button
+                            type="button"
+                            onClick={() => setHistoryFrom(earliest)}
+                            className="text-cardinal-600 hover:text-cardinal-700 text-xs font-semibold"
+                          >
+                            All time
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHistoryFrom(null);
+                            setPickingHistory(false);
+                          }}
+                          className="text-ink-muted hover:text-ink text-xs font-semibold"
+                        >
+                          Back to today
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPickingHistory(true)}
+                        className="text-ink-soft hover:text-ink text-xs font-semibold"
+                      >
+                        Show history →
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : null}
               {live.map((item) => (

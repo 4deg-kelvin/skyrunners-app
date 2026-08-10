@@ -142,6 +142,16 @@ export function buildGantt(
      * work gone", and its own history is half the answer.
      */
     clipToToday?: boolean;
+    /**
+     * Open the window on a date the reader chose. Overrides `clipToToday`.
+     *
+     * The escape hatch for the division chart: the default is "what's ahead",
+     * and this is how somebody goes looking at what happened. Clamped to the
+     * earliest date actually present, so asking for 2019 doesn't produce four
+     * years of empty axis; and never later than the last date, so it can't
+     * produce a window with nothing in it.
+     */
+    from?: string;
   } = {}
 ): GanttChart {
   const maxDepth = options.maxDepth ?? MAX_GANTT_DEPTH;
@@ -160,7 +170,16 @@ export function buildGantt(
   let min = Math.min(...dates);
   let max = Math.max(...dates);
 
-  if (options.clipToToday) {
+  /*
+    The window's natural left edge, before anybody narrows it. Both narrowing
+    modes clamp to this, so neither can open the chart earlier than its own
+    content and leave dead space on the left.
+  */
+  const naturalMin = min;
+
+  if (options.from) {
+    min = Math.min(Math.max(utc(options.from), naturalMin), max);
+  } else if (options.clipToToday) {
     const todayMs = utc(today);
     /*
       The earliest thing that has slipped, or today if nothing has. `Infinity`
@@ -209,7 +228,8 @@ export function buildGantt(
     "N deeper sub-projects hidden", and folding a different kind of omission
     into it would make the sentence false.
   */
-  const drawn = options.clipToToday
+  const narrowed = min > naturalMin;
+  const drawn = narrowed
     ? visible.filter((r) => !r.end || utc(r.end) >= min)
     : visible;
 

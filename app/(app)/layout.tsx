@@ -5,6 +5,8 @@ import { getMyWork } from "@/lib/data/my-work";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { getClubIdentity } from "@/lib/data/settings";
 import { DiscordBanner } from "@/components/ui/discord-banner";
+import { LogHoursBanner } from "@/components/ui/log-hours-banner";
+import { daysBetweenDays, todayInClubTime } from "@/lib/dates";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import type { Metadata } from "next";
 
@@ -79,6 +81,18 @@ export default async function AppLayout({
   }
 
   let alertCount = 0;
+  /*
+    Never logged an hour, and past their first day.
+
+    Read off the same `getMyWork` call as the alert count rather than a second
+    query — it's already here, and the layout wraps every page in the app.
+
+    The day's grace is a date comparison, not a scheduled job: a new member's
+    first visit already asks them to connect Discord, and there is nothing
+    honest to nag about before they've done any work. Expressing the delay as
+    `joinedAt` versus today means it starts applying on its own, with no cron.
+  */
+  let nudgeToLogHours = false;
   try {
     const myWork = await getMyWork(viewer.member.id);
     const updateNeedsAttention =
@@ -86,10 +100,15 @@ export default async function AppLayout({
       myWork.currentUpdate.update.status === "late";
     alertCount =
       (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
+    nudgeToLogHours =
+      !myWork.hasEverLoggedHours &&
+      daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;
   } catch {
-    // Expected in live mode until lib/data/* is switched over to Postgres: the
-    // mock lookups key on ids like "m-anish" and won't find a real UUID.
+    // Fail quiet on both counts. A nav badge and a nudge are never worth a 500
+    // on every authenticated route, and a banner that appears because a lookup
+    // threw would be telling somebody they've logged nothing on no evidence.
     alertCount = 0;
+    nudgeToLogHours = false;
   }
 
   return (
@@ -121,6 +140,7 @@ export default async function AppLayout({
           botLive={discordIsConfigured()}
         />
       ) : null}
+      {nudgeToLogHours ? <LogHoursBanner /> : null}
       <TopNav
         memberId={viewer.member.id}
         userName={viewer.member.fullName}

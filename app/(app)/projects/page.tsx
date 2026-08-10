@@ -229,8 +229,10 @@ export default async function ProjectsPage() {
               */}
                 <DivisionExtras
                   deadlines={extras[division.id]?.deadlines ?? []}
-                  timeline={extras[division.id]?.timeline ?? null}
-                  timelineLive={extras[division.id]?.timelineLive ?? null}
+                  timelineRows={extras[division.id]?.timelineRows ?? null}
+                  timelineLiveRows={
+                    extras[division.id]?.timelineLiveRows ?? null
+                  }
                   blocked={extras[division.id]?.blocked ?? []}
                   today={todayIso}
                 />
