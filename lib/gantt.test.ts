@@ -259,7 +259,12 @@ describe("clipToToday", () => {
   test("work completed in the past is dropped, not squashed onto the edge", () => {
     const c = buildGantt(
       [
-        row({ id: "done", tone: "ok", kind: "deliverable", end: "2026-07-01" }),
+        row({
+          id: "done",
+          tone: "done",
+          kind: "deliverable",
+          end: "2026-07-01",
+        }),
         row({ id: "live", start: TODAY, end: "2026-12-01" }),
       ],
       TODAY,
@@ -276,7 +281,7 @@ describe("clipToToday", () => {
     // window back.
     const c = buildGantt(
       [
-        row({ id: "done", tone: "ok", end: "2026-08-10" }),
+        row({ id: "done", tone: "done", end: "2026-08-10" }),
         row({ id: "live", start: TODAY, end: "2026-12-01" }),
       ],
       TODAY,
@@ -288,7 +293,14 @@ describe("clipToToday", () => {
   test("everything in the past leaves a window, not an empty strip", () => {
     // The edge must never move forward past all the content.
     const c = buildGantt(
-      [row({ id: "old", tone: "ok", start: "2026-06-01", end: "2026-07-01" })],
+      [
+        row({
+          id: "old",
+          tone: "done",
+          start: "2026-06-01",
+          end: "2026-07-01",
+        }),
+      ],
       TODAY,
       clip
     );
@@ -303,5 +315,34 @@ describe("clipToToday", () => {
       clip
     );
     assert.equal(c.todayPct, 0);
+  });
+  /*
+    Regression. `projectTone` returns "done" for a complete project and "ok" for
+    one that is merely on track, and the first version of this filter excluded
+    "ok" — so every division with finished work treated its own history as
+    overdue and opened the window at the beginning of time, which is exactly
+    what the clipping exists to prevent.
+  */
+  test("the tone that means COMPLETE is the one that gets clipped", () => {
+    const c = buildGantt(
+      [
+        row({ id: "shipped", tone: "done", end: "2026-03-01" }),
+        row({ id: "live", start: TODAY, end: "2026-12-01" }),
+      ],
+      TODAY,
+      clip
+    );
+    assert.equal(c.windowStart, TODAY, "finished work must not drag it back");
+  });
+
+  test("every not-done tone in the past does drag it back", () => {
+    for (const tone of ["warn", "risk", "neutral"] as const) {
+      const c = buildGantt(
+        [row({ id: tone, tone, end: "2026-07-15" })],
+        TODAY,
+        clip
+      );
+      assert.equal(c.windowStart, "2026-07-15", `${tone} should count`);
+    }
   });
 });
