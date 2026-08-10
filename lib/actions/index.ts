@@ -36,6 +36,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
 import {
   today,
+  blockerAudience,
   getEvent,
   getMember,
   getProject,
@@ -327,7 +328,63 @@ async function setDeliverableStatusAction$impl(
 
   const result = await ops.setDeliverableStatus(id, status, blockerNote);
   if (result.ok) refresh();
+
+  /*
+    A blocker is the one thing in the app that stops work and stays invisible
+    until somebody happens to look. It went onto the board and the project page
+    and nowhere else — `discordMessages.blockerRaised` was written for exactly
+    this and called from nothing, so the message existed and reached nobody.
+
+    `blockerAudience` decides who: the project's REs, minus whoever raised it,
+    climbing one level if that empties the list. That last part is the rule that
+    matters — an RE blocked on their own deliverable would otherwise be DMed
+    about their own blocker, and the case that most needs escalating would be
+    the only one nobody heard about.
+  */
+  if (result.ok && status === "blocked" && deliverable) {
+    notifyBlocked({
+      projectId,
+      raiserId: viewer.member.id,
+      raiserName: viewer.member.preferredName ?? viewer.member.fullName,
+      what: deliverable.title,
+      note: blockerNote,
+    });
+  }
+
   return toResult(result, "Updated.");
+}
+
+/**
+ * DM whoever has to clear a blocker. Fire-and-forget, like every other notify.
+ *
+ * `what` names the deliverable, or the project itself when the whole thing is
+ * blocked. The message carries the project name either way, because a DM
+ * arrives with no context around it.
+ */
+function notifyBlocked(input: {
+  projectId: string;
+  raiserId: string;
+  raiserName: string;
+  what: string;
+  note: string;
+}): void {
+  const project = getProject(input.projectId);
+  if (!project) return;
+
+  for (const recipientId of blockerAudience(input.projectId, input.raiserId)) {
+    notify(
+      getMember(recipientId)?.discordUserId,
+      discordMessages.blockerRaised({
+        memberName: input.raiserName,
+        projectName:
+          input.what === project.name
+            ? project.name
+            : `${input.what} (${project.name})`,
+        note: input.note,
+        url: appUrl(`/projects/${project.slug}`),
+      })
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1141,12 +1198,23 @@ async function updateProjectAction$impl(
     }
   }
 
+  /*
+    Whether THIS edit is what blocks the project, as opposed to an edit to a
+    project that was already blocked. Without the before-state, every save on a
+    blocked project re-DMs the same person, and repeating yourself is the
+    fastest way to get a bot muted.
+  */
+  const healthBefore = viewer.graph.getProject(projectId)?.health;
+  const health = String(
+    formData.get("health") ?? "on_track"
+  ) as Project["health"];
+
   const result = await ops.updateProject({
     projectId,
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || undefined,
     phase,
-    health: String(formData.get("health") ?? "on_track") as Project["health"],
+    health,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     openRoles: String(formData.get("openRoles") ?? "") || undefined,
     // From the session, never the form: the notice names who completed the
@@ -1156,6 +1224,19 @@ async function updateProjectAction$impl(
   });
 
   if (result.ok) refresh();
+
+  // Same routing as a blocked deliverable — see `notifyBlocked`. An RE marking
+  // their OWN project blocked is exactly the case that has to reach one level
+  // up, because there is nobody left at this level to tell.
+  if (result.ok && health === "blocked" && healthBefore !== "blocked") {
+    notifyBlocked({
+      projectId,
+      raiserId: viewer.member.id,
+      raiserName: viewer.member.preferredName ?? viewer.member.fullName,
+      what: result.value.name,
+      note: "The whole project is marked blocked — see the project page.",
+    });
+  }
 
   // Say what the announcement did, rather than letting it happen invisibly.
   // Someone who marks a project complete should know it went somewhere.

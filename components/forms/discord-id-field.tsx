@@ -41,6 +41,7 @@ export function DiscordIdField({
   discordUserId,
   verifiedAt,
   botLive,
+  inviteUrl,
   /**
    * A Co-Lead fixing somebody else's profile.
    *
@@ -55,6 +56,19 @@ export function DiscordIdField({
   verifiedAt?: string;
   /** Whether the club has a bot yet. Without one there's nothing to test. */
   botLive: boolean;
+  /**
+   * The club's Discord invite, if a Co-Lead has set one.
+   *
+   * Shown here because this is where somebody who has lost the link comes
+   * looking, and because joining the server is a prerequisite the bot cannot
+   * work around — Discord refuses a DM between two accounts that share no
+   * server, so the commonest reason verification fails is not being in it.
+   *
+   * This and the new-member guide are the only two places it appears. It is
+   * NOT on the club-wide banner: that would publish the server link
+   * permanently to thirty people who are already in the server.
+   */
+  inviteUrl?: string;
   editingSomeoneElse?: boolean;
 }) {
   const saved = (discordUserId ?? "").trim();
@@ -188,6 +202,20 @@ export function DiscordIdField({
             be told exactly why.{" "}
           </span>
         )}
+        {inviteUrl ? (
+          <>
+            <a
+              href={inviteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+            >
+              Join the club Discord
+            </a>{" "}
+            first if you haven&apos;t — the bot can&apos;t message somebody who
+            isn&apos;t in the server.{" "}
+          </>
+        ) : null}
         It&apos;s a long number, not your username: in Discord turn on{" "}
         <span className="text-ink font-semibold">
           Settings → Advanced → Developer Mode

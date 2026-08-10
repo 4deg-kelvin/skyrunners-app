@@ -3205,6 +3205,83 @@ export function clubTiers(): TierThresholds {
   };
 }
 
+/**
+ * Who to tell that something is blocked. **The nearest level that isn't you.**
+ *
+ * ---------------------------------------------------------------------------
+ * One stage, not the whole chain
+ * ---------------------------------------------------------------------------
+ *
+ * Deliberately different from `completionAudience`, which announces upward to
+ * everybody accountable above a project. A blocker is not an announcement, it's
+ * a request: one named person has to go clear it. Telling five people produces
+ * the bystander effect — everyone assumes an RE closer to the work has it — and
+ * teaches the whole chain that these messages don't require anything of them.
+ *
+ * So this returns the REs of the project itself, and nothing above them. The
+ * exception is what makes it correct:
+ *
+ * ---------------------------------------------------------------------------
+ * If the only RE is the person who's blocked, go up one level
+ * ---------------------------------------------------------------------------
+ *
+ * An RE who owns a deliverable on their own project would otherwise be DMed
+ * about their own blocker, which is both useless and the fastest way to make
+ * somebody mute the bot. Worse, it means the one case where a blocker genuinely
+ * needs escalating — the person responsible for clearing it is the person stuck
+ * — is the one case nobody hears about.
+ *
+ * So the raiser is dropped, and if that empties the level, it climbs: nearest
+ * ancestor project's REs, then the Division Lead, then the Co-Leads. It stops
+ * at the FIRST level that has somebody, which is what "one stage up the chain
+ * of command" means.
+ *
+ * Co-Leads are the last resort rather than excluded (compare
+ * `completionAudience`, where they're deliberately absent). A completion notice
+ * evaporating is a missed bit of good news; a blocker evaporating is work
+ * stopped with nobody told, which is the failure this whole app exists to
+ * remove.
+ */
+export function blockerAudience(projectId: string, raiserId: string): string[] {
+  const store = live();
+
+  /** REs of one project, primary first, minus whoever raised it. */
+  const responsibleFor = (p: Project): string[] => [
+    ...new Set(
+      [p.primaryReId, ...p.reIds].filter((id) => id && id !== raiserId)
+    ),
+  ];
+
+  const project = store.projects.find((p) => p.id === projectId);
+  if (!project) return [];
+
+  const own = responsibleFor(project);
+  if (own.length > 0) return own;
+
+  // Climb the PROJECT tree, not the reporting tree: who is accountable for the
+  // work above this one. Cycle-guarded — `parentId` is a plain column.
+  const seen = new Set<string>([projectId]);
+  let parentId = project.parentId;
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = store.projects.find((p) => p.id === parentId);
+    if (!parent) break;
+    const above = responsibleFor(parent);
+    if (above.length > 0) return above;
+    parentId = parent.parentId;
+  }
+
+  const divisionLeadId = divisionForProject(projectId)?.leadId;
+  if (divisionLeadId && divisionLeadId !== raiserId) return [divisionLeadId];
+
+  return store.members
+    .filter(
+      (m) =>
+        m.globalRole === "co_lead" && m.status === "active" && m.id !== raiserId
+    )
+    .map((m) => m.id);
+}
+
 /** How many projects an RE has actually put this member on. No cap. */
 export function committedProjectCount(memberId: string): number {
   return live().projectMemberships.filter(

@@ -22,9 +22,19 @@ import type { Member } from "@/lib/types";
 export function ProfileForm({
   member,
   botLive,
+  inviteUrl,
   editingSomeoneElse = false,
 }: {
   member: Member;
+  /**
+   * The club's Discord invite, if a Co-Lead has set one.
+   *
+   * Here and on the new-member guide, and nowhere else. Somebody who needs the
+   * link again comes looking in their own settings; publishing it in the
+   * club-wide banner instead would put the server link permanently in front of
+   * thirty people who are already in it.
+   */
+  inviteUrl?: string;
   /**
    * Whether the club has a Discord bot configured.
    *
@@ -91,6 +101,7 @@ export function ProfileForm({
         discordUserId={member.discordUserId}
         verifiedAt={member.discordVerifiedAt}
         botLive={botLive}
+        inviteUrl={inviteUrl}
         editingSomeoneElse={editingSomeoneElse}
       />
 
