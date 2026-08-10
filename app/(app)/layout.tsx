@@ -88,12 +88,25 @@ export default async function AppLayout({
     <>
       {viewer.isDemo ? <DemoBanner /> : null}
       {/*
-        Only when there IS a bot to connect to. Nagging people about an
-        integration the club hasn't set up teaches everybody to ignore banners,
-        and this one has to still work in a month.
+        Two different nags, and only one of them waits for the bot.
+
+        NO ID AT ALL is always worth chasing, whether or not the club has wired
+        the bot up yet. Everybody needs to have pasted their ID before
+        notifications can start, and collecting thirty of them is slower than
+        flipping an env var — so the asking should already be underway by the
+        time the token lands. Every member sees it, leadership included:
+        nothing here has ever been role-dependent, and a Lead who can't be
+        reached is the worse case, since check-ins escalate to them.
+
+        AN UNCONFIRMED ID is different. Confirming means sending a real test
+        message, so with no bot there is nothing to confirm against — showing
+        "we haven't reached you yet" when the club has no way to reach anybody
+        would be blaming the member for our missing config.
       */}
-      {discordIsConfigured() && !viewer.member.discordVerifiedAt ? (
-        <DiscordBanner hasId={Boolean(viewer.member.discordUserId)} />
+      {!viewer.member.discordUserId ? (
+        <DiscordBanner hasId={false} />
+      ) : discordIsConfigured() && !viewer.member.discordVerifiedAt ? (
+        <DiscordBanner hasId />
       ) : null}
       <TopNav
         memberId={viewer.member.id}

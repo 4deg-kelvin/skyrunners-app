@@ -21,11 +21,60 @@ import { verifyDiscordAction } from "@/lib/actions";
 export function DiscordConnect({
   discordUserId,
   verifiedAt,
+  canVerify,
 }: {
   discordUserId?: string;
   /** ISO timestamp of the last successful delivery. Undefined = unproven. */
   verifiedAt?: string;
+  /**
+   * Whether the club has a bot yet.
+   *
+   * Without one there's nothing to send a test message to, so having pasted an
+   * ID is the whole job. Offering a button that can only fail — or calling
+   * somebody "not connected" when the club has no way to connect to anybody —
+   * blames the member for our missing config.
+   */
+  canVerify: boolean;
 }) {
+  if (!canVerify) {
+    return (
+      <div className="mt-3">
+        {discordUserId ? (
+          <>
+            <p className="text-ok-fg flex items-center gap-2 text-[15px] font-semibold">
+              <CheckCircle2 className="size-4.5" strokeWidth={2.5} />
+              ID saved
+            </p>
+            <p className="text-ink-soft mt-1 max-w-2xl text-[15px]">
+              That&apos;s your part done. The club&apos;s Discord bot isn&apos;t
+              switched on yet — once it is, you&apos;ll get a message when
+              you&apos;re added to something.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-warn-fg flex items-center gap-2 text-[15px] font-semibold">
+              <CircleAlert className="size-4.5" strokeWidth={2.5} />
+              Not added
+            </p>
+            <p className="text-ink-soft mt-1 max-w-2xl text-[15px]">
+              All club communication runs through Discord. Add your ID in{" "}
+              <span className="text-ink font-semibold">My Profile</span> above.
+              The bot isn&apos;t live yet, so there&apos;s nothing to test — but
+              having it saved is what lets notifications start the day it is.
+            </p>
+            <Link
+              href="/getting-started#discord"
+              className="text-cardinal-600 hover:text-cardinal-700 mt-3 inline-block text-sm font-semibold"
+            >
+              How to find your Discord ID →
+            </Link>
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (verifiedAt) {
     return (
       <div className="mt-3">

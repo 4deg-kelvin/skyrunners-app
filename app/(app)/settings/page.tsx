@@ -240,17 +240,16 @@ export default async function SettingsPage() {
         never been proven to reach anybody looks identical to one that has, and
         that false confidence is the whole reason verification exists.
       */}
-      {discordIsConfigured() ? (
-        <Card>
-          <CardBody>
-            <SectionLabel>Discord</SectionLabel>
-            <DiscordConnect
-              discordUserId={viewer.member.discordUserId}
-              verifiedAt={viewer.member.discordVerifiedAt}
-            />
-          </CardBody>
-        </Card>
-      ) : null}
+      <Card>
+        <CardBody>
+          <SectionLabel>Discord</SectionLabel>
+          <DiscordConnect
+            discordUserId={viewer.member.discordUserId}
+            verifiedAt={viewer.member.discordVerifiedAt}
+            canVerify={discordIsConfigured()}
+          />
+        </CardBody>
+      </Card>
 
       {/*
         Appearance. Near the top because it's the only setting on this page a

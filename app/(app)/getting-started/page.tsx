@@ -59,7 +59,18 @@ export default async function GettingStartedPage() {
   const tiers = await getClubTiers();
   const firstName =
     viewer.member.preferredName ?? viewer.member.fullName.split(" ")[0];
-  const connected = Boolean(viewer.member.discordVerifiedAt);
+  /*
+    "Done" means different things depending on whether the bot exists yet.
+
+    With a bot, done = a message actually arrived. Without one there is nothing
+    to verify against, so having pasted an ID IS the whole job — and telling
+    somebody they aren't finished when there is no next step they can take is
+    how a required section gets ignored.
+  */
+  const canVerify = discordIsConfigured();
+  const connected = canVerify
+    ? Boolean(viewer.member.discordVerifiedAt)
+    : Boolean(viewer.member.discordUserId);
 
   return (
     <div className="space-y-6">
@@ -75,94 +86,89 @@ export default async function GettingStartedPage() {
           first thing to understand; this is the two minutes of admin that has
           to happen before any of it can reach you.
       ------------------------------------------------------------------- */}
-      {discordIsConfigured() ? (
-        // Anchor on a wrapper: `Card` takes no id, and adding one to a shared
-        // primitive for a single link target isn't worth widening its API.
-        <div id="discord">
-          <Card
-            className={
-              connected ? undefined : "border-warn-fg/40 bg-warn-bg/40"
-            }
-          >
-            <CardBody>
-              <SectionLabel>Required · two minutes</SectionLabel>
-              <h2 className="text-ink mt-2 flex flex-wrap items-center gap-2.5 text-2xl font-bold">
-                <MessagesSquare
-                  className="text-cardinal-600 size-6"
-                  strokeWidth={2.5}
-                />
-                Connect Discord
-                {connected ? (
-                  <Badge tone="ok">Done</Badge>
-                ) : (
-                  <Badge tone="warn">Not done</Badge>
-                )}
-              </h2>
-
-              <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-                All club communication runs through Discord. The app messages
-                you there when you&apos;re added to a project, when an ask of
-                yours is answered, and — if you end up leading people — when one
-                of them checks in. Nothing else, and never a group ping.
-              </p>
-
+      {/* Anchor on a wrapper: `Card` takes no id, and adding one to a shared
+          primitive for a single link target isn't worth widening its API. */}
+      <div id="discord">
+        <Card
+          className={connected ? undefined : "border-warn-fg/40 bg-warn-bg/40"}
+        >
+          <CardBody>
+            <SectionLabel>Required · two minutes</SectionLabel>
+            <h2 className="text-ink mt-2 flex flex-wrap items-center gap-2.5 text-2xl font-bold">
+              <MessagesSquare
+                className="text-cardinal-600 size-6"
+                strokeWidth={2.5}
+              />
+              Connect Discord
               {connected ? (
-                <p className="text-ok-fg mt-3 text-[15px] font-semibold">
-                  You&apos;re connected. Nothing more to do here.
-                </p>
+                <Badge tone="ok">Done</Badge>
               ) : (
-                <ol className="mt-4 space-y-2.5">
-                  <Step n={1}>
-                    <span className="text-ink font-semibold">
-                      Install Discord and join the club server
-                    </span>{" "}
-                    if you haven&apos;t. Ask any Co-Lead for the invite link.
-                    The bot can&apos;t message somebody who isn&apos;t in the
-                    server.
-                  </Step>
-                  <Step n={2}>
-                    In Discord, turn on{" "}
-                    <span className="text-ink font-semibold">
-                      Settings → Advanced → Developer Mode
-                    </span>
-                    .
-                  </Step>
-                  <Step n={3}>
-                    Right-click your own name anywhere and choose{" "}
-                    <span className="text-ink font-semibold">Copy User ID</span>
-                    . It&apos;s a long number — not your username.
-                  </Step>
-                  <Step n={4}>
-                    Paste it into{" "}
-                    <Link
-                      href="/settings"
-                      className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-                    >
-                      Settings → My Profile
-                    </Link>
-                    , save, then press{" "}
-                    <span className="text-ink font-semibold">
-                      Send a test message
-                    </span>
-                    . If it arrives, you&apos;re done.
-                  </Step>
-                </ol>
+                <Badge tone="warn">Not done</Badge>
               )}
+            </h2>
 
-              {connected ? null : (
-                <div className="mt-4">
+            <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
+              All club communication runs through Discord. The app messages you
+              there when you&apos;re added to a project, when an ask of yours is
+              answered, and — if you end up leading people — when one of them
+              checks in. Nothing else, and never a group ping.
+            </p>
+
+            {connected ? (
+              <p className="text-ok-fg mt-3 text-[15px] font-semibold">
+                {canVerify
+                  ? "You're connected. Nothing more to do here."
+                  : "Your ID is saved — that's your part. The bot will reach you once the club switches it on."}
+              </p>
+            ) : (
+              <ol className="mt-4 space-y-2.5">
+                <Step n={1}>
+                  <span className="text-ink font-semibold">
+                    Install Discord and join the club server
+                  </span>{" "}
+                  if you haven&apos;t. Ask any Co-Lead for the invite link. The
+                  bot can&apos;t message somebody who isn&apos;t in the server.
+                </Step>
+                <Step n={2}>
+                  In Discord, turn on{" "}
+                  <span className="text-ink font-semibold">
+                    Settings → Advanced → Developer Mode
+                  </span>
+                  .
+                </Step>
+                <Step n={3}>
+                  Right-click your own name anywhere and choose{" "}
+                  <span className="text-ink font-semibold">Copy User ID</span>.
+                  It&apos;s a long number — not your username.
+                </Step>
+                <Step n={4}>
+                  Paste it into{" "}
                   <Link
                     href="/settings"
-                    className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
+                    className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
                   >
-                    Go connect it
+                    Settings → My Profile
                   </Link>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
-      ) : null}
+                  {canVerify
+                    ? " Then press Send a test message — if it arrives, you're done."
+                    : " That's it. The club's bot isn't switched on yet, so there's nothing to test against; it'll start reaching you once it is."}
+                </Step>
+              </ol>
+            )}
+
+            {connected ? null : (
+              <div className="mt-4">
+                <Link
+                  href="/settings"
+                  className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
+                >
+                  Go connect it
+                </Link>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       {/* ------------------------------------------------------------------
           1. Hours. First because it's the smallest habit and the one the rest
