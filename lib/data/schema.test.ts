@@ -362,3 +362,46 @@ describe("assumptions the org graph is built on", () => {
     assert.notEqual(schema.get("teams"), schema.get("projects"));
   });
 });
+
+// ---------------------------------------------------------------------------
+// One definition of a profile
+// ---------------------------------------------------------------------------
+
+describe("the viewer reads profiles through the shared spec", () => {
+  /*
+    `lib/data/viewer.ts` fetches the signed-in member directly rather than
+    through the snapshot, and used to carry its own hand-written column list.
+    That list fell behind three times: `phone`, `discord_user_id` and
+    `discord_verified_at` were each added to the mapping and not to it.
+
+    Nothing failed. The query succeeded and the columns were simply absent, so
+    the profile form rendered its placeholders on top of values that were
+    saved in the database, and the Discord banner could never see that somebody
+    had verified. A second column list is a second thing to remember, and this
+    test exists so there is only ever one.
+  */
+  test("it doesn't hand-write its own column list", () => {
+    const viewer = readFileSync(
+      join(process.cwd(), "lib", "data", "viewer.ts"),
+      "utf8"
+    );
+
+    // A literal string of comma-separated snake_case columns passed to
+    // `.select(...)` is the shape that drifts.
+    const handWritten = /\.select\(\s*["'`][a-z_]+,\s*[a-z_]+/.test(viewer);
+    assert.equal(
+      handWritten,
+      false,
+      "viewer.ts should select `membersSpec.columns`, not its own list — see the note above"
+    );
+    assert.match(viewer, /membersSpec\.columns/);
+  });
+
+  test("and maps rows with the shared fromRow", () => {
+    const viewer = readFileSync(
+      join(process.cwd(), "lib", "data", "viewer.ts"),
+      "utf8"
+    );
+    assert.match(viewer, /membersSpec\.fromRow/);
+  });
+});

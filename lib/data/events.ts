@@ -36,6 +36,12 @@ import {
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { preloadLiveStore } from "@/lib/store/request";
+import {
+  isCoLead,
+  isREofOrAbove,
+  type Actor,
+  type OrgGraph,
+} from "@/lib/permissions";
 import type { ClubEvent, Member, Project } from "@/lib/types";
 
 /** How far ahead the calendar looks by default. */
@@ -79,16 +85,34 @@ export interface CalendarDay {
 
 export interface CalendarView {
   days: CalendarDay[];
-  /** Projects the viewer is committed to — what they can run a session for. */
+  /**
+   * Projects this person may attach an event to.
+   *
+   * Three ways to qualify, and the old code had two different wrong answers
+   * for the same question:
+   *
+   *   - you're COMMITTED to it — a session on work you're doing
+   *   - you're an RE of it or of anything above it — authority inherits down
+   *     the project tree, so a Division Lead can schedule a review on any
+   *     project inside their division without being named on it
+   *   - you're a Co-Lead
+   *
+   * Creating used to offer only committed memberships, which silently excluded
+   * every RE who holds a project through inheritance. Editing offered EVERY
+   * live project to anybody who could edit the event, which let a member move
+   * a club-wide session onto work they have nothing to do with. One list, one
+   * rule, both forms.
+   */
   myProjects: { id: string; name: string }[];
   /**
-   * Every live project, for the EDIT form only.
+   * Same list as `myProjects`, kept as a separate field so the edit form's
+   * intent stays readable at the call site.
    *
-   * Editing is already gated on being the organiser or leadership, and the
-   * commonest reason to touch the link is attaching a session created
-   * club-wide to the work it turned out to be about — which is very often not
-   * a project the organiser is on. Creating still offers `myProjects`, because
-   * that membership is what gives a plain member the right to schedule at all.
+   * It used to be every live project in the club. That was wrong: the
+   * commonest reason to edit the link is attaching a club-wide session to the
+   * work it turned out to be about — but "the work it turned out to be about"
+   * is still work the organiser has standing on, and offering everything let
+   * somebody point an event at a project they have nothing to do with.
    */
   allProjects: { id: string; name: string }[];
   /** Everyone active, for naming who you're working with. */
@@ -112,6 +136,15 @@ function timesOverlap(a: ClubEvent, b: ClubEvent): boolean {
 export async function getCalendar(input: {
   memberId: string;
   isLeadership: boolean;
+  /**
+   * Needed to work out which projects this person may attach an event to.
+   *
+   * Optional so `verify:live` and the store tests can call this without
+   * building a graph — without it, the linkable list falls back to committed
+   * memberships only, which is the narrower answer and never the wrong one to
+   * fail towards.
+   */
+  viewer?: { actor: Actor; graph: OrgGraph };
   /** Days ahead. The page passes nothing; tests pass a window. */
   horizonDays?: number;
 }): Promise<CalendarView> {
@@ -137,6 +170,30 @@ export async function getCalendar(input: {
     const day = dateOf(e.startsAt);
     return day >= now && day <= until;
   });
+
+  /*
+    What this person may hang an event on. Committed, or RE-of-or-above, or a
+    Co-Lead — see `myProjects` on `CalendarView` for why all three.
+  */
+  const committedTo = new Set(
+    store.projectMemberships
+      .filter(
+        (m) => m.memberId === input.memberId && m.commitment === "committed"
+      )
+      .map((m) => m.projectId)
+  );
+  const linkable = store.projects
+    .filter((p) => {
+      if (p.phase === "complete") return false;
+      if (committedTo.has(p.id)) return true;
+      if (!input.viewer) return false;
+      return (
+        isCoLead(input.viewer.actor) ||
+        isREofOrAbove(input.viewer.actor, input.viewer.graph, p.id)
+      );
+    })
+    .map((p) => ({ id: p.id, name: p.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const byDay = new Map<string, ClubEvent[]>();
   for (const event of inWindow) {
@@ -218,17 +275,8 @@ export async function getCalendar(input: {
 
   return {
     days,
-    myProjects: store.projectMemberships
-      .filter(
-        (m) => m.memberId === input.memberId && m.commitment === "committed"
-      )
-      .map((m) => getProject(m.projectId))
-      .filter((p): p is Project => Boolean(p) && p!.phase !== "complete")
-      .map((p) => ({ id: p.id, name: p.name })),
-    allProjects: store.projects
-      .filter((p) => p.phase !== "complete")
-      .map((p) => ({ id: p.id, name: p.name }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    myProjects: linkable,
+    allProjects: linkable,
     people: store.members
       .filter((m) => m.status === "active" && m.id !== input.memberId)
       .map((m) => ({ id: m.id, fullName: m.fullName }))

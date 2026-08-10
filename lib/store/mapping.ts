@@ -721,3 +721,20 @@ export const COLLECTIONS = [
 ] as CollectionSpec<any>[];
 
 export { progressUpdates as progressUpdatesSpec };
+
+/**
+ * The profiles spec, for the one place that reads a single profile directly.
+ *
+ * `lib/data/viewer.ts` fetches the signed-in member on its own rather than
+ * through the snapshot, and used to carry its own hand-written column list.
+ * That list silently fell behind: `phone`, `discord_user_id` and
+ * `discord_verified_at` were all added here and never there, so the signed-in
+ * member object had no phone and no Discord — the profile form rendered
+ * placeholders over saved values, and the Discord banner could never see that
+ * somebody had verified.
+ *
+ * Nothing about that fails loudly. The query succeeds, the columns are simply
+ * absent, and every consumer reads `undefined` as "not set". Exporting the
+ * spec means there is one definition of what a profile is.
+ */
+export { members as membersSpec };

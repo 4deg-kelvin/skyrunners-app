@@ -11,6 +11,7 @@
  */
 
 import { cache } from "react";
+import { membersSpec } from "@/lib/store/mapping";
 import { redirect } from "next/navigation";
 
 import type { Actor, OrgGraph } from "@/lib/permissions";
@@ -118,11 +119,18 @@ async function getLiveViewer(): Promise<Viewer> {
   // route that slips past the matcher.
   if (!user) redirect("/login");
 
+  /*
+    Columns from the shared spec, never a hand-written list.
+
+    This had its own copy, and it fell behind three times over: `phone`,
+    `discord_user_id` and `discord_verified_at` were added to the mapping and
+    not here. Nothing failed — the query succeeded and the fields were just
+    absent — so the profile form rendered its placeholders on top of saved
+    values, and the Discord banner could never tell that somebody had verified.
+  */
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select(
-      "id, email, full_name, preferred_name, photo_url, class_year, major, global_role, status, lead_id, primary_team_id, skills, joined_at"
-    )
+    .select(membersSpec.columns)
     .eq("id", user.id)
     .single();
 
@@ -133,23 +141,18 @@ async function getLiveViewer(): Promise<Viewer> {
   // has invited them yet. Send them somewhere that explains it.
   if (error || !profile) redirect("/auth/no-profile");
 
-  if (profile.status !== "active") redirect("/auth/inactive");
+  /*
+    Selecting by a string built at runtime loses the generated row type, so
+    this is cast once, here, and immediately mapped through the shared spec.
+    The alternative is keeping a hand-written column list for the types alone,
+    which is what drifted in the first place.
+  */
+  const row = profile as unknown as Record<string, unknown>;
+  if (row.status !== "active") redirect("/auth/inactive");
 
-  const member: Member = {
-    id: profile.id,
-    fullName: profile.full_name,
-    preferredName: profile.preferred_name ?? undefined,
-    email: profile.email,
-    photoUrl: profile.photo_url ?? undefined,
-    classYear: profile.class_year ?? undefined,
-    major: profile.major ?? undefined,
-    globalRole: profile.global_role,
-    status: profile.status,
-    leadId: profile.lead_id,
-    primaryTeamId: profile.primary_team_id ?? undefined,
-    skills: profile.skills ?? undefined,
-    joinedAt: profile.joined_at,
-  };
+  // Same mapping the snapshot uses, so a new column reaches the viewer the
+  // moment it reaches the spec.
+  const member: Member = membersSpec.fromRow(row);
 
   return {
     member,
