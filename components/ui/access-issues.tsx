@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { TriangleAlert, UserCheck, UserX } from "lucide-react";
 
-import { ActionButton } from "@/components/forms/action-form";
-import { setMemberStatusAction } from "@/lib/actions";
+import { AdmitMemberForm } from "@/components/forms/admit-member";
 import { Badge } from "./badge";
 import { SectionLabel } from "./section-label";
 import type { Member } from "@/lib/types";
@@ -36,11 +35,23 @@ import type { Member } from "@/lib/types";
 export function AccessIssues({
   waitingForActivation,
   neverSignedIn,
+  leads,
+  defaultLeadId,
 }: {
   /** Signed in at least once, but not active. One click away. */
   waitingForActivation: Member[];
   /** A row that has never been signed in to. Usually a wrong email. */
   neverSignedIn: Member[];
+  /**
+   * Who this person could report to. Same list as the invite form.
+   *
+   * Admitting somebody without a Lead leaves them invisible to the half of the
+   * app that runs on the reporting chain — no review, no escalation, no
+   * dashboard. So the Lead is chosen in the same click.
+   */
+  leads: { id: string; fullName: string }[];
+  /** Whoever is looking at the page. They sent the link; they know who this is. */
+  defaultLeadId: string;
 }) {
   if (waitingForActivation.length === 0 && neverSignedIn.length === 0) {
     return null;
@@ -61,7 +72,8 @@ export function AccessIssues({
             </p>
             <p className="text-ink-soft mt-1 text-sm">
               They&apos;re stuck on the &ldquo;account inactive&rdquo; screen.
-              Activating takes one click and gives them the whole app.
+              One click gives them the whole app. Any Lead can do this, not just
+              a Co-Lead — you sent them the link, you can finish the job.
             </p>
 
             <div className="mt-3 space-y-2">
@@ -81,12 +93,11 @@ export function AccessIssues({
                       {m.email}
                     </span>
                   </span>
-                  <ActionButton
-                    action={setMemberStatusAction}
-                    fields={{ memberId: m.id, status: "active" }}
-                    label="Activate"
-                    pendingLabel="Activating…"
-                    tone="primary"
+                  <AdmitMemberForm
+                    memberId={m.id}
+                    memberName={m.fullName}
+                    leads={leads}
+                    defaultLeadId={defaultLeadId}
                   />
                 </div>
               ))}

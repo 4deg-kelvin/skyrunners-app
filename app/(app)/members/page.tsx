@@ -67,6 +67,8 @@ export default async function MembersPage() {
         <AccessIssues
           waitingForActivation={waitingForActivation}
           neverSignedIn={neverSignedIn}
+          leads={options.leadOptions}
+          defaultLeadId={viewer.member.id}
         />
       ) : null}
 

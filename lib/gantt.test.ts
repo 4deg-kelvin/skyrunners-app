@@ -184,3 +184,124 @@ describe("bar tone", () => {
     assert.equal(projectTone("testing", "on_track", false), "ok");
   });
 });
+
+/**
+ * The division chart clips the past away — unless something has slipped.
+ *
+ * The exception is the whole feature. Clipping unconditionally would hide a
+ * deadline that has already gone, which is the one thing on this chart nobody
+ * may miss.
+ */
+describe("clipToToday", () => {
+  const clip = { clipToToday: true } as const;
+
+  test("without it, the window still opens at the earliest date", () => {
+    const c = buildGantt(
+      [row({ start: "2026-06-01", end: "2026-12-01" })],
+      TODAY
+    );
+    assert.equal(c.windowStart, "2026-06-01");
+  });
+
+  test("with it, the window opens today", () => {
+    const c = buildGantt(
+      [row({ start: "2026-06-01", end: "2026-12-01" })],
+      TODAY,
+      clip
+    );
+    assert.equal(c.windowStart, TODAY);
+  });
+
+  test("a project that began earlier reads as open on the left", () => {
+    const c = buildGantt(
+      [row({ start: "2026-06-01", end: "2026-12-01" })],
+      TODAY,
+      clip
+    );
+    // Closing the edge would claim the work began today.
+    assert.equal(c.bars[0].hasStart, false);
+    assert.equal(c.bars[0].leftPct, 0);
+  });
+
+  test("something overdue drags the window back to show itself", () => {
+    const c = buildGantt(
+      [
+        row({ id: "late", tone: "risk", end: "2026-08-10" }),
+        row({ id: "ahead", start: TODAY, end: "2026-12-01" }),
+      ],
+      TODAY,
+      clip
+    );
+    assert.equal(c.windowStart, "2026-08-10");
+    assert.ok(
+      c.bars.some((b) => b.id === "late"),
+      "the overdue row has to be on the chart"
+    );
+  });
+
+  test("the EARLIEST slip sets the edge, not the latest", () => {
+    const c = buildGantt(
+      [
+        row({ id: "older", tone: "risk", end: "2026-07-01" }),
+        row({ id: "newer", tone: "warn", end: "2026-08-20" }),
+      ],
+      TODAY,
+      clip
+    );
+    assert.equal(c.windowStart, "2026-07-01");
+  });
+
+  /*
+    Finished work in the past is history. A completed deliverable clamped to the
+    left edge renders as a diamond pointing at a date that isn't on the chart,
+    which reads as due-now rather than long done.
+  */
+  test("work completed in the past is dropped, not squashed onto the edge", () => {
+    const c = buildGantt(
+      [
+        row({ id: "done", tone: "ok", kind: "deliverable", end: "2026-07-01" }),
+        row({ id: "live", start: TODAY, end: "2026-12-01" }),
+      ],
+      TODAY,
+      clip
+    );
+    assert.deepEqual(
+      c.bars.map((b) => b.id),
+      ["live"]
+    );
+  });
+
+  test("a completed row is never treated as overdue", () => {
+    // Same date as the slipped case above, but done — so it must not pull the
+    // window back.
+    const c = buildGantt(
+      [
+        row({ id: "done", tone: "ok", end: "2026-08-10" }),
+        row({ id: "live", start: TODAY, end: "2026-12-01" }),
+      ],
+      TODAY,
+      clip
+    );
+    assert.equal(c.windowStart, TODAY);
+  });
+
+  test("everything in the past leaves a window, not an empty strip", () => {
+    // The edge must never move forward past all the content.
+    const c = buildGantt(
+      [row({ id: "old", tone: "ok", start: "2026-06-01", end: "2026-07-01" })],
+      TODAY,
+      clip
+    );
+    assert.ok(c.windowStart <= c.windowEnd, "window must not invert");
+    assert.ok(Number.isFinite(c.bars.length));
+  });
+
+  test("today is still marked when the window starts on it", () => {
+    const c = buildGantt(
+      [row({ start: "2026-06-01", end: "2026-12-01" })],
+      TODAY,
+      clip
+    );
+    assert.equal(c.todayPct, 0);
+  });
+});
