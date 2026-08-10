@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql
 
 
 -- ==========================================================================
@@ -3597,4 +3597,58 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0028_deliverable_todos.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0029_checkin_late_notice.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0029 — remember that a "still open" follow-up was sent
+--
+-- Sibling of `reminder_sent_at` (0027) and the same idempotency mechanism, for
+-- the other half of the job: the reminder goes out BEFORE the deadline, this
+-- one goes out after it, once, if the check-in still hasn't been written.
+--
+-- ---------------------------------------------------------------------------
+-- Why a second column instead of reusing the first
+-- ---------------------------------------------------------------------------
+--
+-- They answer different questions and both answers matter. "Were they warned
+-- in time?" and "were they chased afterwards?" are the two things somebody
+-- asks when a member says they never heard anything, and one column could only
+-- ever answer whichever fired last. They also fire under opposite conditions —
+-- due_at in the future versus due_at in the past — so a shared column would
+-- make the second send clear the first send's evidence.
+--
+-- ---------------------------------------------------------------------------
+-- Once, not daily
+-- ---------------------------------------------------------------------------
+--
+-- Deliberately a timestamp that is set once and never cleared, so a member who
+-- stays late gets exactly one follow-up rather than a DM every morning. After
+-- that it stops being a notification problem and becomes their Lead's: an
+-- unread or missing check-in escalates on age through `lib/review.ts`, which
+-- names one person and is actionable. A bot repeating itself daily is how the
+-- whole channel gets muted, and a muted channel is worse than no channel
+-- because it looks like coverage.
+-- ---------------------------------------------------------------------------
+
+alter table progress_updates
+  add column if not exists late_notice_sent_at timestamptz;
+
+-- Mirrors `progress_updates_reminder_idx`. The job scans for "overdue, not
+-- submitted, not yet chased", which is a tiny slice of the table.
+create index if not exists progress_updates_late_notice_idx
+  on progress_updates (due_at)
+  where late_notice_sent_at is null and status = 'pending';
+
+insert into schema_migrations (version)
+values ('0029_checkin_late_notice')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0029_checkin_late_notice.sql
 -- ==========================================================================
