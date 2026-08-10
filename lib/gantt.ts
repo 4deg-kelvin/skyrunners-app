@@ -129,14 +129,19 @@ export function buildGantt(
      *
      * **Unless something is behind schedule**, and that exception is the whole
      * point. Clipping unconditionally would hide the one thing nobody may miss:
-     * a deadline that has already gone. So the left edge is today, or the
-     * earliest overdue date if there is one — a slip drags the window back far
-     * enough to show itself, and the chart says how far behind it is by how much
-     * of the past it had to include.
+     * a deadline that has already gone. So the left edge is the **furthest-back
+     * overdue item**, or today when nothing has slipped — a slip drags the
+     * window back far enough to show itself, and the chart says how far behind
+     * it is by how much of the past it had to include.
      *
-     * A row is behind schedule when it has an end date in the past and its tone
-     * isn't `ok` (see `projectTone` — complete work is `ok`). Finished work in
-     * the past is history and gets clipped away like everything else.
+     * Behind schedule means an end date in the past and a tone that isn't
+     * `done`. **`done`, not `ok`** — `projectTone` returns `"done"` for a
+     * complete project and `"ok"` for one that is merely on track, and getting
+     * that backwards is how this feature broke on its first day: every division
+     * with finished work behind it treated that history as overdue and dragged
+     * the window all the way to the beginning, which is the exact behaviour the
+     * clipping exists to prevent. `"ok"` cannot be overdue anyway — `pastTarget`
+     * turns it into `"warn"` — so excluding it was doing nothing at all.
      *
      * Off for the PROJECT chart, deliberately. That one answers "how has my
      * work gone", and its own history is half the answer.
@@ -182,12 +187,13 @@ export function buildGantt(
   } else if (options.clipToToday) {
     const todayMs = utc(today);
     /*
-      The earliest thing that has slipped, or today if nothing has. `Infinity`
-      when the list is empty, so the `Math.min` below falls through to today.
+      The furthest-back thing that has slipped, or today if nothing has.
+      `Infinity` when the list is empty, so the `Math.min` below falls through
+      to today.
     */
     const earliestOverdue = Math.min(
       ...visible
-        .filter((r) => r.end && r.tone !== "ok" && utc(r.end) < todayMs)
+        .filter((r) => r.end && r.tone !== "done" && utc(r.end) < todayMs)
         .map((r) => utc(r.end!)),
       Infinity
     );
@@ -217,9 +223,11 @@ export function buildGantt(
   /*
     Anything that finished before the window is dropped, not squashed.
 
-    Only reachable with `clipToToday`, and only for work that is genuinely done:
-    an overdue row drags the window back far enough to include itself, so it
-    can't be clipped by definition. Without this a completed deliverable from
+    Only reachable when the window has been narrowed, and only for work that is
+    genuinely `done`: an overdue row drags the window back far enough to include
+    itself, so it can't be clipped by definition. With an explicit `from` the
+    reader has asked for a narrower view, and dropping what falls outside it is
+    the whole point of asking. Without this a completed deliverable from
     three months ago clamps to `leftPct: 0, widthPct: 0` and renders as a
     diamond glued to the left edge — a marker pointing at a date that isn't on
     the chart, which reads as due-now rather than long finished.
