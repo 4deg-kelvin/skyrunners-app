@@ -8,7 +8,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AccessIssues } from "@/components/ui/access-issues";
 import { Avatar } from "@/components/ui/avatar";
-import { DiscordStatus } from "@/components/ui/discord-status";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getRoster, getRosterOptions } from "@/lib/data/members";
@@ -153,20 +152,6 @@ export default async function MembersPage() {
                             </span>
                           </Badge>
                         ))}
-                        {/*
-                          Whether the bot can reach them, on every row.
-
-                          Connecting Discord is required — every notification
-                          the app sends goes through it — so a Lead scanning
-                          their people needs to see the gap without opening six
-                          profiles. Shown for alumni and deactivated members
-                          too: it costs nothing, and reactivating somebody is
-                          exactly when you want to know.
-                        */}
-                        <DiscordStatus
-                          verifiedAt={member.discordVerifiedAt}
-                          compact
-                        />
                         {/* Alumni and deactivated people stay on the roster so
                             they can be brought back. Say which they are. */}
                         {member.status !== "active" ? (

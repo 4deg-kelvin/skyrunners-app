@@ -32,34 +32,28 @@ import { cn } from "@/lib/utils";
  * once" and "nothing" are the same amount of reachable.
  *
  * ---------------------------------------------------------------------------
- * It IS on the roster, and being a wall is the point
+ * The profile, and nowhere else
  * ---------------------------------------------------------------------------
  *
- * This was left off the roster at first, on the grounds that a column of grey
- * "not connected" badges across a club where almost nobody had verified would
- * read as shaming. Anish overruled that, and he's right: connecting is
- * required, the app is days old so nobody is being singled out for falling
- * behind, and a Lead needs to see at a glance which of their people the bot
- * cannot reach. A visible gap everybody is closing at the same time is a
- * to-do list, not a punishment.
+ * Not the roster. Anish's call, and it's the right one: the roster row is
+ * already carrying a name, a role, what they lead, their status, their major
+ * and their year, and this is the least urgent of those to anybody scanning it.
+ * You look somebody up when you're about to deal with them, and that is the
+ * page this belongs on.
  *
- * Worth revisiting once the club has settled — at that point the handful of
- * grey badges are individuals rather than a cohort, and it reads differently.
+ * A one-off badge with no compact variant, deliberately — the moment there's a
+ * `compact` prop, somebody finds a strip to put it in.
  */
 export function DiscordStatus({
   verifiedAt,
-  /** Roster-sized: shorter words, tighter padding, sits in a badge strip. */
-  compact = false,
   className,
 }: {
   /** ISO instant of the last delivery that landed. Undefined = unproven. */
   verifiedAt?: string;
-  compact?: boolean;
   className?: string;
 }) {
   const base = cn(
-    "inline-flex items-center gap-1.5 rounded-full text-xs font-bold",
-    compact ? "px-2 py-0.5" : "px-2.5 py-1",
+    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold",
     className
   );
 
@@ -73,7 +67,7 @@ export function DiscordStatus({
         })}`}
       >
         <BadgeCheck className="size-3.5 shrink-0" strokeWidth={2.5} />
-        {compact ? "Discord" : "Discord verified"}
+        Discord verified
       </span>
     );
   }
@@ -84,7 +78,7 @@ export function DiscordStatus({
       title="No Discord message has been delivered to them yet, so the bot can't reach them."
     >
       <MessageSquareOff className="size-3.5 shrink-0" strokeWidth={2.5} />
-      {compact ? "No Discord" : "Discord not connected"}
+      Discord not connected
     </span>
   );
 }
