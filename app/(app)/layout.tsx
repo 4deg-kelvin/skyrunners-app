@@ -67,7 +67,10 @@ export default async function AppLayout({
     must not resolve the viewer — see CLAUDE.md. Metadata from a nested layout
     applies to everything beneath it, so this is the right seam anyway.
   */
-  let identity = { name: "SkyRunners HQ", description: "" };
+  let identity: Awaited<ReturnType<typeof getClubIdentity>> = {
+    name: "SkyRunners HQ",
+    description: "",
+  };
   try {
     identity = await getClubIdentity();
   } catch {
@@ -116,6 +119,7 @@ export default async function AppLayout({
         <DiscordBanner
           hasId={Boolean(viewer.member.discordUserId)}
           botLive={discordIsConfigured()}
+          inviteUrl={identity.discordInviteUrl}
         />
       ) : null}
       <TopNav

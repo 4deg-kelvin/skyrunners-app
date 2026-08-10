@@ -24,9 +24,12 @@ import { updateClubIdentityAction } from "@/lib/actions";
 export function ClubIdentityForm({
   name,
   description,
+  discordInviteUrl,
 }: {
   name: string;
   description: string;
+  /** The club's Discord invite. Empty until a Co-Lead pastes one in. */
+  discordInviteUrl?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -76,10 +79,36 @@ export function ClubIdentityForm({
         />
       </label>
 
-      <p className="text-ink-muted mt-2 mb-2.5 text-xs">
-        Used everywhere the club is named — the header, every browser tab, and
-        the dashboard. The sign-in page keeps the built-in name, since it
-        renders before anybody is signed in to read settings for.
+      <label className="mt-3 block">
+        <span className="text-ink mb-1 block text-sm font-semibold">
+          Discord invite link{" "}
+          <span className="text-ink-muted font-normal">(optional)</span>
+        </span>
+        <input
+          type="url"
+          name="discordInviteUrl"
+          defaultValue={discordInviteUrl ?? ""}
+          placeholder="https://discord.gg/xxxxxxx"
+          className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+        />
+        <span className="text-ink-muted mt-1 block text-xs">
+          Turns &ldquo;ask a Co-Lead for the link&rdquo; into a button, on the
+          new-member guide and on the connect-Discord banner. Make it a{" "}
+          <span className="text-ink font-semibold">permanent</span> one:
+          right-click the channel →{" "}
+          <span className="text-ink font-semibold">Invite People</span> →{" "}
+          <span className="text-ink font-semibold">Edit invite link</span> →
+          expire <span className="text-ink font-semibold">Never</span>, uses{" "}
+          <span className="text-ink font-semibold">No limit</span>. Discord
+          defaults to seven days, which is how a dead link ends up on the page
+          new members are told to follow.
+        </span>
+      </label>
+
+      <p className="text-ink-muted mt-3 mb-2.5 text-xs">
+        The name is used everywhere the club is named — the header, every
+        browser tab, and the dashboard. The sign-in page keeps the built-in
+        name, since it renders before anybody is signed in to read settings for.
       </p>
 
       <button

@@ -2142,6 +2142,7 @@ async function updateClubIdentityAction$impl(
   const result = await ops.updateClubIdentity({
     name: String(formData.get("clubName") ?? ""),
     description: String(formData.get("clubDescription") ?? ""),
+    discordInviteUrl: String(formData.get("discordInviteUrl") ?? ""),
     actorId: viewer.member.id,
   });
 

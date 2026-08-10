@@ -24,10 +24,21 @@ import { MessageSquareWarning } from "lucide-react";
 export function DiscordBanner({
   hasId,
   botLive,
+  inviteUrl,
 }: {
   hasId: boolean;
   /** Whether the club has a bot yet — decides whose move it is. */
   botLive: boolean;
+  /**
+   * The club's Discord invite, if a Co-Lead has set one.
+   *
+   * Shown only in the no-ID state, because that's the one where the reader may
+   * not be in the server yet — and joining is a prerequisite the bot cannot
+   * work around: Discord refuses a DM between two accounts that share no
+   * server. Telling somebody to connect without telling them where is the
+   * dead end this banner is supposed to close.
+   */
+  inviteUrl?: string;
 }) {
   /*
     Three states, because the reader's next action is different in each. The
@@ -66,12 +77,24 @@ export function DiscordBanner({
           </span>
         </p>
         {waitingOnUs ? null : (
-          <Link
-            href="/settings"
-            className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
-          >
-            {hasId ? "Confirm it now →" : "Connect it →"}
-          </Link>
+          <span className="flex flex-wrap items-center gap-x-3">
+            {!hasId && inviteUrl ? (
+              <a
+                href={inviteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
+              >
+                Join the server →
+              </a>
+            ) : null}
+            <Link
+              href="/settings"
+              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
+            >
+              {hasId ? "Confirm it now →" : "Connect it →"}
+            </Link>
+          </span>
         )}
       </div>
     </div>

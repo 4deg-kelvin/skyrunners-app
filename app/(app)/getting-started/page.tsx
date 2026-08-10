@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getClubTiers } from "@/lib/data/settings";
+import { getClubIdentity, getClubTiers } from "@/lib/data/settings";
 import { getViewer } from "@/lib/data/viewer";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import { TIER_LABELS } from "@/lib/contribution";
@@ -56,7 +56,10 @@ export const metadata = {
  */
 export default async function GettingStartedPage() {
   const viewer = await getViewer();
-  const tiers = await getClubTiers();
+  const [tiers, identity] = await Promise.all([
+    getClubTiers(),
+    getClubIdentity(),
+  ]);
   const firstName =
     viewer.member.preferredName ?? viewer.member.fullName.split(" ")[0];
   /*
@@ -126,8 +129,31 @@ export default async function GettingStartedPage() {
                   <span className="text-ink font-semibold">
                     Install Discord and join the club server
                   </span>{" "}
-                  if you haven&apos;t. Ask any Co-Lead for the invite link. The
-                  bot can&apos;t message somebody who isn&apos;t in the server.
+                  if you haven&apos;t. The bot can&apos;t message somebody who
+                  isn&apos;t in the server, so this step is not optional.
+                  {/*
+                    "Ask any Co-Lead for the invite link" was the instruction
+                    here, which is the dead end this whole app exists to
+                    remove: a required step whose only route is finding a
+                    specific person. A Co-Lead pastes the link into Settings
+                    once and it becomes a button. Absent, the old wording is
+                    still the honest fallback rather than a broken link.
+                  */}
+                  {identity.discordInviteUrl ? (
+                    <>
+                      {" "}
+                      <a
+                        href={identity.discordInviteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+                      >
+                        Join the {identity.name} Discord →
+                      </a>
+                    </>
+                  ) : (
+                    " Ask any Co-Lead for the invite link."
+                  )}
                 </Step>
                 <Step n={2}>
                   In Discord, turn on{" "}
