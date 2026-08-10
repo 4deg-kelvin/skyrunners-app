@@ -360,7 +360,9 @@ async function todoGate(
     (d) => d.id === deliverableId
   );
   if (!deliverable) {
-    return { refusal: { ok: false, error: "That deliverable no longer exists." } };
+    return {
+      refusal: { ok: false, error: "That deliverable no longer exists." },
+    };
   }
 
   if (

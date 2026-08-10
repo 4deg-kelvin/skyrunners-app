@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import ./scripts/alias-loader.mjs --experimental-strip-types --test \"lib/**/*.test.ts\"",
     "sweep": "node scripts/dead-controls.mjs",
-    "check": "npm run typecheck && npm run lint && npm run sweep && npm test"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run sweep && npm test"
   },
   "dependencies": {
     "next": "^15.0.0",

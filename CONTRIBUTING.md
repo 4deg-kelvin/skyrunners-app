@@ -39,7 +39,7 @@ git checkout -b feature/hours-logging
 
 # ... make changes ...
 
-npm run check                     # typecheck + lint + tests
+npm run check                     # typecheck + lint + Prettier + sweep + tests
 git add .
 git commit -m "Add quick-add hours form"
 git push -u origin feature/hours-logging

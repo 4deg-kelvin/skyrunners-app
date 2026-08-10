@@ -364,7 +364,10 @@ export async function createDeliverable(input: {
  * busier person and not the one who knows whether the item is really
  * outstanding. This way whoever wrote the list is the one told about it.
  */
-function openTodoBlock(store: StoreShape, deliverableId: string): string | null {
+function openTodoBlock(
+  store: StoreShape,
+  deliverableId: string
+): string | null {
   const open = store.deliverableTodos.filter(
     (t) => t.deliverableId === deliverableId && !t.done
   );
@@ -541,7 +544,8 @@ export async function deleteDeliverableTodo(
 ): Promise<Result<{ id: string }>> {
   return guarded((store) => {
     const index = store.deliverableTodos.findIndex((t) => t.id === todoId);
-    if (index === -1) return fail<{ id: string }>("That item no longer exists.");
+    if (index === -1)
+      return fail<{ id: string }>("That item no longer exists.");
     store.deliverableTodos.splice(index, 1);
     return ok({ id: todoId });
   });
