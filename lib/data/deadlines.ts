@@ -398,5 +398,16 @@ function timelineFor(
 
   // Nothing dated at all draws an axis with no information on it.
   if (!rows.some((r) => r.start || r.end)) return null;
-  return buildGantt(rows, now);
+  /*
+    Starts at today, so the whole width goes to what this division still has to
+    deliver. A division six months in otherwise spends most of its chart on
+    finished work and squeezes everything live into the last inch — the part
+    somebody can act on gets the least room.
+
+    Anything overdue drags the window back far enough to show itself, so the one
+    thing nobody may miss is the one thing clipping can't hide. See
+    `clipToToday`. The project detail chart deliberately does NOT do this: its
+    question is "how has my work gone", and its own history is half the answer.
+  */
+  return buildGantt(rows, now, { clipToToday: true });
 }

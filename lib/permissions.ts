@@ -343,6 +343,32 @@ export const can = {
     !isSelf(actor, memberId) &&
     (isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId)),
 
+  /**
+   * Letting somebody INTO the club for the first time.
+   *
+   * Separate from `setMemberStatus`, and the difference is not cosmetic. A
+   * person who has just signed in with no invite has **no Lead** — the trigger
+   * in migration 0005 creates their profile with `lead_id` null — so
+   * `isLeadOfOrAbove` can never be true for anybody, and the rule above admits
+   * only Co-Leads. The roster's Access panel meanwhile offers Activate to every
+   * Lead, which made it a dead control for five of the club's seven leaders:
+   * the button was there, and pressing it was refused.
+   *
+   * Any Lead or Co-Lead, because this is the same act as inviting somebody —
+   * `can.inviteMember` is already exactly that wide — and the person who sent
+   * them the link is the person who should be able to finish the job. Making
+   * them find a Co-Lead recreates the "ask a specific person and wait" dead end
+   * that this app exists to remove, at the very first moment a new member
+   * touches it.
+   *
+   * Deliberately NOT wider than the first admission. Once they're in and have a
+   * Lead, deactivating them goes back through `setMemberStatus`, which is
+   * chain-scoped — removing somebody from the club is a heavier act than
+   * welcoming them, and it belongs to whoever is accountable for them.
+   */
+  admitMember: (actor: Actor, memberId: string) =>
+    !isSelf(actor, memberId) && actor.globalRole !== "member",
+
   // --- Projects --------------------------------------------------------
 
   /**

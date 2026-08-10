@@ -3,29 +3,43 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 
 /**
- * Profile exists but `status` isn't `active` — inactive or alumni.
+ * Profile exists but `status` isn't `active`.
  *
- * We never hard-delete people, so accounts persist after someone leaves or
- * graduates. This is the door they hit, and it's deliberately warm: an alum
- * coming back to look something up shouldn't be met with an error.
+ * Two very different people land here and the copy has to serve both:
+ *
+ *   - **Somebody brand new.** They followed a link, signed in with Stanford
+ *     Google, and the trigger in migration 0005 created them an inactive
+ *     profile. This is the front door, not an error — they are one click from
+ *     being in, and the click belongs to any Lead. Saying "your account isn't
+ *     active" to somebody on their first visit reads as a rejection, so the
+ *     heading names what's actually happening: they're in the queue.
+ *   - **An alum or a deactivated member.** Nothing is deleted, and coming back
+ *     to look something up shouldn't be met with a wall.
+ *
+ * Deliberately doesn't distinguish them in the UI. The app can tell (by
+ * `lastActiveAt`) but this page renders before a viewer is resolved, and
+ * guessing wrong at somebody would be worse than one warm message that covers
+ * both.
  */
 export default function InactivePage() {
   return (
     <div className="mx-auto max-w-lg py-10">
       <Card>
         <CardBody className="py-8">
-          <SectionLabel>Account Inactive</SectionLabel>
+          <SectionLabel>Almost In</SectionLabel>
           <h1 className="text-ink mt-2 text-3xl font-bold">
-            Your account isn&apos;t active
+            You&apos;re signed in — waiting to be let in
           </h1>
           <p className="text-ink-soft mt-3 text-[15px]">
-            Your profile is marked inactive or alumni, so the app is read-locked
-            for now. Your contribution history is all still there — nothing gets
-            deleted.
+            Your Stanford account worked. Somebody from the club has to admit
+            you before the app opens up, and it takes them one click — any Lead
+            or Co-Lead can do it, so message whoever sent you the link.
           </p>
           <p className="text-ink-soft mt-3 text-[15px]">
-            Rejoining? Ask a Co-Lead to reactivate you and everything comes back
-            as it was.
+            Been here before? If you were deactivated or you&apos;ve graduated,
+            nothing was deleted — your hours, check-ins and delivered work are
+            all still attached to their projects, and everything comes back
+            exactly as it was.
           </p>
           <div className="mt-6">
             <SignOutButton />

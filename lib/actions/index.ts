@@ -656,12 +656,58 @@ async function setMemberStatusAction$impl(
   const status = String(formData.get("status") ?? "") as
     "active" | "inactive" | "alumni";
 
-  if (!can.setMemberStatus(viewer.actor, viewer.graph, memberId)) {
-    return denied("change their status");
-  }
+  /*
+    Admitting somebody is a different act from changing a member's status, and
+    it needs a different rule.
+
+    A person who signed in without an invite has no Lead, so
+    `isLeadOfOrAbove` is false for everybody and `setMemberStatus` would admit
+    only Co-Leads — while the roster's Access panel shows Activate to every
+    Lead. That made it a dead control for five of the club's seven leaders. See
+    `can.admitMember`.
+  */
+  const target = viewer.graph.getMember(memberId);
+  const isFirstAdmission =
+    status === "active" && !!target && !target.leadId && !!target.lastActiveAt;
+
+  const allowed = isFirstAdmission
+    ? can.admitMember(viewer.actor, memberId)
+    : can.setMemberStatus(viewer.actor, viewer.graph, memberId);
+
+  if (!allowed) return denied("change their status");
 
   const result = await ops.setMemberStatus({ memberId, status });
-  if (result.ok) refresh();
+  if (!result.ok) return toResult(result, "");
+
+  /*
+    Give them a Lead in the same click.
+
+    A member with no Lead is invisible to the half of the app that runs on the
+    reporting chain: nobody reviews their check-ins, nothing escalates when they
+    go quiet, and they appear on no dashboard. Landing in the club that way is
+    worse than not being admitted, because everybody assumes somebody has them.
+
+    Defaults to whoever pressed the button — they're the person who sent the
+    link and knows who this is. A Co-Lead admitting on somebody else's behalf
+    can pass `leadId` to hand them straight over.
+  */
+  if (isFirstAdmission) {
+    const leadId = String(formData.get("leadId") ?? "") || viewer.member.id;
+    if (leadId !== memberId) {
+      await ops.setMemberLead({ memberId, leadId });
+    }
+  }
+
+  refresh();
+  if (isFirstAdmission) {
+    const lead = viewer.graph.getMember(
+      String(formData.get("leadId") ?? "") || viewer.member.id
+    );
+    return {
+      ok: true,
+      message: `They're in, reporting to ${lead?.fullName ?? "you"}.`,
+    };
+  }
   return toResult(
     result,
     status === "active" ? "Reactivated." : "Deactivated."

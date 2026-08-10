@@ -117,8 +117,34 @@ export const MAX_GANTT_DEPTH = 2;
 export function buildGantt(
   rows: GanttRow[],
   today: string,
-  maxDepth: number = MAX_GANTT_DEPTH
+  options: {
+    maxDepth?: number;
+    /**
+     * Start the window at today, giving the whole width to what's ahead.
+     *
+     * For the DIVISION chart, whose question is "what is this division about to
+     * have to deliver". A division six months in spends most of its chart on
+     * finished work, squeezing everything still live into the last inch — the
+     * part somebody can actually act on gets the least room.
+     *
+     * **Unless something is behind schedule**, and that exception is the whole
+     * point. Clipping unconditionally would hide the one thing nobody may miss:
+     * a deadline that has already gone. So the left edge is today, or the
+     * earliest overdue date if there is one — a slip drags the window back far
+     * enough to show itself, and the chart says how far behind it is by how much
+     * of the past it had to include.
+     *
+     * A row is behind schedule when it has an end date in the past and its tone
+     * isn't `ok` (see `projectTone` — complete work is `ok`). Finished work in
+     * the past is history and gets clipped away like everything else.
+     *
+     * Off for the PROJECT chart, deliberately. That one answers "how has my
+     * work gone", and its own history is half the answer.
+     */
+    clipToToday?: boolean;
+  } = {}
 ): GanttChart {
+  const maxDepth = options.maxDepth ?? MAX_GANTT_DEPTH;
   const visible = rows.filter((r) => r.depth <= maxDepth);
   const hiddenCount = rows.length - visible.length;
 
@@ -133,6 +159,23 @@ export function buildGantt(
 
   let min = Math.min(...dates);
   let max = Math.max(...dates);
+
+  if (options.clipToToday) {
+    const todayMs = utc(today);
+    /*
+      The earliest thing that has slipped, or today if nothing has. `Infinity`
+      when the list is empty, so the `Math.min` below falls through to today.
+    */
+    const earliestOverdue = Math.min(
+      ...visible
+        .filter((r) => r.end && r.tone !== "ok" && utc(r.end) < todayMs)
+        .map((r) => utc(r.end!)),
+      Infinity
+    );
+    // Never move the edge FORWARD past existing content — a window that starts
+    // after everything in it is an empty chart.
+    min = Math.min(Math.min(todayMs, earliestOverdue), max);
+  }
 
   /*
     A window has to have width.
@@ -152,7 +195,25 @@ export function buildGantt(
   const pct = (ms: number) => ((ms - min) / span) * 100;
   const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
-  const bars: GanttBar[] = visible.map((r) => {
+  /*
+    Anything that finished before the window is dropped, not squashed.
+
+    Only reachable with `clipToToday`, and only for work that is genuinely done:
+    an overdue row drags the window back far enough to include itself, so it
+    can't be clipped by definition. Without this a completed deliverable from
+    three months ago clamps to `leftPct: 0, widthPct: 0` and renders as a
+    diamond glued to the left edge — a marker pointing at a date that isn't on
+    the chart, which reads as due-now rather than long finished.
+
+    Not counted into `hiddenCount`: that number is reported to the reader as
+    "N deeper sub-projects hidden", and folding a different kind of omission
+    into it would make the sentence false.
+  */
+  const drawn = options.clipToToday
+    ? visible.filter((r) => !r.end || utc(r.end) >= min)
+    : visible;
+
+  const bars: GanttBar[] = drawn.map((r) => {
     const hasStart = Boolean(r.start);
     const hasEnd = Boolean(r.end);
 
@@ -186,7 +247,13 @@ export function buildGantt(
       ...r,
       leftPct: left,
       widthPct: Math.max(0, right - left),
-      hasStart,
+      /*
+        A project that began before the window reads as open-ended on the left,
+        the same way one with no recorded start does. Both mean "it didn't start
+        here" — closing the edge at the window boundary would claim the work
+        began today, which is the opposite of the truth for long-running work.
+      */
+      hasStart: hasStart && startMs >= min,
       hasEnd,
     };
   });
