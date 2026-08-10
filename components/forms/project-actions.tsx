@@ -27,9 +27,19 @@ import {
 export function AskToJoinButton({
   projectId,
   projectName,
+  isRecruiting = true,
 }: {
   projectId: string;
   projectName: string;
+  /**
+   * Whether the RE has the project marked as looking for people.
+   *
+   * Only changes the WORDS. The button is always here, because a project that
+   * refuses asks leaves a member no route in except knowing somebody — and
+   * being told "they're not looking, but ask anyway" is a much better outcome
+   * than a missing button with no explanation.
+   */
+  isRecruiting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -40,7 +50,7 @@ export function AskToJoinButton({
         className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors"
       >
         <UserPlus className="size-4" strokeWidth={2.5} />
-        Ask to join
+        {isRecruiting ? "Ask to join" : "Ask anyway"}
       </button>
     );
   }

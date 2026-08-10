@@ -21,29 +21,58 @@ import { MessageSquareWarning } from "lucide-react";
  * connect to something that doesn't exist yet is how a banner teaches everyone
  * to ignore banners.
  */
-export function DiscordBanner({ hasId }: { hasId: boolean }) {
+export function DiscordBanner({
+  hasId,
+  botLive,
+}: {
+  hasId: boolean;
+  /** Whether the club has a bot yet — decides whose move it is. */
+  botLive: boolean;
+}) {
+  /*
+    Three states, because the reader's next action is different in each. The
+    banner only ever clears on a verified delivery, so the third one — ID
+    saved, no bot to prove it against — has to say plainly that it's waiting on
+    the club rather than on them.
+  */
+  const waitingOnUs = hasId && !botLive;
+
   return (
-    <div className="border-warn-fg/30 bg-warn-bg/60 border-b">
+    <div
+      className={
+        waitingOnUs
+          ? "border-line bg-surface border-b"
+          : "border-warn-fg/30 bg-warn-bg/60 border-b"
+      }
+    >
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-2.5 sm:px-8">
-        <MessageSquareWarning className="text-warn-fg size-4 shrink-0" />
+        <MessageSquareWarning
+          className={`size-4 shrink-0 ${waitingOnUs ? "text-ink-muted" : "text-warn-fg"}`}
+        />
         <p className="text-ink min-w-0 text-sm">
           <span className="font-semibold">
-            {hasId
-              ? "Your Discord ID isn't confirmed yet."
-              : "You haven't connected Discord yet."}
+            {!hasId
+              ? "You haven't connected Discord yet."
+              : waitingOnUs
+                ? "Discord ID saved — waiting on the club."
+                : "Your Discord ID isn't confirmed yet."}
           </span>{" "}
           <span className="text-ink-soft">
-            {hasId
-              ? "We haven't been able to reach you on it — one click confirms it works."
-              : "All club communication runs through Discord, and it's how you'll hear that you've been added to something. If you don't have it, install it first."}
+            {!hasId
+              ? "All club communication runs through Discord, and it's how you'll hear that you've been added to something. If you don't have it, install it first."
+              : waitingOnUs
+                ? "Nothing for you to do. The club's bot isn't switched on yet, so we can't send the test message that confirms it works."
+                : "We haven't proved a message actually reaches you — one click does it."}
           </span>
         </p>
-        <Link
-          href="/settings"
-          className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
-        >
-          {hasId ? "Confirm it now →" : "Connect it →"}
-        </Link>
+        {waitingOnUs ? null : (
+          <Link
+            href="/settings"
+            className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
+          >
+            {hasId ? "Confirm it now →" : "Connect it →"}
+          </Link>
+        )}
       </div>
     </div>
   );

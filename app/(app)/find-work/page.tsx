@@ -263,6 +263,7 @@ export default async function FindWorkPage() {
                         <AskToJoinButton
                           projectId={project.id}
                           projectName={project.name}
+                          isRecruiting={project.isOpenToJoin}
                         />
                       )}
 

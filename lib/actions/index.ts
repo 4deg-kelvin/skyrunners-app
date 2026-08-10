@@ -782,7 +782,7 @@ async function requestToJoinAction$impl(
 
   const project = getProject(projectId);
   if (!project) return { ok: false, error: "That project no longer exists." };
-  if (!can.requestToJoin(viewer.actor, project)) {
+  if (!can.requestToJoin()) {
     return {
       ok: false,
       error: "This project isn't taking new people right now.",

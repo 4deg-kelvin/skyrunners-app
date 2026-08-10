@@ -440,7 +440,20 @@ export const can = {
    * in the RE's queue, is visible to the member as pending, and escalates when
    * it goes stale. Same gate, no limbo.
    */
-  requestToJoin: (_actor: Actor, project: Project) => project.isOpenToJoin,
+  /*
+    Anybody may ask, always.
+
+    This used to return `project.isOpenToJoin`, which turned "we're not
+    recruiting right now" into "you may not even ask" — and hid the button
+    that is the entire point of Find Work. A member who can't ask has no route
+    in at all except knowing somebody, which is the problem this app exists to
+    remove.
+
+    `isOpenToJoin` is now a SIGNAL: the card says the RE isn't looking, so
+    nobody wastes an ask, and somebody who really is the right person can still
+    make the case. The RE decides either way — that hasn't changed.
+  */
+  requestToJoin: () => true,
 
   /** Accepting or declining a request — the RE's call. */
   reviewJoinRequest: (actor: Actor, graph: OrgGraph, projectId: string) =>

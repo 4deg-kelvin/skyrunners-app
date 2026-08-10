@@ -524,6 +524,14 @@ export interface ProgressUpdate {
   id: string;
   memberId: string;
   dueAt: string;
+  /**
+   * When the "due in a few hours" nudge went out, if it did.
+   *
+   * The whole idempotency mechanism for the reminder cron: it runs hourly over
+   * a four-hour window, so without this every member would get four identical
+   * nudges per check-in. See `app/api/cron/checkin-reminders/route.ts`.
+   */
+  reminderSentAt?: string;
   submittedAt?: string;
   status: UpdateStatus;
   /** One entry per project worked on. Auto-seeded from logged hours. */

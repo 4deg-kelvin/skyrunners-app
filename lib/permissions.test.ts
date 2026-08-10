@@ -462,7 +462,7 @@ describe("membership is RE-controlled, with no cap", () => {
   });
 
   test("a member can ask to join, but cannot add themselves", () => {
-    assert.equal(can.requestToJoin(actor("worker"), open), true);
+    assert.equal(can.requestToJoin(), true);
     assert.equal(can.addProjectMember(actor("worker"), graph, "leaf"), false);
   });
 
@@ -483,8 +483,15 @@ describe("membership is RE-controlled, with no cap", () => {
     assert.ok(!("commitToProject" in can));
   });
 
-  test("a closed project stops requests but not following", () => {
-    assert.equal(can.requestToJoin(actor("worker"), closed), false);
+  test("'not recruiting' is a signal, not a lock", () => {
+    /*
+      This used to assert the opposite — a closed project refused requests.
+      That turned "we're not looking right now" into "you may not even ask",
+      and hid the one button that gets somebody onto a project. A member who
+      can't ask has no route in except knowing somebody, which is the problem
+      the app exists to remove. The RE still decides.
+    */
+    assert.equal(can.requestToJoin(), true);
     assert.equal(can.followProject(), true);
   });
 });

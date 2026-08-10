@@ -13,7 +13,7 @@ export function ProjectBadges({
   project,
   className,
 }: {
-  project: Pick<Project, "phase" | "health" | "targetDate">;
+  project: Pick<Project, "phase" | "health" | "targetDate" | "isOpenToJoin">;
   className?: string;
 }) {
   /*
@@ -50,6 +50,22 @@ export function ProjectBadges({
         <Badge tone={HEALTH_TONES[project.health]}>
           {HEALTH_LABELS[project.health]}
         </Badge>
+        {/*
+          "Not recruiting" is a signal, not a lock.
+
+          The Ask to join button stays either way — `can.requestToJoin` is
+          unconditional. This exists so nobody spends an ask on a project
+          that's fully staffed, and so somebody who really is the right person
+          can still make the case knowing the odds. A project that literally
+          refused requests would leave a member with no route in except knowing
+          somebody, which is the thing this app exists to remove.
+
+          Hidden on complete projects: "not recruiting" for something that's
+          finished is noise stating the obvious.
+        */}
+        {!project.isOpenToJoin && project.phase !== "complete" ? (
+          <Badge tone="neutral">Not recruiting</Badge>
+        ) : null}
       </div>
     </div>
   );

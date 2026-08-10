@@ -88,25 +88,30 @@ export default async function AppLayout({
     <>
       {viewer.isDemo ? <DemoBanner /> : null}
       {/*
-        Two different nags, and only one of them waits for the bot.
+        Clears on VERIFICATION, and on nothing else.
 
-        NO ID AT ALL is always worth chasing, whether or not the club has wired
-        the bot up yet. Everybody needs to have pasted their ID before
-        notifications can start, and collecting thirty of them is slower than
-        flipping an env var — so the asking should already be underway by the
-        time the token lands. Every member sees it, leadership included:
-        nothing here has ever been role-dependent, and a Lead who can't be
-        reached is the worse case, since check-ins escalate to them.
+        A saved ID is not a working one — a typo, somebody who never joined the
+        club server, or DMs switched off all look identical to a correct entry
+        and deliver nothing. Letting the banner go on "they typed something"
+        would mean the app declaring everyone reachable while a third of them
+        silently aren't, which is the exact false confidence the whole
+        verification step exists to prevent.
 
-        AN UNCONFIRMED ID is different. Confirming means sending a real test
-        message, so with no bot there is nothing to confirm against — showing
-        "we haven't reached you yet" when the club has no way to reach anybody
-        would be blaming the member for our missing config.
+        So it stays up until a real message has arrived. Three states, because
+        the reader's next action differs: nothing entered, entered but
+        unproven, and entered-with-no-bot-to-prove-it-against. That last one is
+        the club's outstanding work rather than the member's, and the copy says
+        so — but it stays visible, because it IS still unfinished.
+
+        Every member sees it, leadership included. Nothing here is
+        role-dependent and shouldn't be: a Lead who can't be reached is the
+        worse case, since check-ins escalate to them.
       */}
-      {!viewer.member.discordUserId ? (
-        <DiscordBanner hasId={false} />
-      ) : discordIsConfigured() && !viewer.member.discordVerifiedAt ? (
-        <DiscordBanner hasId />
+      {!viewer.member.discordVerifiedAt ? (
+        <DiscordBanner
+          hasId={Boolean(viewer.member.discordUserId)}
+          botLive={discordIsConfigured()}
+        />
       ) : null}
       <TopNav
         memberId={viewer.member.id}

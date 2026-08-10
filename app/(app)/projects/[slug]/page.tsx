@@ -116,9 +116,7 @@ export default async function ProjectDetailPage({
   const isFollowing = myMembership?.membership.commitment === "following";
 
   const mayRequest =
-    !isOnProject &&
-    !view.myPendingRequest &&
-    can.requestToJoin(viewer.actor, project);
+    !isOnProject && !view.myPendingRequest && can.requestToJoin();
   const mayReviewRequests = can.reviewJoinRequest(
     viewer.actor,
     viewer.graph,
@@ -158,6 +156,7 @@ export default async function ProjectDetailPage({
                 <AskToJoinButton
                   projectId={project.id}
                   projectName={project.name}
+                  isRecruiting={project.isOpenToJoin}
                 />
               ) : null}
 

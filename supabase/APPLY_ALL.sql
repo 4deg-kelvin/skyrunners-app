@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql
 
 
 -- ==========================================================================
@@ -3454,4 +3454,46 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0026_discord_verified.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0027_checkin_reminders.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0027 — remember that a check-in reminder was sent
+--
+-- The reminder fires four hours before a check-in is due, and only if it
+-- hasn't been submitted. Which means something has to remember it already
+-- went out, or every cron tick inside that window sends another one — and the
+-- fastest way to get a notification channel muted is to send the same nudge
+-- four times.
+--
+-- A timestamp rather than a boolean, so it's possible to tell WHEN somebody
+-- was nudged when they say they never were. The column is the whole
+-- idempotency mechanism: the job's query excludes rows that already have one.
+--
+-- Deliberately NOT a separate table. There is exactly one reminder per
+-- obligation, it dies with the obligation, and a join table for a nullable
+-- timestamp is a table nobody would thank us for.
+-- ---------------------------------------------------------------------------
+
+alter table progress_updates
+  add column if not exists reminder_sent_at timestamptz;
+
+-- The job scans for "due soon, not submitted, not yet reminded" on every tick.
+-- Partial index because the interesting rows are a tiny slice of the table and
+-- shrink to nothing as the term goes on.
+create index if not exists progress_updates_reminder_idx
+  on progress_updates (due_at)
+  where reminder_sent_at is null and status = 'pending';
+
+insert into schema_migrations (version)
+values ('0027_checkin_reminders')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0027_checkin_reminders.sql
 -- ==========================================================================
