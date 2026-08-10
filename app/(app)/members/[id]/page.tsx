@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
+import { DiscordStatus } from "@/components/ui/discord-status";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -105,7 +106,17 @@ export default async function MemberProfilePage({
                 photoUrl={member.photoUrl}
                 className="size-[72px] text-2xl"
               />
-              <ContactLink member={member} />
+              <div className="min-w-0">
+                <ContactLink member={member} />
+                {/*
+                  Next to the phone number, because it belongs to the same
+                  question: how do I reach this person. Public for the same
+                  reason trainings are — see `DiscordStatus`.
+                */}
+                <div className="mt-2">
+                  <DiscordStatus verifiedAt={member.discordVerifiedAt} />
+                </div>
+              </div>
             </div>
 
             <div className="mt-5">
