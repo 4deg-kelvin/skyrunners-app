@@ -720,6 +720,32 @@ export const can = {
   // --- Deliverables ------------------------------------------------------
 
   /**
+   * Asking a Lead for something — access, a key, a licence seat.
+   *
+   * Anybody may ask, of anybody in leadership. The recipient must be a Lead or
+   * Co-Lead, which is checked here rather than only in the UI: the button lives
+   * on a profile page, and a profile id is trivially guessable, so "the button
+   * only appears on Leads" is a UI convention and not a rule.
+   *
+   * Not askable of an advisor. They hold no authority, so a request addressed
+   * to one is a question that can never be answered — and it would sit in a
+   * queue on a dashboard they can't reach.
+   */
+  requestFromLead: (actor: Actor, recipient: Actor) =>
+    isLeadership(recipient) && !isSelf(actor, recipient.id),
+
+  /**
+   * Answering one.
+   *
+   * The person asked, or a Co-Lead. Deliberately NOT their whole Lead chain:
+   * the member picked one name, and the point of picking is that somebody owns
+   * it. A Co-Lead can answer anything so nothing is stranded when the person
+   * asked goes quiet for a fortnight.
+   */
+  answerMemberRequest: (actor: Actor, leadId: string) =>
+    isCoLead(actor) || isSelf(actor, leadId),
+
+  /**
    * Naming an advisor on a project, or removing one.
    *
    * Same authority as adding a member: the RE is accountable for the project,

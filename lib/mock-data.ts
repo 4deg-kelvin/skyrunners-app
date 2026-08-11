@@ -16,6 +16,7 @@ import {
   type JoinRequest,
   type Deliverable,
   type DeliverableTodo,
+  type MemberRequest,
   type TrainingSection,
   type Member,
   type Project,
@@ -3280,6 +3281,26 @@ export function blockerAudience(projectId: string, raiserId: string): string[] {
         m.globalRole === "co_lead" && m.status === "active" && m.id !== raiserId
     )
     .map((m) => m.id);
+}
+
+/**
+ * Requests waiting on this Lead, oldest first.
+ *
+ * Age-ordered like every other queue in the app: "Kenji has been waiting six
+ * days" is actionable, "4 open requests" is a number people learn to scroll
+ * past.
+ */
+export function requestsAwaitingLead(leadId: string): MemberRequest[] {
+  return live()
+    .memberRequests.filter((r) => r.leadId === leadId && r.status === "pending")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Everything one member has asked for, newest first. */
+export function myRequestsToLeads(memberId: string): MemberRequest[] {
+  return live()
+    .memberRequests.filter((r) => r.memberId === memberId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** Advisors named on this project, in the order they were added. */

@@ -48,6 +48,7 @@ import {
 import * as ops from "@/lib/store/operations";
 import type { Deliverable, Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
+import { readStore } from "@/lib/store/disk";
 import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
 import { after } from "next/server";
 import {
@@ -498,6 +499,117 @@ async function deleteDeliverableTodoAction$impl(
 
   if (result.ok) refresh();
   return toResult(result, "Removed.");
+}
+
+// ---------------------------------------------------------------------------
+// Asking a Lead for something
+// ---------------------------------------------------------------------------
+
+async function createMemberRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const leadId = String(formData.get("leadId") ?? "");
+
+  /*
+    The recipient must be leadership, checked here and not only in the UI.
+
+    The button only renders on a Lead's profile, but a profile id is trivially
+    guessable — "the button isn't there" is a convention, not a rule. An
+    advisor in particular must be excluded: they hold no authority, so a
+    request addressed to one could never be answered and would sit in a queue
+    on a dashboard they cannot reach.
+  */
+  const recipient = viewer.graph.getMember(leadId);
+  if (!recipient) return { ok: false, error: "That person no longer exists." };
+  if (
+    !can.requestFromLead(viewer.actor, {
+      id: recipient.id,
+      globalRole: recipient.globalRole,
+    })
+  ) {
+    return {
+      ok: false,
+      error:
+        "You can only send a request to a Lead or a Co-Lead — and not to yourself.",
+    };
+  }
+
+  const result = await ops.createMemberRequest({
+    memberId: viewer.member.id,
+    leadId,
+    body: String(formData.get("body") ?? ""),
+    now: new Date().toISOString(),
+  });
+
+  if (result.ok) {
+    refresh();
+    // Straight to the one person who has to act. This is the whole reason the
+    // request names somebody instead of going to a shared queue.
+    notify(
+      recipient.discordUserId,
+      discordMessages.requestReceived({
+        memberName: viewer.member.preferredName ?? viewer.member.fullName,
+        body: result.value.body,
+        url: appUrl("/dashboard"),
+      })
+    );
+  }
+  return toResult(
+    result,
+    `Sent to ${recipient.preferredName ?? recipient.fullName}.`
+  );
+}
+
+async function answerMemberRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const requestId = String(formData.get("requestId") ?? "");
+  const status = String(formData.get("status") ?? "") as "granted" | "declined";
+
+  const existing = readStore().memberRequests.find((r) => r.id === requestId);
+  if (!existing) return { ok: false, error: "That request no longer exists." };
+
+  if (!can.answerMemberRequest(viewer.actor, existing.leadId)) {
+    return denied("answer this request — it was addressed to somebody else");
+  }
+
+  const result = await ops.answerMemberRequest({
+    requestId,
+    status,
+    response: String(formData.get("response") ?? ""),
+    responderId: viewer.member.id,
+    now: new Date().toISOString(),
+  });
+
+  if (result.ok) {
+    refresh();
+    notify(
+      getMember(existing.memberId)?.discordUserId,
+      discordMessages.requestAnswered({
+        granted: status === "granted",
+        answeredBy: viewer.member.preferredName ?? viewer.member.fullName,
+        body: existing.body,
+        response: result.value.response,
+      })
+    );
+  }
+  return toResult(result, status === "granted" ? "Granted." : "Declined.");
+}
+
+async function withdrawMemberRequestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  // Ownership lives in the operation, which is the layer holding the row.
+  const result = await ops.withdrawMemberRequest({
+    requestId: String(formData.get("requestId") ?? ""),
+    memberId: viewer.member.id,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Withdrawn.");
 }
 
 // ---------------------------------------------------------------------------
@@ -2095,6 +2207,24 @@ export async function setDeliverableStatusAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setDeliverableStatusAction$impl(formData));
+}
+
+export async function createMemberRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => createMemberRequestAction$impl(formData));
+}
+
+export async function answerMemberRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => answerMemberRequestAction$impl(formData));
+}
+
+export async function withdrawMemberRequestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => withdrawMemberRequestAction$impl(formData));
 }
 
 export async function addProjectAdvisorAction(

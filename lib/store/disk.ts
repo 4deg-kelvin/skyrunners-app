@@ -40,6 +40,7 @@ import type {
   CatalogueItem,
   ClubSettings,
   DeliverableTodo,
+  MemberRequest,
   ProjectAdvisor,
   HelpRequest,
   MemberCertification,
@@ -141,6 +142,8 @@ export interface StoreShape {
    * `ProjectAdvisor`.
    */
   projectAdvisors: ProjectAdvisor[];
+  /** "Can I have access to…" — see `MemberRequest`. */
+  memberRequests: MemberRequest[];
 }
 
 /**
@@ -151,7 +154,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 11;
+const STORE_VERSION = 12;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -197,6 +200,8 @@ function seed(): StoreShape {
     deliverableTodos: [],
     // Likewise — the sample club has no faculty.
     projectAdvisors: [],
+    // And nobody has had to ask for anything yet.
+    memberRequests: [],
     clubSettings: [
       {
         id: "1",

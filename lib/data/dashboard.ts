@@ -32,6 +32,7 @@ import {
   clubIdentity,
   divisions,
   getMember,
+  requestsAwaitingLead,
   getProject,
   memberProjects,
   recentWorkLogs,
@@ -51,6 +52,7 @@ import {
 } from "@/lib/review";
 import { isREofOrAbove } from "@/lib/permissions";
 import type {
+  MemberRequest,
   Member,
   Project,
   ProgressUpdate,
@@ -204,6 +206,26 @@ export interface DashboardView {
     pending: TrainingQueueItem[];
     expired: TrainingQueueItem[];
   };
+  /**
+   * "Can I have access to…" — asks addressed to THIS person by name.
+   *
+   * Not their reporting subtree, unlike everything else on this page. A member
+   * picks who to ask by opening that person's profile, and the point of picking
+   * is that somebody owns it. Routing it by chain instead would put it in front
+   * of people who never agreed to answer and let the person actually asked off
+   * the hook.
+   *
+   * Co-Leads additionally see everything outstanding, so nothing is stranded
+   * when the person asked goes quiet for a fortnight.
+   */
+  requests: {
+    request: MemberRequest;
+    asker?: Member;
+    /** Days it has been waiting. Age is what makes a queue actionable. */
+    ageDays: number;
+    /** True when it was addressed to somebody else and we're mopping up. */
+    onBehalf: boolean;
+  }[];
   today: string;
   maxBackdateDays: number;
 }
@@ -391,6 +413,26 @@ export async function getDashboard(
   // subtree, which is exactly who `can.verifyTraining` covers.
   const trainings = await getTrainingQueue(overseen.map((m) => m.id));
 
+  /*
+    Requests addressed to this person, plus — for a Co-Lead — everything else
+    still outstanding, so a request to somebody who has gone quiet is visible
+    to the people who can unblock it.
+  */
+  const mine = requestsAwaitingLead(actor.id);
+  const alsoVisible = isCoLead(actor)
+    ? readStore().memberRequests.filter(
+        (r) => r.status === "pending" && r.leadId !== actor.id
+      )
+    : [];
+  const requests = [...mine, ...alsoVisible]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((request) => ({
+      request,
+      asker: getMember(request.memberId),
+      ageDays: daysSince(request.createdAt),
+      onBehalf: request.leadId !== actor.id,
+    }));
+
   const flaggedProjects: FlaggedProject[] = atRiskProjects().map((project) => ({
     project,
     res: project.reIds
@@ -561,6 +603,7 @@ export async function getDashboard(
     goneQuiet,
     rollUp,
     trainings,
+    requests,
     today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     flaggedProjects,

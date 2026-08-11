@@ -18,6 +18,7 @@ import { getDashboard } from "@/lib/data/dashboard";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
+import { RequestDecision } from "@/components/forms/request-decision";
 import { formatNumber } from "@/lib/utils";
 
 export default async function DashboardPage({
@@ -41,6 +42,7 @@ export default async function DashboardPage({
     goneQuiet,
     rollUp,
     trainings,
+    requests,
   } = view;
 
   /**
@@ -357,6 +359,78 @@ export default async function DashboardPage({
             send one. So it has to be somewhere a Lead already looks, not a
             page they'd have to remember to open.
           */}
+          {/*
+            Requests addressed to this person by name.
+
+            Above the trainings queue because somebody is blocked on it right
+            now — they can't open the file they need — where a training
+            verification is confirming something that already happened. Both
+            are "waiting on you"; only one of them is stopping work today.
+          */}
+          {requests.length > 0 ? (
+            <Card>
+              <CardBody>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <SectionLabel>Requests To Answer</SectionLabel>
+                  <span className="text-ink-muted text-sm">
+                    {requests.length} waiting
+                  </span>
+                </div>
+                <p className="text-ink-soft mt-2 text-sm">
+                  Somebody asked you for something by name. Granting is one
+                  press; declining asks for a line, because a bare no is what
+                  stops people asking next time.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {requests.map(({ request, asker, ageDays, onBehalf }) => (
+                    <div
+                      key={request.id}
+                      className={`rounded-tile border px-4 py-3.5 ${
+                        ageDays >= 5
+                          ? "border-risk-fg/30 bg-risk-bg"
+                          : "border-line"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <Link
+                            href={`/members/${request.memberId}`}
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                          >
+                            {asker?.fullName ?? "Unknown member"}
+                          </Link>
+                          {/*
+                            Age, not a date. "6 days" is the thing that makes a
+                            queue actionable; a timestamp is something you have
+                            to do arithmetic on.
+                          */}
+                          <span className="text-ink-muted ml-2 text-sm">
+                            {ageDays === 0
+                              ? "today"
+                              : `${ageDays} day${ageDays === 1 ? "" : "s"} ago`}
+                          </span>
+                        </div>
+                        {onBehalf ? (
+                          <Badge tone="neutral">Asked someone else</Badge>
+                        ) : null}
+                      </div>
+
+                      <p className="text-ink-soft mt-2 text-sm">
+                        &ldquo;{request.body}&rdquo;
+                      </p>
+
+                      <RequestDecision
+                        requestId={request.id}
+                        askerName={asker?.fullName ?? "They"}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           {trainings.pending.length + trainings.expired.length > 0 ? (
             <Card>
               <CardBody>

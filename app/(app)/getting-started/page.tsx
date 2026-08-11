@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Clock,
   Eye,
+  HandHelping,
   HardHat,
   PenLine,
   MessagesSquare,
@@ -382,10 +383,47 @@ export default async function GettingStartedPage() {
               href={`/members/${viewer.member.id}`}
               linkLabel="your profile"
             >
-              Site access and machine trainings live on your profile. Request
-              one there; a Lead verifies it once you&apos;ve done the training.
+              Rooms and machines live on your own profile, under Trainings.
+              Request one there and a Lead verifies it once you&apos;ve done the
+              safety training — the robotics room, the laser cutter, the mill.
               Everyone can see who&apos;s cleared on what, which is how you find
               the person to ask about a machine.
+            </Guide>
+
+            {/*
+              The two request routes, side by side and in this order.
+
+              They look like the same thing and are not, and getting it wrong
+              costs a member a day: asking a Lead for laser cutter access gets
+              a "do the training first" they could have read here, and filing a
+              training request for a Google Drive goes into a queue that expects
+              a safety sign-off nobody is going to give.
+
+              The rule in one line: **needs training -> Trainings; needs
+              somebody to say yes -> ask a person.**
+            */}
+            <Guide
+              icon={<HandHelping className="size-5" strokeWidth={2.5} />}
+              title="Asking for anything else"
+              href="/members"
+              linkLabel="the roster"
+            >
+              Software and accounts don&apos;t need a safety check, so they
+              don&apos;t go through Trainings — the{" "}
+              <span className="text-ink font-semibold">Fusion team drive</span>,
+              an Onshape seat, the GitHub org, a key to the parts cabinet. Open
+              the profile of the Lead who looks after it and press{" "}
+              <span className="text-ink font-semibold">
+                Ask &lt;name&gt; for something
+              </span>
+              . Say what it&apos;s for in one line — that&apos;s what makes it a
+              two-second yes rather than a reply asking why.
+              <br />
+              <br />
+              It lands on that person&apos;s dashboard next to everything else
+              they owe an answer on, and you get a Discord message when they
+              respond. If you don&apos;t know who to ask, ask any Co-Lead — they
+              can answer anything.
             </Guide>
 
             <Guide
