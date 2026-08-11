@@ -200,8 +200,8 @@ function seed(): StoreShape {
     clubSettings: [
       {
         id: "1",
-        coreHours: 12,
-        committedHours: 8,
+        coreHours: 16,
+        committedHours: 10,
         contributingHours: 4,
         minimumHours: 10,
       },

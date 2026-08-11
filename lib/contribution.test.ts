@@ -45,10 +45,17 @@ const persona = (o: Partial<ContributionInputs>): ContributionInputs => ({
 });
 
 describe("commitment tiers", () => {
-  test("tiers follow the club's stated 12 hr/week expectation", () => {
-    assert.equal(commitmentTier(14), "core");
-    assert.equal(commitmentTier(12), "core");
-    assert.equal(commitmentTier(9), "committed");
+  /*
+    The club's stated expectation as of 2026-08-10: 10–12 a week is committed,
+    16+ is core. `committed` is the LOW end of the published range, so somebody
+    doing exactly 10 has met the bar the club actually states.
+  */
+  test("tiers follow the club's stated expectation", () => {
+    assert.equal(commitmentTier(20), "core");
+    assert.equal(commitmentTier(16), "core");
+    assert.equal(commitmentTier(15), "committed");
+    assert.equal(commitmentTier(10), "committed");
+    assert.equal(commitmentTier(9), "contributing");
     assert.equal(commitmentTier(5), "contributing");
     assert.equal(commitmentTier(1), "light");
   });
@@ -74,7 +81,9 @@ describe("the gap shown is to the NEXT rung, not the top one", () => {
     const r = buildContributionRecord(persona({ hoursTotal: 70 })); // 7/wk
     assert.equal(r.commitment.hoursPerWeek, 7);
     assert.equal(r.commitment.nextTier?.tier, "committed");
-    assert.equal(r.commitment.nextTier?.hoursAway, 1);
+    // The next rung is 10, not the 16 at the top. Showing the top would tell
+    // somebody three hours short that they're nine hours short.
+    assert.equal(r.commitment.nextTier?.hoursAway, 3);
     assert.equal(r.commitment.meetsMinimum, false);
   });
 
@@ -91,7 +100,11 @@ describe("the gap shown is to the NEXT rung, not the top one", () => {
   });
 
   test("null once at the top", () => {
-    const r = buildContributionRecord(persona({ hoursTotal: 140 })); // 14/wk
+    // 18/wk — past Core's 16. There is no rung above, so there is no gap to
+    // show, and inventing one would mean the top tier still reads as falling
+    // short of something.
+    const r = buildContributionRecord(persona({ hoursTotal: 180 }));
+    assert.equal(r.commitment.tier, "core");
     assert.equal(r.commitment.nextTier, null);
     assert.equal(r.commitment.meetsMinimum, true);
   });
@@ -122,7 +135,7 @@ describe("the tiers are configuration, not constants", () => {
   test("the published descriptions follow the numbers", () => {
     // /how-we-lead prints these. If they were still hard-coded strings, the
     // rubric would state a bar nobody is actually measured against.
-    assert.match(tierDescriptions(DEFAULT_TIERS).core, /12\+ hrs\/week/);
+    assert.match(tierDescriptions(DEFAULT_TIERS).core, /16\+ hrs\/week/);
     assert.match(tierDescriptions(lowered).core, /8\+ hrs\/week/);
     assert.match(tierDescriptions(lowered).contributing, /3–6 hrs\/week/);
   });
@@ -216,9 +229,15 @@ describe("personas — the record must describe real people sensibly", () => {
   /** Absent all term, correctly paused. */
   const paused = persona({ isPaused: true });
 
-  test("the workhorse reads as Core and clearly productive", () => {
+  /*
+    13/wk. Under the club's stated expectation — 10–12 committed, 16+ core —
+    that is comfortably Committed and not Core, which is the honest reading:
+    they meet the bar the club publishes without living in the lab.
+  */
+  test("the workhorse meets the club's bar and is clearly productive", () => {
     const r = buildContributionRecord(workhorse);
-    assert.equal(r.commitment.tier, "core");
+    assert.equal(r.commitment.tier, "committed");
+    assert.equal(r.commitment.meetsMinimum, true);
     assert.equal(r.delivered.projectsCompleted, 2);
     assert.ok(r.delivered.completionRate !== null);
     assert.ok(r.delivered.completionRate > 0.8);
