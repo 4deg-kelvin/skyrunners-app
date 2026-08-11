@@ -933,3 +933,37 @@ export interface ProjectAdvisor {
   addedBy?: string;
   addedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Asking a Lead for something
+// ---------------------------------------------------------------------------
+
+export type MemberRequestStatus = "pending" | "granted" | "declined";
+
+/**
+ * A member asks ONE named Lead for something. Free-form.
+ *
+ * The catch-all for everything the trainings catalogue deliberately doesn't
+ * model: the Fusion team drive, an Onshape seat, the GitHub org, a key to the
+ * cabinet. The line between the two is whether it needs TRAINING — a laser
+ * cutter does and is a `CatalogueItem`; a shared drive doesn't and is this.
+ *
+ * Addressed to one person and never fanned out. A request everybody can see is
+ * a request nobody owns, which is the bystander effect `blockerAudience`
+ * already avoids for blockers. The member chooses by opening that person's
+ * profile, which is also how the app avoids having to know who owns what.
+ */
+export interface MemberRequest {
+  id: string;
+  /** Who asked. */
+  memberId: string;
+  /** Who they asked. Always somebody in leadership — see `can.requestFromLead`. */
+  leadId: string;
+  body: string;
+  status: MemberRequestStatus;
+  /** The answer. Required on a decline: "no" with no reason stops people asking. */
+  response?: string;
+  respondedBy?: string;
+  respondedAt?: string;
+  createdAt: string;
+}

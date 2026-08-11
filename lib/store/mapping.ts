@@ -15,6 +15,7 @@
 import type {
   CatalogueItem,
   DeliverableTodo,
+  MemberRequest,
   ProjectAdvisor,
   ClubSettings,
   ClubEvent,
@@ -755,6 +756,37 @@ const projectAdvisors: CollectionSpec<ProjectAdvisor> = {
   dependsOn: ["projects", "members"],
 };
 
+const memberRequests: CollectionSpec<MemberRequest> = {
+  key: "memberRequests",
+  table: "member_requests",
+  columns:
+    "id, member_id, lead_id, body, status, response, responded_by, responded_at, created_at",
+  identify: (r) => r.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    memberId: r.member_id as string,
+    leadId: r.lead_id as string,
+    body: r.body as string,
+    status: r.status as MemberRequest["status"],
+    response: opt(r.response as string),
+    respondedBy: opt(r.responded_by as string),
+    respondedAt: opt(r.responded_at as string),
+    createdAt: r.created_at as string,
+  }),
+  toRow: (r) => ({
+    id: r.id,
+    member_id: r.memberId,
+    lead_id: r.leadId,
+    body: r.body,
+    status: r.status,
+    response: nul(r.response),
+    responded_by: nul(r.respondedBy),
+    responded_at: nul(r.respondedAt),
+    created_at: r.createdAt,
+  }),
+  dependsOn: ["members"],
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -776,6 +808,7 @@ export const COLLECTIONS = [
   clubSettings,
   deliverableTodos,
   projectAdvisors,
+  memberRequests,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

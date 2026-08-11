@@ -50,6 +50,7 @@ import type {
   Deliverable,
   DeliverableStatus,
   DeliverableTodo,
+  MemberRequest,
   ProjectAdvisor,
   GlobalRole,
   HelpReply,
@@ -970,6 +971,142 @@ export async function setGlobalRole(input: {
     if (input.role === "advisor") member.leadId = null;
 
     return ok(member);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Asking a Lead for something
+// ---------------------------------------------------------------------------
+
+export async function createMemberRequest(input: {
+  memberId: string;
+  leadId: string;
+  body: string;
+  now: string;
+}): Promise<Result<MemberRequest>> {
+  const body = input.body.trim();
+  if (!body) {
+    return fail<MemberRequest>("Say what you need — one line is plenty.");
+  }
+  if (body.length > 1000) {
+    return fail<MemberRequest>(
+      "That's very long for a request. If it needs a paragraph, it probably needs a conversation — send a short version and say you'd like to talk."
+    );
+  }
+
+  return guarded((store) => {
+    const lead = store.members.find((m) => m.id === input.leadId);
+    if (!lead) return fail<MemberRequest>("That person no longer exists.");
+    if (lead.status !== "active") {
+      return fail<MemberRequest>(
+        `${lead.fullName}'s account isn't active, so they'd never see this. Ask somebody else.`
+      );
+    }
+
+    /*
+      One open request per person per recipient.
+
+      Not a technical limit — a guard against the thing that actually happens,
+      which is somebody pressing the button again a day later because nothing
+      visibly changed. Three copies of the same ask makes the queue look busier
+      than it is and makes the Lead answer the same question twice.
+    */
+    const open = store.memberRequests.find(
+      (r) =>
+        r.memberId === input.memberId &&
+        r.leadId === input.leadId &&
+        r.status === "pending"
+    );
+    if (open) {
+      return fail<MemberRequest>(
+        `You already have a request open with ${lead.fullName}. Withdraw it first if you want to change what you asked for.`
+      );
+    }
+
+    const request: MemberRequest = {
+      id: newId("request"),
+      memberId: input.memberId,
+      leadId: input.leadId,
+      body,
+      status: "pending",
+      createdAt: input.now,
+    };
+    store.memberRequests.push(request);
+    return ok(request);
+  });
+}
+
+/**
+ * Grant or decline. A decline REQUIRES a reason.
+ *
+ * Same rule as rejecting a deliverable or a training: "no" with nothing after
+ * it is what stops somebody asking again, and the whole point of routing these
+ * through the app rather than a DM is that the answer is recorded somewhere the
+ * member can re-read it.
+ *
+ * Granting doesn't require one, because the grant IS the answer.
+ */
+export async function answerMemberRequest(input: {
+  requestId: string;
+  status: "granted" | "declined";
+  response: string;
+  responderId: string;
+  now: string;
+}): Promise<Result<MemberRequest>> {
+  const response = input.response.trim();
+  if (input.status === "declined" && !response) {
+    return fail<MemberRequest>(
+      "Say why, even briefly. A bare no is the thing that stops people asking next time — and if it's a 'not yet', that's worth them knowing."
+    );
+  }
+
+  return guarded((store) => {
+    const request = store.memberRequests.find((r) => r.id === input.requestId);
+    if (!request) return fail<MemberRequest>("That request no longer exists.");
+    if (request.status !== "pending") {
+      return fail<MemberRequest>("That one has already been answered.");
+    }
+
+    request.status = input.status;
+    request.response = response || undefined;
+    request.respondedBy = input.responderId;
+    request.respondedAt = input.now;
+    return ok(request);
+  });
+}
+
+/**
+ * The asker changes their mind.
+ *
+ * Deleted rather than marked withdrawn. Nothing hangs off it — no record, no
+ * count, no history worth keeping — and leaving a tombstone in the Lead's queue
+ * would mean withdrawing didn't actually clear anything.
+ */
+export async function withdrawMemberRequest(input: {
+  requestId: string;
+  memberId: string;
+}): Promise<Result<{ id: string }>> {
+  return guarded((store) => {
+    const request = store.memberRequests.find((r) => r.id === input.requestId);
+    if (!request) return fail<{ id: string }>("That request no longer exists.");
+    /*
+      Ownership, checked HERE because this is the layer holding the row — the
+      same exception the header of this file names for `deleteWorkLog` and
+      friends. `lib/permissions.ts` never sees a request id.
+    */
+    if (request.memberId !== input.memberId) {
+      return fail<{ id: string }>("That isn't your request.");
+    }
+    if (request.status !== "pending") {
+      return fail<{ id: string }>(
+        "That one has already been answered, so there's nothing to withdraw."
+      );
+    }
+
+    store.memberRequests = store.memberRequests.filter(
+      (r) => r.id !== input.requestId
+    );
+    return ok({ id: input.requestId });
   });
 }
 

@@ -20,13 +20,14 @@ import { TrainingRecord } from "@/components/ui/training-record";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ActionButton } from "@/components/forms/action-form";
 import { ReopenButton } from "@/components/forms/help-request-actions";
+import { MemberRequestForm } from "@/components/forms/member-request";
 import { deleteCheckInAction } from "@/lib/actions";
 import { getResolvedAsksFor } from "@/lib/data/blockers";
 import { getMemberProfile, type MemberProjectRow } from "@/lib/data/members";
 import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
-import { can, isCoLead } from "@/lib/permissions";
+import { can, isCoLead, isLeadership } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
@@ -42,7 +43,7 @@ export default async function MemberProfilePage({
   // into a page that isn't allowed to show them.
   const canViewEffort = can.viewMemberEffort(viewer.actor, viewer.graph, id);
   const [view, trainings, resolvedAsks] = await Promise.all([
-    getMemberProfile(id, canViewEffort),
+    getMemberProfile(id, canViewEffort, viewer.member.id),
     getTrainings(id),
     // Asks they posted that got sorted. Public, like the trainings below it —
     // the note on HOW it got sorted is the useful half, and it's how the next
@@ -158,6 +159,23 @@ export default async function MemberProfilePage({
                 </>
               ) : null}
             </div>
+
+            {/*
+              Ask this person for something.
+
+              Only on a Lead's or Co-Lead's profile, and never your own. The
+              routing IS the profile: you ask whoever the new-member guide says
+              owns the thing, and it lands on exactly their dashboard — no
+              central list of grantable things to keep current.
+            */}
+            {!isOwnProfile &&
+            isLeadership({ id: member.id, globalRole: member.globalRole }) ? (
+              <MemberRequestForm
+                leadId={member.id}
+                leadName={member.fullName}
+                existing={view.myRequest}
+              />
+            ) : null}
           </CardBody>
         </Card>
 

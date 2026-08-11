@@ -17,6 +17,7 @@ import {
   hoursOnProject,
   isOverdue,
   memberProjects,
+  myRequestsToLeads,
   myDeliverables,
   projectBreadcrumb,
   projectREs,
@@ -33,6 +34,7 @@ import type {
   Deliverable,
   Member,
   MemberCertification,
+  MemberRequest,
   ProgressUpdate,
   Project,
   ProjectMembership,
@@ -247,6 +249,15 @@ export interface MemberProfileView {
    */
   checkIns: MemberCheckIn[];
   /**
+   * The VIEWER's own most recent request to this person, if they've made one.
+   *
+   * Belongs to the viewer, not the profile's owner, which is why it's passed in
+   * rather than derived from `memberId`. Shown so an ask doesn't vanish the
+   * moment it's sent — an invisible request is the "email the RE and wait" dead
+   * end, and the only move it leaves is to send it again.
+   */
+  myRequest?: MemberRequest;
+  /**
    * What they're cleared on. **Public**, unlike everything else gated by
    * `canViewEffort` — knowing who can run a machine is how you find the person
    * to ask, and `PUBLIC_TO_ALL_MEMBERS` has always listed trainings.
@@ -274,7 +285,9 @@ export interface MemberCheckIn {
 
 export async function getMemberProfile(
   memberId: string,
-  canViewEffort: boolean
+  canViewEffort: boolean,
+  /** Who is looking. Only used to find their own outstanding request. */
+  viewerId?: string
 ): Promise<MemberProfileView | null> {
   // Ensure the live snapshot exists before any synchronous read.
   //
@@ -315,6 +328,9 @@ export async function getMemberProfile(
     // Never even compute it for a viewer who isn't allowed to see it
     contribution: canViewEffort
       ? buildContributionRecord(contributionInputsFor(memberId))
+      : undefined,
+    myRequest: viewerId
+      ? myRequestsToLeads(viewerId).find((r) => r.leadId === memberId)
       : undefined,
     checkIns: canViewEffort
       ? readStore()

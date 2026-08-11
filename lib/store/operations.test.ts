@@ -818,3 +818,184 @@ describe("becoming an advisor clears the reporting line", () => {
     }
   });
 });
+
+describe("asking a Lead for something", () => {
+  const LEAD = "m-priya";
+  const NOW = "2026-08-10T12:00:00.000Z";
+
+  async function ask(body = "Access to the Fusion team drive") {
+    return ops.createMemberRequest({
+      memberId: MEMBER,
+      leadId: LEAD,
+      body,
+      now: NOW,
+    });
+  }
+
+  test("a blank body is refused", async () => {
+    const r = await ops.createMemberRequest({
+      memberId: MEMBER,
+      leadId: LEAD,
+      body: "   ",
+      now: NOW,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  test("it starts pending, with no answer attached", async () => {
+    const r = await ask();
+    assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.equal(r.value.status, "pending");
+      assert.equal(r.value.response, undefined);
+      assert.equal(r.value.respondedAt, undefined);
+    }
+  });
+
+  /*
+    Not a technical limit — a guard against the thing that actually happens,
+    which is pressing the button again because nothing visibly changed.
+  */
+  test("a second open request to the same person is refused", async () => {
+    assert.equal((await ask()).ok, true);
+    const again = await ask("Actually, the GitHub org too");
+    assert.equal(again.ok, false);
+    assert.equal(disk.readStore().memberRequests.length, 1);
+  });
+
+  test("but asking a DIFFERENT person is fine", async () => {
+    assert.equal((await ask()).ok, true);
+    const other = await ops.createMemberRequest({
+      memberId: MEMBER,
+      leadId: "m-anish",
+      body: "Onshape seat",
+      now: NOW,
+    });
+    assert.equal(other.ok, true);
+  });
+
+  test("asking somebody inactive is refused — they'd never see it", async () => {
+    await ops.setMemberStatus({ memberId: LEAD, status: "inactive" });
+    const r = await ask();
+    assert.equal(r.ok, false);
+  });
+
+  test("granting needs no reason — the grant is the answer", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+
+    const r = await ops.answerMemberRequest({
+      requestId: created.value.id,
+      status: "granted",
+      response: "",
+      responderId: LEAD,
+      now: NOW,
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.equal(r.value.status, "granted");
+      assert.equal(r.value.respondedBy, LEAD);
+      assert.ok(r.value.respondedAt);
+    }
+  });
+
+  /*
+    The asymmetry is the point. A bare no is what stops somebody asking next
+    time, and "not yet, do the training first" is usually the real answer.
+  */
+  test("declining without a reason is refused", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+
+    const r = await ops.answerMemberRequest({
+      requestId: created.value.id,
+      status: "declined",
+      response: "  ",
+      responderId: LEAD,
+      now: NOW,
+    });
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.error, /Say why/);
+  });
+
+  test("declining with a reason keeps the reason", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+
+    const r = await ops.answerMemberRequest({
+      requestId: created.value.id,
+      status: "declined",
+      response: "Not until you're signed off on the mill.",
+      responderId: LEAD,
+      now: NOW,
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.match(r.value.response!, /signed off on the mill/);
+  });
+
+  test("answering twice is refused", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+    const args = {
+      requestId: created.value.id,
+      status: "granted" as const,
+      response: "",
+      responderId: LEAD,
+      now: NOW,
+    };
+    assert.equal((await ops.answerMemberRequest(args)).ok, true);
+    assert.equal((await ops.answerMemberRequest(args)).ok, false);
+  });
+
+  test("answering clears the way for a new request", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+    await ops.answerMemberRequest({
+      requestId: created.value.id,
+      status: "granted",
+      response: "",
+      responderId: LEAD,
+      now: NOW,
+    });
+    // Only OPEN requests block a new one — otherwise one ask would be all
+    // anybody ever got.
+    assert.equal((await ask("And the GitHub org")).ok, true);
+  });
+
+  test("only the asker can withdraw", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+
+    const notMine = await ops.withdrawMemberRequest({
+      requestId: created.value.id,
+      memberId: "m-omar",
+    });
+    assert.equal(notMine.ok, false);
+    assert.equal(disk.readStore().memberRequests.length, 1);
+
+    const mine = await ops.withdrawMemberRequest({
+      requestId: created.value.id,
+      memberId: MEMBER,
+    });
+    assert.equal(mine.ok, true);
+    assert.equal(disk.readStore().memberRequests.length, 0);
+  });
+
+  test("an answered request can't be withdrawn", async () => {
+    const created = await ask();
+    if (!created.ok) throw new Error(created.error);
+    await ops.answerMemberRequest({
+      requestId: created.value.id,
+      status: "granted",
+      response: "",
+      responderId: LEAD,
+      now: NOW,
+    });
+
+    const r = await ops.withdrawMemberRequest({
+      requestId: created.value.id,
+      memberId: MEMBER,
+    });
+    assert.equal(r.ok, false);
+  });
+});

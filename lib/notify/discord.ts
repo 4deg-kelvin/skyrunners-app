@@ -161,6 +161,28 @@ export const discordMessages = {
       : "") +
     `.\n${opts.url}`,
 
+  requestReceived: (opts: { memberName: string; body: string; url: string }) =>
+    `**${opts.memberName}** has asked you for something.
+` +
+    `> ${opts.body}
+` +
+    `Grant or decline it on your dashboard.
+${opts.url}`,
+
+  requestAnswered: (opts: {
+    granted: boolean;
+    answeredBy: string;
+    body: string;
+    response?: string;
+  }) =>
+    `**${opts.answeredBy}** ${opts.granted ? "granted" : "declined"} your request.
+` +
+    `> ${opts.body}` +
+    (opts.response
+      ? `
+${opts.answeredBy} said: ${opts.response}`
+      : ""),
+
   blockerRaised: (opts: {
     memberName: string;
     projectName: string;
