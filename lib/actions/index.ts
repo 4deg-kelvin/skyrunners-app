@@ -513,13 +513,21 @@ async function inviteMemberAction$impl(
   const globalRole = String(formData.get("globalRole") ?? "member") as
     "member" | "lead" | "co_lead";
 
-  // Inviting somebody straight in as leadership is the same act as promoting
-  // them, so it needs the same authority — otherwise a Team Lead could mint a
-  // Co-Lead just by using the invite form instead of the role dropdown.
+  /*
+    Inviting somebody straight in as anything other than a member is the same
+    act as promoting them, so it needs the same authority — otherwise a Team
+    Lead could mint a Co-Lead by using the invite form instead of the role
+    dropdown.
+
+    `!== "member"` is right here and stays: it covers `advisor` too, which is
+    what we want. An advisor holds no authority but does get a standing seat at
+    the club's entire record, and that is a Co-Lead's call.
+  */
   if (globalRole !== "member" && !isCoLead(viewer.actor)) {
     return {
       ok: false,
-      error: "Only a Co-Lead can invite someone as a Lead or Co-Lead.",
+      error:
+        "Only a Co-Lead can invite someone as an Advisor, a Lead or a Co-Lead.",
     };
   }
 

@@ -50,7 +50,7 @@ import {
   PHASE_LABELS,
   PROJECT_ROLE_LABELS,
 } from "@/lib/labels";
-import { can } from "@/lib/permissions";
+import { can, isLeadership } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 import { formatDay } from "@/lib/dates";
 
@@ -64,7 +64,7 @@ export default async function ProjectDetailPage({
   const view = await getProjectBySlug(
     slug,
     viewer.member.id,
-    viewer.actor.globalRole !== "member"
+    isLeadership(viewer.actor)
   );
 
   if (!view) notFound();

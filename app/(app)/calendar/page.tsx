@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getCalendar, type CalendarEvent } from "@/lib/data/events";
 import { getViewer } from "@/lib/data/viewer";
-import { can } from "@/lib/permissions";
+import { can, isLeadership } from "@/lib/permissions";
 import { EVENT_KIND_LABELS } from "@/lib/labels";
 
 export const metadata = {
@@ -69,7 +69,7 @@ export default async function CalendarPage() {
   const viewer = await getViewer();
   const view = await getCalendar({
     memberId: viewer.member.id,
-    isLeadership: viewer.actor.globalRole !== "member",
+    isLeadership: isLeadership(viewer.actor),
     // Decides which projects an event may be attached to: committed, RE-of-or-
     // above, or Co-Lead. Without it the list falls back to committed only.
     viewer: { actor: viewer.actor, graph: viewer.graph },

@@ -143,8 +143,16 @@ export function InviteMemberForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           >
             <option value="member">Member</option>
+            {/*
+              Advisor is Co-Lead-gated with the leadership roles, even though it
+              carries no authority. It's a standing outside seat at the club's
+              whole record — every project, every check-in entry, every roster
+              page — and who gets one is a Co-Lead's call, not a decision made
+              in passing while inviting somebody.
+            */}
             {canAppointLeadership ? (
               <>
+                <option value="advisor">Advisor</option>
                 <option value="lead">Team Lead</option>
                 <option value="co_lead">Co-Lead</option>
               </>
@@ -248,9 +256,17 @@ export function MemberAdminControls({
               className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
             >
               <option value="member">Member</option>
+              <option value="advisor">Advisor</option>
               <option value="lead">Team Lead</option>
               <option value="co_lead">Co-Lead</option>
             </select>
+            <span className="text-ink-muted mt-1 mb-2 block text-xs">
+              An <span className="text-ink font-semibold">Advisor</span> — a
+              faculty or project advisor — sees and can comment on everything,
+              but runs nothing: no projects, no deliverables, no check-ins, and
+              nobody above or below them. Making somebody an advisor clears
+              their reporting line in both directions.
+            </span>
           </label>
         </ActionForm>
       ) : null}

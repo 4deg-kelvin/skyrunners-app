@@ -36,6 +36,7 @@ import type {
   ProgressUpdate,
   UpdateEntry,
 } from "./types.ts";
+import { isLeadership } from "./permissions.ts";
 
 /**
  * Grace period before an unread report escalates.
@@ -139,7 +140,9 @@ export function escalationsFor(
   today: string
 ): LeadEscalation[] {
   const myLeads = allMembers.filter(
-    (m) => m.leadId === viewerId && m.globalRole !== "member"
+    (m) =>
+      m.leadId === viewerId &&
+      isLeadership({ id: m.id, globalRole: m.globalRole })
   );
 
   return myLeads

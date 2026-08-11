@@ -9,6 +9,7 @@ import { LogHoursBanner } from "@/components/ui/log-hours-banner";
 import { daysBetweenDays, todayInClubTime } from "@/lib/dates";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import type { Metadata } from "next";
+import { isAdvisor, isLeadership } from "@/lib/permissions";
 
 /**
  * The signed-in shell: nav, demo banner, page container.
@@ -93,22 +94,34 @@ export default async function AppLayout({
     `joinedAt` versus today means it starts applying on its own, with no cron.
   */
   let nudgeToLogHours = false;
-  try {
-    const myWork = await getMyWork(viewer.member.id);
-    const updateNeedsAttention =
-      myWork.currentUpdate.update.status === "pending" ||
-      myWork.currentUpdate.update.status === "late";
-    alertCount =
-      (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
-    nudgeToLogHours =
-      !myWork.hasEverLoggedHours &&
-      daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;
-  } catch {
-    // Fail quiet on both counts. A nav badge and a nudge are never worth a 500
-    // on every authenticated route, and a banner that appears because a lookup
-    // threw would be telling somebody they've logged nothing on no evidence.
-    alertCount = 0;
-    nudgeToLogHours = false;
+  /*
+    Skipped entirely for advisors, and not merely hidden.
+
+    Both of these come out of `getMyWork`, which synthesises a pending check-in
+    obligation for anybody with no history so the composer has somewhere to
+    write. An advisor owes no check-in ever, so that placeholder would put a
+    permanent red dot on a nav item they cannot even see — an alert that cannot
+    be cleared, for a page that does not exist for them. Not asking is cheaper
+    than asking and then discarding the answer.
+  */
+  if (!isAdvisor(viewer.actor)) {
+    try {
+      const myWork = await getMyWork(viewer.member.id);
+      const updateNeedsAttention =
+        myWork.currentUpdate.update.status === "pending" ||
+        myWork.currentUpdate.update.status === "late";
+      alertCount =
+        (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
+      nudgeToLogHours =
+        !myWork.hasEverLoggedHours &&
+        daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;
+    } catch {
+      // Fail quiet on both counts. A nav badge and a nudge are never worth a
+      // 500 on every authenticated route, and a banner that appears because a
+      // lookup threw would tell somebody they've logged nothing on no evidence.
+      alertCount = 0;
+      nudgeToLogHours = false;
+    }
   }
 
   return (
@@ -134,13 +147,23 @@ export default async function AppLayout({
         role-dependent and shouldn't be: a Lead who can't be reached is the
         worse case, since check-ins escalate to them.
       */}
-      {!viewer.member.discordVerifiedAt ? (
+      {/*
+        Both banners are about doing the work, so neither applies to an advisor.
+
+        Discord is optional for them — the club has no obligation to be able to
+        DM a professor, and every notification the bot sends is about a project
+        they don't own, a check-in they don't file, or a blocker that isn't
+        theirs to clear. Nagging them daily for a channel they were never asked
+        to join is how a required banner teaches everybody to ignore banners.
+        They can still connect it from Settings if they want the traffic.
+      */}
+      {!viewer.member.discordVerifiedAt && !isAdvisor(viewer.actor) ? (
         <DiscordBanner
           hasId={Boolean(viewer.member.discordUserId)}
           botLive={discordIsConfigured()}
         />
       ) : null}
-      {nudgeToLogHours ? <LogHoursBanner /> : null}
+      {nudgeToLogHours && !isAdvisor(viewer.actor) ? <LogHoursBanner /> : null}
       <TopNav
         memberId={viewer.member.id}
         userName={viewer.member.fullName}
@@ -154,9 +177,8 @@ export default async function AppLayout({
         isLeadership={
           viewer.member.globalRole === "co_lead" || leadershipRoles.hasReports
         }
-        showLeadingGuide={
-          viewer.member.globalRole !== "member" || leadershipRoles.isRE
-        }
+        isAdvisor={isAdvisor(viewer.actor)}
+        showLeadingGuide={isLeadership(viewer.actor) || leadershipRoles.isRE}
         clubName={identity.name}
         photoUrl={viewer.member.photoUrl}
         isDemo={viewer.isDemo}

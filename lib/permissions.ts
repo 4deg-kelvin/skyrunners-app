@@ -78,6 +78,41 @@ export function isCoLead(actor: Actor): boolean {
   return actor.globalRole === "co_lead";
 }
 
+/**
+ * Runs the club, or part of it. A Lead or a Co-Lead — nobody else.
+ *
+ * This exists because `globalRole !== "member"` used to mean this, in twenty
+ * places, and that shorthand was a landmine the moment a fourth role appeared:
+ * `advisor` is not a member, so every one of those checks would have silently
+ * granted a professor the ability to invite people, admit them, create
+ * club-wide events, record attendance and file roll-ups.
+ *
+ * Named rather than inlined so the next role added has one place to be
+ * considered instead of twenty places to be missed.
+ */
+export function isLeadership(actor: Actor): boolean {
+  return actor.globalRole === "lead" || actor.globalRole === "co_lead";
+}
+
+/**
+ * A faculty or project advisor.
+ *
+ * Sees everything, can say something about anything, builds nothing. The
+ * permission model handles most of this by omission — an advisor is never an
+ * RE and never in anybody's Lead chain, so every project and review right
+ * declines on its own. This predicate is for the handful of places that have
+ * to say something POSITIVE about them: letting them comment, and keeping them
+ * out of machinery that assumes a person does engineering work.
+ *
+ * The things it must keep them out of are all obligations rather than
+ * permissions — check-in generation, the commitment tiers, the Lead dropdown,
+ * the "you haven't logged hours" nudge. An advisor with a check-in obligation
+ * would be late forever, through a page they cannot even reach.
+ */
+export function isAdvisor(actor: Actor | { globalRole: GlobalRole }): boolean {
+  return actor.globalRole === "advisor";
+}
+
 /** Walk from a project up to the root, collecting ancestors (inclusive). */
 export function projectChain(graph: OrgGraph, projectId: string): string[] {
   const chain: string[] = [];
@@ -295,7 +330,7 @@ export const can = {
     isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
 
   /** Any Lead or Co-Lead can invite a new member by Stanford email. */
-  inviteMember: (actor: Actor) => actor.globalRole !== "member",
+  inviteMember: (actor: Actor) => isLeadership(actor),
 
   /**
    * Editing a profile — name shown, photo, major, year, phone, skills.
@@ -367,7 +402,7 @@ export const can = {
    * welcoming them, and it belongs to whoever is accountable for them.
    */
   admitMember: (actor: Actor, memberId: string) =>
-    !isSelf(actor, memberId) && actor.globalRole !== "member",
+    !isSelf(actor, memberId) && isLeadership(actor),
 
   // --- Projects --------------------------------------------------------
 
@@ -584,7 +619,7 @@ export const can = {
     isCoLead(actor) || hasReports,
 
   /** Leads roll their reports' updates up the chain. */
-  submitRollup: (actor: Actor) => actor.globalRole !== "member",
+  submitRollup: (actor: Actor) => isLeadership(actor),
 
   // --- Trainings and facility access ------------------------------------
 
@@ -642,14 +677,14 @@ export const can = {
    * `viewLeadershipDashboard(actor, hasReports)`.
    */
   createEvent: (actor: Actor, isOnProject = false) =>
-    actor.globalRole !== "member" || isOnProject,
+    isLeadership(actor) || isOnProject,
 
   /** Your own, or leadership tidying the club calendar. */
   manageEvent: (actor: Actor, createdBy?: string) =>
-    actor.globalRole !== "member" || (!!createdBy && createdBy === actor.id),
+    isLeadership(actor) || (!!createdBy && createdBy === actor.id),
 
   /** Deliberately not scope-limited: leadership can invite anyone, anywhere. */
-  inviteToEvent: (actor: Actor) => actor.globalRole !== "member",
+  inviteToEvent: (actor: Actor) => isLeadership(actor),
 
   /**
    * Creating an event nobody can join — a fixed guest list.
@@ -677,7 +712,7 @@ export const can = {
   manageEventGuestList: (actor: Actor, createdBy?: string) =>
     isCoLead(actor) || (!!createdBy && createdBy === actor.id),
 
-  recordAttendance: (actor: Actor) => actor.globalRole !== "member",
+  recordAttendance: (actor: Actor) => isLeadership(actor),
 
   /** Anyone can propose a 1:1 with anyone. */
   requestMeeting: () => true,

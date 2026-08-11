@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Clock, Eye, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -31,12 +32,25 @@ import {
   UPDATE_STATUS_LABELS,
   UPDATE_STATUS_TONES,
 } from "@/lib/labels";
-import { can } from "@/lib/permissions";
+import { can, isAdvisor } from "@/lib/permissions";
 import { formatNumber } from "@/lib/utils";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MyWorkPage() {
   const viewer = await getViewer();
+
+  /*
+    Advisors have no work of their own, so this page has nothing to show them.
+
+    Not access control — nothing here is secret — but every section would be an
+    empty state: no projects, no deliverables, no check-in, no hours, no
+    contribution record. Redirected rather than merely hidden from the nav, for
+    the same reason `/dashboard` redirects: `/` points here, so an advisor
+    typing the club's URL would land on a page that looks broken before they
+    have seen anything that works.
+  */
+  if (isAdvisor(viewer.actor)) redirect("/projects");
+
   const view = await getMyWork(viewer.member.id);
   const {
     me,
