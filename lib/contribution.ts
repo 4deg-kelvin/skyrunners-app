@@ -105,9 +105,23 @@ export interface TierThresholds {
   minimum: number;
 }
 
+/**
+ * The club's expectations as of 2026-08-10: **10–12 hours a week is committed,
+ * 16+ is core.**
+ *
+ * `committed` is the LOW end of the stated range, not the middle — a member
+ * doing 10 has met the expectation the club actually publishes, and a floor of
+ * 11 would quietly tell them they hadn't.
+ *
+ * These are only the fallback and the seed. The live numbers are four columns
+ * on `club_settings` that a Co-Lead edits from Settings, because the club
+ * adjusts its expectations faster than anybody ships a deploy — changing these
+ * constants does NOT change what the club is measured against. Read them
+ * through `getClubTiers()`.
+ */
 export const DEFAULT_TIERS: TierThresholds = {
-  core: 12,
-  committed: 8,
+  core: 16,
+  committed: 10,
   contributing: 4,
   minimum: 10,
 };
