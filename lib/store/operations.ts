@@ -936,16 +936,38 @@ export async function setGlobalRole(input: {
       }
     }
 
-    // Demoting a Lead leaves their reports pointing at someone who no longer
-    // has authority over them — the reporting chain would still route reviews
-    // and escalations to a plain member. Re-point them upward.
-    if (member.globalRole !== "member" && input.role === "member") {
+    /*
+      Anybody losing authority leaves their reports pointing at somebody who no
+      longer has any — reviews and escalations would still route to them, and
+      nothing would ever be read. Re-point those reports upward.
+
+      `advisor` counts as losing it, and that is the whole reason this check is
+      a list rather than `=== "member"`. An advisor holds no authority at all,
+      so a Lead converted into one would otherwise keep a review queue they can
+      no longer reach: their people's check-ins would pile up unread with the
+      escalation pointed at somebody the app has stopped asking anything of.
+    */
+    const losesAuthority = input.role === "member" || input.role === "advisor";
+    if (member.globalRole !== input.role && losesAuthority) {
       for (const m of store.members) {
         if (m.leadId === member.id) m.leadId = member.leadId;
       }
     }
 
     member.globalRole = input.role;
+
+    /*
+      An advisor reports to nobody, in both directions. The loop above cleared
+      the downward half; this is the upward one.
+
+      Not cosmetic: a Lead with an advisor in their queue would be asked to
+      review check-ins that will never be written, and the review escalation
+      runs on AGE — so the advisor would sit at the top of somebody's overdue
+      list forever, growing more urgent, with no action that could ever clear
+      it.
+    */
+    if (input.role === "advisor") member.leadId = null;
+
     return ok(member);
   });
 }

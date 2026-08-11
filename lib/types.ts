@@ -11,12 +11,27 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Global role. Ordered least to most authority.
+ * Global role.
  *
  * These strings must match the `global_role` enum in the database exactly —
  * see docs/DATA_MODEL.md. `co_lead`, not `admin`.
+ *
+ * **`member` -> `lead` -> `co_lead` is a ladder. `advisor` is not on it.**
+ *
+ * An advisor is a faculty or project advisor: they see everything and can say
+ * something about anything, but they build nothing. No projects, no
+ * deliverables, no hours, no check-ins, and nobody above or below them in the
+ * reporting chain. More access than a member in some directions, none of the
+ * authority in any.
+ *
+ * That makes ordering comparisons meaningless, and the code no longer does
+ * them. Twenty places once read `globalRole !== "member"` as shorthand for "is
+ * leadership" — every one would have handed an advisor the power to invite
+ * people, admit them, create club-wide events and file roll-ups. They all go
+ * through `isLeadership()` now. If you add a fifth role, that predicate is the
+ * first thing to check.
  */
-export type GlobalRole = "member" | "lead" | "co_lead";
+export type GlobalRole = "member" | "advisor" | "lead" | "co_lead";
 
 export type MemberStatus = "active" | "inactive" | "alumni";
 

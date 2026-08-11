@@ -31,12 +31,22 @@ import type { BadgeTone } from "@/components/ui/badge";
 
 export const ROLE_LABELS: Record<GlobalRole, string> = {
   member: "Member",
+  advisor: "Advisor",
   lead: "Team Lead",
   co_lead: "Co-Lead",
 };
 
+/**
+ * Cardinal marks authority. An advisor has none, so they get a neutral badge.
+ *
+ * It still shows — an advisor's badge is the useful one on a roster, because
+ * it's the answer to "why does this person have no projects". A member with no
+ * badge reads as a member who hasn't been given anything yet; an advisor with
+ * no badge reads as broken data.
+ */
 export const ROLE_TONES: Record<GlobalRole, BadgeTone> = {
   member: "neutral",
+  advisor: "neutral",
   lead: "cardinal",
   co_lead: "cardinal",
 };

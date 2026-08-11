@@ -22,6 +22,7 @@ import {
   projectREs,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { isAdvisor } from "@/lib/permissions";
 import {
   buildContributionRecord,
   commitmentTier,
@@ -116,8 +117,13 @@ export async function getRosterOptions(): Promise<RosterOptions> {
     leadOptions: active
       .filter(
         (m) =>
-          m.globalRole !== "member" ||
-          active.some((other) => other.leadId === m.id)
+          // Advisors are never candidates. Nobody reports to them — that's
+          // half the definition of the role — and offering one here would
+          // create a reporting line whose owner has no review queue to read it
+          // in, so the member's check-ins would go somewhere nothing renders.
+          !isAdvisor(m) &&
+          (m.globalRole !== "member" ||
+            active.some((other) => other.leadId === m.id))
       )
       .map((m) => ({
         id: m.id,
@@ -163,7 +169,15 @@ export async function getRoster(): Promise<RosterRow[]> {
   // because the roster's most common use is "who do I ask about this?" — and
   // that's answered by leadership, not by whoever's name starts with A.
   const byStatus = { active: 0, inactive: 1, alumni: 2 } as const;
-  const byRank = { co_lead: 0, lead: 1, member: 2 } as const;
+  /*
+    Advisors sort below leadership and above members.
+
+    Not a statement about seniority — they hold no authority at all. It's the
+    same "who do I ask about this?" logic: a faculty advisor is a useful person
+    to find, and there are two of them among thirty, so burying them in the
+    alphabetical run makes the roster worse at its main job.
+  */
+  const byRank = { co_lead: 0, lead: 1, advisor: 2, member: 3 } as const;
 
   return [...readStore().members]
     .sort(

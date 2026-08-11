@@ -466,6 +466,7 @@ export async function getDashboard(
         .filter(
           (m) =>
             m.globalRole !== "member" &&
+            m.globalRole !== "advisor" &&
             m.status === "active" &&
             // Not yourself. A roll-up is what you read to check on OTHER
             // people's oversight — your own reports are already the review

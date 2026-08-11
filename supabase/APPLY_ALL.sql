@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql
 
 
 -- ==========================================================================
@@ -3706,4 +3706,135 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0030_discord_invite_url.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0031_advisor_role.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0031 — the `advisor` role
+--
+-- A faculty or project advisor. Somebody who sees everything and can say
+-- something about anything, but builds nothing: no projects, no deliverables,
+-- no hours, no check-ins, and nobody above or below them in the reporting
+-- chain.
+--
+-- ---------------------------------------------------------------------------
+-- This file adds the enum value and NOTHING else, deliberately
+-- ---------------------------------------------------------------------------
+--
+-- Postgres will not let a transaction use an enum value it added in that same
+-- transaction, and `scripts/db-migrate.mjs` wraps every migration file in one.
+-- So any statement that wanted to WRITE 'advisor' — a backfill, a policy
+-- comparing against it, a default — has to live in a later file. Splitting it
+-- out is cheaper than discovering that rule from an error message that reads
+-- "unsafe use of new value of enum type".
+--
+-- ---------------------------------------------------------------------------
+-- Why a role and not a boolean
+-- ---------------------------------------------------------------------------
+--
+-- An advisor is a different KIND of person, not a member with a flag. Every
+-- question the app asks about somebody — do they owe a check-in, do they have a
+-- Lead, do they appear in the commitment tiers, can they be given a deliverable
+-- — has a different answer for them, and a boolean sitting beside
+-- `global_role = 'member'` would mean every one of those checks had to remember
+-- to consult both fields. Roles are the thing the app already branches on.
+--
+-- Note that this breaks the "ordered least to most authority" reading of the
+-- enum. Advisor is not a rung on that ladder; it is off to one side. The
+-- application no longer relies on the ordering — see `isLeadership` in
+-- `lib/permissions.ts`, which replaced twenty `globalRole !== 'member'` checks
+-- that would each have silently granted advisors a leadership power.
+-- ---------------------------------------------------------------------------
+
+alter type global_role add value if not exists 'advisor';
+
+insert into schema_migrations (version)
+values ('0031_advisor_role')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0031_advisor_role.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0032_project_advisors.sql
+-- ==========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 0032 — which advisors are named on which projects
+--
+-- An advisor can see and comment on everything in the club; this table is the
+-- separate, smaller question of who a given project should ASK. A faculty
+-- advisor who oversees Aerostructures is still available to Avionics, but only
+-- Aerostructures should list them under "Who to ask".
+--
+-- ---------------------------------------------------------------------------
+-- Why not a `role` on project_members
+-- ---------------------------------------------------------------------------
+--
+-- Because `project_members` drives staffing, and staffing drives /find-work.
+-- Membership rows feed "N committed members", the unstaffed-first ordering on
+-- the discoverability page, and the roster counts on every project card. An
+-- advisor is not staff — a project with two engineers and a professor is a
+-- project with two engineers — and adding a fourth `project_role` would put
+-- them into every one of those numbers unless each count remembered to exclude
+-- it. That is the shape of bug this schema keeps trying to avoid: a default
+-- that silently includes something it shouldn't.
+--
+-- A separate table cannot leak. Nothing counts it unless it asks for it.
+-- ---------------------------------------------------------------------------
+
+create table if not exists project_advisors (
+  project_id  uuid not null references projects(id) on delete cascade,
+  member_id   uuid not null references profiles(id) on delete cascade,
+  -- Who named them, for the same reason `project_members.added_by` exists:
+  -- "why is this person on here" should be answerable by something other than
+  -- one person's memory.
+  added_by    uuid references profiles(id) on delete set null,
+  added_at    timestamptz not null default now(),
+  primary key (project_id, member_id)
+);
+
+create index if not exists project_advisors_member_idx
+  on project_advisors (member_id);
+
+alter table project_advisors enable row level security;
+
+-- Public to read, like everything else about who is on what. The club's
+-- transparency default: activity is visible, personal reports are not.
+drop policy if exists project_advisors_read on project_advisors;
+create policy project_advisors_read on project_advisors
+  for select to authenticated using (true);
+
+-- --------------------------------------------------------------------------
+-- Named by the project's REs, or a Co-Lead.
+--
+-- Same rule as adding a member: the RE is accountable for the project, so the
+-- RE decides who it says to go and ask. `auth_is_re_for` already includes
+-- Co-Leads and inherits down the project tree.
+--
+-- Note there is NO check here that the named person is actually an advisor.
+-- That belongs in `lib/store/operations.ts` where a readable error can be
+-- returned; an RLS refusal surfaces as "the database refused it", which tells
+-- the RE nothing about what to do instead.
+-- --------------------------------------------------------------------------
+drop policy if exists project_advisors_write on project_advisors;
+create policy project_advisors_write on project_advisors
+  for all to authenticated
+  using (auth_is_re_for(project_id))
+  with check (auth_is_re_for(project_id));
+
+insert into schema_migrations (version)
+values ('0032_project_advisors')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0032_project_advisors.sql
 -- ==========================================================================

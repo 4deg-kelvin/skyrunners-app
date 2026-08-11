@@ -7,9 +7,21 @@ import { cn } from "@/lib/utils";
 import { AccountMenu } from "./account-menu";
 
 const NAV_ITEMS = [
-  { href: "/my-work", label: "My Work" },
+  /*
+    Hidden from advisors, who have no work of their own.
+
+    Not a permission — there's nothing sensitive on it — but every section of
+    that page would be an empty state: no projects, no deliverables, no
+    check-in, no hours, no contribution record. A page that is structurally
+    empty for a whole class of user reads as broken, and it's the landing page,
+    so it would be their first impression of the app. `/` sends them to
+    Projects instead.
+  */
+  { href: "/my-work", label: "My Work", hideFromAdvisors: true },
   // High in the nav on purpose: "I have nothing to do" is the club's biggest
-  // retention problem, and this page is the answer to it.
+  // retention problem, and this page is the answer to it. Advisors keep it —
+  // the "I'm stuck" board lives there, and unsticking somebody is the single
+  // most useful thing an advisor can do in an afternoon.
   { href: "/find-work", label: "Find Work" },
   { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
   { href: "/projects", label: "Projects" },
@@ -21,6 +33,7 @@ export function TopNav({
   memberId,
   userName,
   isLeadership,
+  isAdvisor,
   isDemo,
   showLeadingGuide,
   clubName,
@@ -38,6 +51,8 @@ export function TopNav({
    * given reports does.
    */
   isLeadership: boolean;
+  /** Hides My Work, which is empty by construction for them. */
+  isAdvisor: boolean;
   isDemo: boolean;
   /** Leads, Co-Leads, and anyone who is an RE of something. */
   showLeadingGuide: boolean;
@@ -57,14 +72,19 @@ export function TopNav({
   const pathname = usePathname();
 
   const items = NAV_ITEMS.filter(
-    (item) => !item.leadershipOnly || isLeadership
+    (item) =>
+      (!item.leadershipOnly || isLeadership) &&
+      (!item.hideFromAdvisors || !isAdvisor)
   );
 
   return (
     <header className="border-line bg-card sticky top-0 z-50 border-b">
       <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-6 px-5 sm:px-8">
-        {/* Wordmark — goes to the member's own home, same as "/" */}
-        <Link href="/my-work" className="flex items-center gap-2.5">
+        {/* Wordmark — goes to whatever "home" means for this person. */}
+        <Link
+          href={isAdvisor ? "/projects" : "/my-work"}
+          className="flex items-center gap-2.5"
+        >
           <span className="bg-cardinal-600 flex size-8 items-center justify-center rounded-full text-white">
             <DroneMark className="size-5" />
           </span>

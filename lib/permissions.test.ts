@@ -13,7 +13,9 @@ import { test, describe } from "node:test";
 
 import {
   can,
+  isAdvisor,
   isCoLead,
+  isLeadership,
   isLeadOfOrAbove,
   isREofOrAbove,
   leadChain,
@@ -855,5 +857,79 @@ describe("closing an event off is narrower than creating one", () => {
     // meeting is a different act from tidying the calendar.
     assert.equal(can.manageEvent(actor("lead1"), "worker"), true);
     assert.equal(can.manageEventGuestList(actor("lead1"), "worker"), false);
+  });
+});
+
+/**
+ * The advisor role.
+ *
+ * A faculty or project advisor: sees everything, comments on anything, builds
+ * nothing. Most of that falls out of the model for free — an advisor is never
+ * an RE and never in a Lead chain, so every project and review right declines
+ * on its own. What needs pinning is the half that does NOT fall out:
+ *
+ * `globalRole !== "member"` was shorthand for "is leadership" in twenty places.
+ * Adding a fourth role turned every one of them into a silent grant, because an
+ * advisor is not a member. These tests are the guard on that, and the reason
+ * `isLeadership` exists as a named predicate.
+ */
+describe("an advisor holds no authority", () => {
+  const advisor = (): Actor => ({ id: "prof", globalRole: "advisor" });
+
+  test("isLeadership says no, even though they aren't a member", () => {
+    assert.equal(isLeadership(advisor()), false);
+    assert.equal(advisor().globalRole !== "member", true, "the old trap");
+  });
+
+  test("isAdvisor identifies them and nobody else", () => {
+    assert.equal(isAdvisor(advisor()), true);
+    assert.equal(isAdvisor(actor("coLead")), false);
+    assert.equal(isAdvisor(actor("worker")), false);
+  });
+
+  /*
+    Each of these read `globalRole !== "member"` before `isLeadership` existed,
+    and each would have been granted to a professor.
+  */
+  test("cannot invite or admit people", () => {
+    assert.equal(can.inviteMember(advisor()), false);
+    assert.equal(can.admitMember(advisor(), "worker"), false);
+  });
+
+  test("cannot create club-wide events, invite to them, or take attendance", () => {
+    assert.equal(can.createEvent(advisor()), false);
+    assert.equal(can.inviteToEvent(advisor()), false);
+    assert.equal(can.recordAttendance(advisor()), false);
+  });
+
+  test("cannot file a roll-up", () => {
+    assert.equal(can.submitRollup(advisor()), false);
+  });
+
+  test("cannot manage, complete or delete a project", () => {
+    assert.equal(can.manageProject(advisor(), graph, "leaf"), false);
+    assert.equal(can.manageDeliverables(advisor(), graph, "leaf"), false);
+    assert.equal(can.completeProject(advisor(), graph, "leaf"), false);
+    assert.equal(can.deleteProject(advisor(), graph, "leaf"), false);
+    assert.equal(can.createProject(advisor(), graph, { teamId: "div" }), false);
+  });
+
+  test("cannot read somebody's personal effort record", () => {
+    // Same as any non-Lead. Seeing everything means seeing the club's WORK,
+    // not each member's private half — see the update privacy split.
+    assert.equal(can.viewMemberEffort(advisor(), graph, "worker"), false);
+  });
+
+  /* The positive half: what an advisor is FOR. */
+  test("can see the project-side of check-ins, like everyone", () => {
+    assert.equal(can.viewProjectUpdates(), true);
+  });
+
+  test("can post and answer on the help board", () => {
+    assert.equal(can.postHelpRequest(), true);
+  });
+
+  test("can propose a 1:1 with anyone", () => {
+    assert.equal(can.requestMeeting(), true);
   });
 });

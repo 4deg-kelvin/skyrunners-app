@@ -207,12 +207,34 @@ describe("SQL enums match the TypeScript unions", () => {
     "utf8"
   );
 
+  /**
+   * The enum as Postgres would have it after every migration has run.
+   *
+   * `create type` is only the starting set. Enums grow by `alter type … add
+   * value`, which is how `advisor` reached `global_role` in 0031 — reading only
+   * the create statement made this test compare the TypeScript union against a
+   * definition three migrations out of date, and report drift that didn't
+   * exist. A check that cries wolf about its own migration history is one
+   * somebody eventually deletes.
+   */
   function sqlEnum(name: string): string[] | null {
-    const match = sql.match(
+    const created = sql.match(
       new RegExp(`create type ${name} as enum\\s*\\(([^)]*)\\)`)
     );
-    if (!match) return null;
-    return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+    if (!created) return null;
+
+    const values = [...created[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+
+    for (const added of sql.matchAll(
+      new RegExp(
+        `alter type ${name}\\s+add value(?:\\s+if not exists)?\\s+'([^']+)'`,
+        "g"
+      )
+    )) {
+      values.push(added[1]);
+    }
+
+    return [...new Set(values)].sort();
   }
 
   function tsUnion(name: string): string[] | null {

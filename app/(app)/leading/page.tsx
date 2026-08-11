@@ -8,7 +8,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getViewer } from "@/lib/data/viewer";
 import { getLeadershipRoles } from "@/lib/data/members";
-import { isCoLead } from "@/lib/permissions";
+import { isCoLead, isLeadership } from "@/lib/permissions";
 import { HELP_REQUEST_STALE_DAYS } from "@/lib/types";
 import { REVIEW_GRACE_DAYS } from "@/lib/review";
 
@@ -62,9 +62,7 @@ export default async function LeadingPage() {
     watched.
   */
   const holdsSomething =
-    viewer.member.globalRole !== "member" ||
-    role.isRE ||
-    role.divisionsLed.length > 0;
+    isLeadership(viewer.actor) || role.isRE || role.divisionsLed.length > 0;
   if (!holdsSomething) redirect("/how-we-lead");
 
   const coLead = isCoLead(viewer.actor);
