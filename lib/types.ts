@@ -912,3 +912,24 @@ export interface DeliverableTodo {
   sortOrder: number;
   createdBy?: string;
 }
+
+/**
+ * An advisor named on a specific project.
+ *
+ * An advisor can already see and comment on everything in the club; this is the
+ * narrower question of who a given project should ASK. A faculty advisor who
+ * oversees Aerostructures remains available to Avionics, but only
+ * Aerostructures lists them under "Who to ask".
+ *
+ * NOT a `project_role` on `ProjectMembership`, deliberately. Membership drives
+ * staffing — the committed count, /find-work's unstaffed-first ordering, the
+ * roster figures — and a professor is not staff. A separate row cannot leak
+ * into a number that nothing asked it to be part of.
+ */
+export interface ProjectAdvisor {
+  projectId: string;
+  memberId: string;
+  /** Which RE named them. Same reason `ProjectMembership.addedBy` exists. */
+  addedBy?: string;
+  addedAt: string;
+}

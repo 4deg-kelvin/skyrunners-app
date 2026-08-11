@@ -15,6 +15,7 @@ import {
   DeliverableActions,
 } from "@/components/forms/deliverable-actions";
 import { DeliverableTodos } from "@/components/forms/deliverable-todos";
+import { ProjectAdvisors } from "@/components/forms/project-advisors";
 import {
   AskToJoinButton,
   FollowToggle,
@@ -105,6 +106,11 @@ export default async function ProjectDetailPage({
     project.id
   );
   const mayDelete = can.deleteProject(viewer.actor, viewer.graph, project.id);
+  const mayManageAdvisors = can.manageProjectAdvisors(
+    viewer.actor,
+    viewer.graph,
+    project.id
+  );
 
   const mayAddMember = can.addProjectMember(
     viewer.actor,
@@ -936,6 +942,17 @@ export default async function ProjectDetailPage({
                   ))
                 )}
               </div>
+
+              {/*
+                Advisors under the REs, quieter. The RE is who you ask first;
+                the advisor is who the RE asks. See `ProjectAdvisors`.
+              */}
+              <ProjectAdvisors
+                projectId={project.id}
+                advisors={view.advisors}
+                choices={view.advisorChoices}
+                canManage={mayManageAdvisors}
+              />
             </CardBody>
           </Card>
 

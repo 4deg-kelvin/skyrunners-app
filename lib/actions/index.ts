@@ -501,6 +501,50 @@ async function deleteDeliverableTodoAction$impl(
 }
 
 // ---------------------------------------------------------------------------
+// Advisors named on a project
+// ---------------------------------------------------------------------------
+
+async function addProjectAdvisorAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageProjectAdvisors(viewer.actor, viewer.graph, projectId)) {
+    return denied("name an advisor on this project");
+  }
+
+  const result = await ops.addProjectAdvisor({
+    projectId,
+    memberId: String(formData.get("memberId") ?? ""),
+    actorId: viewer.member.id,
+    now: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Advisor added.");
+}
+
+async function removeProjectAdvisorAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageProjectAdvisors(viewer.actor, viewer.graph, projectId)) {
+    return denied("change this project's advisors");
+  }
+
+  const result = await ops.removeProjectAdvisor({
+    projectId,
+    memberId: String(formData.get("memberId") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Removed.");
+}
+
+// ---------------------------------------------------------------------------
 // People — the leadership controls
 // ---------------------------------------------------------------------------
 
@@ -2051,6 +2095,18 @@ export async function setDeliverableStatusAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setDeliverableStatusAction$impl(formData));
+}
+
+export async function addProjectAdvisorAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => addProjectAdvisorAction$impl(formData));
+}
+
+export async function removeProjectAdvisorAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => removeProjectAdvisorAction$impl(formData));
 }
 
 export async function addDeliverableTodoAction(

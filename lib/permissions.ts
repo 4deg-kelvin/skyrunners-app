@@ -719,6 +719,20 @@ export const can = {
 
   // --- Deliverables ------------------------------------------------------
 
+  /**
+   * Naming an advisor on a project, or removing one.
+   *
+   * Same authority as adding a member: the RE is accountable for the project,
+   * so the RE decides who it tells people to go and ask. Inherits down the
+   * project tree, and a Division Lead counts, like every other RE right.
+   *
+   * Note this grants nothing to the advisor — they could already see and
+   * comment on this project, and on every other one. All it changes is whether
+   * the project lists them.
+   */
+  manageProjectAdvisors: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
   /** REs shape the list; that's the five minutes a week the model costs them. */
   manageDeliverables: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),

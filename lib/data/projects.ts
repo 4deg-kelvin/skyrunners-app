@@ -20,6 +20,8 @@ import {
   hoursOnProject,
   isOverdue,
   pendingRequestsFor,
+  projectAdvisors,
+  advisorOptions,
   projectAttentionFlags,
   projectBreadcrumb,
   projectDeliverables,
@@ -229,6 +231,16 @@ export interface ProjectDetailView {
   breadcrumb: BreadcrumbNode[];
   division?: Team;
   res: Member[];
+  /**
+   * Faculty or project advisors named on this project.
+   *
+   * Separate from `members` and `res` on purpose — an advisor is not staff, so
+   * they appear beside "Who to ask" and in none of the counts. See
+   * `ProjectAdvisor`.
+   */
+  advisors: Member[];
+  /** Active advisors not already named here, for the RE's picker. */
+  advisorChoices: { id: string; fullName: string }[];
   members: ProjectMemberRow[];
   children: ProjectTreeNode[];
   parent?: Project;
@@ -365,6 +377,12 @@ export async function getProjectBySlug(
       member: pm.member,
       hoursOnProject: hoursOnProject(pm.memberId, project.id),
     })),
+    advisors: projectAdvisors(project.id),
+    advisorChoices: advisorOptions()
+      .filter(
+        (a) => !projectAdvisors(project.id).some((named) => named.id === a.id)
+      )
+      .map((a) => ({ id: a.id, fullName: a.fullName })),
     children: childProjects(project.id).map(buildNode),
     parent: project.parentId ? getProject(project.parentId) : undefined,
     timeline: projectTimeline(project),
