@@ -77,8 +77,18 @@ export function CheckInForm({
           <X className="size-4" />
         </button>
       </div>
+      {/*
+        Say that there is one box PER PROJECT, before showing three of them.
+
+        The composer repeats every project the page has already listed further
+        up, which reads as the page showing everything twice unless something
+        explains why. It isn't duplication — each box is a separate answer that
+        lands on that project's own feed — but the reader has no way to know
+        that from three identical-looking panels.
+      */}
       <p className="text-ink-muted mb-4 text-sm">
-        A line per project is enough.{" "}
+        One box per project you&apos;re on — a line in each is enough, and you
+        can leave any of them blank.{" "}
         {readerName
           ? `${readerName} reads this to start a conversation, not to grade you.`
           : "You're at the top of the reporting chain, so this goes to the other Co-Leads — same cadence as everyone else."}
@@ -104,19 +114,48 @@ export function CheckInForm({
           </p>
         ) : (
           sections.map((s) => (
+            /*
+              A RECESSED panel per project, with raised inputs inside it.
+
+              This used to be a transparent box on the card, bordered in
+              `border-line` — the same colour as the borders of the inputs
+              inside it, on the same `bg-card` background. In dark mode those
+              two values are four points apart, so the whole composer read as
+              one undifferentiated stack of boxes and you could not tell where
+              one project ended and the next began.
+
+              `bg-surface` is the page colour, so each project sits a step BACK
+              from the card and the fields sit forward of it. Figure and ground,
+              rather than eleven identical rectangles.
+            */
             <div
               key={s.projectId}
-              className="rounded-tile border-line border px-3.5 py-3"
+              className="rounded-tile border-line bg-surface border px-3.5 py-3"
             >
               {/* Repeated field carrying the project id, so the action can
                   reconstruct a variable number of sections from flat FormData. */}
               <input type="hidden" name="projectId" value={s.projectId} />
 
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-ink text-sm font-bold">
+              {/*
+                The project name as a section label, not body text.
+
+                Every other card in the app orients you with a small uppercase
+                cardinal label before the content. These panels had the project
+                name at the same weight as the words inside them, which is why
+                the page read as a wall — nothing said "a new thing starts
+                here".
+              */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-cardinal-600 text-[11px] font-semibold tracking-[0.1em] uppercase">
                   {s.projectName}
                 </span>
-                <span className="text-ink-muted text-xs">
+                <span
+                  className={
+                    s.hours > 0
+                      ? "bg-ok-bg text-ok-fg rounded-full px-2 py-0.5 text-xs font-bold"
+                      : "text-ink-muted text-xs"
+                  }
+                >
                   {formatNumber(s.hours, 1)} hrs logged
                 </span>
               </div>
