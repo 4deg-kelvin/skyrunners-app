@@ -40,6 +40,7 @@ import type {
   CatalogueItem,
   ClubSettings,
   DeliverableTodo,
+  ProjectAdvisor,
   HelpRequest,
   MemberCertification,
   ProjectNotice,
@@ -135,6 +136,11 @@ export interface StoreShape {
    * Checklists under deliverables. Not sub-tasks — see `DeliverableTodo`.
    */
   deliverableTodos: DeliverableTodo[];
+  /**
+   * Which advisors are named on which projects. Not staffing — see
+   * `ProjectAdvisor`.
+   */
+  projectAdvisors: ProjectAdvisor[];
 }
 
 /**
@@ -145,7 +151,7 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 10;
+const STORE_VERSION = 11;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -189,6 +195,8 @@ function seed(): StoreShape {
     // anybody sees until a Co-Lead edits them.
     // Nothing to seed: a todo only exists because somebody wrote one.
     deliverableTodos: [],
+    // Likewise — the sample club has no faculty.
+    projectAdvisors: [],
     clubSettings: [
       {
         id: "1",

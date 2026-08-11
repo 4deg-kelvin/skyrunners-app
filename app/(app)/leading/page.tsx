@@ -238,6 +238,57 @@ export default async function LeadingPage() {
       </Card>
 
       {/* ------------------------------------------------------------------
+          Advisors. Here rather than in the member guide because the people who
+          need to understand the role are the ones who work alongside one — an
+          RE wondering why a professor can comment but not sign anything off.
+      ------------------------------------------------------------------- */}
+      <Card>
+        <CardBody>
+          <SectionLabel>Working with an advisor</SectionLabel>
+          <h2 className="text-ink mt-2 text-2xl font-bold">
+            They see everything and run nothing
+          </h2>
+          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+            A faculty or project advisor. They can read every project, every
+            check-in entry and every ask on the board, and comment on any of it.
+            They can turn up to any session on the calendar. They hold no
+            authority at all — and that is the point, not a gap.
+          </p>
+
+          <div className="mt-4 space-y-2.5">
+            <Rule can title="Name one on your project">
+              Any RE can, from{" "}
+              <span className="text-ink font-semibold">Who to ask</span>. It
+              grants them nothing — they could already see your project, and
+              every other one. All it changes is whether your project tells
+              people they&apos;re available.
+            </Rule>
+            <Rule can title="Ask them anything, in the open">
+              Their answer lands on the project where the next person with the
+              same problem will find it, rather than in a DM only you can read.
+            </Rule>
+            <Rule title="Give an advisor a deliverable">
+              There&apos;s nowhere to. They own no work, log no hours and file
+              no check-ins, so they appear in no staffing count and no
+              contribution record. A project with two engineers and a professor
+              is a project with two engineers.
+            </Rule>
+            <Rule title="Report to one, or have one report to you">
+              They sit outside the reporting chain entirely, in both directions.
+              Making somebody an advisor clears their reporting line — which is
+              why it&apos;s a Co-Lead&apos;s call on the roster, not something
+              done in passing.
+            </Rule>
+            <Rule title="Expect them to sign anything off">
+              Approving work is an RE&apos;s job and stays one. An advisor
+              saying the analysis looks wrong is exactly what they&apos;re for;
+              acting on it is still yours.
+            </Rule>
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* ------------------------------------------------------------------
           Division Lead — both hierarchies at once, which surprises people.
       ------------------------------------------------------------------- */}
       <Card>

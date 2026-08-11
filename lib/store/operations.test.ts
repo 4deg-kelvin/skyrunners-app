@@ -670,3 +670,151 @@ describe("concurrent writes", () => {
     assert.equal(disk.readStore().workLogs.length, before + 8);
   });
 });
+
+describe("advisors named on a project", () => {
+  const ADVISOR = "m-tyler";
+
+  async function makeAdvisor(id = ADVISOR) {
+    const r = await ops.setGlobalRole({ memberId: id, role: "advisor" });
+    if (!r.ok) throw new Error(r.error);
+    return r.value;
+  }
+
+  test("a non-advisor is refused, with a sentence that says what to do", async () => {
+    const r = await ops.addProjectAdvisor({
+      projectId: PROJECT,
+      memberId: MEMBER,
+      actorId: "m-priya",
+      now: TODAY,
+    });
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.error, /isn't an advisor/);
+  });
+
+  test("an advisor can be named", async () => {
+    await makeAdvisor();
+    const r = await ops.addProjectAdvisor({
+      projectId: PROJECT,
+      memberId: ADVISOR,
+      actorId: "m-priya",
+      now: TODAY,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(
+      disk.readStore().projectAdvisors.filter((a) => a.projectId === PROJECT)
+        .length,
+      1
+    );
+  });
+
+  test("naming the same person twice is refused, not duplicated", async () => {
+    await makeAdvisor();
+    const args = {
+      projectId: PROJECT,
+      memberId: ADVISOR,
+      actorId: "m-priya",
+      now: TODAY,
+    };
+    assert.equal((await ops.addProjectAdvisor(args)).ok, true);
+    assert.equal((await ops.addProjectAdvisor(args)).ok, false);
+    assert.equal(disk.readStore().projectAdvisors.length, 1);
+  });
+
+  test("an inactive advisor is refused — the page would point at a locked account", async () => {
+    await makeAdvisor();
+    await ops.setMemberStatus({ memberId: ADVISOR, status: "inactive" });
+
+    const r = await ops.addProjectAdvisor({
+      projectId: PROJECT,
+      memberId: ADVISOR,
+      actorId: "m-priya",
+      now: TODAY,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  test("removing one takes nothing else with it", async () => {
+    await makeAdvisor();
+    await ops.addProjectAdvisor({
+      projectId: PROJECT,
+      memberId: ADVISOR,
+      actorId: "m-priya",
+      now: TODAY,
+    });
+
+    const deliverablesBefore = disk.readStore().deliverables.length;
+    const r = await ops.removeProjectAdvisor({
+      projectId: PROJECT,
+      memberId: ADVISOR,
+    });
+
+    assert.equal(r.ok, true);
+    assert.equal(disk.readStore().projectAdvisors.length, 0);
+    // Unlike removing a member, nothing hangs off an advisor row.
+    assert.equal(disk.readStore().deliverables.length, deliverablesBefore);
+  });
+
+  test("removing somebody who isn't listed says so", async () => {
+    const r = await ops.removeProjectAdvisor({
+      projectId: PROJECT,
+      memberId: ADVISOR,
+    });
+    assert.equal(r.ok, false);
+  });
+});
+
+/*
+  The invariant that makes the role safe: an advisor sits outside the reporting
+  chain in BOTH directions. A Lead converted into one would otherwise keep a
+  review queue they can no longer reach, and the escalation — which runs on age
+  — would point at somebody the app has stopped asking anything of.
+*/
+describe("becoming an advisor clears the reporting line", () => {
+  test("their own Lead is dropped", async () => {
+    const before = disk.readStore().members.find((m) => m.id === "m-tyler")!;
+    assert.ok(before.leadId, "fixture needs somebody who reports to someone");
+
+    await ops.setGlobalRole({ memberId: "m-tyler", role: "advisor" });
+
+    const after = disk.readStore().members.find((m) => m.id === "m-tyler")!;
+    assert.equal(after.leadId, null);
+  });
+
+  test("their reports are re-pointed upward, not orphaned", async () => {
+    /*
+      A `lead` specifically, not just anybody with reports.
+
+      The first person in the seed who has reports is the Co-Lead, and
+      converting the only active Co-Lead is refused by design — "the club is
+      left with nobody who can appoint anyone". Picking them made this test
+      assert against a write that never happened.
+    */
+    const seeded = disk.readStore();
+    const lead = seeded.members.find(
+      (m) =>
+        m.globalRole === "lead" && seeded.members.some((x) => x.leadId === m.id)
+    )!;
+    assert.ok(lead, "seed needs a Team Lead with reports");
+    const reports = seeded.members
+      .filter((m) => m.leadId === lead.id)
+      .map((m) => m.id);
+    /*
+      Copied out BEFORE the write, not read off `lead` afterwards.
+
+      `readStore()` hands back the live in-memory objects, so `lead` is the same
+      row `setGlobalRole` mutates — and the conversion sets an advisor's own
+      `leadId` to null. Reading it after the fact compares the reports against
+      null instead of against where they should have moved.
+    */
+    const grandLead = lead.leadId;
+
+    await ops.setGlobalRole({ memberId: lead.id, role: "advisor" });
+
+    const store = disk.readStore();
+    for (const id of reports) {
+      const m = store.members.find((x) => x.id === id)!;
+      assert.notEqual(m.leadId, lead.id, `${id} still reports to an advisor`);
+      assert.equal(m.leadId, grandLead, `${id} should move up a level`);
+    }
+  });
+});

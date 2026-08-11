@@ -50,6 +50,7 @@ import type {
   Deliverable,
   DeliverableStatus,
   DeliverableTodo,
+  ProjectAdvisor,
   GlobalRole,
   HelpReply,
   HelpRequest,
@@ -969,6 +970,88 @@ export async function setGlobalRole(input: {
     if (input.role === "advisor") member.leadId = null;
 
     return ok(member);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Advisors named on a project
+// ---------------------------------------------------------------------------
+
+/**
+ * Name an advisor on a project.
+ *
+ * The role check is HERE rather than in RLS. Migration 0032 deliberately
+ * doesn't verify that the named person is an advisor, because an RLS refusal
+ * reaches the user as "the database refused it" — true, useless, and it tells
+ * an RE nothing about what to do instead. A `fail()` here reaches them as a
+ * sentence.
+ */
+export async function addProjectAdvisor(input: {
+  projectId: string;
+  memberId: string;
+  actorId: string;
+  now: string;
+}): Promise<Result<ProjectAdvisor>> {
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<ProjectAdvisor>("That project no longer exists.");
+
+    const person = store.members.find((m) => m.id === input.memberId);
+    if (!person) return fail<ProjectAdvisor>("That member no longer exists.");
+
+    if (person.globalRole !== "advisor") {
+      return fail<ProjectAdvisor>(
+        `${person.fullName} isn't an advisor. This slot is for a faculty or project advisor — to put somebody on the project as an engineer, add them as a member instead. A Co-Lead can change somebody's role on the roster.`
+      );
+    }
+    if (person.status !== "active") {
+      return fail<ProjectAdvisor>(
+        `${person.fullName}'s account isn't active, so naming them here would point people at somebody who can't open the project.`
+      );
+    }
+
+    const already = store.projectAdvisors.some(
+      (a) => a.projectId === input.projectId && a.memberId === input.memberId
+    );
+    if (already) {
+      return fail<ProjectAdvisor>(
+        `${person.fullName} is already an advisor on this project.`
+      );
+    }
+
+    const row: ProjectAdvisor = {
+      projectId: input.projectId,
+      memberId: input.memberId,
+      addedBy: input.actorId,
+      addedAt: input.now,
+    };
+    store.projectAdvisors.push(row);
+    return ok(row);
+  });
+}
+
+/**
+ * Take an advisor off a project.
+ *
+ * No guard beyond existing, unlike removing a member. Nothing hangs off this
+ * row — no deliverables, no hours, no history — so removing it takes nothing
+ * away from anybody's record. It only changes who the project says to ask.
+ */
+export async function removeProjectAdvisor(input: {
+  projectId: string;
+  memberId: string;
+}): Promise<Result<{ projectId: string; memberId: string }>> {
+  return guarded((store) => {
+    const before = store.projectAdvisors.length;
+    store.projectAdvisors = store.projectAdvisors.filter(
+      (a) => !(a.projectId === input.projectId && a.memberId === input.memberId)
+    );
+    if (store.projectAdvisors.length === before) {
+      return fail<{ projectId: string; memberId: string }>(
+        "They aren't listed as an advisor on this project."
+      );
+    }
+    return ok({ projectId: input.projectId, memberId: input.memberId });
   });
 }
 

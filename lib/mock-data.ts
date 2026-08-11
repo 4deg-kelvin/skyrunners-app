@@ -3282,6 +3282,22 @@ export function blockerAudience(projectId: string, raiserId: string): string[] {
     .map((m) => m.id);
 }
 
+/** Advisors named on this project, in the order they were added. */
+export function projectAdvisors(projectId: string): Member[] {
+  return live()
+    .projectAdvisors.filter((a) => a.projectId === projectId)
+    .sort((a, b) => a.addedAt.localeCompare(b.addedAt))
+    .map((a) => getMember(a.memberId))
+    .filter((m): m is Member => Boolean(m));
+}
+
+/** Everyone who could be named. Active advisors, alphabetical. */
+export function advisorOptions(): Member[] {
+  return live()
+    .members.filter((m) => m.globalRole === "advisor" && m.status === "active")
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
 /** How many projects an RE has actually put this member on. No cap. */
 export function committedProjectCount(memberId: string): number {
   return live().projectMemberships.filter(

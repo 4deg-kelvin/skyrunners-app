@@ -15,6 +15,7 @@
 import type {
   CatalogueItem,
   DeliverableTodo,
+  ProjectAdvisor,
   ClubSettings,
   ClubEvent,
   Deliverable,
@@ -732,6 +733,28 @@ const deliverableTodos: CollectionSpec<DeliverableTodo> = {
   dependsOn: ["deliverables"],
 };
 
+const projectAdvisors: CollectionSpec<ProjectAdvisor> = {
+  key: "projectAdvisors",
+  table: "project_advisors",
+  columns: "project_id, member_id, added_by, added_at",
+  // Composite key: one advisor can be on many projects and one project can
+  // have several advisors, so neither column identifies a row on its own.
+  identify: (a) => `${a.projectId}:${a.memberId}`,
+  fromRow: (r) => ({
+    projectId: r.project_id as string,
+    memberId: r.member_id as string,
+    addedBy: opt(r.added_by as string),
+    addedAt: r.added_at as string,
+  }),
+  toRow: (a) => ({
+    project_id: a.projectId,
+    member_id: a.memberId,
+    added_by: nul(a.addedBy),
+    added_at: a.addedAt,
+  }),
+  dependsOn: ["projects", "members"],
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -752,6 +775,7 @@ export const COLLECTIONS = [
   certifications,
   clubSettings,
   deliverableTodos,
+  projectAdvisors,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

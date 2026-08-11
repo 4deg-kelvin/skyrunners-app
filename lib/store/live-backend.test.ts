@@ -74,6 +74,7 @@ const liveSnapshot = {
   certifications: [],
   clubSettings: [],
   deliverableTodos: [],
+  projectAdvisors: [],
 };
 
 describe("mutate resolves the backend inside the request", () => {
