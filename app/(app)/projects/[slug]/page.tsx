@@ -33,9 +33,9 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ArtifactList } from "@/components/ui/artifact-list";
+import { AttachArtifactForm } from "@/components/forms/artifact-form";
 import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Gantt } from "@/components/ui/gantt";
@@ -122,6 +122,23 @@ export default async function ProjectDetailPage({
   );
   const isOnProject = myMembership?.membership.commitment === "committed";
   const isFollowing = myMembership?.membership.commitment === "following";
+
+  /*
+    The engineering record splits adding from removing, and only this one is
+    open past the REs. `isOnProject` deliberately excludes followers — watching
+    a project isn't working on it.
+  */
+  const mayAttachArtifact = can.attachArtifact(
+    viewer.actor,
+    viewer.graph,
+    project.id,
+    isOnProject
+  );
+  const mayManageArtifacts = can.manageArtifact(
+    viewer.actor,
+    viewer.graph,
+    project.id
+  );
 
   const mayRequest =
     !isOnProject && !view.myPendingRequest && can.requestToJoin();
@@ -984,20 +1001,33 @@ export default async function ProjectDetailPage({
 
           <Card className="h-fit">
             <CardBody>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <SectionLabel>Engineering Record</SectionLabel>
-                {mayManage ? (
-                  <Button variant="ghost" className="px-2 py-1" disabled>
-                    Add link
-                  </Button>
-                ) : null}
-              </div>
+              <SectionLabel>Engineering Record</SectionLabel>
               <p className="text-ink-soft mt-2 text-sm">
                 Slides, requirements, CAD and reports — everything you&apos;d
                 read to understand this project.
               </p>
+
+              {/*
+                Attaching is open to anyone committed to the project, not just
+                the RE — the person who ran the test holds the test report, and
+                routing that through one inbox is how the record stays empty.
+                Removing is the RE's, and a Co-Lead's alone once this is
+                complete. See `can.attachArtifact` / `can.manageArtifact`.
+              */}
+              {mayAttachArtifact ? (
+                <div className="mt-4">
+                  <AttachArtifactForm projectId={project.id} />
+                </div>
+              ) : null}
+
               <div className="mt-4">
-                <ArtifactList rows={artifacts} canAdd={mayManage} />
+                <ArtifactList
+                  rows={artifacts}
+                  projectId={project.id}
+                  canAdd={mayAttachArtifact}
+                  canRemove={mayManageArtifacts}
+                  frozen={project.phase === "complete"}
+                />
               </div>
             </CardBody>
           </Card>

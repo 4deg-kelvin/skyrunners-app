@@ -42,8 +42,10 @@
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
 import { todayInClubTime } from "../dates.ts";
+import { checkLinkPermanence } from "../artifacts.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
+  ArtifactKind,
   CatalogueItem,
   CatalogueItemKind,
   ClubEvent,
@@ -62,6 +64,7 @@ import type {
   MemberStatus,
   ProgressUpdate,
   Project,
+  ProjectArtifact,
   Team,
   Term,
   TrainingSection,
@@ -2214,6 +2217,116 @@ export async function deleteProject(
       (n) => n.projectId !== projectId
     );
     store.projects = store.projects.filter((p) => p.id !== projectId);
+    return ok(null);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The engineering record
+//
+// Links, overwhelmingly, rather than uploads: the club's CAD lives in Onshape
+// and its code on GitHub, and a copy here is a copy that goes stale. The app is
+// the index.
+//
+// Which makes link rot the failure mode worth designing against, so both halves
+// of that run here — `checkLinkPermanence` refuses what a machine can prove is
+// temporary, and `confirmedPermanent` records that a human vouched for the
+// rest. Neither is optional.
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach a document to a project's engineering record.
+ *
+ * Permission is the caller's job as always (`can.attachArtifact`), including
+ * the "committed to this project" half. What lives here is what needs the row:
+ * the project must exist, and the link must be one that will still resolve
+ * after everyone who could fix it has graduated.
+ */
+export async function addProjectArtifact(input: {
+  projectId: string;
+  uploadedById: string;
+  kind: ArtifactKind;
+  title: string;
+  url: string;
+  description?: string;
+  version?: string;
+  /** The uploader ticked the box saying this link doesn't expire. */
+  confirmedPermanent: boolean;
+  today: string;
+}): Promise<Result<ProjectArtifact>> {
+  const title = input.title.trim();
+  if (!title) return fail<ProjectArtifact>("Give the document a title.");
+  if (title.length > 160) {
+    // Titles are what people scan when they arrive asking "where are the
+    // requirements?". Past a line it stops being scannable.
+    return fail<ProjectArtifact>(
+      "Keep the title to a line — put the rest in the description."
+    );
+  }
+
+  /*
+    Checked before the URL so the message is the useful one. Someone who pasted
+    a signed link and didn't tick the box should hear about the link, but
+    someone who pasted a fine link and didn't tick the box should hear about
+    the box — and validating the box first gets that backwards.
+  */
+  const problem = checkLinkPermanence(input.url);
+  if (problem) return fail<ProjectArtifact>(problem.reason);
+
+  if (!input.confirmedPermanent) {
+    return fail<ProjectArtifact>(
+      "Confirm the link won't expire before attaching it. Once this project is complete the record is frozen, and a dead link can't be fixed then."
+    );
+  }
+
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) {
+      return fail<ProjectArtifact>("That project no longer exists.");
+    }
+
+    const artifact: ProjectArtifact = {
+      id: newId("artifact"),
+      projectId: input.projectId,
+      kind: input.kind,
+      title,
+      description: input.description?.trim() || undefined,
+      /*
+        `externalUrl`, never `fileUrl`. The two columns mean different things —
+        `fileUrl` is for a file this app is hosting, which it currently doesn't
+        do — and `ArtifactList` reads the distinction to decide whether to open
+        in a new tab and show the outbound arrow.
+      */
+      externalUrl: input.url.trim(),
+      version: input.version?.trim() || undefined,
+      uploadedById: input.uploadedById,
+      createdAt: input.today,
+    };
+
+    store.projectArtifacts.push(artifact);
+    return ok(artifact);
+  });
+}
+
+/**
+ * Take something out of the engineering record.
+ *
+ * The phase check lives in `can.manageArtifact`, not here — it's a question
+ * about the actor's role, and role questions belong in `permissions.ts`. This
+ * only needs to find the row.
+ */
+export async function removeProjectArtifact(input: {
+  artifactId: string;
+}): Promise<Result<null>> {
+  return guarded((store) => {
+    const index = store.projectArtifacts.findIndex(
+      (a) => a.id === input.artifactId
+    );
+    if (index === -1) {
+      return fail<null>("That document has already been removed.");
+    }
+
+    store.projectArtifacts.splice(index, 1);
     return ok(null);
   });
 }

@@ -6,12 +6,14 @@ import {
   Box,
   FlaskConical,
   LineChart,
+  Lock,
   PenLine,
   Link2,
 } from "lucide-react";
 
 import { Badge } from "./badge";
 import { EmptyState } from "./empty-state";
+import { RemoveArtifactButton } from "@/components/forms/artifact-form";
 import { ARTIFACT_KIND_LABELS, ARTIFACT_KIND_ORDER } from "@/lib/labels";
 import type { ArtifactKind, Member, ProjectArtifact } from "@/lib/types";
 import { formatDay } from "@/lib/dates";
@@ -46,10 +48,21 @@ export interface ArtifactRow {
  */
 export function ArtifactList({
   rows,
+  projectId,
   canAdd,
+  canRemove,
+  /**
+   * The project is complete, so the record is history and nobody below Co-Lead
+   * can take anything out of it. Worth saying out loud rather than just hiding
+   * the buttons — a missing control with no explanation reads as a bug.
+   */
+  frozen,
 }: {
   rows: ArtifactRow[];
+  projectId: string;
   canAdd?: boolean;
+  canRemove?: boolean;
+  frozen?: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -57,7 +70,7 @@ export function ArtifactList({
         message={
           canAdd
             ? "Nothing linked yet. Adding the slides, requirements and CAD makes this project understandable to anyone who wanders in."
-            : "The RE hasn't linked any documents for this project yet."
+            : "Nobody has linked any documents for this project yet."
         }
         actionLabel="Browse other projects"
         actionHref="/projects"
@@ -72,6 +85,14 @@ export function ArtifactList({
 
   return (
     <div className="space-y-5">
+      {frozen ? (
+        <p className="text-ink-muted flex items-start gap-2 text-sm">
+          <Lock className="mt-0.5 size-3.5 shrink-0" />
+          This project is complete, so its record is frozen. You can still
+          attach something new — removing takes a Co-Lead.
+        </p>
+      ) : null}
+
       {grouped.map(({ kind, items }) => {
         const Icon = KIND_ICONS[kind];
         return (
@@ -85,37 +106,54 @@ export function ArtifactList({
                 const href = artifact.externalUrl ?? artifact.fileUrl;
                 const isExternal = !!artifact.externalUrl;
 
+                /*
+                  The row is a div wrapping an anchor, not an anchor wrapping
+                  everything. Remove is a form, and a form inside an <a> is
+                  invalid HTML that browsers "fix" by hoisting it out — the
+                  button ends up outside the row and clicking it navigates.
+                */
                 return (
-                  <a
+                  <div
                     key={artifact.id}
-                    href={href}
-                    target={isExternal ? "_blank" : undefined}
-                    rel={isExternal ? "noopener noreferrer" : undefined}
-                    className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
+                    className="rounded-tile border-line hover:bg-surface flex items-start justify-between gap-3 border px-4 py-3 transition-colors"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <p className="text-ink flex items-center gap-2 text-[15px] font-semibold">
-                        {artifact.title}
-                        {isExternal ? (
-                          <ExternalLink className="text-ink-muted size-3.5 shrink-0" />
+                    <a
+                      href={href}
+                      target={isExternal ? "_blank" : undefined}
+                      rel={isExternal ? "noopener noreferrer" : undefined}
+                      className="min-w-0 flex-1"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <p className="text-ink flex items-center gap-2 text-[15px] font-semibold">
+                          {artifact.title}
+                          {isExternal ? (
+                            <ExternalLink className="text-ink-muted size-3.5 shrink-0" />
+                          ) : null}
+                        </p>
+                        {artifact.version ? (
+                          <Badge tone="neutral">{artifact.version}</Badge>
                         ) : null}
-                      </p>
-                      {artifact.version ? (
-                        <Badge tone="neutral">{artifact.version}</Badge>
+                      </div>
+
+                      {artifact.description ? (
+                        <p className="text-ink-soft mt-1 text-sm">
+                          {artifact.description}
+                        </p>
                       ) : null}
-                    </div>
 
-                    {artifact.description ? (
-                      <p className="text-ink-soft mt-1 text-sm">
-                        {artifact.description}
+                      <p className="text-ink-muted mt-1.5 text-sm">
+                        {uploadedBy?.fullName ?? "Unknown"} ·{" "}
+                        {formatDay(artifact.createdAt)}
                       </p>
-                    ) : null}
+                    </a>
 
-                    <p className="text-ink-muted mt-1.5 text-sm">
-                      {uploadedBy?.fullName ?? "Unknown"} ·{" "}
-                      {formatDay(artifact.createdAt)}
-                    </p>
-                  </a>
+                    {canRemove ? (
+                      <RemoveArtifactButton
+                        artifactId={artifact.id}
+                        projectId={projectId}
+                      />
+                    ) : null}
+                  </div>
                 );
               })}
             </div>

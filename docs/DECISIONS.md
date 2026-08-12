@@ -55,6 +55,8 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 | Divisions | Co-Lead editable in the UI — addable, removable, renameable |
 | Academic calendar | **`terms` table gates all obligations.** Finals, breaks and summer generate nothing |
 | Activity visibility | **Public to all members** — projects, deliverables, who's on what, artifacts, calendar |
+| Engineering record | **Anyone committed to the project attaches; only an RE removes.** Links must be confirmed non-expiring, and provably temporary ones are refused outright |
+| Record on completion | **Frozen.** A complete project accepts new attachments but nothing can be edited or removed except by a Co-Lead |
 | Effort visibility | **Restricted** — hours and update contents visible to the member, their Lead chain, and REs of projects they contribute to |
 | Contribution tracking | **Four independent signals, no composite score:** deliverables done, hours/week tier, updates on time, roles held |
 | Score visibility | **Members see their own.** Weights and rubric published at `/how-we-lead`. No ranking exists |

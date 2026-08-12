@@ -428,6 +428,29 @@ its project.
   `setEventGuestList` is the only way a closed event's list can change, since
   `setEventAttendance` refuses those by design, and closing an open event never
   evicts whoever already joined.
+- **The engineering record is the one project write open past the REs.** Anyone
+  *committed* to a project can attach a document (`can.attachArtifact`);
+  removing is the RE's (`can.manageArtifact`). Adding extends the record,
+  removing rewrites it — that asymmetry is the design, and it exists because
+  the person who ran the test holds the test report. Following is not enough:
+  watching a project isn't working on it.
+- **Completing a project freezes its record.** Existing entries can no longer be
+  edited or removed by anyone but a Co-Lead. New attachments are still allowed
+  deliberately — the final report is usually written the week *after* the work
+  stops, and blocking that means the record can never be finished. There is no
+  edit-in-place, so a Co-Lead removing plus anyone re-attaching *is* the repair
+  path; don't close it.
+- **Links must be permanent, checked twice.** `lib/artifacts.ts` refuses what a
+  machine can prove is temporary — presigned S3/GCS/Azure URLs, Supabase signed
+  storage paths, `localhost` and RFC1918 hosts — and a required checkbox covers
+  what only a person can judge. Both run on the client (as you type) and the
+  server (on submit) from the same function, so they can't drift. Keep the
+  machine half **conservative**: a validator that blocks a good link teaches
+  people to route around the feature, which costs more than the rot it prevents.
+  That's why bare `token=` is deliberately allowed.
+- **The artifact kind auto-detects from the URL, as a DEFAULT only.** Host beats
+  extension. `requirements` and `test_report` are never guessed — both are
+  claims about what a document *says*, and both are usually PDFs.
 - **Creating projects must feel effortless for leadership** — permissions are deliberately
   permissive there.
 

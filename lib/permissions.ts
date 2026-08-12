@@ -445,9 +445,60 @@ export const can = {
     return false;
   },
 
-  /** Edit details, phase, dates, artifacts, requirements, tasks. */
+  /** Edit details, phase, dates, requirements, tasks. */
   manageProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
+  /**
+   * Attach a document to a project's engineering record.
+   *
+   * Deliberately WIDER than `manageProject`, and the only project write that
+   * is. The person who ran the test holds the test report; routing every
+   * attachment through the RE rebuilds the "go ask someone" bottleneck this app
+   * exists to remove, and the predictable result is an empty record.
+   *
+   * Curation stays with the RE — `manageArtifact` covers removal. Anyone on the
+   * project can ADD to the record; only an RE can take something out of it.
+   *
+   * `committedToProject` is passed in rather than read from `graph` on purpose.
+   * `OrgGraph` carries RE memberships only, and its four lookups are called in
+   * loops while walking both trees (see CLAUDE.md) — widening it to hold every
+   * project membership would grow the structure that must stay cheap, to answer
+   * a question exactly one rule asks. Following a project does NOT count: an
+   * observer is watching, not working.
+   */
+  attachArtifact: (
+    actor: Actor,
+    graph: OrgGraph,
+    projectId: string,
+    committedToProject: boolean
+  ) =>
+    isCoLead(actor) ||
+    isREofOrAbove(actor, graph, projectId) ||
+    committedToProject,
+
+  /**
+   * Remove something already in the engineering record.
+   *
+   * Once a project is COMPLETE the record stops being a working document and
+   * becomes the club's history, so the RE loses this and only a Co-Lead keeps
+   * it. That asymmetry is the whole point: history should be hard to rewrite,
+   * and the person closest to the work is the one most tempted to tidy it.
+   *
+   * Note that `attachArtifact` does NOT check phase. Adding to a completed
+   * record extends it; removing from one rewrites it. The final report is
+   * usually written the week *after* the work stops, and blocking that would
+   * mean the record can never actually be finished.
+   *
+   * The Co-Lead escape hatch is also the repair path: there is no edit-in-place
+   * for an artifact, so fixing a bad link on a completed project is a Co-Lead
+   * removing it and anyone re-attaching a good one.
+   */
+  manageArtifact: (actor: Actor, graph: OrgGraph, projectId: string) => {
+    if (isCoLead(actor)) return true;
+    if (graph.getProject(projectId)?.phase === "complete") return false;
+    return isREofOrAbove(actor, graph, projectId);
+  },
 
   /**
    * Marking a project COMPLETE — the review step, not the editing step.
