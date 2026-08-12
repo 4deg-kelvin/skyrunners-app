@@ -48,6 +48,8 @@ import {
 import * as ops from "@/lib/store/operations";
 import { ARTIFACT_KIND_ORDER } from "@/lib/labels";
 import { checkUpload } from "@/lib/storage";
+import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
+import { appUrl } from "@/lib/urls";
 import {
   removeDocument,
   uploadDocument,
@@ -90,22 +92,6 @@ function notify(discordUserId: string | undefined, message: string): void {
   } catch {
     // Not worth a log line: the write succeeded and the courtesy didn't.
   }
-}
-
-/**
- * Absolute links for those messages.
- *
- * A DM is read on a lock screen with no browser context, so a relative path is
- * useless. `NEXT_PUBLIC_SITE_URL` when set, Vercel's own host otherwise, and
- * localhost in development.
- */
-function appUrl(path: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
-  return `${base}${path}`;
 }
 
 export interface ActionResult {
@@ -1928,6 +1914,55 @@ async function respondToUpdateEntryAction$impl(
 }
 
 // ---------------------------------------------------------------------------
+// MCP tokens — connecting your own AI
+// ---------------------------------------------------------------------------
+
+/**
+ * Mint a token. The plaintext comes back in the success MESSAGE, once.
+ *
+ * That's unusual — every other action returns a short confirmation — but only
+ * the hash is stored, so this really is the only moment the token exists
+ * anywhere readable. `ActionForm` renders `result.message`, and the form keeps
+ * it on screen until dismissed.
+ */
+async function createMcpTokenAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  const scope = String(formData.get("scope") ?? "read");
+  const result = await createMyToken({
+    memberId: viewer.member.id,
+    name: String(formData.get("name") ?? ""),
+    scope: scope === "write" ? "write" : "read",
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refresh();
+  return {
+    ok: true,
+    message: `${result.token}
+
+Copy it now — this is the only time it is shown. Paste it into your AI client alongside the server URL.`,
+  };
+}
+
+async function revokeMcpTokenAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  // No permission check beyond being signed in: RLS scopes every policy on
+  // `mcp_tokens` to `auth.uid()`, so this can only ever reach your own rows.
+  await getViewer();
+
+  const error = await revokeMyToken(String(formData.get("tokenId") ?? ""));
+  if (error) return { ok: false, error };
+
+  refresh();
+  return { ok: true, message: "Revoked. Anything using it stops working now." };
+}
+
+// ---------------------------------------------------------------------------
 // The engineering record
 // ---------------------------------------------------------------------------
 
@@ -2387,6 +2422,18 @@ export async function attachArtifactAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => attachArtifactAction$impl(formData));
+}
+
+export async function createMcpTokenAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => createMcpTokenAction$impl(formData));
+}
+
+export async function revokeMcpTokenAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => revokeMcpTokenAction$impl(formData));
 }
 
 export async function removeArtifactAction(

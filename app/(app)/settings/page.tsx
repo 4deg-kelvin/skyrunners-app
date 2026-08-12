@@ -3,11 +3,14 @@ import { Info, TriangleAlert } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
+import { McpTokens } from "@/components/forms/mcp-tokens";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { TierAdminForm } from "@/components/forms/tier-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
 import { ThemeToggle } from "@/components/forms/theme-toggle";
 import { discordIsConfigured } from "@/lib/notify/discord";
+import { listMyTokens } from "@/lib/mcp/store";
+import { appUrl } from "@/lib/urls";
 import {
   AddCatalogueItemForm,
   AddSectionForm,
@@ -49,11 +52,12 @@ function termRange(startsOn: string, endsOn: string): string {
 export default async function SettingsPage() {
   const viewer = await getViewer();
   const theme = await getThemeChoice();
-  const [view, catalogue, tiers, identity] = await Promise.all([
+  const [view, catalogue, tiers, identity, mcpTokens] = await Promise.all([
     getSettings(viewer.member.id),
     getCatalogue(),
     getClubTiers(),
     getClubIdentity(),
+    listMyTokens(),
   ]);
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
@@ -99,6 +103,33 @@ export default async function SettingsPage() {
               inviteUrl={identity.discordInviteUrl}
               // No Supabase in demo mode means no bucket to upload into.
               canUpload={!viewer.isDemo}
+            />
+          </div>
+        </CardBody>
+      </Card>
+
+      {/*
+        Directly under the profile, because the person most likely to want it
+        is the person who least wants to be on this page — and anyone who has
+        scrolled past their own details has already found everything else.
+      */}
+      <Card>
+        <CardBody>
+          <SectionLabel>Connect your AI</SectionLabel>
+          <h2 className="text-ink mt-2 text-2xl font-bold">
+            Use the club from Claude
+          </h2>
+          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+            Point an AI assistant at SkyRunners and it can catch you up, find
+            what&apos;s blocked, and — with a write token — assign deliverables
+            and move projects along. It acts as you, with exactly your
+            permissions.
+          </p>
+          <div className="mt-5">
+            <McpTokens
+              tokens={mcpTokens}
+              serverUrl={appUrl("/api/mcp")}
+              canUse={!viewer.isDemo}
             />
           </div>
         </CardBody>
