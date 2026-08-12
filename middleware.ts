@@ -36,8 +36,26 @@ export const config = {
    * This does NOT make the endpoint public. It authenticates itself, harder
    * than a session would: no `CRON_SECRET` configured is a 503, and a wrong or
    * missing bearer token is a 401. See the header of that route.
+   *
+   * -------------------------------------------------------------------------
+   * `api/mcp` is excluded for exactly the same reason
+   * -------------------------------------------------------------------------
+   *
+   * An MCP client sends `Authorization: Bearer skr_…` and no cookie, so
+   * `updateSession` found no user and 307'd it to `/login`. The AI client got
+   * an HTML redirect where it expected JSON-RPC and reported the server as
+   * simply broken, with nothing in any log to say why.
+   *
+   * Caught by hitting production directly after the first deploy — it cannot
+   * reproduce locally in demo mode, and no test covers the matcher. If you add
+   * another self-authenticating endpoint, it belongs in this list too, and the
+   * symptom to recognise is a JSON caller receiving "Redirecting...".
+   *
+   * Also not public: `/api/mcp` resolves its own token, and every unknown,
+   * expired or revoked one is refused with a sentence. See
+   * `lib/mcp/viewer.ts`.
    */
   matcher: [
-    "/((?!_next/static|_next/image|api/cron|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|api/cron|api/mcp|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
