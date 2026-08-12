@@ -34,6 +34,7 @@ import {
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
   ClubEvent,
   Deliverable,
@@ -115,6 +116,14 @@ function descendantsOf(projectId: string): Project[] {
     frontier = next;
   }
   return found;
+}
+
+/** Look up a signed URL, tolerating a row that has no stored file. */
+function signedFor(
+  signed: Map<string, string>,
+  storagePath?: string
+): string | undefined {
+  return storagePath ? signed.get(storagePath) : undefined;
 }
 
 function buildNode(project: Project): ProjectTreeNode {
@@ -290,8 +299,23 @@ export interface ProjectDetailView {
   }[];
   /** The whole task model: one flat list, one owner each. */
   deliverables: DeliverableRowData[];
-  /** The project's engineering record — mostly links, not uploads. */
-  artifacts: { artifact: ProjectArtifact; uploadedBy?: Member }[];
+  /**
+   * The project's engineering record — mostly links, not uploads.
+   *
+   * `href` is resolved HERE rather than in the component, because an uploaded
+   * file lives in a private bucket and its address is a signed URL that has to
+   * be minted per request. A component can't do that (it would need a Supabase
+   * client and an await), and letting it try is how a page ends up doing one
+   * round trip per row.
+   *
+   * Undefined when a stored file can't be signed — a missing object should
+   * render as an un-openable row, not take the page down.
+   */
+  artifacts: {
+    artifact: ProjectArtifact;
+    uploadedBy?: Member;
+    href?: string;
+  }[];
   progress: ReturnType<typeof projectProgress>;
   /** Why this project may need leadership attention. */
   attentionFlags: ProjectAttentionFlag[];
@@ -367,6 +391,19 @@ export async function getProjectBySlug(
   const allFlags = projectAttentionFlags();
   const requests = pendingRequestsFor(project.id);
 
+  /*
+    Sign every stored document in ONE batch before building the view model.
+
+    Not inside the map below: `createSignedUrl` is a network call, and calling
+    it per row is the round-trip-per-row mistake this whole layer exists to
+    prevent. Links and demo mode cost nothing here — the batch is empty and
+    the call is skipped.
+  */
+  const record = artifactsFor(project.id);
+  const signed = await signDocumentUrls(
+    record.map((a) => a.storagePath).filter((p): p is string => Boolean(p))
+  );
+
   return {
     project,
     breadcrumb: projectBreadcrumb(project.id),
@@ -394,9 +431,12 @@ export async function getProjectBySlug(
       overdue: isOverdue(d),
       todos: deliverableTodos(d.id),
     })),
-    artifacts: artifactsFor(project.id).map((a) => ({
+    artifacts: record.map((a) => ({
       artifact: a,
       uploadedBy: getMember(a.uploadedById),
+      // Precedence matches how the row was written: exactly one of the three
+      // is ever set, so the order only decides what happens to legacy rows.
+      href: a.externalUrl ?? a.fileUrl ?? signedFor(signed, a.storagePath),
     })),
     progress: projectProgress(project.id),
     attentionFlags: allFlags.filter((f) => f.projectId === project.id),

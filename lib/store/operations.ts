@@ -2247,11 +2247,25 @@ export async function addProjectArtifact(input: {
   uploadedById: string;
   kind: ArtifactKind;
   title: string;
-  url: string;
+  /** A permanent link. Exactly one of this or `storagePath`. */
+  url?: string;
+  /**
+   * Object key of an already-uploaded file in the private bucket.
+   *
+   * The caller uploads first and passes the key. Doing it that way round means
+   * a failed upload never leaves a row pointing at nothing — the row is the
+   * last thing written, not the first.
+   */
+  storagePath?: string;
   description?: string;
   version?: string;
-  /** The uploader ticked the box saying this link doesn't expire. */
-  confirmedPermanent: boolean;
+  /**
+   * The uploader ticked the box saying this link doesn't expire.
+   *
+   * Only meaningful for links. An uploaded file cannot rot: this app is
+   * holding it, so there is nothing for a human to vouch for.
+   */
+  confirmedPermanent?: boolean;
   today: string;
 }): Promise<Result<ProjectArtifact>> {
   const title = input.title.trim();
@@ -2264,19 +2278,36 @@ export async function addProjectArtifact(input: {
     );
   }
 
-  /*
-    Checked before the URL so the message is the useful one. Someone who pasted
-    a signed link and didn't tick the box should hear about the link, but
-    someone who pasted a fine link and didn't tick the box should hear about
-    the box — and validating the box first gets that backwards.
-  */
-  const problem = checkLinkPermanence(input.url);
-  if (problem) return fail<ProjectArtifact>(problem.reason);
+  const url = input.url?.trim() || undefined;
+  const storagePath = input.storagePath?.trim() || undefined;
 
-  if (!input.confirmedPermanent) {
+  // The DB constraint says the same thing (`project_artifacts_has_target`);
+  // this says it in a sentence instead of a Postgres error.
+  if (!url && !storagePath) {
+    return fail<ProjectArtifact>("Attach a file or paste a link.");
+  }
+  if (url && storagePath) {
     return fail<ProjectArtifact>(
-      "Confirm the link won't expire before attaching it. Once this project is complete the record is frozen, and a dead link can't be fixed then."
+      "That's both a file and a link — pick one, so the record has a single source."
     );
+  }
+
+  /*
+    Link rules apply only to links.
+
+    Checked before the confirmation so the message is the useful one: someone
+    who pasted a signed link and didn't tick the box should hear about the
+    link, not the box.
+  */
+  if (url) {
+    const problem = checkLinkPermanence(url);
+    if (problem) return fail<ProjectArtifact>(problem.reason);
+
+    if (!input.confirmedPermanent) {
+      return fail<ProjectArtifact>(
+        "Confirm the link won't expire before attaching it. Once this project is complete the record is frozen, and a dead link can't be fixed then."
+      );
+    }
   }
 
   return guarded((store) => {
@@ -2292,12 +2323,18 @@ export async function addProjectArtifact(input: {
       title,
       description: input.description?.trim() || undefined,
       /*
-        `externalUrl`, never `fileUrl`. The two columns mean different things —
-        `fileUrl` is for a file this app is hosting, which it currently doesn't
-        do — and `ArtifactList` reads the distinction to decide whether to open
-        in a new tab and show the outbound arrow.
+        Three columns, three different meanings, and only ever one of them set.
+        `externalUrl` is somewhere else on the internet; `storagePath` is a key
+        in our own private bucket that has to be signed before it can be
+        opened; `fileUrl` is a permanent hosted URL, which nothing writes today
+        and which exists because the schema predates the bucket.
+
+        `ArtifactList` reads the difference to decide whether to open in a new
+        tab and show the outbound arrow, so putting a value in the wrong one is
+        a visible bug rather than an untidy one.
       */
-      externalUrl: input.url.trim(),
+      externalUrl: url,
+      storagePath,
       version: input.version?.trim() || undefined,
       uploadedById: input.uploadedById,
       createdAt: input.today,

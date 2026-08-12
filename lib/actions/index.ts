@@ -47,6 +47,13 @@ import {
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
 import { ARTIFACT_KIND_ORDER } from "@/lib/labels";
+import { checkUpload } from "@/lib/storage";
+import {
+  removeDocument,
+  uploadDocument,
+  uploadPhoto,
+  type UploadableFile,
+} from "@/lib/supabase/storage";
 import type { ArtifactKind, Deliverable, Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 import { readStore } from "@/lib/store/disk";
@@ -726,6 +733,34 @@ async function updateProfileAction$impl(
   const yearRaw = String(formData.get("classYear") ?? "").trim();
   const skillsRaw = String(formData.get("skills") ?? "");
 
+  /*
+    A photo is either uploaded or linked, and an upload wins if both arrive.
+
+    Only for your OWN profile. The `avatars` storage policies compare the
+    folder to `auth.uid()`, so a Co-Lead editing someone else's profile would
+    be refused by Postgres anyway — this just says why, instead of surfacing
+    "new row violates row-level security policy". Changing another member's
+    photo isn't an administrative need; it's an impersonation vector.
+  */
+  let photoUrl = String(formData.get("photoUrl") ?? "");
+  const photo = formData.get("photo");
+
+  if (isUploadableFile(photo) && photo.size > 0) {
+    if (memberId !== viewer.member.id) {
+      return {
+        ok: false,
+        error: "You can only upload a photo to your own profile.",
+      };
+    }
+
+    const problem = checkUpload(photo, "photo");
+    if (problem) return { ok: false, error: problem.reason };
+
+    const upload = await uploadPhoto(viewer.member.id, photo);
+    if (!upload.ok) return { ok: false, error: upload.error };
+    photoUrl = upload.value;
+  }
+
   const result = await ops.updateProfile({
     memberId,
     edits: {
@@ -733,7 +768,7 @@ async function updateProfileAction$impl(
       phone: String(formData.get("phone") ?? ""),
       discordUserId: String(formData.get("discordUserId") ?? ""),
       major: String(formData.get("major") ?? ""),
-      photoUrl: String(formData.get("photoUrl") ?? ""),
+      photoUrl,
       classYear: yearRaw ? Number(yearRaw) : 0,
       // Comma-separated, because a tag widget is a lot of machinery for a
       // field people touch once. Splitting happens here so the operation takes
@@ -1924,12 +1959,33 @@ async function attachArtifactAction$impl(
     return { ok: false, error: "Pick what kind of document this is." };
   }
 
+  /*
+    A file or a link, never both.
+
+    The upload runs FIRST and the row is written only if it succeeded. The
+    other order leaves a row pointing at a file that isn't there, which reads
+    as a broken record rather than a failed action — see `documentPath`.
+  */
+  const file = formData.get("file");
+  const hasFile = isUploadableFile(file) && file.size > 0;
+
+  let storagePath: string | undefined;
+  if (hasFile) {
+    const problem = checkUpload(file, "document");
+    if (problem) return { ok: false, error: problem.reason };
+
+    const upload = await uploadDocument(projectId, crypto.randomUUID(), file);
+    if (!upload.ok) return { ok: false, error: upload.error };
+    storagePath = upload.value;
+  }
+
   const result = await ops.addProjectArtifact({
     projectId,
     uploadedById: viewer.member.id,
     kind: kind as ArtifactKind,
     title: String(formData.get("title") ?? ""),
-    url: String(formData.get("url") ?? ""),
+    url: hasFile ? undefined : String(formData.get("url") ?? ""),
+    storagePath,
     description: String(formData.get("description") ?? "") || undefined,
     version: String(formData.get("version") ?? "") || undefined,
     // An unchecked box posts nothing at all, so absence is the "no" case.
@@ -1937,8 +1993,28 @@ async function attachArtifactAction$impl(
     today: today(),
   });
 
+  /*
+    Clean up after ourselves if the row was refused — otherwise a rejected
+    title leaves the file sitting in the bucket forever, counting against a
+    1 GB quota, reachable by nothing.
+  */
+  if (!result.ok && storagePath) {
+    await removeDocument(storagePath);
+  }
+
   if (result.ok) refresh();
   return toResult(result, "Attached to the engineering record.");
+}
+
+/** Does this FormData value look like an uploaded file? */
+function isUploadableFile(value: unknown): value is UploadableFile {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "arrayBuffer" in value &&
+    "size" in value &&
+    "name" in value
+  );
 }
 
 /**
@@ -1970,9 +2046,20 @@ async function removeArtifactAction$impl(
     return denied("remove documents from this project");
   }
 
-  const result = await ops.removeProjectArtifact({
-    artifactId: String(formData.get("artifactId") ?? ""),
-  });
+  /*
+    Read the row before deleting it, so we know whether there's a file behind
+    it. Afterwards the storage path is gone and the object would be orphaned.
+  */
+  const artifactId = String(formData.get("artifactId") ?? "");
+  const stored = readStore().projectArtifacts.find((a) => a.id === artifactId);
+
+  const result = await ops.removeProjectArtifact({ artifactId });
+
+  // Row first, file second — best effort. An orphaned object is untidy; a
+  // listed row whose file has vanished is a broken link people will report.
+  if (result.ok && stored?.storagePath) {
+    await removeDocument(stored.storagePath);
+  }
 
   if (result.ok) refresh();
   return toResult(result, "Removed.");

@@ -4,6 +4,7 @@ import { ActionForm } from "./action-form";
 import { DiscordIdField } from "./discord-id-field";
 import { Avatar } from "@/components/ui/avatar";
 import { updateProfileAction } from "@/lib/actions";
+import { MAX_UPLOAD_BYTES, PHOTO_ACCEPT, formatBytes } from "@/lib/storage";
 import type { Member } from "@/lib/types";
 
 /**
@@ -24,6 +25,7 @@ export function ProfileForm({
   botLive,
   inviteUrl,
   editingSomeoneElse = false,
+  canUpload = false,
 }: {
   member: Member;
   /**
@@ -44,6 +46,13 @@ export function ProfileForm({
   botLive: boolean;
   /** A Co-Lead fixing another person's details. Changes the copy only. */
   editingSomeoneElse?: boolean;
+  /**
+   * Whether file storage exists. False in demo mode, which has no Supabase.
+   *
+   * Passed in for the same reason as `botLive`: this is a Client Component,
+   * and `lib/data/viewer.ts` is the only place allowed to know the mode.
+   */
+  canUpload?: boolean;
 }) {
   return (
     <ActionForm
@@ -173,10 +182,39 @@ export function ProfileForm({
         </div>
         <span className="text-ink-muted mt-1 block text-xs">
           Picked up from your Google account when you first sign in. Paste a
-          link to change it — uploads would need file storage, which isn&apos;t
-          set up.
+          link to change it{canUpload ? ", or upload one below" : ""}.
         </span>
       </label>
+
+      {/*
+        Uploading is only offered on your OWN profile, and only in live mode.
+
+        Not a UI nicety — the `avatars` storage policies compare the folder to
+        `auth.uid()`, so a Co-Lead uploading here would be refused by Postgres.
+        Rendering the control anyway would be a button that always fails, which
+        is the dead-control bug this repo keeps re-learning.
+
+        An upload wins over the link field when both are filled, and the action
+        says so too.
+      */}
+      {canUpload && !editingSomeoneElse ? (
+        <label className="block">
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Or upload a photo{" "}
+            <span className="text-ink-muted font-normal">(optional)</span>
+          </span>
+          <input
+            type="file"
+            name="photo"
+            accept={PHOTO_ACCEPT}
+            className="text-ink-soft file:rounded-tile file:border-line file:bg-surface file:text-ink w-full text-sm file:mr-3 file:border file:px-3 file:py-1.5 file:text-sm file:font-semibold"
+          />
+          <span className="text-ink-muted mt-1 block text-xs">
+            PNG, JPG or WebP, up to {formatBytes(MAX_UPLOAD_BYTES)}. Replaces
+            the link above.
+          </span>
+        </label>
+      ) : null}
 
       {editingSomeoneElse ? (
         <p className="text-warn-fg text-sm">
