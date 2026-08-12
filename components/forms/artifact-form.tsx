@@ -6,6 +6,12 @@ import { AlertTriangle, Paperclip, Sparkles } from "lucide-react";
 import { ActionButton, ActionForm } from "./action-form";
 import { attachArtifactAction, removeArtifactAction } from "@/lib/actions";
 import { checkLinkPermanence, detectArtifactKind } from "@/lib/artifacts";
+import {
+  DOCUMENT_ACCEPT,
+  MAX_UPLOAD_BYTES,
+  checkUpload,
+  formatBytes,
+} from "@/lib/storage";
 import { ARTIFACT_KIND_LABELS, ARTIFACT_KIND_ORDER } from "@/lib/labels";
 import type { ArtifactKind } from "@/lib/types";
 
@@ -29,8 +35,27 @@ const FIELD =
  * (`lib/artifacts.ts`), so the warning you see is exactly what will refuse you
  * on submit — no round trip to find out, and no way for the two to disagree.
  */
-export function AttachArtifactForm({ projectId }: { projectId: string }) {
+export function AttachArtifactForm({
+  projectId,
+  /**
+   * Demo mode has no Supabase, so there is nowhere to put a file.
+   *
+   * The upload half is hidden rather than disabled: a control that can only
+   * fail is worse than one that isn't there, and links work perfectly in demo
+   * mode so the form is still fully usable.
+   */
+  canUpload,
+}: {
+  projectId: string;
+  canUpload?: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"link" | "file">("link");
+  const [file, setFile] = useState<{
+    name: string;
+    size: number;
+    type: string;
+  } | null>(null);
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<ArtifactKind>("link");
   /*
@@ -53,14 +78,45 @@ export function AttachArtifactForm({ projectId }: { projectId: string }) {
     );
   }
 
+  const linking = mode === "link";
   const trimmed = url.trim();
-  const problem = trimmed ? checkLinkPermanence(trimmed) : null;
+
+  const linkProblem = linking && trimmed ? checkLinkPermanence(trimmed) : null;
+  const fileProblem = !linking && file ? checkUpload(file, "document") : null;
+  const problem = linkProblem ?? fileProblem;
+
   const detected = trimmed ? detectArtifactKind(trimmed) : null;
-  const autoDetected = !kindTouched && detected !== null && detected !== "link";
+  const autoDetected =
+    linking && !kindTouched && detected !== null && detected !== "link";
+
+  // Nothing to submit yet: a link that's empty, or a file nobody picked.
+  const incomplete = linking ? !trimmed : !file;
+
+  // The permanence promise is about LINKS. An uploaded file is held by this
+  // app, so there is nothing for a person to vouch for — see `addProjectArtifact`.
+  const needsConfirmation = linking;
 
   function onUrlChange(next: string) {
     setUrl(next);
     if (!kindTouched) setKind(detectArtifactKind(next));
+  }
+
+  function onFileChange(picked: File | null) {
+    setFile(
+      picked
+        ? { name: picked.name, size: picked.size, type: picked.type }
+        : null
+    );
+    if (picked && !kindTouched)
+      setKind(detectArtifactKind(`file:///${picked.name}`));
+  }
+
+  function switchMode(next: "link" | "file") {
+    setMode(next);
+    // Clearing the other side is what keeps "a file or a link, never both"
+    // true by the time it reaches the action.
+    if (next === "link") setFile(null);
+    else setUrl("");
   }
 
   return (
@@ -71,9 +127,10 @@ export function AttachArtifactForm({ projectId }: { projectId: string }) {
       resetOnSuccess
       // Belt and braces with the server: the action refuses an unconfirmed or
       // expiring link anyway, this just means you find out before pressing.
-      disabled={!confirmed || !!problem || !trimmed}
+      disabled={incomplete || !!problem || (needsConfirmation && !confirmed)}
       onSuccess={() => {
         setUrl("");
+        setFile(null);
         setKind("link");
         setKindTouched(false);
         setConfirmed(false);
@@ -82,18 +139,60 @@ export function AttachArtifactForm({ projectId }: { projectId: string }) {
     >
       <input type="hidden" name="projectId" value={projectId} />
 
-      <label className="block">
-        <span className="text-ink mb-1 block text-sm font-semibold">Link</span>
-        <input
-          type="url"
-          name="url"
-          required
-          value={url}
-          onChange={(e) => onUrlChange(e.target.value)}
-          placeholder="https://cad.onshape.com/documents/…"
-          className={FIELD}
-        />
-      </label>
+      {canUpload ? (
+        <div className="border-line mb-4 inline-flex rounded-full border p-0.5">
+          {(["link", "file"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => switchMode(option)}
+              className={
+                mode === option
+                  ? "bg-cardinal-600 rounded-full px-3 py-1 text-sm font-semibold text-white"
+                  : "text-ink-soft hover:text-ink rounded-full px-3 py-1 text-sm font-semibold"
+              }
+            >
+              {option === "link" ? "Paste a link" : "Upload a file"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {linking ? (
+        <label className="block">
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Link
+          </span>
+          <input
+            type="url"
+            name="url"
+            required
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
+            placeholder="https://cad.onshape.com/documents/…"
+            className={FIELD}
+          />
+        </label>
+      ) : (
+        <label className="block">
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            File
+          </span>
+          <input
+            type="file"
+            name="file"
+            required
+            accept={DOCUMENT_ACCEPT}
+            onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+            className="text-ink-soft file:rounded-tile file:border-line file:bg-surface file:text-ink w-full text-sm file:mr-3 file:border file:px-3 file:py-1.5 file:text-sm file:font-semibold"
+          />
+          <span className="text-ink-muted mt-1 block text-xs">
+            Up to {formatBytes(MAX_UPLOAD_BYTES)}. Anything bigger belongs in
+            Drive or Onshape — paste a link to it instead.
+            {file ? ` · ${file.name} (${formatBytes(file.size)})` : ""}
+          </span>
+        </label>
+      )}
 
       {problem ? (
         <p
@@ -101,7 +200,7 @@ export function AttachArtifactForm({ projectId }: { projectId: string }) {
           className="text-risk-fg mt-2 flex items-start gap-2 text-sm"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          {problem.reason}
+          {"reason" in problem ? problem.reason : ""}
         </p>
       ) : null}
 
@@ -180,24 +279,30 @@ export function AttachArtifactForm({ projectId }: { projectId: string }) {
         catches signed URLs and unreachable hosts; it cannot tell that a Drive
         file is shared to one address, or sits in a personal folder that gets
         deprovisioned at graduation. Only the person pasting it knows that.
+
+        Absent for uploads on purpose. The file is ours; asking someone to
+        promise it won't expire would be a box with no meaning, and a box with
+        no meaning teaches people to tick boxes without reading them.
       */}
-      <label className="rounded-tile border-line bg-surface mt-4 flex items-start gap-2.5 border p-3">
-        <input
-          type="checkbox"
-          name="confirmedPermanent"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0"
-        />
-        <span className="text-ink-soft text-sm">
-          <span className="text-ink font-semibold">
-            This link won&apos;t expire.
-          </span>{" "}
-          Anyone in the club can open it, and it isn&apos;t a temporary download
-          or a file in a personal folder. Once this project is complete the
-          record freezes — a dead link can&apos;t be fixed then.
-        </span>
-      </label>
+      {needsConfirmation ? (
+        <label className="rounded-tile border-line bg-surface mt-4 flex items-start gap-2.5 border p-3">
+          <input
+            type="checkbox"
+            name="confirmedPermanent"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            className="mt-0.5 size-4 shrink-0"
+          />
+          <span className="text-ink-soft text-sm">
+            <span className="text-ink font-semibold">
+              This link won&apos;t expire.
+            </span>{" "}
+            Anyone in the club can open it, and it isn&apos;t a temporary
+            download or a file in a personal folder. Once this project is
+            complete the record freezes — a dead link can&apos;t be fixed then.
+          </span>
+        </label>
+      ) : null}
 
       <button
         type="button"

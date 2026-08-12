@@ -97,6 +97,8 @@ export default async function SettingsPage() {
               member={viewer.member}
               botLive={discordIsConfigured()}
               inviteUrl={identity.discordInviteUrl}
+              // No Supabase in demo mode means no bucket to upload into.
+              canUpload={!viewer.isDemo}
             />
           </div>
         </CardBody>

@@ -1,4 +1,5 @@
 import {
+  Download,
   ExternalLink,
   FileText,
   Github,
@@ -33,6 +34,14 @@ const KIND_ICONS: Record<ArtifactKind, typeof FileText> = {
 export interface ArtifactRow {
   artifact: ProjectArtifact;
   uploadedBy?: Member;
+  /**
+   * Where the row points, resolved by `lib/data/projects.ts`.
+   *
+   * Not derived here: an uploaded file lives in a private bucket, so its
+   * address is a signed URL that only the server can mint. Absent means the
+   * file couldn't be signed — the row still renders, it just isn't a link.
+   */
+  href?: string;
 }
 
 /**
@@ -102,9 +111,9 @@ export function ArtifactList({
               {ARTIFACT_KIND_LABELS[kind]}
             </p>
             <div className="mt-2 space-y-2">
-              {items.map(({ artifact, uploadedBy }) => {
-                const href = artifact.externalUrl ?? artifact.fileUrl;
+              {items.map(({ artifact, uploadedBy, href }) => {
                 const isExternal = !!artifact.externalUrl;
+                const isUpload = !!artifact.storagePath;
 
                 /*
                   The row is a div wrapping an anchor, not an anchor wrapping
@@ -129,11 +138,26 @@ export function ArtifactList({
                           {isExternal ? (
                             <ExternalLink className="text-ink-muted size-3.5 shrink-0" />
                           ) : null}
+                          {isUpload ? (
+                            <Download className="text-ink-muted size-3.5 shrink-0" />
+                          ) : null}
                         </p>
                         {artifact.version ? (
                           <Badge tone="neutral">{artifact.version}</Badge>
                         ) : null}
                       </div>
+
+                      {/*
+                        A stored file whose signed URL couldn't be minted. Say
+                        so rather than rendering a link that goes nowhere —
+                        this is the record people are told to trust.
+                      */}
+                      {isUpload && !href ? (
+                        <p className="text-risk-fg mt-1 text-sm">
+                          This file couldn&apos;t be opened. Ask a Co-Lead to
+                          re-attach it.
+                        </p>
+                      ) : null}
 
                       {artifact.description ? (
                         <p className="text-ink-soft mt-1 text-sm">

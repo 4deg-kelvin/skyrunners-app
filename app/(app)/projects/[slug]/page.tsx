@@ -1016,7 +1016,16 @@ export default async function ProjectDetailPage({
               */}
               {mayAttachArtifact ? (
                 <div className="mt-4">
-                  <AttachArtifactForm projectId={project.id} />
+                  {/*
+                    Demo mode has no Supabase, so there's no bucket to upload
+                    into. `viewer.isDemo` is the sanctioned way to ask — it
+                    comes from `lib/data/viewer.ts`, the one file allowed to
+                    know which mode the app is in.
+                  */}
+                  <AttachArtifactForm
+                    projectId={project.id}
+                    canUpload={!viewer.isDemo}
+                  />
                 </div>
               ) : null}
 

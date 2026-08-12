@@ -243,6 +243,15 @@ export interface ProjectArtifact {
   description?: string;
   fileUrl?: string;
   externalUrl?: string;
+  /**
+   * Object key in the private `project-docs` bucket, for genuine uploads.
+   *
+   * NOT a URL, and deliberately a separate field from `fileUrl`. The bucket is
+   * private, so there is no permanent address to store — `lib/data/projects.ts`
+   * mints a short-lived signed URL per request. Anything rendering an artifact
+   * should read the resolved `href` the view model hands it, not this.
+   */
+  storagePath?: string;
   version?: string;
   uploadedById: string;
   createdAt: string;

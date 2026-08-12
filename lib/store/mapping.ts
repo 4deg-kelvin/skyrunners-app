@@ -420,7 +420,7 @@ const projectArtifacts: CollectionSpec<ProjectArtifact> = {
   key: "projectArtifacts",
   table: "project_artifacts",
   columns:
-    "id, project_id, kind, title, description, file_url, external_url, version, uploaded_by, created_at",
+    "id, project_id, kind, title, description, file_url, external_url, storage_path, version, uploaded_by, created_at",
   identify: (a) => a.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -430,6 +430,7 @@ const projectArtifacts: CollectionSpec<ProjectArtifact> = {
     description: opt(r.description as string),
     fileUrl: opt(r.file_url as string),
     externalUrl: opt(r.external_url as string),
+    storagePath: opt(r.storage_path as string),
     version: opt(r.version as string),
     uploadedById: (r.uploaded_by as string) ?? "",
     createdAt: r.created_at as string,
@@ -442,6 +443,7 @@ const projectArtifacts: CollectionSpec<ProjectArtifact> = {
     description: nul(a.description),
     file_url: nul(a.fileUrl),
     external_url: nul(a.externalUrl),
+    storage_path: nul(a.storagePath),
     version: nul(a.version),
     uploaded_by: a.uploadedById || null,
     created_at: a.createdAt,
