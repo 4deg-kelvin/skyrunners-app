@@ -2956,6 +2956,46 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
         severity: 2,
       });
     }
+
+    /*
+      The RE said so themselves.
+
+      `health_flagged` has been a declared `AttentionReason` with a label since
+      Phase 2 and nothing ever produced it — the SQL view `v_project_attention`
+      emits it as its `else` branch, but the app reads this function, not the
+      view. The consequence was the exact mirror of the dashboard bug: a project
+      an RE had marked blocked showed up on the leadership dashboard and raised
+      NO flag on its own page, so the one place you'd go to find out why was the
+      one place that didn't say.
+
+      Deliberately separate from `blocker_stale`, and both can appear at once.
+      They're different claims: one is "somebody recorded a stuck deliverable",
+      the other is "the person accountable for this project judges the whole
+      thing to be in trouble", and a project can easily be one without the
+      other.
+
+      Blocked outranks a non-sole silent RE but not a frozen subtree, so it sits
+      at 3. At risk is a warning rather than a stoppage, so it sits with the
+      other 2s.
+    */
+    if (project.phase !== "complete") {
+      if (project.health === "blocked") {
+        flags.push({
+          projectId: project.id,
+          reason: "health_flagged",
+          detail:
+            "Its RE has marked this project blocked — work has stopped until somebody clears it.",
+          severity: 3,
+        });
+      } else if (project.health === "at_risk") {
+        flags.push({
+          projectId: project.id,
+          reason: "health_flagged",
+          detail: "Its RE has marked this project at risk.",
+          severity: 2,
+        });
+      }
+    }
   }
 
   return flags.sort((a, b) => b.severity - a.severity);
@@ -3616,8 +3656,35 @@ export function awaitingReview() {
   );
 }
 
-export function atRiskProjects() {
-  return live().projects.filter(
-    (p) => p.health === "at_risk" || p.health === "blocked"
-  );
+/**
+ * Projects the leadership dashboard should surface.
+ *
+ * Renamed from `atRiskProjects`, which described the old rule exactly: it
+ * filtered on `health` and nothing else. That made the dashboard silently
+ * disagree with every other surface in the app — someone marked a deliverable
+ * blocked, the project row grew a "1 blocked" badge, the project page raised
+ * `blocker_stale`, a Discord DM went out, and "Needs Attention" went on saying
+ * *Every project is on track*. The section that exists to catch stopped work
+ * was the one place stopped work didn't appear.
+ *
+ * The two signals are genuinely different and both belong here:
+ *
+ *   - `health` is the RE's own judgement, and only moves when they move it.
+ *   - a blocked deliverable is a FACT somebody recorded, and needs no
+ *     agreement from the RE to be true. It is also the one a member can raise
+ *     without any permissions at all, which is the whole point.
+ *
+ * Completed projects are excluded. Without that, adding the deliverable rule
+ * would have introduced a new permanent-noise source: a finished project with
+ * one stale blocked deliverable would sit in this list forever, and the
+ * section stops being read the moment it contains something nobody will act on.
+ */
+export function projectsNeedingAttention() {
+  return live().projects.filter((p) => {
+    if (p.phase === "complete") return false;
+
+    if (p.health === "at_risk" || p.health === "blocked") return true;
+
+    return projectDeliverables(p.id).some((d) => d.status === "blocked");
+  });
 }

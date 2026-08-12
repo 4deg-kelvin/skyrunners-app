@@ -27,7 +27,7 @@
  */
 
 import {
-  atRiskProjects,
+  projectsNeedingAttention,
   club,
   clubIdentity,
   divisions,
@@ -433,12 +433,14 @@ export async function getDashboard(
       onBehalf: request.leadId !== actor.id,
     }));
 
-  const flaggedProjects: FlaggedProject[] = atRiskProjects().map((project) => ({
-    project,
-    res: project.reIds
-      .map((id) => getMember(id))
-      .filter((m): m is Member => m !== undefined),
-  }));
+  const flaggedProjects: FlaggedProject[] = projectsNeedingAttention().map(
+    (project) => ({
+      project,
+      res: project.reIds
+        .map((id) => getMember(id))
+        .filter((m): m is Member => m !== undefined),
+    })
+  );
 
   // --- the RE half of the exception feed -----------------------------------
   //
