@@ -157,3 +157,47 @@ h3 {
 
   color-scheme: dark;
 }
+
+/* ===========================================================================
+   Phones — the club logs hours in the lab, on a phone
+   ===========================================================================
+
+   Two rules, both measured against a 375px viewport rather than guessed at.
+   Everything else about the layout already reflowed correctly; these are the
+   things that make a page LOOK fine and still be miserable to actually use.
+   =========================================================================== */
+
+/*
+  iOS Safari zooms the whole page whenever you focus a form control whose font
+  is under 16px — and it does not zoom back out. Most fields here are `text-sm`
+  or `text-[15px]`, which is right on a laptop and means every single tap on
+  the log-hours form kicked the page into a zoomed state you then had to pinch
+  out of. For the one workflow this app most needs to work one-handed in a
+  workshop, that is the whole experience.
+
+  Done as one rule at the bottom of the cascade rather than by editing fifteen
+  components: the desktop typography is deliberate and stays exactly as it is,
+  and the next form somebody writes gets this for free instead of having to
+  remember it.
+*/
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/*
+  Nav links were 32px tall. Apple's own floor is 44px and the nav is the
+  control people hit most, one-handed, walking. The row already scrolls
+  horizontally, so making each target taller costs nothing but the height it
+  needs.
+*/
+@media (max-width: 767px) {
+  nav a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}

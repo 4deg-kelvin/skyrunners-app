@@ -90,9 +90,19 @@ export default async function MembersPage() {
                 // A div, not a Link. The card now holds admin controls, and
                 // buttons cannot be nested inside an anchor — the name below
                 // carries the link instead.
+                /*
+                  `min-w-0` is load-bearing, not tidiness.
+
+                  A grid item defaults to `min-width: auto`, which means it
+                  refuses to shrink below the intrinsic minimum of its content
+                  — here a long major, a division badge and an avatar on one
+                  row. On a 375px phone every card came out 302px inside a
+                  286px column and the roster scrolled sideways off an iPhone.
+                  Measured, not guessed: 302 -> 286 with this one class.
+                */
                 <div
                   key={member.id}
-                  className="rounded-tile border-line border px-4 py-4"
+                  className="rounded-tile border-line min-w-0 border px-4 py-4"
                 >
                   <div className="flex items-start gap-3">
                     <Avatar
