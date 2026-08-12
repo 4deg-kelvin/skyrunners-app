@@ -22,11 +22,29 @@ import { loadSnapshot, persistDiff, snapshotCopy } from "./supabase";
 import { createClient } from "@/lib/supabase/server";
 import { isLiveMode } from "@/lib/env";
 
+/** The Supabase client shape both the loader and the writer need. */
+type StoreClient = Awaited<ReturnType<typeof createClient>>;
+
 interface Holder {
   /** What operations read and mutate. */
   snapshot: StoreShape | null;
   /** An untouched copy, so a write can be diffed against where it started. */
   original: StoreShape | null;
+  /**
+   * A client supplied by the caller instead of resolved from cookies.
+   *
+   * Only the MCP server sets this. Everything else leaves it null and gets
+   * `createClient()`, which reads the session cookie.
+   *
+   * It has to live on the holder rather than being passed down, because the
+   * WRITER also needs it: `installLiveBackend` is registered once at module
+   * scope and called much later, from inside `mutate()`, with no way to reach
+   * whatever opened the request. Before this, an MCP write would call
+   * `createClient()` with no cookies, get null, and `return` — a silent no-op
+   * reporting success, which is the exact failure shape this file's header
+   * warns about.
+   */
+  client: StoreClient;
 }
 
 /**
@@ -49,7 +67,11 @@ interface Holder {
  * for. The `cache()` call is kept as the seed so the render path is unchanged.
  */
 const store = new AsyncLocalStorage<Holder>();
-const cachedHolder = cache((): Holder => ({ snapshot: null, original: null }));
+const cachedHolder = cache((): Holder => ({
+  snapshot: null,
+  original: null,
+  client: null,
+}));
 
 function holder(): Holder {
   return store.getStore() ?? cachedHolder();
@@ -74,7 +96,25 @@ function holder(): Holder {
  * write with "Live store not loaded" — not silently, and not with bad data.
  */
 export function withRequestStore<T>(fn: () => Promise<T>): Promise<T> {
-  return store.run({ snapshot: null, original: null }, fn);
+  return store.run({ snapshot: null, original: null, client: null }, fn);
+}
+
+/**
+ * The same scope, but reading and writing through a client the caller supplies.
+ *
+ * For the MCP server, which authenticates with a bearer token and therefore has
+ * no session cookie for `createClient()` to find. Everything downstream —
+ * `lib/data/*`, `lib/store/operations.ts`, `persistDiff` — is unchanged and
+ * cannot tell the difference, which is the point: the MCP must not become a
+ * second data layer.
+ *
+ * See `lib/mcp/viewer.ts` for which client is passed and why.
+ */
+export function withSuppliedClientStore<T>(
+  client: StoreClient,
+  fn: () => Promise<T>
+): Promise<T> {
+  return store.run({ snapshot: null, original: null, client }, fn);
 }
 
 /**
@@ -98,7 +138,7 @@ export async function preloadLiveStore(): Promise<void> {
   const h = holder();
   if (h.snapshot) return;
 
-  const supabase = await createClient();
+  const supabase = h.client ?? (await createClient());
   if (!supabase) return;
 
   const loaded = await loadSnapshot(supabase);
@@ -110,7 +150,7 @@ installLiveBackend(
   () => holder().snapshot,
   async (mutated) => {
     const h = holder();
-    const supabase = await createClient();
+    const supabase = h.client ?? (await createClient());
     if (!supabase || !h.original) return;
 
     await persistDiff(supabase, h.original, mutated);
