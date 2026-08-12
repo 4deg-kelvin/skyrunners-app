@@ -46,7 +46,8 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
-import type { Deliverable, Project } from "@/lib/types";
+import { ARTIFACT_KIND_ORDER } from "@/lib/labels";
+import type { ArtifactKind, Deliverable, Project } from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 import { readStore } from "@/lib/store/disk";
 import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
@@ -1892,6 +1893,92 @@ async function respondToUpdateEntryAction$impl(
 }
 
 // ---------------------------------------------------------------------------
+// The engineering record
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach a document to a project.
+ *
+ * The one project write open to people who aren't REs — see
+ * `can.attachArtifact` for why. Committed members only; following a project
+ * means you're watching it, not working on it.
+ */
+async function attachArtifactAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  const isOnProject = memberProjects(viewer.member.id).some(
+    (m) => m.projectId === projectId && m.commitment === "committed"
+  );
+
+  if (!can.attachArtifact(viewer.actor, viewer.graph, projectId, isOnProject)) {
+    return denied("attach documents to this project");
+  }
+
+  // ARTIFACT_KIND_ORDER is the full set, so it doubles as the allowlist —
+  // a second constant listing the same nine would be one more thing to drift.
+  const kind = String(formData.get("kind") ?? "");
+  if (!ARTIFACT_KIND_ORDER.includes(kind as ArtifactKind)) {
+    return { ok: false, error: "Pick what kind of document this is." };
+  }
+
+  const result = await ops.addProjectArtifact({
+    projectId,
+    uploadedById: viewer.member.id,
+    kind: kind as ArtifactKind,
+    title: String(formData.get("title") ?? ""),
+    url: String(formData.get("url") ?? ""),
+    description: String(formData.get("description") ?? "") || undefined,
+    version: String(formData.get("version") ?? "") || undefined,
+    // An unchecked box posts nothing at all, so absence is the "no" case.
+    confirmedPermanent: formData.get("confirmedPermanent") === "on",
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Attached to the engineering record.");
+}
+
+/**
+ * Take a document back out.
+ *
+ * Refused on a completed project unless you're a Co-Lead — the record is the
+ * club's history by then. `can.manageArtifact` holds that rule.
+ */
+async function removeArtifactAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageArtifact(viewer.actor, viewer.graph, projectId)) {
+    /*
+      Two different refusals wearing one message would be confusing here: "you
+      aren't an RE" and "this project is finished" need different next steps,
+      and only one of them is about the person asking.
+    */
+    const project = viewer.graph.getProject(projectId);
+    if (project?.phase === "complete") {
+      return {
+        ok: false,
+        error:
+          "This project is complete, so its engineering record is frozen. Ask a Co-Lead if something in it is wrong.",
+      };
+    }
+    return denied("remove documents from this project");
+  }
+
+  const result = await ops.removeProjectArtifact({
+    artifactId: String(formData.get("artifactId") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Removed.");
+}
+
+// ---------------------------------------------------------------------------
 // Phase 6 — the blocker board
 // ---------------------------------------------------------------------------
 
@@ -2207,6 +2294,18 @@ export async function setDeliverableStatusAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setDeliverableStatusAction$impl(formData));
+}
+
+export async function attachArtifactAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => attachArtifactAction$impl(formData));
+}
+
+export async function removeArtifactAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => removeArtifactAction$impl(formData));
 }
 
 export async function createMemberRequestAction(

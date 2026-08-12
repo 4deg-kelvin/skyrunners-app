@@ -933,3 +933,139 @@ describe("an advisor holds no authority", () => {
     assert.equal(can.requestMeeting(), true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The engineering record
+//
+// The only project write that is WIDER than `manageProject`, and the only one
+// that changes when a project finishes. Both halves are easy to get backwards,
+// so both are pinned here.
+// ---------------------------------------------------------------------------
+
+/** The same world, but `leaf` has shipped. */
+const completedGraph: OrgGraph = {
+  ...graph,
+  getProject: (id) =>
+    id === "leaf"
+      ? { ...project("leaf", "mid", ["reLeaf"]), phase: "complete" }
+      : projects.find((p) => p.id === id),
+};
+
+describe("attaching to the engineering record", () => {
+  test("a committed member can attach, without being an RE", () => {
+    // The point of the rule: the person who ran the test holds the report.
+    assert.equal(
+      can.attachArtifact(actor("worker"), graph, "leaf", true),
+      true
+    );
+  });
+
+  test("someone merely FOLLOWING cannot", () => {
+    // `committedToProject` is false for an observer. Watching isn't working.
+    assert.equal(
+      can.attachArtifact(actor("worker"), graph, "leaf", false),
+      false
+    );
+  });
+
+  test("an RE above the project can, without being on it", () => {
+    assert.equal(
+      can.attachArtifact(actor("reRoot"), graph, "leaf", false),
+      true
+    );
+  });
+
+  test("a Division Lead can, through the same inheritance", () => {
+    assert.equal(
+      can.attachArtifact(actor("divLead"), graph, "leaf", false),
+      true
+    );
+  });
+
+  test("a Co-Lead always can", () => {
+    assert.equal(
+      can.attachArtifact(actor("coLead"), graph, "leaf", false),
+      true
+    );
+  });
+
+  test("an unrelated member cannot", () => {
+    assert.equal(
+      can.attachArtifact(actor("outsider"), graph, "leaf", false),
+      false
+    );
+  });
+
+  test("COMPLETING a project does not close attaching", () => {
+    /*
+      Deliberate, and the case most likely to be "fixed" into a bug. The final
+      report is written after the work stops. Adding extends the record;
+      removing rewrites it, and only the second one is locked.
+    */
+    assert.equal(
+      can.attachArtifact(actor("worker"), completedGraph, "leaf", true),
+      true
+    );
+    assert.equal(
+      can.attachArtifact(actor("reLeaf"), completedGraph, "leaf", false),
+      true
+    );
+  });
+});
+
+describe("removing from the engineering record freezes on completion", () => {
+  test("while active, the project's own RE can remove", () => {
+    assert.equal(can.manageArtifact(actor("reLeaf"), graph, "leaf"), true);
+  });
+
+  test("while active, an RE above can remove", () => {
+    assert.equal(can.manageArtifact(actor("reRoot"), graph, "leaf"), true);
+  });
+
+  test("a committed member cannot remove even while active", () => {
+    // Adding is open, curation is not — that asymmetry is the whole design.
+    assert.equal(can.manageArtifact(actor("worker"), graph, "leaf"), false);
+  });
+
+  test("once COMPLETE, the RE loses it", () => {
+    assert.equal(
+      can.manageArtifact(actor("reLeaf"), completedGraph, "leaf"),
+      false
+    );
+  });
+
+  test("once COMPLETE, an RE above loses it too", () => {
+    assert.equal(
+      can.manageArtifact(actor("reRoot"), completedGraph, "leaf"),
+      false
+    );
+  });
+
+  test("once COMPLETE, a Division Lead loses it", () => {
+    // A Division Lead is a top RE, so this follows — but it's the case where
+    // "surely a Lead can" is most tempting, so it gets its own line.
+    assert.equal(
+      can.manageArtifact(actor("divLead"), completedGraph, "leaf"),
+      false
+    );
+  });
+
+  test("a Co-Lead keeps it — the escape hatch, and the repair path", () => {
+    /*
+      There is no edit-in-place for an artifact. Fixing a rotted link on a
+      finished project IS a Co-Lead removing it and anyone re-attaching. If
+      this returns false the record becomes genuinely unfixable.
+    */
+    assert.equal(
+      can.manageArtifact(actor("coLead"), completedGraph, "leaf"),
+      true
+    );
+  });
+
+  test("completion of one project doesn't freeze its siblings", () => {
+    assert.equal(
+      can.manageArtifact(actor("reMid"), completedGraph, "mid"),
+      true
+    );
+  });
+});
