@@ -13,7 +13,7 @@ where the last session stopped. It has the three outstanding items.
 The app is **live on Supabase** at `skyrunners-app.vercel.app` — note the
 `-app`; `skyrunners.vercel.app` is somebody else's site and probing it to check
 a deploy gives a confident wrong answer. Real Google sign-in, real Postgres,
-migrations `0001`–`0030` applied. **Phases 0–8 are built** — my work, find work, projects,
+migrations `0001`–`0033` applied. **Phases 0–8 are built** — my work, find work, projects,
 members, deliverables and sign-off, check-ins and review, terms, trainings and
 facility access, and the calendar. There is no phase 9+ scoped yet beyond the
 one item under "What's next".
@@ -649,3 +649,129 @@ Two things offered but not done:
   `calendarRunsOut` value already computed in the settings view, surfaced nowhere.
   When the calendar ends, check-ins silently stop generating with no symptom — the
   same shape as the bug that banner already exists to prevent.
+
+---
+
+# Session log — 2026-08-10 (second half)
+
+Continues the log above. Migrations `0031`–`0033`, all applied to live, all
+merged and deployed. 573 tests.
+
+## The advisor role (0031, 0032)
+
+A faculty or project advisor: sees everything, comments on anything, builds
+nothing. No projects, no deliverables, no hours, no check-ins, nobody above or
+below them.
+
+**The dangerous part was not adding the role.** `globalRole !== "member"` was
+shorthand for "is leadership" in **twenty places** — inviting, admitting,
+club-wide events, attendance, roll-ups. An advisor is not a member, so a fourth
+enum value would have granted a professor every one of them. They all go
+through `isLeadership()` now. **If you add a fifth role, that predicate is the
+first thing to read.**
+
+The type checker found the rest: every `Record<GlobalRole, …>` failed to compile
+until it had an advisor entry. That is why this is an enum value and not a
+boolean beside one.
+
+Things that did NOT fall out for free, and are now explicit:
+
+- **Nobody reports to an advisor, either direction.** `setGlobalRole` clears the
+  line both ways. Without it a Lead converted to an advisor keeps a review queue
+  they can no longer reach, and the escalation — which runs on age — points at
+  somebody the app has stopped asking anything of.
+- **No My Work.** Structurally empty for them, and it is the landing page. Nav
+  hides it, `/my-work` redirects to `/projects`, and the layout does not even
+  call `getMyWork` — it synthesises a pending check-in for anybody with no
+  history, which would have pinned an unclearable red dot to a nav item they
+  cannot see.
+- **Neither banner.** Discord is optional for an advisor.
+- **Find Work stays.** The "I'm stuck" board is the most useful thing they can
+  act on.
+
+`project_advisors` is a separate table, NOT a fourth `project_role`.
+`project_members` drives staffing counts and /find-work's unstaffed-first
+ordering; a professor is not staff, and a table nothing counts cannot leak.
+
+## Member requests (0033)
+
+"Can I have access to…" — free-form, addressed to ONE named Lead, from a button
+on that Lead's profile.
+
+**The rule, and it is in the new-member guide in these words: needs training ->
+Trainings; needs somebody to say yes -> ask a person.** Rooms and machines stay
+in the trainings catalogue, which already worked end to end and already
+appeared on the dashboard. This is for the Fusion drive, Onshape, the GitHub
+org, a key to the cabinet.
+
+The button is on a PERSON so the app never has to know who owns what. A central
+request page would need a list of grantable things mapped to owners — a second
+catalogue to keep current. The cost is that the member has to know who, which is
+a sentence in the guide rather than a table in a database.
+
+Lands on that person's dashboard above the trainings queue (somebody is blocked
+now; a training verification confirms something that already happened). Red past
+five days. Granting is one press; **declining requires a reason**, same
+asymmetry as rejecting a deliverable. A Co-Lead sees every outstanding request,
+badged "Asked someone else". Not public — RLS scopes reads to the two people
+plus Co-Leads.
+
+One open request per person per recipient, which is why withdraw exists.
+
+## Commitment expectations changed
+
+**16+ is Core, 10–12 is Committed.** `committed` is the LOW end of the published
+range, so somebody at exactly 10 has met the stated bar. The live
+`club_settings` row was updated too — the constants are only the seed, and
+editing them alone changes nothing anybody is measured against.
+
+## Smaller
+
+- **Division Gantt** clips to today unless something has slipped, with a "Show
+  history" date picker that re-lays-out client-side. A bug shipped and was fixed
+  the same session: `projectTone` returns `"done"` for complete and `"ok"` for
+  on-track, and the overdue filter excluded `"ok"` — so finished work dragged the
+  window back to the beginning, the exact behaviour clipping was added to
+  prevent. The tests passed because the fixture used an invented tone.
+- **Check-in composer** was one undifferentiated wall: each project panel was
+  transparent on `bg-card` with the same border colour as the inputs inside it.
+  Recessed `bg-surface` panels now, project name as a cardinal section label,
+  and an intro saying "one box per project" so the repetition reads as intended
+  rather than as a rendering bug.
+- **Alphabetical** divisions and projects at every depth.
+- **Pacific dates** everywhere via `lib/dates.ts` — see the rule in CLAUDE.md.
+- **Any Lead can admit a new member**, and admitting assigns their Lead.
+
+## Mobile
+
+Measured at 375px, not guessed. The layout already reflowed — no page
+overflowed. Two real problems:
+
+1. **The roster scrolled sideways.** Member cards were 302px in a 286px column;
+   grid items default to `min-width: auto` and refuse to shrink below their
+   content. `min-w-0` fixed it, verified before/after. Page-level scrollWidth
+   was 0 the whole time, which is why a desktop check missed it.
+2. **Every form field zoomed the page on iOS.** Safari zooms on focus under
+   16px and does not zoom back. One media query in `globals.css` forces 16px on
+   phones; desktop typography untouched.
+
+Nav links went 32px -> 44px.
+
+**Still open:** 22 of 27 tap targets on My Work are under 40px, mostly `py-1.5`
+secondary buttons. A blanket `min-height` would stretch the inline icon buttons
+in list rows, so it wants a real pass rather than one rule.
+
+## Outstanding, in order
+
+1. **Rotate the Supabase database password.** Still not done. It has been in
+   plaintext in two chat transcripts.
+2. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
+   Michael, Jonathan. They receive nothing at all until they press Verify now.
+3. **Nobody has logged hours yet.** Every contribution signal correctly reads
+   empty, which looks identical to broken. Get one real week in before judging
+   any of it.
+4. Tap-target pass (above).
+5. Offered and not built: fold the behavioural design rules into
+   `docs/DESIGN_SYSTEM.md`; warn when the academic calendar is about to run out
+   (`calendarRunsOut` is computed and surfaced nowhere); wire a "what I look
+   after" line on Lead profiles so members know who to ask.
