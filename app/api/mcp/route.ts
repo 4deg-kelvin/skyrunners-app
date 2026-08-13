@@ -36,7 +36,7 @@
 
 import { NextResponse } from "next/server";
 
-import { withSuppliedClientStore } from "@/lib/store/request";
+import { preloadLiveStore, withSuppliedClientStore } from "@/lib/store/request";
 import { TOOLS, ToolRefusal } from "@/lib/mcp/tools";
 import { tokenFromHeader } from "@/lib/mcp/tokens";
 import { viewerFromToken, type McpViewer } from "@/lib/mcp/viewer";
@@ -167,12 +167,25 @@ export async function POST(request: Request) {
   try {
     /*
       One store scope around the whole call, with the token's client — exactly
-      what `withRequestStore` does for a Server Action. Without it the first
-      read throws "Live store not loaded", and a write would silently no-op.
+      what `withRequestStore` does for a Server Action. Without it a write
+      would silently no-op.
+
+      The explicit `preloadLiveStore()` is the other half, and it is not
+      optional. On the website every page and action goes through
+      `getViewer()`, which preloads; the data functions in `lib/data/*` also
+      preload defensively. But a tool that reads the store DIRECTLY — `whoami`,
+      `catch_up`, and every `requireProject` / `requireMember` lookup — has
+      neither, and threw "Live store not loaded" against production on the
+      first real call while `list_projects` worked fine, because that one
+      happens to go through `getProjectTree()`.
+
+      So this route is the MCP's `getViewer()`: the one place that guarantees
+      the snapshot exists before anything reads it.
     */
-    const text = await withSuppliedClientStore(viewer.client, () =>
-      tool.handler(args, viewer)
-    );
+    const text = await withSuppliedClientStore(viewer.client, async () => {
+      await preloadLiveStore();
+      return tool.handler(args, viewer);
+    });
     return toolOk(id, text);
   } catch (error) {
     if (error instanceof ToolRefusal) return toolError(id, error.message);
