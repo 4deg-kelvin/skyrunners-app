@@ -41,6 +41,7 @@ import { TOOLS, ToolRefusal } from "@/lib/mcp/tools";
 import { tokenFromHeader } from "@/lib/mcp/tokens";
 import { viewerFromToken, type McpViewer } from "@/lib/mcp/viewer";
 import { SERVER_INSTRUCTIONS } from "@/lib/mcp/guide";
+import { listResources, readResource } from "@/lib/mcp/resources";
 
 /** Node, not Edge: the store and the Supabase admin client both need it. */
 export const runtime = "nodejs";
@@ -110,7 +111,10 @@ export async function POST(request: Request) {
   if (method === "initialize") {
     return result(id, {
       protocolVersion: PROTOCOL_VERSION,
-      capabilities: { tools: { listChanged: false } },
+      capabilities: {
+        tools: { listChanged: false },
+        resources: { listChanged: false, subscribe: false },
+      },
       serverInfo: { name: "skyrunners", version: "1.0.0" },
       instructions: SERVER_INSTRUCTIONS,
     });
@@ -141,6 +145,39 @@ export async function POST(request: Request) {
         description: t.description,
         inputSchema: t.inputSchema,
       })),
+    });
+  }
+
+  /*
+    Resources need the store loaded to enumerate divisions, so unlike
+    `tools/list` they can't answer without a valid token. Returning an empty
+    list for a bad token would look like "this server has no resources"; the
+    refusal sentence is more useful.
+  */
+  if (method === "resources/list") {
+    if (!auth.ok) return rpcError(id, -32001, auth.error);
+    const resources = await withSuppliedClientStore(
+      auth.viewer.client,
+      async () => {
+        await preloadLiveStore();
+        return listResources();
+      }
+    );
+    return result(id, { resources });
+  }
+
+  if (method === "resources/read") {
+    if (!auth.ok) return rpcError(id, -32001, auth.error);
+    const uri = String(body.params?.uri ?? "");
+
+    const text = await withSuppliedClientStore(auth.viewer.client, async () => {
+      await preloadLiveStore();
+      return readResource(uri, auth.viewer);
+    });
+
+    if (text === null) return rpcError(id, -32602, `No resource at "${uri}".`);
+    return result(id, {
+      contents: [{ uri, mimeType: "text/markdown", text }],
     });
   }
 

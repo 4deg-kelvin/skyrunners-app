@@ -608,9 +608,275 @@ export const TOOLS: McpTool[] = [
     },
   },
 
+  {
+    name: "get_member",
+    description:
+      "One person's public record — the projects they're on, what they own on each, their skills and any RE roles. Never their hours, check-ins or reliability; those are website-only.",
+    inputSchema: schema({ member: { type: "string" } }, ["member"]),
+    async handler(args) {
+      const m = requireMember(str(args.member));
+      const store = readStore();
+
+      const on = memberProjects(m.id);
+      const lines = [
+        `# ${m.fullName} <${m.email}>`,
+        [
+          m.globalRole,
+          m.major,
+          m.classYear ? `class of ${m.classYear}` : "",
+          m.status !== "active" ? m.status : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      ];
+
+      if (m.skills?.length) lines.push(`Skills: ${m.skills.join(", ")}`);
+
+      const leads = store.teams.filter((t) => t.leadId === m.id && t.isActive);
+      if (leads.length) {
+        lines.push(`Leads: ${leads.map((t) => t.name).join(", ")}`);
+      }
+
+      lines.push("", `## Projects (${on.length})`);
+      if (!on.length) lines.push("- Not on any project yet.");
+      for (const pm of on) {
+        const project = getProject(pm.projectId);
+        if (!project) continue;
+        const open = projectDeliverables(project.id).filter(
+          (d) => d.ownerId === m.id && d.status !== "done"
+        );
+        lines.push(
+          `- ${project.name} — ${pm.role}${pm.commitment === "following" ? " (following)" : ""}${
+            pm.responsibility ? `, ${pm.responsibility}` : ""
+          }${open.length ? `; ${open.length} open` : ""}`
+        );
+      }
+
+      return lines.join("\n");
+    },
+  },
+
   // -------------------------------------------------------------------------
   // Writes
   // -------------------------------------------------------------------------
+
+  {
+    name: "answer_join_request",
+    description:
+      "Approve or decline someone's request to join a project. Requests escalate after 5 days, so clearing these is the highest-value thing an RE does in a week — `catch_up` lists the ones waiting on you.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        member: { type: "string", description: "Who asked" },
+        decision: { type: "string", enum: ["approve", "decline"] },
+        note: {
+          type: "string",
+          description: "Sent to them. Worth writing when declining.",
+        },
+      },
+      ["project", "member", "decision"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      const member = requireMember(str(args.member));
+
+      if (!can.reviewJoinRequest(viewer.actor, viewer.graph, project.id)) {
+        refuse(
+          `Answering join requests for ${project.name} is the RE's call — you aren't one on that project.`
+        );
+      }
+
+      const request = readStore().joinRequests.find(
+        (r) =>
+          r.projectId === project.id &&
+          r.memberId === member.id &&
+          r.status === "pending"
+      );
+      if (!request) {
+        refuse(
+          `${member.fullName} has no pending request on ${project.name}. It may already have been answered.`
+        );
+      }
+
+      const accept = str(args.decision) === "approve";
+      ok(
+        await ops.decideJoinRequest({
+          requestId: request.id,
+          decidedById: viewer.member.id,
+          accept,
+          responseNote: str(args.note) || undefined,
+          today: today(),
+        })
+      );
+
+      return accept
+        ? `${member.fullName} is now on ${project.name}. They can be given deliverables straight away.`
+        : `Declined ${member.fullName}'s request for ${project.name}${str(args.note) ? ` — they'll see: "${str(args.note)}"` : ""}.`;
+    },
+  },
+
+  {
+    name: "add_project_member",
+    description:
+      "Put someone on a project directly, without waiting for them to ask. Members can't add themselves — the RE decides, because the RE is accountable for the work.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        member: { type: "string" },
+        responsibility: {
+          type: "string",
+          description: "What they own here. Shows on their profile.",
+        },
+        as_re: {
+          type: "boolean",
+          default: false,
+          description: "Make them a Responsible Engineer, not a contributor",
+        },
+      },
+      ["project", "member"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      const member = requireMember(str(args.member));
+
+      if (!can.addProjectMember(viewer.actor, viewer.graph, project.id)) {
+        refuse(`Adding people to ${project.name} is for its REs.`);
+      }
+
+      // Appointing an RE is a bigger step than adding a contributor, and the
+      // app guards it separately.
+      const asRE = args.as_re === true;
+      if (asRE && !can.assignRE(viewer.actor, viewer.graph, project.id)) {
+        refuse(`Appointing REs on ${project.name} isn't yours to do.`);
+      }
+
+      ok(
+        await ops.addProjectMember({
+          projectId: project.id,
+          memberId: member.id,
+          asRE,
+          responsibility: str(args.responsibility) || undefined,
+          addedBy: viewer.member.id,
+          today: today(),
+        })
+      );
+
+      return `${member.fullName} added to ${project.name}${asRE ? " as an RE" : ""}${
+        str(args.responsibility) ? `, owning: ${str(args.responsibility)}` : ""
+      }.`;
+    },
+  },
+
+  {
+    name: "create_project",
+    description:
+      "Start a new project. Give it a parent to nest it under existing work, or a division for a top-level one. The RE defaults to you — a project with nobody accountable is the one state the club's model can't represent.",
+    write: true,
+    inputSchema: schema(
+      {
+        name: { type: "string" },
+        description: { type: "string" },
+        parent: { type: "string", description: "Parent project name or slug" },
+        division: {
+          type: "string",
+          description: "Division name, for a top-level project",
+        },
+        re: { type: "string", description: "Defaults to you" },
+        target_date: { type: "string", description: "YYYY-MM-DD" },
+      },
+      ["name"]
+    ),
+    async handler(args, viewer) {
+      const parent = str(args.parent) ? requireProject(str(args.parent)) : null;
+
+      const store = readStore();
+      const divisionName = str(args.division).toLowerCase();
+      const division = divisionName
+        ? store.teams.find(
+            (t) =>
+              t.isActive &&
+              (t.name.toLowerCase() === divisionName ||
+                t.slug === divisionName ||
+                t.name.toLowerCase().includes(divisionName))
+          )
+        : undefined;
+
+      if (divisionName && !division) {
+        refuse(`No division called "${str(args.division)}".`);
+      }
+      if (!parent && !division) {
+        refuse(
+          "Say where it goes — either a parent project, or a division for a top-level one."
+        );
+      }
+
+      const teamId = division?.id ?? parent?.teamId;
+      if (
+        !can.createProject(viewer.actor, viewer.graph, {
+          parentProjectId: parent?.id,
+          teamId,
+        })
+      ) {
+        refuse("You can't start a project there.");
+      }
+
+      const re = str(args.re) ? requireMember(str(args.re)) : viewer.member;
+      const created = ok(
+        await ops.createProject({
+          name: str(args.name),
+          description: str(args.description) || undefined,
+          parentId: parent?.id ?? null,
+          teamId,
+          primaryReId: re.id,
+          targetDate: str(args.target_date) || undefined,
+          createdBy: viewer.member.id,
+          today: today(),
+        })
+      );
+
+      return `Created ${created.name} (${created.slug})${parent ? ` under ${parent.name}` : ` in ${division?.name}`}, RE ${re.fullName}.`;
+    },
+  },
+
+  {
+    name: "ask_for_help",
+    description:
+      "Post on the club's help board — 'does anyone know Onshape well enough to look at this?'. Anyone can answer. Use it when someone is stuck on something that isn't a specific deliverable, or is waiting on a join request.",
+    write: true,
+    inputSchema: schema(
+      {
+        title: { type: "string", description: "One line, scannable" },
+        detail: { type: "string" },
+        project: { type: "string", description: "Optional, if it's about one" },
+      },
+      ["title"]
+    ),
+    async handler(args, viewer) {
+      const projectId = str(args.project)
+        ? requireProject(str(args.project)).id
+        : undefined;
+
+      /*
+        No permission check, deliberately — see `can.postHelpRequest`. The
+        board exists because membership is RE-controlled, so somebody waiting
+        on a join request needs a route to being useful that doesn't depend on
+        one person answering their inbox.
+      */
+      ok(
+        await ops.postHelpRequest({
+          memberId: viewer.member.id,
+          title: str(args.title),
+          detail: str(args.detail) || undefined,
+          projectId,
+          today: today(),
+        })
+      );
+
+      return `Posted "${str(args.title)}" to the help board. It shows on Find Work for the whole club.`;
+    },
+  },
 
   {
     name: "create_deliverable",
