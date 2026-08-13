@@ -78,8 +78,36 @@ gives the assistant the whole picture.
 > Mark the propulsion test stand at risk
 > The spar layup is blocked — we're waiting on the laser cutter
 > Sign off the mass budget deliverable
+> Approve Julia's request to join SkyBeta Kits
+> Put Kevin on the test stand, owning the load cell wiring
+> Start a new project under Wing Spar called "Rib Tooling"
+> Post on the help board — I need someone who knows Onshape
 > Log 3 hours on Wing Spar yesterday, ran the tensile coupons
 > Add my skills: composites, CAD, structural analysis
+
+---
+
+## Keeping an assistant permanently up to date
+
+Tools are things your assistant decides to call. **Resources** are context you
+pin once, and it refreshes them.
+
+Available to attach:
+
+| Resource | What's in it |
+|---|---|
+| `skyrunners://me/work` | Your open deliverables and the projects you're on |
+| `skyrunners://club/blocked` | Everything blocked, club-wide |
+| `skyrunners://division/<slug>` | One division: every project, who's on it, what's blocked, what's due |
+
+A Division Lead who wants their assistant to always know the state of their
+division should attach the division resource — then "what's the state of Drone
+Hacks" needs no tool call at all.
+
+**One thing to be clear about: this can't notify you.** MCP has no way to push;
+your assistant re-reads a resource when it next runs. If you want to *hear*
+about a blocker the moment it's raised, that's already the Discord DM the club
+sends — it needs no AI and no website. Connect Discord in Settings.
 
 ---
 
