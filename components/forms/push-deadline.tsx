@@ -49,13 +49,31 @@ export function PushDeadlineForm({
   const [open, setOpen] = useState(false);
 
   if (!open) {
+    /*
+      A BORDERED button, not a bare text link, and the label says what moves.
+
+      The first version of this was grey text reading just "Move", on the theory
+      that a slipped deadline should not be encouraged by a loud control. That
+      went too far: Anish could not find it on his own project page and reported
+      the feature as missing. A control nobody can see has the same value as one
+      that was never built.
+
+      The placement was right and has not changed — it belongs on the Target tile,
+      beside the number it changes. What changed is that it now reads as pressable:
+      a border, and "Move date" rather than "Move", which next to the word "Target"
+      was ambiguous about what would move.
+
+      Still secondary rather than cardinal. Slipping a date is honest and should be
+      easy, but it is not the primary action on a project page and should not
+      compete with "Add a deliverable".
+    */
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-ink-muted hover:text-cardinal-600 inline-flex items-center gap-1 text-xs font-semibold transition-colors"
+        className="rounded-tile border-line hover:bg-surface hover:text-cardinal-600 text-ink-soft inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-semibold transition-colors"
       >
         <CalendarClock className="size-3.5" />
-        Move
+        Move date
       </button>
     );
   }
