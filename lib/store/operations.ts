@@ -55,6 +55,7 @@ import type {
   MemberRequest,
   ProjectAdvisor,
   GlobalRole,
+  GuideBlock,
   HelpReply,
   HelpRequest,
   JoinRequest,
@@ -2218,6 +2219,129 @@ export async function deleteProject(
     );
     store.projects = store.projects.filter((p) => p.id !== projectId);
     return ok(null);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Guide pages — club-written material
+//
+// Permission is the caller's job (`can.manageGuides`, Co-Lead only). What lives
+// here is the shape rule: a link with no URL is a dead row on a page new
+// members are told to trust, and the database says the same thing.
+// ---------------------------------------------------------------------------
+
+export async function saveGuideBlock(input: {
+  /** Absent to create, present to edit. */
+  blockId?: string;
+  page: GuideBlock["page"];
+  kind: GuideBlock["kind"];
+  title: string;
+  body?: string;
+  url?: string;
+  category?: string;
+  actorId: string;
+  today: string;
+}): Promise<Result<GuideBlock>> {
+  const title = input.title.trim();
+  if (!title) return fail<GuideBlock>("Give it a title.");
+
+  const url = input.url?.trim() || undefined;
+  const body = input.body?.trim() || undefined;
+
+  if (input.kind === "link") {
+    if (!url) return fail<GuideBlock>("A link needs a URL.");
+    /*
+      Same validator the engineering record uses. A guide is read by somebody
+      in their first week, and a link that has already expired teaches them the
+      app is unreliable before they have used any of it.
+    */
+    const problem = checkLinkPermanence(url);
+    if (problem) return fail<GuideBlock>(problem.reason);
+  } else if (!body) {
+    return fail<GuideBlock>("A note needs something written in it.");
+  }
+
+  return guarded((store) => {
+    if (input.blockId) {
+      const existing = store.guideBlocks.find((b) => b.id === input.blockId);
+      if (!existing) return fail<GuideBlock>("That section no longer exists.");
+
+      existing.kind = input.kind;
+      existing.title = title;
+      existing.body = body;
+      existing.url = input.kind === "link" ? url : undefined;
+      existing.category = input.category?.trim() || undefined;
+      existing.updatedAt = input.today;
+      existing.updatedById = input.actorId;
+      return ok(existing);
+    }
+
+    // New rows go to the end of their page rather than the top, so adding one
+    // never reshuffles what a member read yesterday.
+    const last = store.guideBlocks
+      .filter((b) => b.page === input.page)
+      .reduce((max, b) => Math.max(max, b.sortOrder), 0);
+
+    const block: GuideBlock = {
+      id: newId("guide"),
+      page: input.page,
+      kind: input.kind,
+      title,
+      body,
+      url: input.kind === "link" ? url : undefined,
+      category: input.category?.trim() || undefined,
+      sortOrder: last + 10,
+      updatedAt: input.today,
+      updatedById: input.actorId,
+    };
+
+    store.guideBlocks.push(block);
+    return ok(block);
+  });
+}
+
+export async function removeGuideBlock(input: {
+  blockId: string;
+}): Promise<Result<null>> {
+  return guarded((store) => {
+    const index = store.guideBlocks.findIndex((b) => b.id === input.blockId);
+    if (index === -1) return fail<null>("That section is already gone.");
+    store.guideBlocks.splice(index, 1);
+    return ok(null);
+  });
+}
+
+/**
+ * Nudge one block up or down its page.
+ *
+ * Swaps sort orders with its neighbour rather than renumbering everything — a
+ * full renumber would rewrite every row on the page for a one-place move, and
+ * `persistDiff` would send all of them.
+ */
+export async function moveGuideBlock(input: {
+  blockId: string;
+  direction: "up" | "down";
+}): Promise<Result<GuideBlock>> {
+  return guarded((store) => {
+    const block = store.guideBlocks.find((b) => b.id === input.blockId);
+    if (!block) return fail<GuideBlock>("That section no longer exists.");
+
+    const siblings = store.guideBlocks
+      .filter((b) => b.page === block.page)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const at = siblings.findIndex((b) => b.id === block.id);
+    const swapWith = siblings[input.direction === "up" ? at - 1 : at + 1];
+    if (!swapWith) {
+      return fail<GuideBlock>(
+        `It's already ${input.direction === "up" ? "first" : "last"}.`
+      );
+    }
+
+    const mine = block.sortOrder;
+    block.sortOrder = swapWith.sortOrder;
+    swapWith.sortOrder = mine;
+    return ok(block);
   });
 }
 

@@ -58,7 +58,13 @@ import {
   uploadPhoto,
   type UploadableFile,
 } from "@/lib/supabase/storage";
-import type { ArtifactKind, Deliverable, Project } from "@/lib/types";
+import { GUIDE_PAGES } from "@/lib/types";
+import type {
+  ArtifactKind,
+  Deliverable,
+  GuidePage,
+  Project,
+} from "@/lib/types";
 import { withRequestStore } from "@/lib/store/request";
 import { readStore } from "@/lib/store/disk";
 import { isThemeChoice, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from "@/lib/theme";
@@ -2012,6 +2018,75 @@ async function setDailyDigestAction$impl(
 }
 
 // ---------------------------------------------------------------------------
+// Guide pages — the club's own material
+// ---------------------------------------------------------------------------
+
+async function saveGuideBlockAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageGuides(viewer.actor)) {
+    return denied("edit the guide pages");
+  }
+
+  const page = String(formData.get("page") ?? "");
+  if (!GUIDE_PAGES.includes(page as GuidePage)) {
+    return { ok: false, error: "Pick which page this belongs on." };
+  }
+
+  const kind = String(formData.get("kind") ?? "link");
+
+  const result = await ops.saveGuideBlock({
+    blockId: String(formData.get("blockId") ?? "") || undefined,
+    page: page as GuidePage,
+    kind: kind === "note" ? "note" : "link",
+    title: String(formData.get("title") ?? ""),
+    body: String(formData.get("body") ?? "") || undefined,
+    url: String(formData.get("url") ?? "") || undefined,
+    category: String(formData.get("category") ?? "") || undefined,
+    actorId: viewer.member.id,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved. Members see it immediately.");
+}
+
+async function removeGuideBlockAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageGuides(viewer.actor)) {
+    return denied("edit the guide pages");
+  }
+
+  const result = await ops.removeGuideBlock({
+    blockId: String(formData.get("blockId") ?? ""),
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Removed.");
+}
+
+async function moveGuideBlockAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageGuides(viewer.actor)) {
+    return denied("reorder the guide pages");
+  }
+
+  const result = await ops.moveGuideBlock({
+    blockId: String(formData.get("blockId") ?? ""),
+    direction:
+      String(formData.get("direction") ?? "up") === "down" ? "down" : "up",
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Moved.");
+}
+
+// ---------------------------------------------------------------------------
 // MCP tokens — connecting your own AI
 // ---------------------------------------------------------------------------
 
@@ -2526,6 +2601,24 @@ export async function setDailyDigestAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setDailyDigestAction$impl(formData));
+}
+
+export async function saveGuideBlockAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => saveGuideBlockAction$impl(formData));
+}
+
+export async function removeGuideBlockAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => removeGuideBlockAction$impl(formData));
+}
+
+export async function moveGuideBlockAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => moveGuideBlockAction$impl(formData));
 }
 
 export async function createMcpTokenAction(

@@ -669,6 +669,19 @@ export const can = {
   viewLeadershipDashboard: (actor: Actor, hasReports: boolean) =>
     isCoLead(actor) || hasReports,
 
+  /**
+   * Edit the club-written material on /getting-started and /leading.
+   *
+   * Co-Lead only. These pages are the club's official word to a new member
+   * about how the club works — the first thing somebody reads and the thing
+   * they'll quote back. That is not a wiki, and it is not a Lead-level call.
+   *
+   * Note what this does NOT cover: the hard-coded half of those pages, which
+   * describes how the APP works and has to track the code. Only the rows in
+   * `guide_blocks` are editable — see migration 0038.
+   */
+  manageGuides: (actor: Actor) => isCoLead(actor),
+
   /** Leads roll their reports' updates up the chain. */
   submitRollup: (actor: Actor) => isLeadership(actor),
 

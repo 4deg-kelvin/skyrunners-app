@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { GuideBlocks } from "@/components/ui/guide-blocks";
+import { getGuideSections } from "@/lib/data/guides";
+import { can } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
@@ -57,6 +60,8 @@ export const metadata = {
  */
 export default async function GettingStartedPage() {
   const viewer = await getViewer();
+  const guideSections = await getGuideSections("getting_started");
+  const mayEditGuides = can.manageGuides(viewer.actor);
   const [tiers, identity] = await Promise.all([
     getClubTiers(),
     getClubIdentity(),
@@ -476,6 +481,17 @@ export default async function GettingStartedPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/*
+        The club's own guides, after the expectations.
+
+        Deliberately last: everything above explains how the APP works and is
+        the same for every club, while this is the club's own material —
+        installing Fusion, getting into the shop — which makes most sense once
+        somebody knows what they're being asked to do. Co-Leads edit it at
+        /settings/guides; see migration 0038 for why only this half is data.
+      */}
+      <GuideBlocks sections={guideSections} canEdit={mayEditGuides} />
     </div>
   );
 }

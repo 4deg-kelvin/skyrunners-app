@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { Check, Minus } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { GuideBlocks } from "@/components/ui/guide-blocks";
+import { getGuideSections } from "@/lib/data/guides";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getViewer } from "@/lib/data/viewer";
 import { getLeadershipRoles } from "@/lib/data/members";
-import { isCoLead, isLeadership } from "@/lib/permissions";
+import { can, isCoLead, isLeadership } from "@/lib/permissions";
 import { HELP_REQUEST_STALE_DAYS } from "@/lib/types";
 import { REVIEW_GRACE_DAYS } from "@/lib/review";
 
@@ -46,6 +48,8 @@ export const metadata = {
  */
 export default async function LeadingPage() {
   const viewer = await getViewer();
+  const guideSections = await getGuideSections("leading");
+  const mayEditGuides = can.manageGuides(viewer.actor);
   const role = await getLeadershipRoles(viewer.member.id);
 
   /*
@@ -511,6 +515,18 @@ export default async function LeadingPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/*
+        What the CLUB expects of a Lead, as opposed to what the app permits.
+
+        Everything above is the permission model — what the code will and won't
+        let you do. This is the other half: chasing people who stop logging
+        hours, running a design review, handing a project over cleanly. None of
+        that is enforceable in software and all of it changes term to term,
+        which is exactly why it's editable at /settings/guides rather than
+        hard-coded here.
+      */}
+      <GuideBlocks sections={guideSections} canEdit={mayEditGuides} />
     </div>
   );
 }

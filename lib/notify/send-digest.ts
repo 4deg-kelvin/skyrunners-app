@@ -92,16 +92,19 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
 
       Claim-before-send stops duplicates, but on its own it also means a failed
       delivery silently burns the day: the row says "sent", nobody got
-      anything, and the next run skips them. The first night this shipped,
-      four rows were claimed and at least one member received nothing — and
-      there was no way to tell from the database whether that was a delivery
-      failure or a bug, because success and failure looked identical.
+      anything, and the next run skips that person entirely.
+
+      Found by looking rather than by breaking. On the first night's run four
+      rows were claimed and the DMs did arrive — but while checking whether
+      they had, it became clear the database could not answer the question:
+      a refusal and a success wrote exactly the same value. That is the gap
+      this closes, before a real refusal makes somebody quietly disappear from
+      a daily message.
 
       Clearing it is safe. `sendDiscordDM` returns false only when Discord
       rejected the request outright — no message was delivered — so a retry
       cannot duplicate anything. The cost of being wrong here is one repeated
-      digest; the cost of the old behaviour was a member silently dropped from
-      a daily message with no trace.
+      digest; the cost of the old behaviour was a member dropped with no trace.
     */
     await admin
       .from("profiles")

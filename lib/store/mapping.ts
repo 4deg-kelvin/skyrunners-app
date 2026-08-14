@@ -35,6 +35,7 @@ import type {
   TrainingSection,
   UpdateSchedule,
   WorkLog,
+  GuideBlock,
 } from "../types.ts";
 import type { StoreShape } from "./disk.ts";
 
@@ -791,6 +792,39 @@ const memberRequests: CollectionSpec<MemberRequest> = {
   dependsOn: ["members"],
 };
 
+const guideBlocks: CollectionSpec<GuideBlock> = {
+  key: "guideBlocks",
+  table: "guide_blocks",
+  columns:
+    "id, page, kind, title, body, url, category, sort_order, updated_at, updated_by",
+  identify: (b) => b.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    page: r.page as GuideBlock["page"],
+    kind: r.kind as GuideBlock["kind"],
+    title: r.title as string,
+    body: opt(r.body as string),
+    url: opt(r.url as string),
+    category: opt(r.category as string),
+    sortOrder: r.sort_order as number,
+    updatedAt: r.updated_at as string,
+    updatedById: opt(r.updated_by as string),
+  }),
+  toRow: (b) => ({
+    id: b.id,
+    page: b.page,
+    kind: b.kind,
+    title: b.title,
+    body: nul(b.body),
+    url: nul(b.url),
+    category: nul(b.category),
+    sort_order: b.sortOrder,
+    updated_at: b.updatedAt,
+    updated_by: nul(b.updatedById),
+  }),
+  dependsOn: ["members"],
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -813,6 +847,7 @@ export const COLLECTIONS = [
   deliverableTodos,
   projectAdvisors,
   memberRequests,
+  guideBlocks,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 
