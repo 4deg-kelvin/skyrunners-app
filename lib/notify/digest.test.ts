@@ -211,6 +211,58 @@ describe("a quiet project says how long", () => {
   });
 });
 
+describe("a future-dated entry is not a quiet project", () => {
+  test("work dated tomorrow counts as current, not as silence", async () => {
+    /*
+      Found by rendering real digests against production, not by a test: a work
+      log dated tomorrow wasn't matched by `=== today` but still set the
+      last-activity date, so the line read
+
+        "quiet today; last activity 2026-08-13 (today)"
+
+      which contradicts itself in eight words. Future dates are real — the club
+      runs on Pacific while the database is UTC, so a lab evening is already
+      tomorrow in one of them.
+    */
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const project = store.projects.find(
+      (p) => p.phase !== "complete" && p.reIds.length > 0
+    )!;
+    const re = project.reIds[0];
+
+    await disk.mutate((s) => {
+      s.workLogs = s.workLogs.filter((w) => w.projectId !== project.id);
+      s.deliverables = s.deliverables.filter((d) => d.projectId !== project.id);
+      s.projectArtifacts = s.projectArtifacts.filter(
+        (a) => a.projectId !== project.id
+      );
+      s.progressUpdates = [];
+      s.workLogs.push({
+        id: "wl-tomorrow",
+        memberId: re,
+        projectId: project.id,
+        // One day AFTER `TODAY`.
+        workDate: "2026-08-13",
+        hours: 2,
+        description: "logged ahead",
+      });
+      return { ok: true as const, value: null };
+    });
+
+    const mine = build().find((d) => d.memberId === re);
+    assert.ok(mine);
+
+    const line = mine.body
+      .split("\n")
+      .find((l) => l.includes(project.name) && l.startsWith("**"));
+    assert.ok(line);
+    assert.equal(line.includes("quiet today"), false);
+    assert.match(mine.body, /logged ahead/);
+  });
+});
+
 describe("deadlines inside the week", () => {
   test("a deliverable due in three days shows up", async () => {
     await connectEveryone();

@@ -86,6 +86,24 @@ function ago(days: number): string {
   return `${days} days ago`;
 }
 
+/**
+ * Has this happened yet, as far as "today" is concerned?
+ *
+ * `>=`, not `===`, and the difference is a bug found by rendering real
+ * digests: a work log dated tomorrow wasn't counted as today's activity but
+ * still set the last-activity date, producing
+ * "quiet today; last activity 2026-08-13 (today)" — a line that contradicts
+ * itself in eight words.
+ *
+ * Future dates are real here for two reasons. The club runs on Pacific while
+ * the database is UTC, so an evening in the lab is already tomorrow in one of
+ * them; and nothing stops somebody dating an entry ahead. Either way, work
+ * dated tomorrow is not a quiet project.
+ */
+function isCurrent(date: string | undefined, today: string): boolean {
+  return !!date && date.slice(0, 10) >= today;
+}
+
 interface Activity {
   /** Newest first. */
   lines: string[];
@@ -113,7 +131,7 @@ function projectActivity(projectId: string, today: string): Activity {
   for (const log of store.workLogs) {
     if (log.projectId !== projectId) continue;
     seen(log.workDate);
-    if (log.workDate.slice(0, 10) === today) {
+    if (isCurrent(log.workDate, today)) {
       const who = store.members.find((m) => m.id === log.memberId)?.fullName;
       lines.push(
         `${who ?? "Someone"} logged ${log.hours} hrs${log.description ? ` — ${log.description}` : ""}`
@@ -126,9 +144,9 @@ function projectActivity(projectId: string, today: string): Activity {
     seen(d.completedAt);
     seen(d.submittedAt);
 
-    if (d.completedAt?.slice(0, 10) === today) {
+    if (isCurrent(d.completedAt, today)) {
       lines.push(`✅ signed off: ${d.title}`);
-    } else if (d.submittedAt?.slice(0, 10) === today) {
+    } else if (isCurrent(d.submittedAt, today)) {
       const who = store.members.find((m) => m.id === d.ownerId)?.fullName;
       lines.push(`awaiting your sign-off: ${d.title} (${who ?? "unknown"})`);
     }
@@ -139,7 +157,7 @@ function projectActivity(projectId: string, today: string): Activity {
     for (const entry of update.entries) {
       if (entry.projectId !== projectId) continue;
       seen(update.submittedAt);
-      if (update.submittedAt.slice(0, 10) === today) {
+      if (isCurrent(update.submittedAt, today)) {
         const who = store.members.find(
           (m) => m.id === update.memberId
         )?.fullName;
@@ -153,7 +171,7 @@ function projectActivity(projectId: string, today: string): Activity {
   for (const artifact of store.projectArtifacts) {
     if (artifact.projectId !== projectId) continue;
     seen(artifact.createdAt);
-    if (artifact.createdAt.slice(0, 10) === today) {
+    if (isCurrent(artifact.createdAt, today)) {
       lines.push(`📎 attached: ${artifact.title}`);
     }
   }
@@ -286,11 +304,11 @@ function leadSection(reports: Member[], today: string): string {
   for (const person of reports) {
     const logs = store.workLogs.filter((w) => w.memberId === person.id);
     const todayHours = logs
-      .filter((w) => w.workDate.slice(0, 10) === today)
+      .filter((w) => isCurrent(w.workDate, today))
       .reduce((sum, w) => sum + w.hours, 0);
 
     const checkedInToday = store.progressUpdates.some(
-      (u) => u.memberId === person.id && u.submittedAt?.slice(0, 10) === today
+      (u) => u.memberId === person.id && isCurrent(u.submittedAt, today)
     );
 
     if (todayHours > 0 || checkedInToday) {
