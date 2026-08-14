@@ -80,7 +80,21 @@ function RepeatFields({
   const [repeats, setRepeats] = useState(Boolean(defaultUntil));
 
   return (
-    <div className="rounded-tile border-line bg-surface border px-3.5 py-3">
+    /*
+      `sm:col-span-2` and `min-w-0`, and both are load-bearing.
+
+      Both call sites drop this into a `grid sm:grid-cols-2`, so without the span it
+      became a HALF-WIDTH column containing its own two-column grid of a select and
+      a date input. `<input type="date">` has a large intrinsic minimum width (the
+      picker plus the placeholder), and a grid item defaults to `min-width: auto`,
+      which means it refuses to shrink below its content — so the whole form
+      overflowed off the right of the screen.
+
+      Exactly the roster bug in docs/HANDOFF.md: cards 302px wide in a 286px
+      column. `min-w-0` is the other half of that fix, letting the inner columns
+      actually give way instead of pushing the container wider.
+    */
+    <div className="rounded-tile border-line bg-surface min-w-0 border px-3.5 py-3 sm:col-span-2">
       <label className="flex items-start gap-2.5">
         <input
           type="checkbox"
@@ -102,7 +116,9 @@ function RepeatFields({
 
       {repeats ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block">
+          {/* `min-w-0` on each column too, so a date input can never widen the
+              row past its container. See the note on the wrapper above. */}
+          <label className="block min-w-0">
             <span className="text-ink mb-1 block text-xs font-semibold">
               How often
             </span>
@@ -116,7 +132,7 @@ function RepeatFields({
             </select>
           </label>
 
-          <label className="block">
+          <label className="block min-w-0">
             <span className="text-ink mb-1 block text-xs font-semibold">
               Last one on
             </span>

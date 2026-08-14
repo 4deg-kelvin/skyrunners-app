@@ -37,8 +37,8 @@ export default function InactivePage() {
           </p>
           <p className="text-ink-soft mt-3 text-[15px]">
             Been here before? If you were deactivated or you&apos;ve graduated,
-            nothing was deleted — your hours, check-ins and delivered work are
-            all still attached to their projects, and everything comes back
+            nothing was deleted — your work log, check-ins and delivered work
+            are all still attached to their projects, and everything comes back
             exactly as it was.
           </p>
           <div className="mt-6">

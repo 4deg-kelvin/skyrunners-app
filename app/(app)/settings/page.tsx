@@ -139,63 +139,6 @@ export default async function SettingsPage() {
       </Card>
 
       {/*
-        The way into the guide editor.
-
-        A link rather than the editor itself: this page already carries the
-        profile, check-in days, the pause, the AI connection, the
-        academic calendar and the trainings catalogue. A two-page content
-        editor inline would bury everything a plain member came here for.
-      */}
-      {can.manageGuides(viewer.actor) ? (
-        <Card>
-          <CardBody>
-            <SectionLabel>Co-Lead</SectionLabel>
-            <h2 className="text-ink mt-2 text-2xl font-bold">
-              The guide pages
-            </h2>
-            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Add the club&apos;s own material to <em>New here?</em> and the
-              Lead guide — how to set up Fusion or KiCad, shop rules, templates,
-              anything you want a new member to have. Links to Google Docs work
-              well.
-            </p>
-            <Link
-              href="/settings/guides"
-              className="rounded-tile border-line hover:bg-surface text-ink mt-4 inline-flex items-center gap-2 border px-4 py-2.5 text-[15px] font-semibold transition-colors"
-            >
-              Edit the guides →
-            </Link>
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {/*
-        Only for people who'd actually receive one. A toggle for a message a
-        plain member never gets is a setting that does nothing.
-      */}
-      {digestReasons.length > 0 ? (
-        <Card>
-          <CardBody>
-            <SectionLabel>Daily Digest</SectionLabel>
-            <h2 className="text-ink mt-2 text-2xl font-bold">
-              One message each evening
-            </h2>
-            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Because you hold responsibility for work or people, Discord sends
-              you a summary each evening — what moved, what&apos;s gone quiet
-              and for how long, and anything due inside a week.
-            </p>
-            <div className="mt-5">
-              <DigestToggle
-                optedOut={viewer.member.dailyDigestOptOut ?? false}
-                reasons={digestReasons}
-              />
-            </div>
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {/*
         Above "Connect your AI", and that ordering is deliberate.
 
         This is the one integration nearly every member should do, it takes one
@@ -257,9 +200,9 @@ export default async function SettingsPage() {
               <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
                 Two short check-ins beat one long one — they give you and your
                 Lead something concrete to talk about twice as often, which is
-                the whole point. Each one is pre-filled from your logged hours
-                and open deliverables, so it&apos;s usually a couple of
-                sentences.
+                the whole point. Each one is pre-filled from your work log, so
+                the only box you have to write yourself is for a project you
+                logged nothing against.
               </p>
             </div>
             {isPaused ? <Badge tone="neutral">Paused</Badge> : null}
@@ -327,6 +270,63 @@ export default async function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/*
+        The way into the guide editor.
+
+        A link rather than the editor itself: this page already carries the
+        profile, check-in days, the pause, the AI connection, the
+        academic calendar and the trainings catalogue. A two-page content
+        editor inline would bury everything a plain member came here for.
+      */}
+      {can.manageGuides(viewer.actor) ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Co-Lead</SectionLabel>
+            <h2 className="text-ink mt-2 text-2xl font-bold">
+              The guide pages
+            </h2>
+            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+              Add the club&apos;s own material to <em>New here?</em> and the
+              Lead guide — how to set up Fusion or KiCad, shop rules, templates,
+              anything you want a new member to have. Links to Google Docs work
+              well.
+            </p>
+            <Link
+              href="/settings/guides"
+              className="rounded-tile border-line hover:bg-surface text-ink mt-4 inline-flex items-center gap-2 border px-4 py-2.5 text-[15px] font-semibold transition-colors"
+            >
+              Edit the guides →
+            </Link>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/*
+        Only for people who'd actually receive one. A toggle for a message a
+        plain member never gets is a setting that does nothing.
+      */}
+      {digestReasons.length > 0 ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Daily Digest</SectionLabel>
+            <h2 className="text-ink mt-2 text-2xl font-bold">
+              One message each evening
+            </h2>
+            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+              Because you hold responsibility for work or people, Discord sends
+              you a summary each evening — what moved, what&apos;s gone quiet
+              and for how long, and anything due inside a week.
+            </p>
+            <div className="mt-5">
+              <DigestToggle
+                optedOut={viewer.member.dailyDigestOptOut ?? false}
+                reasons={digestReasons}
+              />
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {/* The club's own name. Co-Lead only, like everything else that
           reshapes the org. */}

@@ -2,18 +2,24 @@ import Link from "next/link";
 import { Clock } from "lucide-react";
 
 /**
- * "You haven't logged any hours yet" — once, until they do.
+ * "You haven't logged any work yet" — once, until they do.
+ *
+ * Called `LogHoursBanner` until the tiers went, and it kept asking members for
+ * hours for a while after there was anywhere to put them: it is rendered by the
+ * app shell on every page, so it was simultaneously the most-read copy in the
+ * product and the easiest thing to miss when grepping for a model field. Worth
+ * remembering that a component whose NAME contains a deleted concept is how a
+ * removal ends up half-done.
  *
  * ---------------------------------------------------------------------------
  * Why this is worth a banner
  * ---------------------------------------------------------------------------
  *
- * Logging hours is the one habit the whole app rests on, and it is the habit
- * nothing in a student's life has taught them. Everything downstream is built
- * on it: check-ins pre-fill from logged hours, the commitment tier IS hours per
- * in-session week, and the Delivered signal sits next to an effort figure that
- * reads zero. A member can do six weeks of real work and have a record that says
- * they did nothing — and the record is what a Lead sees.
+ * Logging what you did is the one habit the whole app rests on, and it is the
+ * habit nothing in a student's life has taught them. Everything downstream is
+ * built on it: check-ins pre-fill from the log, and the Delivered signal sits
+ * beside a record that reads empty. A member can do six weeks of real work and
+ * have a record that says they did nothing — and the record is what a Lead sees.
  *
  * That failure is completely silent. Nobody is told they're invisible; they just
  * are. Which is exactly the case a banner is for, and exactly the case a
@@ -40,19 +46,19 @@ import { Clock } from "lucide-react";
  * their Lead's review queue is the thing that says it. A banner that reappears
  * whenever somebody has a quiet fortnight is a banner people learn to look past.
  */
-export function LogHoursBanner() {
+export function LogWorkBanner() {
   return (
     <div className="border-cardinal-200 bg-cardinal-50 border-b">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-2.5 sm:px-8">
         <Clock className="text-cardinal-600 size-4 shrink-0" />
         <p className="text-ink min-w-0 text-sm">
           <span className="font-semibold">
-            You haven&apos;t logged any hours yet.
+            You haven&apos;t logged any work yet.
           </span>{" "}
           <span className="text-ink-soft">
-            Log them every time you work on something for the club, however
-            small — it takes about ten seconds. It&apos;s how your effort shows
-            up at all: your check-ins fill themselves in from it, and without it
+            Write a line every time you work on something for the club, however
+            small — it takes about ten seconds. It&apos;s how your work shows up
+            at all: your check-ins fill themselves in from it, and without it
             your record reads as nothing no matter how much you&apos;ve done.
           </span>
         </p>
@@ -60,7 +66,7 @@ export function LogHoursBanner() {
           href="/my-work"
           className="text-cardinal-600 hover:text-cardinal-700 text-sm font-bold whitespace-nowrap"
         >
-          Log hours →
+          Log what you did →
         </Link>
       </div>
     </div>

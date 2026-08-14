@@ -371,7 +371,7 @@ export default async function ProjectDetailPage({
             were the part carrying no information: three hours of what? Since
             2026-08-14 there is no duration to show, which is the whole point.
           */}
-          {mayManage && view.recentHours.length > 0 ? (
+          {mayManage && view.recentWorkLog.length > 0 ? (
             <Card>
               <CardBody>
                 <SectionLabel>Recent Work</SectionLabel>
@@ -381,7 +381,7 @@ export default async function ProjectDetailPage({
                   check-in.
                 </p>
                 <div className="mt-4 space-y-2">
-                  {view.recentHours.map(({ log, member }) => (
+                  {view.recentWorkLog.map(({ log, member }) => (
                     <div
                       key={log.id}
                       className="rounded-tile border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border px-3.5 py-2.5"

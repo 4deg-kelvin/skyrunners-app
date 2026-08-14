@@ -5,7 +5,7 @@ import { getMyWork } from "@/lib/data/my-work";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { getClubIdentity } from "@/lib/data/settings";
 import { DiscordBanner } from "@/components/ui/discord-banner";
-import { LogHoursBanner } from "@/components/ui/log-hours-banner";
+import { LogWorkBanner } from "@/components/ui/log-work-banner";
 import { daysBetweenDays, todayInClubTime } from "@/lib/dates";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import type { Metadata } from "next";
@@ -93,7 +93,7 @@ export default async function AppLayout({
     honest to nag about before they've done any work. Expressing the delay as
     `joinedAt` versus today means it starts applying on its own, with no cron.
   */
-  let nudgeToLogHours = false;
+  let nudgeToLogWork = false;
   /*
     Skipped entirely for advisors, and not merely hidden.
 
@@ -112,7 +112,7 @@ export default async function AppLayout({
         myWork.currentUpdate.update.status === "late";
       alertCount =
         (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
-      nudgeToLogHours =
+      nudgeToLogWork =
         !myWork.hasEverLoggedWork &&
         daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;
     } catch {
@@ -120,7 +120,7 @@ export default async function AppLayout({
       // 500 on every authenticated route, and a banner that appears because a
       // lookup threw would tell somebody they've logged nothing on no evidence.
       alertCount = 0;
-      nudgeToLogHours = false;
+      nudgeToLogWork = false;
     }
   }
 
@@ -163,7 +163,7 @@ export default async function AppLayout({
           botLive={discordIsConfigured()}
         />
       ) : null}
-      {nudgeToLogHours && !isAdvisor(viewer.actor) ? <LogHoursBanner /> : null}
+      {nudgeToLogWork && !isAdvisor(viewer.actor) ? <LogWorkBanner /> : null}
       <TopNav
         memberId={viewer.member.id}
         userName={viewer.member.fullName}

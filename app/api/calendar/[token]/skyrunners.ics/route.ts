@@ -228,6 +228,13 @@ export async function GET(
     name: "SkyRunners",
     description: `Club sessions, meetings and reviews you are on. Managed at ${appUrl("/calendar")}`,
     stampAt: new Date(),
+    /*
+      Dates the "calendar connected" placeholder that a brand-new member's feed
+      consists entirely of. From the feed row so it never moves — see
+      `placeholderLines`. This is the fix for a subscription Google refused to
+      add at all, which presented as a bad URL rather than as an empty calendar.
+    */
+    connectedOn: feed.createdAt.slice(0, 10),
   });
 
   /*

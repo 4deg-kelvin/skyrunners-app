@@ -274,31 +274,87 @@ function eventLines(event: IcsEvent, stamp: string): string[] {
   lines.push("TRANSP:OPAQUE");
 
   /*
-    A reminder — which this feed had none of, and it was the real gap.
+    NO VALARM, deliberately.
 
-    Anish asked whether RSVPing produces a notification. It does not and cannot: a
-    subscription is a pull, so nothing pings when an event APPEARS in a calendar.
-    A VALARM is what actually gets somebody notified, because their own device
-    fires it before the event — no server involvement, and it works on every
-    client including Apple, where we have no API at all.
+    An earlier version emitted a 30-minute reminder. Anish removed it, and the
+    reasoning is worth keeping: the ask was only ever that a club event POPULATE
+    somebody's calendar. How they want to be reminded about their own diary is
+    their setting, not the club's.
 
-    Thirty minutes: long enough to walk to the lab, short enough not to fire in the
-    middle of something else. `DISPLAY` rather than `EMAIL`, which asks the client
-    to send mail on the club's behalf, or `AUDIO`, which is nobody's friend.
+    It is also the more honest choice. Whether a SUBSCRIBED calendar honours an
+    alarm is entirely the client's decision — Apple fires them, Google discards
+    them on calendars added from a URL — so the feature would have worked for some
+    members and silently not for others, with nobody able to tell which. Every
+    calendar app already lets its owner set a default reminder per calendar, which
+    is the right place for that decision and works today.
 
-    On a repeating event the alarm belongs to the series, so EVERY occurrence gets
-    one. That is what makes "RSVP once to the weekly meeting" genuinely useful
-    rather than merely tidy.
+    If a reminder is ever genuinely needed, the reliable channel is a Discord DM
+    from the existing daily cron, not this file.
   */
-  lines.push("BEGIN:VALARM");
-  lines.push("ACTION:DISPLAY");
-  lines.push(`DESCRIPTION:${escapeText(event.title)}`);
-  lines.push("TRIGGER:-PT30M");
-  lines.push("END:VALARM");
-
   lines.push("END:VEVENT");
 
   return lines;
+}
+
+/**
+ * The one event a calendar is never allowed to be without.
+ *
+ * ---------------------------------------------------------------------------
+ * Google refuses to ADD a feed that contains no events at all
+ * ---------------------------------------------------------------------------
+ *
+ * This shipped as a real bug and it looked like a broken URL. A member who
+ * connects their calendar before they have joined anything has an empty event
+ * list, which produced a valid, empty VCALENDAR — legal per RFC 5545, and
+ * rejected by Google Calendar's "From URL" box with "Validation failed, please
+ * edit the URL and try again". Nothing about that message points at "you are on
+ * no events yet", so the member concludes the link is wrong and tries again,
+ * forever. That was Anish's report.
+ *
+ * Emitting one placeholder makes the document acceptable to every client, and it
+ * is worth having on its own merits: a subscription that appears as an empty
+ * calendar is indistinguishable from one that silently failed, so this is also
+ * the only confirmation a member ever gets that the connection works.
+ *
+ * Three deliberate properties:
+ *
+ *   - **All-day**, so it occupies no time slot. DTEND on an all-day event is
+ *     exclusive, hence the next day.
+ *   - **TRANSPARENT**, so it never marks anybody busy. This is the one event in
+ *     the feed that is not a commitment, and OPAQUE would make a note about
+ *     nothing collide with a lecture.
+ *   - **Dated when the feed was made**, not today. A DTSTART derived from the
+ *     stamp would move the note forward every time a client polled, so it would
+ *     follow the member down their calendar a day at a time — the kind of
+ *     harmless-looking wrongness nobody reports and everybody notices.
+ *
+ * It disappears from the feed as soon as there is a real event, which is the
+ * correct end state: it exists only to answer "did this work".
+ */
+function placeholderLines(connectedOn: string, stamp: string): string[] {
+  const start = connectedOn.slice(0, 10).replace(/-/g, "");
+  const next = new Date(`${connectedOn.slice(0, 10)}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const end = next.toISOString().slice(0, 10).replace(/-/g, "");
+
+  return [
+    "BEGIN:VEVENT",
+    `UID:${uidFor("calendar-connected")}`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${start}`,
+    `DTEND;VALUE=DATE:${end}`,
+    "SUMMARY:SkyRunners calendar connected",
+    `DESCRIPTION:${escapeText(
+      "Your SkyRunners calendar is working. Club sessions and meetings will " +
+        "appear here as soon as you say you're coming to one — this note will " +
+        "go away once you have.\n\nRSVP on the website: " +
+        "https://skyrunners-app.vercel.app/calendar"
+    )}`,
+    "SEQUENCE:0",
+    "STATUS:CONFIRMED",
+    "TRANSP:TRANSPARENT",
+    "END:VEVENT",
+  ];
 }
 
 /**
@@ -307,10 +363,19 @@ function eventLines(event: IcsEvent, stamp: string): string[] {
  * @param name  What the calendar is called in the member's client. Worth being
  *              specific — it sits in a sidebar next to "Home" and "Birthdays".
  * @param stampAt Now, injected so the output is deterministic under test.
+ * @param connectedOn `YYYY-MM-DD` the feed was created. Dates the placeholder
+ *              that keeps an eventless calendar addable — see
+ *              `placeholderLines`. Falls back to the stamp day if absent, which
+ *              is only ever a caller that has no feed row to hand.
  */
 export function buildIcs(
   events: IcsEvent[],
-  options: { name: string; description?: string; stampAt: Date }
+  options: {
+    name: string;
+    description?: string;
+    stampAt: Date;
+    connectedOn?: string;
+  }
 ): string {
   const stamp = `${options.stampAt.toISOString().slice(0, 19).replace(/[-:]/g, "")}Z`;
 
@@ -346,6 +411,23 @@ export function buildIcs(
   }
 
   for (const event of events) lines.push(...eventLines(event, stamp));
+
+  /*
+    A calendar with no VEVENT is unaddable in Google, so there is always one.
+
+    Checked on the OUTPUT rather than trusted to the caller: the route builds its
+    event list from a filtered store read, and every future caller will do
+    something similar, so "did that come back empty" is exactly the question a
+    caller forgets to ask. Here it cannot be forgotten.
+  */
+  if (events.length === 0) {
+    lines.push(
+      ...placeholderLines(
+        options.connectedOn ?? options.stampAt.toISOString().slice(0, 10),
+        stamp
+      )
+    );
+  }
 
   lines.push("END:VCALENDAR");
 

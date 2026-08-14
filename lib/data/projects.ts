@@ -312,7 +312,7 @@ export interface ProjectDetailView {
    * already having reported that day — signing a deliverable off has no
    * bearing on it at all.
    */
-  recentHours: {
+  recentWorkLog: {
     log: WorkLog;
     member?: Member;
   }[];
@@ -476,7 +476,7 @@ export async function getProjectBySlug(
     parent: project.parentId ? getProject(project.parentId) : undefined,
     timeline: projectTimeline(project),
     events: upcomingEventsFor(project.id, viewerId, viewerIsLeadership),
-    recentHours: recentHoursOn(project.id),
+    recentWorkLog: recentWorkLogOn(project.id),
     deliverables: projectDeliverables(project.id).map((d) => ({
       deliverable: d,
       owner: getMember(d.ownerId),
@@ -883,7 +883,9 @@ function upcomingEventsFor(
  * and a project a year old would render a wall nobody reads. The total per
  * person is on the member rows above for the longer view.
  */
-function recentHoursOn(projectId: string): { log: WorkLog; member?: Member }[] {
+function recentWorkLogOn(
+  projectId: string
+): { log: WorkLog; member?: Member }[] {
   const cutoff = new Date(`${today()}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - 21);
   const from = cutoff.toISOString().slice(0, 10);

@@ -297,7 +297,7 @@ export default async function MemberProfilePage({
                   <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
                     <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
                     <span>
-                      Hours and update contents are visible only to this
+                      The work log and update contents are visible only to this
                       member&apos;s Lead chain and the REs of projects they
                       contribute to. Their project work is public — see above.
                     </span>

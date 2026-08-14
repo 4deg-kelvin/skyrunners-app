@@ -530,8 +530,8 @@ export default async function DashboardPage({
               <CardBody>
                 <SectionLabel>Gone Quiet</SectionLabel>
                 <p className="text-ink-soft mt-2 text-[15px]">
-                  No hours logged this week, but still holding open work. Worth
-                  a message — usually it&apos;s midterms, sometimes it&apos;s
+                  Nothing logged this week, but still holding open work. Worth a
+                  message — usually it&apos;s midterms, sometimes it&apos;s
                   being stuck and not saying so.
                 </p>
 
@@ -562,7 +562,7 @@ export default async function DashboardPage({
                                   day: "numeric",
                                   timeZone: "UTC",
                                 })}`
-                              : " · has never logged hours"}
+                              : " · has never logged any work"}
                           </p>
                         </div>
                         <ContactLink member={member} showLabel={false} />

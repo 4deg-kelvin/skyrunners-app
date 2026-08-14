@@ -228,14 +228,19 @@ describe("the document a client actually parses", () => {
     assert.equal((ics.match(/END:VEVENT/g) ?? []).length, 2);
   });
 
-  test("an empty calendar is still a valid document", () => {
-    // A brand-new member is on no events. This must be a parseable empty
-    // calendar, not an error page — a client that gets HTML here may unsubscribe
-    // itself, and the member would never know why.
+  test("a calendar with no events of its own is still a valid document", () => {
+    /*
+      A brand-new member is on no events. This must be a parseable calendar, not
+      an error page — a client that gets HTML here may unsubscribe itself, and
+      the member would never know why.
+
+      This test used to assert there was NO VEVENT in that case. That was the
+      bug: legal per RFC 5545, and refused outright by Google's "From URL" box.
+      See the "eventless calendar" block below for what replaced it.
+    */
     const ics = build([]);
     assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
     assert.match(ics, /END:VCALENDAR\r\n$/);
-    assert.ok(!ics.includes("BEGIN:VEVENT"));
   });
 });
 
@@ -335,32 +340,104 @@ describe("a repeating meeting in the feed", () => {
   });
 });
 
-describe("reminders", () => {
-  test("every event carries a VALARM", () => {
+describe("no reminder is emitted", () => {
+  test("there is no VALARM", () => {
     /*
-      The answer to "will they get a notification". Nothing pings when an event
-      APPEARS — a subscription is a pull — but the member's own device fires this
-      before the event, on every client, including Apple where we have no API.
+      Removed on request. The feature is only that a club event POPULATES a
+      member's calendar; how they want reminding about their own diary is their
+      own setting.
+
+      Asserted rather than just deleted, because "add a helpful 30-minute
+      reminder" is an obvious-looking improvement somebody will reach for again —
+      and whether a SUBSCRIBED calendar honours an alarm is the client's call, so it
+      would fire for Apple users and silently not for Google ones. That asymmetry
+      is worse than having no reminder at all.
+
+      If one is ever genuinely wanted, the reliable channel is a Discord DM from
+      the existing daily cron.
     */
     const ics = build([event()]);
-    assert.match(ics, /BEGIN:VALARM/);
-    assert.match(ics, /ACTION:DISPLAY/);
-    assert.match(ics, /TRIGGER:-PT30M/);
-    assert.match(ics, /END:VALARM/);
+    assert.ok(!ics.includes("VALARM"), "no alarm block");
+    assert.ok(!ics.includes("TRIGGER"), "no trigger line");
   });
 
-  test("the alarm is INSIDE the event", () => {
-    // A VALARM outside a VEVENT is invalid and some clients reject the whole file.
+  test("the event itself is still complete without one", () => {
+    // Guards against the removal having taken a neighbouring line with it.
     const ics = build([event()]);
-    const ev = ics.indexOf("BEGIN:VEVENT");
-    const al = ics.indexOf("BEGIN:VALARM");
-    const end = ics.indexOf("END:VEVENT");
-    assert.ok(ev < al && al < end, "VALARM must be nested in VEVENT");
+    assert.match(ics, /BEGIN:VEVENT/);
+    assert.match(ics, /TRANSP:OPAQUE/);
+    assert.match(ics, /END:VEVENT/);
+  });
+});
+
+describe("an eventless calendar — the one Google would not add", () => {
+  /*
+    A member who connects before joining anything has no events, and an empty
+    VCALENDAR is legal per RFC 5545 but Google's "From URL" box rejects it with
+    "Validation failed, please edit the URL and try again". Anish hit exactly
+    this and reasonably read it as a broken link.
+
+    So the document always carries at least one VEVENT. These tests pin both
+    halves: that it appears when it must, and that it disappears the moment it
+    is not needed.
+  */
+  test("still has a VEVENT, so a client will accept it", () => {
+    const ics = build([]);
+    assert.equal(ics.match(/BEGIN:VEVENT/g)?.length, 1);
+    assert.match(ics, /SUMMARY:SkyRunners calendar connected/);
   });
 
-  test("alarm blocks are balanced", () => {
-    const ics = build([event({ id: "a" }), event({ id: "b" })]);
-    assert.equal((ics.match(/BEGIN:VALARM/g) ?? []).length, 2);
-    assert.equal((ics.match(/END:VALARM/g) ?? []).length, 2);
+  test("it is all-day, so it occupies no time slot", () => {
+    const ics = build([]);
+    assert.match(ics, /DTSTART;VALUE=DATE:20260814/);
+    // DTEND on an all-day event is EXCLUSIVE — the next day, or clients draw
+    // a zero-length event and some drop it.
+    assert.match(ics, /DTEND;VALUE=DATE:20260815/);
+  });
+
+  test("it never marks anybody busy", () => {
+    /*
+      The only event in the feed that is not a commitment. OPAQUE would make a
+      note about nothing collide with a lecture, which is the opposite of the
+      point of putting club events in a personal calendar.
+    */
+    assert.match(build([]), /TRANSP:TRANSPARENT/);
+  });
+
+  test("it is dated when the feed was made, NOT today", () => {
+    /*
+      The subtle one, and the reason `connectedOn` is plumbed through from the
+      feed row at all. A DTSTART taken from the stamp would move forward every
+      time a calendar app polled — so the note would walk down the member's
+      calendar a day at a time, forever. Nobody reports that; everybody sees it.
+    */
+    const ics = buildIcs([], {
+      name: "SkyRunners",
+      stampAt: STAMP,
+      connectedOn: "2026-03-02",
+    });
+    assert.match(ics, /DTSTART;VALUE=DATE:20260302/);
+    assert.match(ics, /DTEND;VALUE=DATE:20260303/);
+    assert.ok(!ics.includes("VALUE=DATE:20260814"), "not the stamp day");
+  });
+
+  test("month and year roll over correctly", () => {
+    // `setUTCDate` past the end of the month is the whole reason this uses Date
+    // arithmetic rather than string surgery on the day component.
+    const ics = buildIcs([], {
+      name: "SkyRunners",
+      stampAt: STAMP,
+      connectedOn: "2026-12-31",
+    });
+    assert.match(ics, /DTEND;VALUE=DATE:20270101/);
+  });
+
+  test("one real event replaces it entirely", () => {
+    const ics = build([event()]);
+    assert.equal(ics.match(/BEGIN:VEVENT/g)?.length, 1);
+    assert.ok(
+      !ics.includes("SkyRunners calendar connected"),
+      "the placeholder exists only to answer 'did this work'"
+    );
   });
 });

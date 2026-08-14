@@ -99,6 +99,31 @@ export default async function CalendarPage() {
         }
       />
 
+      {/*
+        Where to go to get this in your own calendar.
+
+        A pointer rather than the control itself, because the control belongs in
+        Settings beside its sibling ("Connect your AI") and duplicating it would be
+        two places to rotate a token from. But THIS is the page somebody is on when
+        the thought occurs — Anish went looking for it here and reported there was
+        "nowhere to link my calendar", which is the right complaint about a feature
+        living only where he wasn't.
+
+        Shown to everyone, including people already connected: it's one line, and
+        the alternative is loading a feed row into this page purely to hide a link.
+      */}
+      <p className="text-ink-muted px-1 text-sm">
+        Want these in your own calendar?{" "}
+        <Link
+          href="/settings"
+          className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+        >
+          Connect Apple, Google or Outlook in Settings
+        </Link>{" "}
+        — one link, once, and anything you say you&apos;re coming to shows up
+        there.
+      </p>
+
       {days.length === 0 ? (
         <Card>
           <CardBody>
@@ -175,7 +200,7 @@ export default async function CalendarPage() {
       <p className="text-ink-muted px-1 text-sm">
         Sessions keep running over breaks — the academic calendar pauses
         check-ins, not the club. Helping on something you&apos;re not committed
-        to? Log those hours as <span className="font-semibold">misc</span>.
+        to? Log it against <span className="font-semibold">misc</span>.
       </p>
     </div>
   );

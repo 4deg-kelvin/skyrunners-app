@@ -30,7 +30,6 @@ import {
   generateFeedToken,
   hashFeedToken,
   looksLikeFeedToken,
-  type CalendarClient,
 } from "./feed-token";
 
 export interface FeedSummary {
@@ -146,9 +145,17 @@ export function feedUrl(origin: string, token: string): string {
  * The shape check runs FIRST so a mangled paste — the commonest failure by far —
  * costs no database round trip.
  */
-export async function feedByToken(
-  token: string
-): Promise<{ memberId: string; feedId: string } | null> {
+export async function feedByToken(token: string): Promise<{
+  memberId: string;
+  feedId: string;
+  /**
+   * When this feed was made. Dates the placeholder event that keeps an
+   * eventless calendar addable in Google — see `placeholderLines` in
+   * `lib/calendar/ics.ts`. It has to be a fixed point in the past rather than
+   * "today", or the note moves forward every time a client polls.
+   */
+  createdAt: string;
+} | null> {
   if (!looksLikeFeedToken(token)) return null;
 
   const supabase = createAdminClient();
@@ -156,13 +163,17 @@ export async function feedByToken(
 
   const { data, error } = await supabase
     .from("calendar_feeds")
-    .select("id, member_id")
+    .select("id, member_id, created_at")
     .eq("token_hash", hashFeedToken(token))
     .is("revoked_at", null)
     .maybeSingle();
 
   if (error || !data) return null;
-  return { memberId: data.member_id as string, feedId: data.id as string };
+  return {
+    memberId: data.member_id as string,
+    feedId: data.id as string,
+    createdAt: data.created_at as string,
+  };
 }
 
 /**

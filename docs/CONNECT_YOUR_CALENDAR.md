@@ -12,7 +12,8 @@ clears itself when something is cancelled.
 
 1. On the website, go to **Settings → Your calendar**.
 2. Press **Connect my calendar**.
-3. Copy the link it shows you.
+3. Copy the link **for your app** — there are two, each labelled, and they are the
+   same subscription in two forms.
 4. Follow the line below for whatever you use.
 
 **iPhone, iPad or Mac** — just open the link. It starts with `webcal://`, which
@@ -85,11 +86,17 @@ Two different things, and it's worth being precise:
   and nothing pings. The bot covers that gap, and says when the meeting is.
 - **When you RSVP yourself, nothing pings** — you already know. The entry just
   appears in your calendar within a few hours.
-- **Before the event itself, your own device reminds you**, 30 minutes ahead. That's
-  built into every entry the feed sends, so it works on Apple, Google and Outlook
-  without the club doing anything.
+- **Before the event itself, nothing from us reminds you.** The feed deliberately
+  sends no alarm. The ask was that club events *populate* your calendar; how you
+  want reminding about your own diary is your setting, not the club's — and every
+  calendar app lets you set a default reminder per calendar, which is both the
+  right place for that choice and the only one that actually works everywhere.
+  (A subscribed calendar honours an alarm only if the app feels like it: Apple
+  fires them, Google discards them on calendars added from a URL. A reminder that
+  reached some members and silently not others would be worse than none.)
 
-So: added to something → Discord. About to happen → your own calendar alarm.
+So: added to something → Discord. Reminders before an event → your own calendar's
+setting, once, on the SkyRunners calendar.
 
 ---
 
@@ -116,6 +123,16 @@ Apple Calendar as well works — same link, and Apple polls much more often.
 ---
 
 ## Questions people actually ask
+
+**Google says "Validation failed, please edit the URL and try again".** You pasted
+the `webcal://` link. Google's box only accepts the `https://` one — copy the link
+labelled **Google Calendar** instead. (Google shows the same message for anything it
+can't fetch, but this is the reason nine times out of ten.)
+
+**There is one event called "SkyRunners calendar connected".** That is the
+confirmation it worked, and it appears when you are not yet on any sessions. It is
+an all-day note that marks you free, and it disappears by itself the first time you
+say you're coming to something.
 
 **Do I have to install anything?** No. It's a link.
 

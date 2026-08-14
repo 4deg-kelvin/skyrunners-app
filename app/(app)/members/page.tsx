@@ -46,7 +46,7 @@ export default async function MembersPage() {
       <PageHeader
         label="Roster"
         title="Members"
-        description={`${roster.length} active members. Who's on what, and what they're cleared to use, is public. Total hours and personal reports stay between a member and their Lead.`}
+        description={`${roster.length} active members. Who's on what, and what they're cleared to use, is public. Personal reports stay between a member and their Lead.`}
         action={
           mayInvite ? (
             <InviteMemberForm

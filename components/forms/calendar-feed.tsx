@@ -35,6 +35,43 @@ import type { CalendarClient } from "@/lib/calendar/feed-token";
  * a member who reconnects their laptop and finds their phone blank three days
  * later would otherwise have no way to work out why.
  */
+/**
+ * How to actually subscribe, per platform.
+ *
+ * Shown BEFORE the link is generated as well as after, which is the fix to a real
+ * complaint: these steps used to live inside the `{url ? ... }` block, so a member
+ * who wanted to know what they were committing to saw a heading, a sentence and a
+ * button — and nothing about how it works on their phone. "There is no tutorial"
+ * was the accurate reading of that.
+ *
+ * One component rather than two copies, because the pre- and post-link versions
+ * have to say the same thing. The only difference is that afterwards there is a
+ * link to paste.
+ */
+function SetupSteps({ compact = false }: { compact?: boolean }) {
+  return (
+    <ol
+      className={`text-ink-soft space-y-1.5 ${compact ? "text-xs" : "text-sm"}`}
+    >
+      <li>
+        <span className="text-ink font-semibold">iPhone, iPad or Mac:</span>{" "}
+        open the link — Calendar asks you to subscribe. Say yes.
+      </li>
+      <li>
+        <span className="text-ink font-semibold">Google Calendar:</span> on a
+        computer, Other calendars → <em>From URL</em>, and paste the{" "}
+        <code className="text-xs">https://</code> version. Google rejects{" "}
+        <code className="text-xs">webcal://</code>, and its phone app can&apos;t
+        add subscriptions — but once added on a computer it shows on your phone.
+      </li>
+      <li>
+        <span className="text-ink font-semibold">Outlook:</span> Add calendar →
+        Subscribe from web, and paste either form.
+      </li>
+    </ol>
+  );
+}
+
 export function CalendarFeed({
   feed,
   clients,
@@ -61,13 +98,34 @@ export function CalendarFeed({
     does rather than looking like a "view" button.
   */
   const [url, setUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  /*
+    WHICH form was copied, not just "something was".
+
+    Two links are offered now — see the panel below — and a single boolean put the
+    tick on both buttons at once, which reads as "you already did this" next to
+    the one the member has not pressed.
+  */
+  const [copied, setCopied] = useState<"webcal" | "https" | null>(null);
 
   if (!canUse) {
+    /*
+      Demo mode still shows the STEPS, just not the button.
+
+      They're static text and they're the informative half — somebody evaluating a
+      fresh clone learns what the feature does, and a bare "needs a real database"
+      teaches them nothing. It also means the tutorial is verifiable without live
+      credentials, which is how the missing-tutorial bug got confirmed.
+    */
     return (
-      <p className="text-ink-soft text-sm">
-        Calendar subscriptions need a real database, and this is demo mode.
-      </p>
+      <div>
+        <p className="text-ink-soft text-sm">
+          Connecting a calendar needs a real database, and this is demo mode.
+          Here&apos;s what it looks like:
+        </p>
+        <div className="mt-3">
+          <SetupSteps compact />
+        </div>
+      </div>
     );
   }
 
@@ -89,7 +147,7 @@ export function CalendarFeed({
     // shape rather than on which button was pressed keeps this in one place.
     if (result.ok && result.message?.includes("/api/calendar/")) {
       setUrl(result.message);
-      setCopied(false);
+      setCopied(null);
     }
   };
 
@@ -168,20 +226,42 @@ export function CalendarFeed({
           </p>
         </div>
       ) : (
-        <ActionForm
-          action={createCalendarFeedAction}
-          onResult={captureUrl}
-          renderSubmit={(pending) => (
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors disabled:opacity-60"
-            >
-              <CalendarPlus className="size-4" strokeWidth={2.5} />
-              {pending ? "Setting it up…" : "Connect my calendar"}
-            </button>
-          )}
-        />
+        <div>
+          <ActionForm
+            action={createCalendarFeedAction}
+            onResult={captureUrl}
+            renderSubmit={(pending) => (
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-tile bg-cardinal-600 hover:bg-cardinal-700 inline-flex items-center gap-2 px-4 py-2.5 text-[15px] font-semibold text-white transition-colors disabled:opacity-60"
+              >
+                <CalendarPlus className="size-4" strokeWidth={2.5} />
+                {pending ? "Setting it up…" : "Connect my calendar"}
+              </button>
+            )}
+          />
+
+          {/*
+            The steps, BEFORE pressing anything.
+
+            They used to live only inside the "here is your link" panel, so this
+            whole card was a heading, one sentence and a button — and Anish's
+            reading of it, "there is no tutorial", was exactly right. Somebody
+            deciding whether to bother needs to know it is three taps on an iPhone
+            and a trip to a computer on Google.
+
+            Numbered and phrased identically to the post-link version, because it is
+            the same component. `compact` only shrinks the type, since here it is
+            preview rather than instruction.
+          */}
+          <div className="border-line mt-4 border-t pt-3">
+            <p className="text-ink-muted mb-2 text-xs font-semibold tracking-wide uppercase">
+              What happens next
+            </p>
+            <SetupSteps compact />
+          </div>
+        </div>
       )}
 
       {url && webcal ? (
@@ -190,48 +270,84 @@ export function CalendarFeed({
             Your personal calendar link
           </p>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
-              {webcal}
-            </code>
-            <button
-              onClick={() => {
-                void navigator.clipboard.writeText(webcal);
-                setCopied(true);
-              }}
-              className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
-            >
-              {copied ? (
-                <Check className="size-4" />
-              ) : (
-                <Copy className="size-4" />
-              )}
-              {copied ? "Copied" : "Copy"}
-            </button>
+          {/*
+            BOTH forms, each with its own copy button, each labelled with what it
+            is for.
+
+            This is a bug fix and the bug was mine. The webcal form used to be the
+            only thing with a copy button and the https form was a line of grey
+            text at the bottom — while the instructions two inches below said
+            Google needs the https one. So the obvious path (press Copy, paste
+            into Google) produced "Validation failed, please edit the URL and try
+            again", which is Google's message for a URL it will not accept, and
+            it names neither the scheme nor the real problem. Anish hit it
+            immediately.
+
+            Google is not being difficult: `webcal://` is not a scheme its fetcher
+            speaks. Apple and Outlook accept either, and webcal is much nicer
+            there because the OS hands it straight to the calendar app, so the
+            answer is to offer both and say which is which rather than to pick one.
+          */}
+          <div className="mt-3 space-y-3">
+            <div>
+              <p className="text-ink text-xs font-bold">
+                Apple Calendar or Outlook — open this on the device
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+                  {webcal}
+                </code>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(webcal);
+                    setCopied("webcal");
+                  }}
+                  className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+                >
+                  {copied === "webcal" ? (
+                    <Check className="size-4" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  {copied === "webcal" ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-ink text-xs font-bold">
+                Google Calendar — paste this one
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+                  {url}
+                </code>
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(url);
+                    setCopied("https");
+                  }}
+                  className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+                >
+                  {copied === "https" ? (
+                    <Check className="size-4" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  {copied === "https" ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <p className="text-ink-muted mt-1 text-xs">
+                Google rejects the <code className="text-xs">webcal://</code>{" "}
+                form with &ldquo;Validation failed&rdquo; — if you see that, you
+                have the wrong one of these two.
+              </p>
+            </div>
           </div>
 
-          <ol className="text-ink-soft mt-3 space-y-1.5 text-sm">
-            <li>
-              <span className="text-ink font-semibold">
-                iPhone, iPad or Mac:
-              </span>{" "}
-              open the link above — Calendar asks you to subscribe. Say yes.
-            </li>
-            <li>
-              <span className="text-ink font-semibold">Google Calendar:</span>{" "}
-              Other calendars → <em>From URL</em>, and paste the{" "}
-              <code className="text-xs">https://</code> version below. Google
-              rejects <code className="text-xs">webcal://</code>.
-            </li>
-            <li>
-              <span className="text-ink font-semibold">Outlook:</span> Add
-              calendar → Subscribe from web, and paste either form.
-            </li>
-          </ol>
-
-          <p className="text-ink-muted mt-3 text-xs break-all">
-            https version: {url}
-          </p>
+          <div className="mt-3">
+            <SetupSteps />
+          </div>
 
           <p className="text-ink-muted mt-2 text-xs">
             Treat it like a password — anyone with the link can see which club

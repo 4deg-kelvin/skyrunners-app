@@ -26,6 +26,11 @@ Go to **Settings → Connect your AI** on the website and press **New token**.
 it is stored, so nobody, including whoever runs the site, can recover it. Lost
 one? Revoke it and make another; it takes ten seconds.
 
+The panel that appears after you press **Create token** also gives you the whole
+`claude mcp add` command with your token and the server URL already filled in, so
+step 2 is one paste into a terminal. Nothing on that panel survives leaving the
+page — that is the "shown once" rule working, not a bug.
+
 Tokens last 180 days.
 
 ### 2. Add it to Claude

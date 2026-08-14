@@ -224,7 +224,7 @@ export default async function LeadingPage() {
             </Rule>
             <Rule title="Read the personal report of somebody on your project">
               You get the per-project half — what they said about <em>your</em>{" "}
-              project — and not their total hours, reliability or record. Those
+              project — and not their personal record or reliability. Those
               belong to them and their Lead. Being on your project doesn&apos;t
               make you responsible for the person.
             </Rule>
@@ -272,10 +272,10 @@ export default async function LeadingPage() {
               same problem will find it, rather than in a DM only you can read.
             </Rule>
             <Rule title="Give an advisor a deliverable">
-              There&apos;s nowhere to. They own no work, log no hours and file
-              no check-ins, so they appear in no staffing count and no
-              contribution record. A project with two engineers and a professor
-              is a project with two engineers.
+              There&apos;s nowhere to. They own no work, log nothing and file no
+              check-ins, so they appear in no staffing count and no contribution
+              record. A project with two engineers and a professor is a project
+              with two engineers.
             </Rule>
             <Rule title="Report to one, or have one report to you">
               They sit outside the reporting chain entirely, in both directions.
@@ -399,12 +399,11 @@ export default async function LeadingPage() {
 
           <div className="mt-4 space-y-2.5">
             <Rule title="Read the personal report of somebody who doesn't report to you">
-              Total hours, reliability and the contribution record belong to the
-              member and their Lead chain. An RE gets the per-project half
-              instead — what somebody wrote about <em>their project</em>, which
-              is public to everyone. Reviewing is one named person&apos;s
-              obligation, and that&apos;s exactly what makes the escalation mean
-              something.
+              The personal record and reliability belong to the member and their
+              Lead chain. An RE gets the per-project half instead — what
+              somebody wrote about <em>their project</em>, which is public to
+              everyone. Reviewing is one named person&apos;s obligation, and
+              that&apos;s exactly what makes the escalation mean something.
             </Rule>
             <Rule title="Mark a project complete when you're its RE">
               Finishing the work and agreeing it&apos;s finished are different
@@ -465,11 +464,6 @@ export default async function LeadingPage() {
                 </span>{" "}
                 — it&apos;s the one setup step with no other symptom.
               </Rule>
-              <Rule can title="Commitment expectations">
-                The hours behind Core, Committed and Contributing. Changing them
-                updates the published rubric immediately; it renames tiers and
-                recalculates nobody&apos;s hours.
-              </Rule>
               <Rule can title="The trainings catalogue">
                 Sites and machines are data, not code — add one and it appears
                 for everyone with no deploy.
@@ -521,7 +515,7 @@ export default async function LeadingPage() {
 
         Everything above is the permission model — what the code will and won't
         let you do. This is the other half: chasing people who stop logging
-        hours, running a design review, handing a project over cleanly. None of
+        their work, running a design review, handing a project over cleanly. None of
         that is enforceable in software and all of it changes term to term,
         which is exactly why it's editable at /settings/guides rather than
         hard-coded here.

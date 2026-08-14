@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Plus } from "lucide-react";
+import { Bot, Check, Copy, Plus } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import { createMcpTokenAction, revokeMcpTokenAction } from "@/lib/actions";
@@ -31,6 +31,26 @@ export function McpTokens({
   canUse: boolean;
 }) {
   const [open, setOpen] = useState(false);
+
+  /*
+    The minted token, held HERE rather than left inside the form.
+
+    This is a bug fix, and the bug made the whole feature unusable: the token
+    arrives as the first line of the action's success message, `ActionForm`
+    renders that message inside itself, and this component used to pass
+    `onSuccess={() => setOpen(false)}` — which unmounted the form in the same
+    tick the token appeared. Anish's report was exactly right: "I can never see
+    the token when it is made, it never shows for me." It rendered and was
+    destroyed before paint.
+
+    Only the hash is stored, so there is no second chance to show it. Lifting it
+    into state that OUTLIVES the form is the fix, which is what
+    `components/forms/calendar-feed.tsx` already does with the feed URL — worth
+    noting that the two are the same pattern, since a third one-time secret would
+    otherwise arrive at the same trap.
+  */
+  const [minted, setMinted] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"token" | "command" | null>(null);
 
   if (!canUse) {
     return (
@@ -100,7 +120,22 @@ export function McpTokens({
           submitLabel="Create token"
           submittingLabel="Creating…"
           className="rounded-card border-line bg-card border p-4"
-          onSuccess={() => setOpen(false)}
+          /*
+            `onResult`, not `onSuccess` — the difference is the whole fix.
+
+            The token is the first line of the message; the rest is the warning
+            that it won't be shown again. Guarded on the `skr_` prefix so a
+            future change to that copy can't silently start storing a sentence
+            in place of a credential.
+          */
+          onResult={(result) => {
+            if (!result.ok || !result.message) return;
+            const token = result.message.split("\n")[0].trim();
+            if (!token.startsWith("skr_")) return;
+            setMinted(token);
+            setCopied(null);
+            setOpen(false);
+          }}
         >
           <label className="block">
             <span className="text-ink mb-1 block text-sm font-semibold">
@@ -128,7 +163,7 @@ export function McpTokens({
                 Read only — ask questions, change nothing
               </option>
               <option value="write">
-                Read and write — assign work, update projects, log hours
+                Read and write — assign work, update projects, log what you did
               </option>
             </select>
             <span className="text-ink-muted mt-1 block text-xs">
@@ -153,11 +188,82 @@ export function McpTokens({
         </button>
       )}
 
+      {/*
+        The token, and the command that uses it.
+
+        Both, because "here is a secret" left Anish with a token and no idea what
+        to do with it — "I'm not sure how to link the mcp, and where to get the
+        token I made". The command has the token and the URL already in it, so
+        connecting is one paste into a terminal rather than a trip to a doc and
+        two substitutions.
+      */}
+      {minted ? (
+        <div className="rounded-tile border-cardinal-600/30 bg-cardinal-50 border px-4 py-3.5">
+          <p className="text-ink text-sm font-bold">Your token — copy it now</p>
+          <p className="text-ink-soft mt-1 text-sm">
+            This is the only time it is shown. If you lose it, revoke it above
+            and make another; nothing can print it again.
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+              {minted}
+            </code>
+            <button
+              onClick={() => {
+                void navigator.clipboard.writeText(minted);
+                setCopied("token");
+              }}
+              className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+            >
+              {copied === "token" ? (
+                <Check className="size-4" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+              {copied === "token" ? "Copied" : "Copy"}
+            </button>
+          </div>
+
+          <p className="text-ink mt-4 text-sm font-bold">
+            Claude Code — paste this in a terminal
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs whitespace-pre">
+              {`claude mcp add --transport http skyrunners ${serverUrl} --header "Authorization: Bearer ${minted}"`}
+            </code>
+            <button
+              onClick={() => {
+                void navigator.clipboard.writeText(
+                  `claude mcp add --transport http skyrunners ${serverUrl} --header "Authorization: Bearer ${minted}"`
+                );
+                setCopied("command");
+              }}
+              className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+            >
+              {copied === "command" ? (
+                <Check className="size-4" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+              {copied === "command" ? "Copied" : "Copy"}
+            </button>
+          </div>
+
+          <p className="text-ink-muted mt-3 text-xs">
+            In the Claude desktop or web app instead: Settings → Connectors →
+            Add custom connector, paste the server URL, and put{" "}
+            <code className="text-xs">Bearer </code>then your token in the
+            Authorization header.
+          </p>
+        </div>
+      ) : null}
+
       <p className="text-ink-muted flex items-start gap-2 text-xs">
         <Bot className="mt-0.5 size-3.5 shrink-0" />
         Risky and rare things stay on the website — deleting anything, changing
-        roles, archiving a division, or reading someone else&apos;s hours. Your
-        AI will tell you to come here for those.
+        roles, archiving a division, or reading someone else&apos;s personal
+        record. Your AI will tell you to come here for those.
       </p>
     </div>
   );
