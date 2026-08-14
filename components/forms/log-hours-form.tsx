@@ -43,9 +43,24 @@ export function LogHoursForm({
    * so `deleteHoursAction` had nothing to attach to and a mistyped 80 instead
    * of 8.0 was permanent. Correcting a number belongs beside entering it.
    */
-  recent?: { log: WorkLog; project?: { name: string }; locked: boolean }[];
+  recent?: {
+    log: WorkLog;
+    project?: { name: string };
+    locked: boolean;
+    /**
+     * Older than the fortnight window.
+     *
+     * True when the member has logged nothing recently and the data layer fell
+     * back to their last few entries — which is the case that matters for
+     * somebody returning after a break.
+     */
+    stale?: boolean;
+  }[];
 }) {
   const [open, setOpen] = useState(false);
+
+  // All-or-nothing by construction: the fallback either applied or it didn't.
+  const stale = recent.some((r) => r.stale);
 
   /*
     No early return for "you're on no projects" any more.
@@ -174,29 +189,55 @@ export function LogHoursForm({
 
       {recent.length > 0 ? (
         <div className="border-line mt-4 border-t pt-3">
+          {/*
+            Two different headings for two different situations.
+
+            Normally this list is for correcting a mistyped number. But when
+            the last fortnight is empty the data layer falls back to the last
+            few entries whatever their age — and for somebody back from
+            midterms the useful question isn't "which of these is wrong", it's
+            "what was I doing". Saying which one this is stops the older dates
+            reading as stale data.
+          */}
           <p className="text-ink-muted text-xs font-semibold tracking-wide uppercase">
-            Logged recently
+            {stale ? "Where you left off" : "Logged recently"}
           </p>
-          <ul className="mt-2 space-y-1.5">
+
+          <ul className="mt-2 space-y-2">
             {recent.map(({ log, project, locked }) => (
               <li
                 key={log.id}
-                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                className="flex flex-wrap items-start justify-between gap-2 text-sm"
               >
-                <span className="text-ink-soft min-w-0">
-                  <span className="text-ink font-semibold">
-                    {new Date(`${log.workDate}T00:00:00Z`).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric", timeZone: "UTC" }
-                    )}
-                  </span>{" "}
-                  · {log.hours} hrs
+                <span className="min-w-0">
                   {/*
-                    A misc entry has no project, and a blank there reads as
-                    missing data rather than as a deliberate choice.
+                    Project and date first, description on its OWN line. It
+                    used to be one run-on string joined by middots, which on a
+                    phone wrapped so the description — the only part that says
+                    what actually happened — ended up truncated at the end.
                   */}
-                  {project ? ` · ${project.name}` : " · Misc"}
-                  {log.description ? ` · ${log.description}` : ""}
+                  <span className="text-ink block font-semibold">
+                    {project ? project.name : "Misc"}
+                    <span className="text-ink-muted font-normal">
+                      {" · "}
+                      {new Date(`${log.workDate}T00:00:00Z`).toLocaleDateString(
+                        "en-US",
+                        { month: "short", day: "numeric", timeZone: "UTC" }
+                      )}
+                      {" · "}
+                      {log.hours} hrs
+                    </span>
+                  </span>
+
+                  {log.description ? (
+                    <span className="text-ink-soft mt-0.5 block">
+                      {log.description}
+                    </span>
+                  ) : (
+                    <span className="text-ink-muted mt-0.5 block text-xs italic">
+                      No note on what you did
+                    </span>
+                  )}
                 </span>
 
                 {/*

@@ -3540,6 +3540,28 @@ export function recentWorkLogs(memberId: string, days = 14) {
     );
 }
 
+/**
+ * The last few entries regardless of age — what were you working on?
+ *
+ * A different question from `recentWorkLogs`, which is windowed to a fortnight
+ * because its job is correcting a mistyped number and a two-month-old entry is
+ * not a mistake anybody is about to fix.
+ *
+ * This one exists for the person coming back from midterms. Their fortnight is
+ * empty, so the log form showed them nothing at all — at exactly the moment
+ * "which project was I on, and what had I done" is the question they have. An
+ * empty list there reads as "you have never done anything here", which is both
+ * wrong and discouraging for the member the club is most at risk of losing.
+ */
+export function lastWorkLogs(memberId: string, limit = 3) {
+  return live()
+    .workLogs.filter((w) => w.memberId === memberId)
+    .sort(
+      (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
+    )
+    .slice(0, limit);
+}
+
 export function hoursOnProject(memberId: string, projectId: string) {
   return live()
     .workLogs.filter(

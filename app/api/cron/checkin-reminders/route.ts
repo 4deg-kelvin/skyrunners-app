@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendDiscordDM, discordIsConfigured } from "@/lib/notify/discord";
-import { sendDailyDigests } from "@/lib/notify/send-digest";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 /**
@@ -31,8 +30,9 @@ import { formatDay, todayInClubTime } from "@/lib/dates";
  * on age, which names one person and is actionable in a way a fourth DM isn't.
  *
  * `late_notice_sent_at` (migration 0029) is what makes it once, exactly as
- * `reminder_sent_at` does for the nudge. Both passes run in this one route so
- * the club needs one cron job rather than two.
+ * `reminder_sent_at` does for the nudge. Both passes run in this one route
+ * because both hang off the same 23:59 UTC deadline and therefore want the
+ * same run time.
  *
  * ---------------------------------------------------------------------------
  * Once a day, at 19:30 UTC — and do NOT make it hourly
@@ -156,8 +156,9 @@ export async function GET(request: Request) {
     a channel gets muted. Each column is the other's guarantee that nobody gets
     both halves twice.
 
-    Two passes also mean one cron job instead of two, which is what the Hobby
-    plan allows — see the header.
+    Two passes rather than two cron jobs, because these two want the same
+    time — both hang off the 23:59 UTC deadline. The digest is a separate job
+    at `/api/cron/daily-digest` precisely because it does NOT.
   */
   const [ahead, late] = await Promise.all([
     supabase
@@ -185,25 +186,20 @@ export async function GET(request: Request) {
   }
 
   /*
-    Third pass: the daily digest for REs and Leads.
+    The daily digest used to run here as a third pass, to keep the club on one
+    scheduled job. It has moved to `/api/cron/daily-digest`.
 
-    Runs BEFORE the early return below, and that placement is the whole point.
-    On any evening where nobody happens to have a check-in due, the two passes
-    above find nothing and bail — and the digest would silently never go out,
-    on exactly the quiet days it's most worth reading.
-
-    Its own failures don't fail the run: a Discord outage must not stop the
-    check-in reminders, which are the older and more load-bearing job.
+    Why: the digest wants 8pm California and this job wants 19:30 UTC, and
+    19:30 is not arbitrary — every check-in is due at 23:59 UTC, so 19:30 plus
+    a five-hour window is what makes "due in about 4 hours" arrive before the
+    deadline instead of after it. One job cannot be at both times, and moving
+    this one would have turned the nudge into a post-mortem.
   */
-  const digest = await sendDailyDigests(todayInClubTime()).catch((error) => {
-    console.error("[cron] daily digest failed", error);
-    return { sent: 0, considered: 0, skipped: 0 };
-  });
 
   const aheadRows = (ahead.data ?? []) as Pending[];
   const lateRows = (late.data ?? []) as Pending[];
   if (aheadRows.length === 0 && lateRows.length === 0) {
-    return NextResponse.json({ ok: true, reminded: 0, chased: 0, digest });
+    return NextResponse.json({ ok: true, reminded: 0, chased: 0 });
   }
 
   /*
@@ -321,7 +317,6 @@ export async function GET(request: Request) {
     reminded,
     chased,
     considered: aheadRows.length + lateRows.length,
-    digest,
   });
 }
 
