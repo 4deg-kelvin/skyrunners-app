@@ -36,7 +36,7 @@ import {
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
-import { daysBetweenDays } from "@/lib/dates";
+import { addDays, daysBetweenDays } from "@/lib/dates";
 import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
   ClubEvent,
@@ -68,6 +68,16 @@ import {
   type Actor,
   type OrgGraph,
 } from "@/lib/permissions";
+
+/**
+ * How far ahead a scheduled session shows on a project's Gantt chart.
+ *
+ * A week. See the note at the loop that uses it: a project with a weekly build
+ * session would otherwise put fifty-two dots a year on a chart whose rows are
+ * meant to be deliverables, and nobody reads a Gantt to learn that Tuesdays
+ * exist. Sessions further out live on /calendar, which is built for browsing.
+ */
+const GANTT_SESSION_DAYS = 7;
 
 export interface ProjectTreeNode {
   project: Project;
@@ -754,7 +764,7 @@ function projectTimeline(project: Project): GanttChart | null {
 
     /*
       Sessions and reviews scheduled for this project, alongside its
-      deliverables.
+      deliverables — but only the IMMINENT ones.
 
       This is the calendar link made visible where the work is. A build session
       on Thursday is a date about this project in exactly the way a deliverable
@@ -762,12 +772,31 @@ function projectTimeline(project: Project): GanttChart | null {
       each other — a design review the day before a deliverable is due is worth
       seeing, and no list sorted by type would show it.
 
-      Only upcoming ones. Past sessions would drag the window months backwards
-      and squash everything that hasn't happened yet into the right-hand edge.
+      ---------------------------------------------------------------------------
+      Why the window is a week and not "everything upcoming"
+      ---------------------------------------------------------------------------
+
+      A project with a weekly build session generates fifty-two dots a year. The
+      chart's rows are deliverables — the things with owners and consequences —
+      and a recurring session buries them under markers that carry no
+      information: nobody reads a Gantt to find out that Tuesdays exist.
+
+      A week is the horizon where a session is still a fact you might act on
+      ("the review is Thursday and the spar analysis isn't finished"). Past that
+      it is routine, and routine belongs on the calendar, which is the page built
+      for browsing it.
+
+      Past sessions stay excluded, as before, and for a second reason now: they
+      would drag the window months backwards and squash everything ahead into the
+      right-hand edge. The project's history is told by its deliverables and its
+      deadline moves, not by which Tuesdays it met on.
     */
+    const sessionHorizon = addDays(now, GANTT_SESSION_DAYS);
+
     for (const event of store.events) {
       if (event.projectId !== p.id) continue;
-      if (event.startsAt.slice(0, 10) < now) continue;
+      const day = event.startsAt.slice(0, 10);
+      if (day < now || day > sessionHorizon) continue;
       rows.push({
         id: event.id,
         name: event.title,

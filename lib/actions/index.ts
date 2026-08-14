@@ -50,6 +50,7 @@ import * as ops from "@/lib/store/operations";
 import { ARTIFACT_KIND_ORDER } from "@/lib/labels";
 import { checkUpload } from "@/lib/storage";
 import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
+import { revokeMyFeed, rotateMyFeed } from "@/lib/calendar/store";
 import { appUrl } from "@/lib/urls";
 import {
   removeDocument,
@@ -2131,6 +2132,53 @@ async function moveGuideBlockAction$impl(
  * anywhere readable. `ActionForm` renders `result.message`, and the form keeps
  * it on screen until dismissed.
  */
+/**
+ * Mint (or replace) the member's calendar subscription URL.
+ *
+ * No permission check beyond being signed in: RLS scopes every policy on
+ * `calendar_feeds` to `auth.uid()`, so this can only ever reach your own row —
+ * the same reasoning as the MCP token actions below.
+ *
+ * The URL is returned in the success message rather than being stored anywhere
+ * readable. Unlike an MCP token it is deliberately re-showable by pressing the
+ * button again, because a calendar URL has to be pasted into every device a
+ * member owns, possibly weeks apart. Doing that replaces the token, which
+ * disconnects the other devices — so the copy says so.
+ */
+async function createCalendarFeedAction$impl(
+  _formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  const result = await rotateMyFeed({
+    memberId: viewer.member.id,
+    origin: appUrl(""),
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refresh();
+  return { ok: true, message: result.url };
+}
+
+async function revokeCalendarFeedAction$impl(
+  _formData: FormData
+): Promise<ActionResult> {
+  await getViewer();
+
+  const result = await revokeMyFeed();
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "Couldn't turn that off." };
+  }
+
+  refresh();
+  return {
+    ok: true,
+    message:
+      "Subscription turned off. The old link stops working immediately — remove it from your calendar app too, or it will sit there empty.",
+  };
+}
+
 async function createMcpTokenAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -2650,6 +2698,18 @@ export async function moveGuideBlockAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => moveGuideBlockAction$impl(formData));
+}
+
+export async function createCalendarFeedAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => createCalendarFeedAction$impl(formData));
+}
+
+export async function revokeCalendarFeedAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => revokeCalendarFeedAction$impl(formData));
 }
 
 export async function createMcpTokenAction(

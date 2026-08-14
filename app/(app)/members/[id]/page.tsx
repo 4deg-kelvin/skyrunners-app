@@ -11,6 +11,8 @@ import { Card, CardBody, CardDivider } from "@/components/ui/card";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
 import { DiscordStatus } from "@/components/ui/discord-status";
+import { CalendarStatus } from "@/components/ui/calendar-status";
+import type { CalendarClient } from "@/lib/calendar/feed-token";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
@@ -65,6 +67,18 @@ export default async function MemberProfilePage({
     (p) => p.project.phase === "complete"
   );
 
+  /*
+    Calendar apps observed collecting this member's feed.
+
+    Narrowed rather than cast: these strings come from parsing a User-Agent, so an
+    old row could hold a value this build no longer produces, and it would render
+    as `undefined` in the badge's label map.
+  */
+  const calendarClients = (member.calendarClients ?? []).filter(
+    (c): c is CalendarClient =>
+      c === "apple" || c === "google" || c === "outlook" || c === "other"
+  );
+
   const isOwnProfile = viewer.member.id === member.id;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
@@ -109,12 +123,18 @@ export default async function MemberProfilePage({
               <div className="min-w-0">
                 <ContactLink member={member} />
                 {/*
-                  Next to the phone number, because it belongs to the same
+                  Next to the phone number, because both belong to the same
                   question: how do I reach this person. Public for the same
                   reason trainings are — see `DiscordStatus`.
+
+                  Two badges, stacked, answering that question about two
+                  channels: Discord carries the message, the calendar carries the
+                  time. Both are OBSERVED rather than claimed — see
+                  `CalendarStatus` — so neither can be earned by typing something.
                 */}
-                <div className="mt-2">
+                <div className="mt-2 flex flex-col items-start gap-1.5">
                   <DiscordStatus verifiedAt={member.discordVerifiedAt} />
+                  <CalendarStatus clients={calendarClients} />
                 </div>
               </div>
             </div>

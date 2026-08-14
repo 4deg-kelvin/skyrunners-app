@@ -61,6 +61,87 @@
 export const CLUB_TIME_ZONE = "America/Los_Angeles";
 
 /**
+ * How far `zone` is ahead of UTC at a given instant, in milliseconds.
+ *
+ * Derived from `Intl` rather than a table, so it follows the DST rules for the
+ * actual date instead of assuming -8 (PST) or -7 (PDT) — either of which is
+ * wrong for half the year. Positive east of Greenwich; negative for California.
+ */
+function zoneOffsetMs(at: Date, zone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+    .formatToParts(at)
+    .filter((p) => p.type !== "literal");
+
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? "0");
+
+  // `hour` comes back as 24 for midnight under hour12: false, which Date.UTC
+  // would roll into the next day.
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second")
+  );
+  return asUtc - at.getTime();
+}
+
+/**
+ * Turn a stored datetime into a real instant.
+ *
+ * ---------------------------------------------------------------------------
+ * The two shapes `startsAt` actually arrives in, and why it matters
+ * ---------------------------------------------------------------------------
+ *
+ * `events.starts_at` is `timestamptz`, so LIVE data reads back as a proper
+ * instant — `2026-08-12T15:00:00.000Z`. The demo seed in `lib/mock-data.ts`
+ * writes zoneless strings instead — `2026-08-12T16:00` — and those two are
+ * interpreted differently by `new Date()`: the first is absolute, the second is
+ * whatever timezone the machine happens to be in.
+ *
+ * On a developer's laptop in California those coincide closely enough that
+ * nothing looks wrong. On Vercel, which runs UTC, a zoneless string is read as
+ * 16:00 UTC — 9am Pacific — so an evening build session would publish to
+ * somebody's phone as a morning one. Seven hours is not a rounding error; it is
+ * a member turning up on the wrong side of the day.
+ *
+ * So: a value carrying `Z` or an offset is taken at its word, and a zoneless one
+ * is read as CLUB time, which is the convention the rest of the app already
+ * follows for a bare datetime. Everything that has to emit an absolute time —
+ * the ICS calendar feed above all — goes through here rather than calling
+ * `new Date()` and hoping.
+ */
+export function instantFrom(iso: string): Date {
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso.trim());
+  if (hasZone) return new Date(iso);
+
+  /*
+    Read the literal as if it were UTC, then subtract the club's offset at that
+    moment. One `Intl` lookup, DST-correct, no table.
+
+    The offset is looked up at the GUESS rather than at the answer, which is
+    ambiguous for exactly one hour each autumn when 1–2am happens twice. Both
+    readings are the same wall-clock time and an hour apart in absolute terms;
+    picking one silently is the standard trade, and the alternative (refusing the
+    input) would drop a real event.
+  */
+  const guess = new Date(`${iso.trim().slice(0, 19)}Z`);
+  if (Number.isNaN(guess.getTime())) return guess;
+  return new Date(guess.getTime() - zoneOffsetMs(guess, CLUB_TIME_ZONE));
+}
+
+/**
  * Today's date on campus, as `YYYY-MM-DD`.
  *
  * `en-CA` because its short date format IS ISO order — the alternative is

@@ -54,8 +54,27 @@ export const config = {
    * Also not public: `/api/mcp` resolves its own token, and every unknown,
    * expired or revoked one is refused with a sentence. See
    * `lib/mcp/viewer.ts`.
+   *
+   * -------------------------------------------------------------------------
+   * `api/calendar` is the third, and it is the least forgiving of the three
+   * -------------------------------------------------------------------------
+   *
+   * The ICS feed is fetched by Apple Calendar, Google Calendar or Outlook. Those
+   * clients send a bare GET with no cookie, so without this exclusion every
+   * subscription would 307 to `/login` and receive an HTML page where it expected
+   * a calendar.
+   *
+   * Worse than the MCP case, because there is no human in the loop to report it:
+   * a calendar client that gets an unexpected redirect or HTML body does not
+   * surface an error. It shows an empty calendar, and some unsubscribe
+   * themselves. The member's symptom is "the SkyRunners calendar doesn't work",
+   * weeks later, with nothing anywhere to explain it.
+   *
+   * The route authenticates itself from the token in its path and answers 404 for
+   * anything it doesn't recognise — never a redirect, never HTML. See the header
+   * of `app/api/calendar/[token]/skyrunners.ics/route.ts`.
    */
   matcher: [
-    "/((?!_next/static|_next/image|api/cron|api/mcp|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|api/cron|api/mcp|api/calendar|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

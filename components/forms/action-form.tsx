@@ -30,6 +30,7 @@ export function ActionForm({
   /** Render your own trigger instead of the default button. */
   renderSubmit,
   onSuccess,
+  onResult,
   disabled,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
@@ -40,6 +41,20 @@ export function ActionForm({
   resetOnSuccess?: boolean;
   renderSubmit?: (pending: boolean) => React.ReactNode;
   onSuccess?: () => void;
+  /**
+   * The whole result, for the rare action whose OUTPUT the caller needs.
+   *
+   * Almost nothing wants this — an action's job is to write, and the message it
+   * returns is for the member to read, which this component already renders. The
+   * exception is an action that mints something the server cannot show again:
+   * the calendar subscription URL exists only in that one response, because only
+   * its hash is stored. The caller needs the value itself to offer a copy button.
+   *
+   * Distinct from `onSuccess`, which is a notification. Fires for failures too,
+   * so a caller can clear stale state rather than leaving a previous success on
+   * screen next to a fresh error.
+   */
+  onResult?: (result: ActionResult) => void;
   /** Blocks submit while the form is incomplete. */
   disabled?: boolean;
 }) {
@@ -54,6 +69,7 @@ export function ActionForm({
     startTransition(async () => {
       const outcome = await action(data);
       setResult(outcome);
+      onResult?.(outcome);
       if (outcome.ok) {
         if (resetOnSuccess) form.reset();
         onSuccess?.();

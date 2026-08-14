@@ -5,12 +5,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { McpTokens } from "@/components/forms/mcp-tokens";
+import { CalendarFeed } from "@/components/forms/calendar-feed";
 import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
 import { ThemeToggle } from "@/components/forms/theme-toggle";
 import { discordIsConfigured } from "@/lib/notify/discord";
 import { listMyTokens } from "@/lib/mcp/store";
+import { myFeed } from "@/lib/calendar/store";
 import { appUrl } from "@/lib/urls";
 import {
   AddCatalogueItemForm,
@@ -28,6 +30,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
 import { can } from "@/lib/permissions";
+import type { CalendarClient } from "@/lib/calendar/feed-token";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export const metadata = {
@@ -49,12 +52,28 @@ function termRange(startsOn: string, endsOn: string): string {
 export default async function SettingsPage() {
   const viewer = await getViewer();
   const theme = await getThemeChoice();
-  const [view, catalogue, identity, mcpTokens] = await Promise.all([
-    getSettings(viewer.member.id),
-    getCatalogue(),
-    getClubIdentity(),
-    listMyTokens(),
-  ]);
+  const [view, catalogue, identity, mcpTokens, calendarFeed] =
+    await Promise.all([
+      getSettings(viewer.member.id),
+      getCatalogue(),
+      getClubIdentity(),
+      listMyTokens(),
+      myFeed(),
+    ]);
+
+  /*
+    Which calendar apps have actually collected the feed.
+
+    From the member row, not from the feed: the credential is owner-only by RLS
+    while the observation is public, so they live in different tables. See
+    migration 0041. Narrowed here rather than cast, because these strings come
+    from parsing a User-Agent and an old row could hold a value this build no
+    longer produces — which would render as `undefined` in the badge.
+  */
+  const calendarClients = (viewer.member.calendarClients ?? []).filter(
+    (c): c is CalendarClient =>
+      c === "apple" || c === "google" || c === "outlook" || c === "other"
+  );
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
 
   /*
@@ -177,10 +196,36 @@ export default async function SettingsPage() {
       ) : null}
 
       {/*
-        Directly under the profile, because the person most likely to want it
-        is the person who least wants to be on this page — and anyone who has
-        scrolled past their own details has already found everything else.
+        Above "Connect your AI", and that ordering is deliberate.
+
+        This is the one integration nearly every member should do, it takes one
+        tap, and it pays off without them ever opening this site again — which is
+        the whole adoption problem the calendar had. Connecting an AI is powerful
+        and interesting and will be relevant to a handful of people.
       */}
+      <Card>
+        <CardBody>
+          <SectionLabel>Your calendar</SectionLabel>
+          <h2 className="text-ink mt-2 text-2xl font-bold">
+            Club events, in your own calendar
+          </h2>
+          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+            Subscribe once and every session you&apos;re on shows up in Apple
+            Calendar, Google Calendar or Outlook — and keeps itself up to date
+            when a time moves or something is cancelled. Nothing to install, and
+            it works on your phone.
+          </p>
+          <div className="mt-5">
+            <CalendarFeed
+              feed={calendarFeed}
+              clients={calendarClients}
+              syncedAt={viewer.member.calendarSyncedAt}
+              canUse={!viewer.isDemo}
+            />
+          </div>
+        </CardBody>
+      </Card>
+
       <Card>
         <CardBody>
           <SectionLabel>Connect your AI</SectionLabel>

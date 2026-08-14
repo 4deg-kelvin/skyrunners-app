@@ -23,6 +23,7 @@ import type {
   UpdateStatus,
 } from "./types";
 import type { BadgeTone } from "@/components/ui/badge";
+import type { CalendarClient } from "./calendar/feed-token";
 
 // ---------------------------------------------------------------------------
 // Roles
@@ -220,6 +221,25 @@ export const DELIVERABLE_STATUS_TONES: Record<DeliverableStatus, BadgeTone> = {
 // ---------------------------------------------------------------------------
 // Project attention flags
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Calendar subscriptions
+// ---------------------------------------------------------------------------
+
+/**
+ * What to call each calendar app in the UI.
+ *
+ * The keys are what `clientFromUserAgent` produces, and `other` is a real value
+ * rather than a fallback: an unrecognised agent still proves a subscription
+ * exists, which is the fact the badge reports. "Another calendar app" is honest
+ * about what we know and reads better than the raw token.
+ */
+export const CALENDAR_CLIENT_LABELS: Record<CalendarClient, string> = {
+  apple: "Apple Calendar",
+  google: "Google Calendar",
+  outlook: "Outlook",
+  other: "Another calendar app",
+};
 
 // ---------------------------------------------------------------------------
 // Project artifacts

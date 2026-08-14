@@ -75,6 +75,22 @@ export interface Member {
    * sides believe it's working. Cleared whenever the ID changes.
    */
   discordVerifiedAt?: string;
+  /**
+   * Calendar apps observed fetching this member's ICS feed, e.g. `["apple"]`.
+   *
+   * Public, and on `profiles` rather than on `calendar_feeds`, for exactly the
+   * reason `discordVerifiedAt` is: whether the club can reach somebody about a
+   * thing that is happening is other people's business, and the feed table holds
+   * a credential so it is owner-only. See migration 0041.
+   *
+   * OBSERVED, never claimed. A calendar subscription has no handshake — the
+   * server only ever receives a GET — so these are parsed from the User-Agent of
+   * fetches that actually happened. A member cannot earn this badge by typing
+   * something, which is what makes it worth reading.
+   */
+  calendarClients?: string[];
+  /** When a calendar app last collected the feed. Undefined = never. */
+  calendarSyncedAt?: string;
   globalRole: GlobalRole;
   status: MemberStatus;
   /** The one person they report to. Null for co-leads. */

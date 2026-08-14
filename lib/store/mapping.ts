@@ -80,7 +80,7 @@ const members: CollectionSpec<Member> = {
   key: "members",
   table: "profiles",
   columns:
-    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, discord_verified_at, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at, daily_digest_opt_out",
+    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, discord_verified_at, calendar_clients, calendar_synced_at, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at, daily_digest_opt_out",
   identify: (m) => m.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -93,6 +93,8 @@ const members: CollectionSpec<Member> = {
     phone: opt(r.phone as string),
     discordUserId: opt(r.discord_user_id as string),
     discordVerifiedAt: opt(r.discord_verified_at as string),
+    calendarClients: (r.calendar_clients as string[]) ?? [],
+    calendarSyncedAt: opt(r.calendar_synced_at as string),
     globalRole: r.global_role as Member["globalRole"],
     status: r.status as Member["status"],
     // Stays null: "reports to nobody" is meaningful, and both chain walks
@@ -115,6 +117,13 @@ const members: CollectionSpec<Member> = {
     phone: nul(m.phone),
     discord_user_id: nul(m.discordUserId),
     discord_verified_at: nul(m.discordVerifiedAt),
+    /*
+      Written back so a diff never blanks them, but the feed route is what
+      actually SETS them — through the service role, because the caller is Apple
+      Calendar and there is no session. See `recordFeedFetch`.
+    */
+    calendar_clients: m.calendarClients ?? [],
+    calendar_synced_at: nul(m.calendarSyncedAt),
     global_role: m.globalRole,
     status: m.status,
     lead_id: m.leadId,
