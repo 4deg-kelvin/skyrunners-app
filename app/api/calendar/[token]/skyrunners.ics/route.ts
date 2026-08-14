@@ -41,7 +41,7 @@
 import { buildIcs, type IcsEvent } from "@/lib/calendar/ics";
 import { feedByToken, recordFeedFetch } from "@/lib/calendar/store";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { withSuppliedClientStore } from "@/lib/store/request";
+import { preloadLiveStore, withSuppliedClientStore } from "@/lib/store/request";
 import { readStore } from "@/lib/store/disk";
 import { appUrl } from "@/lib/urls";
 
@@ -123,6 +123,22 @@ export async function GET(
     rather than by the database. See the header of `lib/mcp/viewer.ts`.
   */
   const built = await withSuppliedClientStore(admin, async () => {
+    /*
+      `withSuppliedClientStore` installs the CLIENT; it does not load the data.
+
+      This is the trap in docs/HANDOFF.md section 6, and it shipped once here
+      before an end-to-end fetch against production caught it. `readStore()`
+      THROWS in live mode when no snapshot is loaded — deliberately, because the
+      alternative was silently serving sample data — so without this line the feed
+      500s on every valid token while a bad token still 404s correctly. The
+      symptom to a member is "my calendar is empty", with the setup page insisting
+      the subscription is fine.
+
+      The MCP route gets away without it because it calls `lib/data/*` functions,
+      and all sixteen of those open with this same line. This route reads the store
+      directly, so it has to do it itself.
+    */
+    await preloadLiveStore();
     const store = readStore();
 
     /*
