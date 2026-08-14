@@ -7,6 +7,25 @@ needs. Written for someone with no memory of how any of this came to be.
 where the last session stopped. It has the three outstanding items.
 
 ---
+## Picking up right now? Read this box first
+
+Two things are agreed and NOT yet built, in priority order:
+
+1. **Remove the hour-tracking system.** Progress becomes deliverables met; the
+   log becomes a diary the check-in writes itself from. Agreed 2026-08-14, fully
+   scoped, not started. **docs/HOURS_REMOVAL_PLAN.md is the spec** — read it
+   before touching hours, tiers or the contribution record. The tier section in
+   CLAUDE.md is superseded by it.
+2. **Rewrite the two guide pages in detail** — /getting-started and /leading.
+   The editable container for club material shipped (migration 0038,
+   /settings/guides); the built-in content still needs expanding.
+
+**docs/NEXT_SESSION_PROMPT.md** has the exact prompt, permissions and
+credentials handling for a fresh session on item 1.
+
+Everything below is the older, still-accurate orientation.
+
+---
 
 ## Where things actually are
 
