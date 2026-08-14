@@ -29,11 +29,7 @@ import {
   type UpdateSchedule,
   type WorkLog,
 } from "./types.ts";
-import {
-  DEFAULT_TIERS,
-  type ContributionInputs,
-  type TierThresholds,
-} from "./contribution.ts";
+import { type ContributionInputs } from "./contribution.ts";
 import { readStore } from "./store/disk.ts";
 import { todayInClubTime } from "./dates.ts";
 import { isLiveMode } from "./env.ts";
@@ -1989,7 +1985,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T21:14",
     status: "submitted",
-    hoursThisPeriod: 6.5,
     entries: [
       {
         id: "ue-1",
@@ -1998,7 +1993,6 @@ export const progressUpdates: ProgressUpdate[] = [
         progress: "Finished three coupon layups, two came out within spec.",
         blockers: "Vacuum pump seal is leaking.",
         nextSteps: "Replace seal, run remaining coupons.",
-        hours: 6.5,
       },
     ],
   },
@@ -2009,7 +2003,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-06T08:30",
     status: "late",
-    hoursThisPeriod: 9,
     entries: [
       {
         id: "ue-2",
@@ -2019,7 +2012,6 @@ export const progressUpdates: ProgressUpdate[] = [
         blockers:
           "The 18% target may not be reachable without changing the layup schedule.",
         nextSteps: "Bring three options to the design review.",
-        hours: 7,
       },
       {
         id: "ue-3",
@@ -2027,7 +2019,6 @@ export const progressUpdates: ProgressUpdate[] = [
         projectId: "p-airframe-v2",
         progress: "Updated the mass budget with the new spar estimate.",
         nextSteps: "Re-check CG margins once the spar number is final.",
-        hours: 2,
       },
     ],
   },
@@ -2036,7 +2027,6 @@ export const progressUpdates: ProgressUpdate[] = [
     memberId: "m-omar",
     dueAt: "2026-08-05T23:59",
     status: "missed",
-    hoursThisPeriod: 1.5,
     entries: [],
   },
   {
@@ -2045,7 +2035,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T18:02",
     status: "reviewed",
-    hoursThisPeriod: 7,
     entries: [
       {
         id: "ue-4",
@@ -2053,7 +2042,6 @@ export const progressUpdates: ProgressUpdate[] = [
         projectId: "p-power",
         progress: "PDB schematic complete, routing 60% done.",
         nextSteps: "Finish routing, send for review before fab.",
-        hours: 7,
       },
     ],
   },
@@ -2063,7 +2051,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T22:40",
     status: "submitted",
-    hoursThisPeriod: 8.5,
     entries: [
       {
         id: "ue-5",
@@ -2071,7 +2058,6 @@ export const progressUpdates: ProgressUpdate[] = [
         projectId: "p-vio",
         progress: "VIO holding under 30 cm drift over 50 m indoor runs.",
         nextSteps: "Outdoor testing next week.",
-        hours: 8.5,
       },
     ],
   },
@@ -2080,7 +2066,6 @@ export const progressUpdates: ProgressUpdate[] = [
     memberId: "m-noah",
     dueAt: "2026-08-05T23:59",
     status: "pending",
-    hoursThisPeriod: 4,
     entries: [],
   },
   {
@@ -2089,7 +2074,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T20:10",
     status: "submitted",
-    hoursThisPeriod: 5.5,
     entries: [
       {
         id: "ue-6",
@@ -2098,7 +2082,6 @@ export const progressUpdates: ProgressUpdate[] = [
         progress: "Test stand frame welded, load cell mounted.",
         blockers: "Waiting on calibration weights.",
         nextSteps: "Calibrate and run the first motor.",
-        hours: 5.5,
       },
     ],
   },
@@ -2125,7 +2108,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-01T23:59",
     submittedAt: "2026-08-01T18:40",
     status: "submitted",
-    hoursThisPeriod: 7,
     entries: [
       {
         id: "ue-8",
@@ -2134,7 +2116,6 @@ export const progressUpdates: ProgressUpdate[] = [
         progress: "Telemetry link holding at 400 m line of sight.",
         blockers: "Packet loss climbs above 15% once the airframe blocks LOS.",
         nextSteps: "Try the higher-gain antenna Marcus mentioned.",
-        hours: 7,
       },
     ],
   },
@@ -2144,7 +2125,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-03T23:59",
     submittedAt: "2026-08-03T22:05",
     status: "submitted",
-    hoursThisPeriod: 5,
     entries: [
       {
         id: "ue-9",
@@ -2153,7 +2133,6 @@ export const progressUpdates: ProgressUpdate[] = [
         progress: "Firmware builds clean on the new toolchain.",
         blockers: "I don't have Lab 64 access yet, so I can't flash hardware.",
         nextSteps: "Blocked until someone can badge me in.",
-        hours: 5,
       },
     ],
   },
@@ -2163,7 +2142,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-01T23:59",
     submittedAt: "2026-08-01T09:15",
     status: "submitted",
-    hoursThisPeriod: 6,
     entries: [
       {
         id: "ue-10",
@@ -2171,7 +2149,6 @@ export const progressUpdates: ProgressUpdate[] = [
         projectId: "p-vio",
         progress: "Swapped the feature tracker; drift down roughly 20%.",
         nextSteps: "Re-run the full indoor set for comparable numbers.",
-        hours: 6,
       },
     ],
   },
@@ -2181,14 +2158,12 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T19:30",
     status: "submitted",
-    hoursThisPeriod: 3.5,
     entries: [
       {
         id: "ue-11",
         updateId: "u-11",
         projectId: "p-vio",
         progress: "Camera intrinsics re-calibrated; reprojection error halved.",
-        hours: 3.5,
       },
     ],
   },
@@ -2198,7 +2173,6 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T21:00",
     status: "reviewed",
-    hoursThisPeriod: 4.5,
     entries: [
       {
         id: "ue-12",
@@ -2206,7 +2180,6 @@ export const progressUpdates: ProgressUpdate[] = [
         projectId: "p-propulsion-test",
         progress: "Thermocouples wired and reading sensibly.",
         nextSteps: "Repeatability run once the stand is calibrated.",
-        hours: 4.5,
       },
     ],
   },
@@ -2216,14 +2189,12 @@ export const progressUpdates: ProgressUpdate[] = [
     dueAt: "2026-08-05T23:59",
     submittedAt: "2026-08-05T17:45",
     status: "reviewed",
-    hoursThisPeriod: 5,
     entries: [
       {
         id: "ue-13",
         updateId: "u-13",
         projectId: "p-airframe-v2",
         progress: "Fuselage frames modelled through station 6.",
-        hours: 5,
       },
     ],
   },
@@ -2232,7 +2203,6 @@ export const progressUpdates: ProgressUpdate[] = [
     memberId: "m-elena",
     dueAt: "2026-08-05T23:59",
     status: "missed",
-    hoursThisPeriod: 0,
     entries: [],
   },
   {
@@ -2240,7 +2210,6 @@ export const progressUpdates: ProgressUpdate[] = [
     memberId: "m-blake",
     dueAt: "2026-08-05T23:59",
     status: "pending",
-    hoursThisPeriod: 0,
     entries: [],
   },
 ];
@@ -2255,7 +2224,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-anish",
     projectId: "p-gps-denied",
     workDate: "2026-08-05",
-    hours: 2.5,
     description: "Flight-test planning",
   },
   {
@@ -2263,7 +2231,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-anish",
     projectId: "p-gps-denied",
     workDate: "2026-08-03",
-    hours: 2,
     description: "Requirements review",
   },
   {
@@ -2271,7 +2238,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-anish",
     projectId: "p-skydelta-concept",
     workDate: "2026-08-04",
-    hours: 3,
     description: "Sizing spreadsheet",
   },
   {
@@ -2279,7 +2245,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-sofia",
     projectId: "p-layup",
     workDate: "2026-08-05",
-    hours: 3,
     description: "Coupon layup",
   },
   {
@@ -2287,7 +2252,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-sofia",
     projectId: "p-layup",
     workDate: "2026-08-04",
-    hours: 3.5,
     description: "Tooling prep",
   },
   {
@@ -2295,7 +2259,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-tyler",
     projectId: "p-wing-spar",
     workDate: "2026-08-05",
-    hours: 4,
     description: "FEA runs",
   },
   {
@@ -2303,7 +2266,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-tyler",
     projectId: "p-wing-spar",
     workDate: "2026-08-03",
-    hours: 5,
     description: "Mesh refinement",
   },
   {
@@ -2311,7 +2273,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-amara",
     projectId: "p-vio",
     workDate: "2026-08-05",
-    hours: 4.5,
     description: "Drift tuning",
   },
   {
@@ -2319,7 +2280,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-amara",
     projectId: "p-vio",
     workDate: "2026-08-02",
-    hours: 4,
     description: "Indoor test runs",
   },
   {
@@ -2327,7 +2287,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-kenji",
     projectId: "p-power",
     workDate: "2026-08-04",
-    hours: 7,
     description: "PCB routing",
   },
   {
@@ -2335,7 +2294,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-hana",
     projectId: "p-propulsion-test",
     workDate: "2026-08-05",
-    hours: 5.5,
     description: "Frame welding",
   },
   {
@@ -2343,7 +2301,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-noah",
     projectId: "p-load-test",
     workDate: "2026-08-03",
-    hours: 4,
     description: "Rig CAD",
   },
   {
@@ -2351,7 +2308,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-omar",
     projectId: "p-sim",
     workDate: "2026-08-01",
-    hours: 1.5,
     description: "ROS 2 migration attempt",
   },
 
@@ -2363,7 +2319,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-yuki",
     projectId: "p-avionics-bringup",
     workDate: "2026-08-05",
-    hours: 4,
     description: "Telemetry range testing",
   },
   {
@@ -2371,7 +2326,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-yuki",
     projectId: "p-avionics-bringup",
     workDate: "2026-08-02",
-    hours: 3,
     description: "Antenna comparison",
   },
   {
@@ -2379,7 +2333,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-priyanka",
     projectId: "p-avionics-bringup",
     workDate: "2026-08-04",
-    hours: 5,
     description: "Firmware toolchain migration",
   },
   {
@@ -2387,7 +2340,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-owen",
     projectId: "p-power",
     workDate: "2026-08-05",
-    hours: 2,
     description: "Connector trade study",
   },
   {
@@ -2395,7 +2347,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-caleb",
     projectId: "p-vio",
     workDate: "2026-08-04",
-    hours: 3.5,
     description: "Feature tracker swap",
   },
   {
@@ -2403,7 +2354,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-caleb",
     projectId: "p-gps-denied",
     workDate: "2026-08-01",
-    hours: 2.5,
     description: "Re-localisation experiments",
   },
   {
@@ -2411,7 +2361,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-lucia",
     projectId: "p-vio",
     workDate: "2026-08-05",
-    hours: 3.5,
     description: "Camera calibration",
   },
   {
@@ -2419,7 +2368,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-mira",
     projectId: "p-sim",
     workDate: "2026-08-03",
-    hours: 2,
     description: "Scenario scripting",
   },
   {
@@ -2427,7 +2375,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-arjun",
     projectId: "p-airframe-v2",
     workDate: "2026-08-05",
-    hours: 5,
     description: "Fuselage frame CAD",
   },
   {
@@ -2435,7 +2382,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-elena",
     projectId: "p-wing-spar",
     workDate: "2026-08-02",
-    hours: 3,
     description: "FEA mesh support",
   },
   {
@@ -2443,7 +2389,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-nadia",
     projectId: "p-wing-spar",
     workDate: "2026-08-04",
-    hours: 4.5,
     description: "Load case definition",
   },
   {
@@ -2451,7 +2396,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-nadia",
     projectId: "p-skydelta-concept",
     workDate: "2026-08-05",
-    hours: 2,
     description: "Structural sizing pass",
   },
   {
@@ -2459,7 +2403,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-jonas",
     projectId: "p-layup",
     workDate: "2026-08-03",
-    hours: 4,
     description: "Layup assistance",
   },
   {
@@ -2467,7 +2410,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-aisha",
     projectId: "p-layup",
     workDate: "2026-08-05",
-    hours: 3,
     description: "Resin cure trials",
   },
   {
@@ -2475,7 +2417,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-ines",
     projectId: "p-propulsion-test",
     workDate: "2026-08-04",
-    hours: 4.5,
     description: "Thermocouple wiring",
   },
   {
@@ -2483,7 +2424,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-theo",
     projectId: "p-propulsion-test",
     workDate: "2026-08-02",
-    hours: 6,
     description: "Stand fabrication",
   },
   {
@@ -2491,7 +2431,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-victor",
     projectId: "p-propulsion-test",
     workDate: "2026-08-05",
-    hours: 3.5,
     description: "CFD correlation",
   },
   {
@@ -2499,7 +2438,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-rosa",
     projectId: "p-propulsion-test",
     workDate: "2026-08-04",
-    hours: 5,
     description: "Test campaign planning",
   },
   {
@@ -2507,7 +2445,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-daniel",
     projectId: "p-outreach",
     workDate: "2026-08-03",
-    hours: 2.5,
     description: "Workshop materials",
   },
   {
@@ -2515,7 +2452,6 @@ export const workLogs: WorkLog[] = [
     memberId: "m-sara",
     projectId: "p-outreach",
     workDate: "2026-08-05",
-    hours: 2,
     description: "School scheduling",
   },
 ];
@@ -3068,81 +3004,24 @@ export function currentUpdateFor(memberId: string): ProgressUpdate {
     dueAt: `${today()}T23:59`,
     status: dueToday ? "pending" : "reviewed",
     entries: [],
-    hoursThisPeriod: 0,
   };
 }
 
 /**
  * Assembles everything the contribution record needs for one member.
  *
- * `activeWeeks` counts in-session weeks only — finals and breaks are excluded,
- * so hours-per-week isn't diluted by three weeks of winter break when nobody was
- * expected to work.
+ * There used to be an `activeWeeksFor(memberId)` beside this, counting
+ * in-session weeks since somebody joined so that hours-per-week could skip
+ * finals and breaks. It went with the tiers on 2026-08-14: it existed only as
+ * the divisor of a rate nothing computes any more, and the three remaining
+ * signals are all counts of things that happened rather than rates over time.
+ *
+ * `isPaused` went for the same reason. A paused member generates no check-in
+ * obligations at all, so `updatesDue` is already 0 for them and Reliability
+ * already reports `null` — "nothing due" — without needing to be told about the
+ * pause separately.
  */
-/**
- * In-session weeks between a member joining and today. Never below 1.
- *
- * ---------------------------------------------------------------------------
- * This used to be the literal number 10
- * ---------------------------------------------------------------------------
- *
- * `activeWeeks = 10` was a default that every single caller took. So hours per
- * week was always `total ÷ 10`, whoever you were and however long you'd been
- * here: somebody who joined last Tuesday and logged 16 hours read as 1.6
- * hrs/week, and the entire roster looked inactive for the first two months of
- * any quarter. The one number members are shown about their own effort was
- * wrong for everyone except a person who had been in the club exactly ten
- * weeks.
- *
- * Weeks the club wasn't running are skipped, which is what makes the rate mean
- * anything across a break. **And that is deliberately a reward for working out
- * of session:** `hoursTotal` counts every hour logged, whenever it was logged,
- * while a break week adds nothing to the denominator. Somebody who builds over
- * spring break sees their rate go UP. Somebody who doesn't is not penalised,
- * because those weeks were never counted against them either.
- *
- * The floor of 1 stops a member who joined this morning dividing by zero and
- * reading as infinitely committed.
- */
-export function activeWeeksFor(memberId: string): number {
-  const member = getMember(memberId);
-  if (!member) return 1;
-
-  const start = Date.parse(`${member.joinedAt.slice(0, 10)}T00:00:00Z`);
-  const end = Date.parse(`${today()}T00:00:00Z`);
-  if (!Number.isFinite(start) || end <= start) return 1;
-
-  /*
-    No academic calendar at all means no weeks are EXCLUDED, not that none
-    count.
-
-    `inSession` is false for every date when the terms table is empty, so
-    counting in-session weeks would return 0, floor to 1, and report somebody's
-    entire term of work as one week's worth — a member with 40 hours logged
-    would read as 40 hrs/week. That is what the live club looked like before
-    anyone had entered a quarter.
-
-    A club that hasn't said when it's off is a club that's on. Check-in
-    OBLIGATIONS still require an explicit term, deliberately — the app must not
-    start chasing people before anyone has set it up — but an hours average
-    should degrade to "every week since you joined" rather than to nonsense.
-  */
-  const hasCalendar = live().terms.length > 0;
-
-  let weeks = 0;
-  for (let t = start; t <= end; t += 7 * 86_400_000) {
-    // Midweek, so a week counts if the club was running for most of it rather
-    // than only on the exact day the member happened to join.
-    const midweek = new Date(t + 3 * 86_400_000).toISOString().slice(0, 10);
-    if (!hasCalendar || inSession(midweek)) weeks++;
-  }
-  return Math.max(1, weeks);
-}
-
-export function contributionInputsFor(
-  memberId: string,
-  activeWeeks?: number
-): ContributionInputs {
+export function contributionInputsFor(memberId: string): ContributionInputs {
   const mine = myDeliverables(memberId);
   const committed = live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
@@ -3182,20 +3061,12 @@ export function contributionInputsFor(
   const myUpdates = live()
     .progressUpdates.filter((u) => u.memberId === memberId)
     .filter((u) => u.status !== "pending");
-  const schedule = scheduleFor(memberId);
 
   return {
-    activeWeeks: activeWeeks ?? activeWeeksFor(memberId),
-    isPaused: !!schedule?.pausedUntil && schedule.pausedUntil > today(),
     deliverablesCompleted: mine.filter((d) => d.status === "done").length,
     deliverablesOpen: mine.filter((d) => d.status !== "done").length,
     deliverablesOverdue: mine.filter(isOverdue).length,
     projectsCompleted: completedProjectIds.size,
-    // live(), not the seed array. Reading the seed here meant Hours/week sat
-    // at 0.0 no matter how much anyone logged — the same bug Find Work had.
-    hoursTotal: live()
-      .workLogs.filter((w) => w.memberId === memberId)
-      .reduce((sum, w) => sum + w.hours, 0),
     updatesDue: myUpdates.length,
     updatesOnTime: myUpdates.filter(
       (u) => u.status === "submitted" || u.status === "reviewed"
@@ -3204,17 +3075,9 @@ export function contributionInputsFor(
     reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId))
       .length,
     projectsCommitted: committed.length,
-    tiers: clubTiers(),
   };
 }
 
-/**
- * The club's configured tier floors, or the shipped defaults.
- *
- * Falls back rather than throwing: a store written before migration 0020 has
- * no row, and the four signals are not worth a 500 over a config value that
- * has a perfectly good default.
- */
 /**
  * The club's name and one-line description.
  *
@@ -3232,17 +3095,6 @@ export function clubIdentity(): {
     name: row?.clubName?.trim() || club.name,
     description: row?.clubDescription?.trim() || club.description,
     discordInviteUrl: row?.discordInviteUrl?.trim() || undefined,
-  };
-}
-
-export function clubTiers(): TierThresholds {
-  const row = live().clubSettings?.[0];
-  if (!row) return DEFAULT_TIERS;
-  return {
-    core: row.coreHours,
-    committed: row.committedHours,
-    contributing: row.contributingHours,
-    minimum: row.minimumHours,
   };
 }
 
@@ -3517,15 +3369,39 @@ export function divisionForProject(projectId: string): Team | undefined {
  * The point of showing it is correcting a mistake, not browsing a history.
  */
 /**
- * Has this person EVER logged hours — not "recently".
+ * Has this person EVER logged work — not "recently".
  *
  * `recentWorkLogs` is windowed to a fortnight, so it can't answer this: a
  * member who logged once in September and nothing since looks identical to one
  * who has never logged at all, and those two need completely different prompts.
  * One needs reminding, the other has never been shown the habit exists.
  */
-export function hasLoggedAnyHours(memberId: string): boolean {
+export function hasLoggedAnyWork(memberId: string): boolean {
   return live().workLogs.some((w) => w.memberId === memberId);
+}
+
+/**
+ * Everything one member has ever logged, newest first.
+ *
+ * Deliberately unwindowed, unlike `recentWorkLogs`. The check-in composer needs
+ * the entries since that member's last SUBMITTED check-in, and that gap has no
+ * fixed length — somebody back from a three-week academic pause has a period
+ * three weeks long. A 14-day window would silently truncate their draft, and the
+ * truncation would look like "I didn't do that work" rather than like a bug.
+ *
+ * `checkInPeriodStart` in `lib/checkin-draft.ts` does the bounding.
+ */
+export function allWorkLogsFor(memberId: string) {
+  return live()
+    .workLogs.filter((w) => w.memberId === memberId)
+    .sort(
+      (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
+    );
+}
+
+/** Every check-in row on record for one member, for the period calculation. */
+export function updatesFor(memberId: string) {
+  return live().progressUpdates.filter((u) => u.memberId === memberId);
 }
 
 export function recentWorkLogs(memberId: string, days = 14) {
@@ -3560,14 +3436,6 @@ export function lastWorkLogs(memberId: string, limit = 3) {
       (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
     )
     .slice(0, limit);
-}
-
-export function hoursOnProject(memberId: string, projectId: string) {
-  return live()
-    .workLogs.filter(
-      (w) => w.memberId === memberId && w.projectId === projectId
-    )
-    .reduce((sum, w) => sum + w.hours, 0);
 }
 
 /** Most recent submitted entry a member wrote about a specific project. */
@@ -3726,23 +3594,30 @@ function daysBetween(a: string, b: string): number {
   return Math.abs(ms) / 86_400_000;
 }
 
-/** Hours logged in the trailing 7 days — matches the dashboard's label. */
-export function hoursThisWeek(): number {
-  return live()
-    .workLogs.filter((w) => daysBetween(w.workDate, today()) <= 7)
-    .reduce((sum, w) => sum + w.hours, 0);
+/**
+ * Work-log entries written club-wide in the trailing 7 days.
+ *
+ * Replaces `hoursThisWeek`, which summed a number that no longer exists. The
+ * dashboard used it as a single club-wide pulse, and the honest replacement is a
+ * COUNT OF ENTRIES rather than any attempt to reconstruct volume — see the
+ * warning in `lib/contribution.ts` about rebuilding the old signal in a new
+ * unit. This one is a liveness reading ("is anybody logging?"), never attached
+ * to an individual and never compared between people.
+ */
+export function workLogsThisWeek(): number {
+  return live().workLogs.filter((w) => daysBetween(w.workDate, today()) <= 7)
+    .length;
 }
 
-/** Hours a member logged on one project in the trailing 7 days. */
-export function hoursOnProjectThisWeek(memberId: string, projectId: string) {
-  return live()
-    .workLogs.filter(
-      (w) =>
-        w.memberId === memberId &&
-        w.projectId === projectId &&
-        daysBetween(w.workDate, today()) <= 7
-    )
-    .reduce((sum, w) => sum + w.hours, 0);
+/** Distinct days a member has a log entry against one project. */
+export function daysWorkedOnProject(memberId: string, projectId: string) {
+  return new Set(
+    live()
+      .workLogs.filter(
+        (w) => w.memberId === memberId && w.projectId === projectId
+      )
+      .map((w) => w.workDate.slice(0, 10))
+  ).size;
 }
 
 export function awaitingReview() {

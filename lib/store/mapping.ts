@@ -279,22 +279,34 @@ const deliverables: CollectionSpec<Deliverable> = {
 const workLogs: CollectionSpec<WorkLog> = {
   key: "workLogs",
   table: "work_logs",
-  columns: "id, member_id, project_id, work_date, hours, description",
+  /*
+    `hours` is deliberately absent.
+
+    The column still exists in Postgres and still holds every number the club
+    recorded before 2026-08-14 — nothing was deleted, per the never-hard-delete
+    rule. It is simply not selected, so no hours value can reach the app and get
+    rendered or re-aggregated by accident. Migration 0039 dropped its NOT NULL
+    so inserts that omit it succeed.
+
+    `description` maps through `str`, not `opt`: it's required on write now, but
+    historical rows predate that and have NULL, and the app's type says
+    `string`. Coercing here rather than at every read site is what keeps the two
+    honest — see `WorkLog` in lib/types.ts.
+  */
+  columns: "id, member_id, project_id, work_date, description",
   identify: (w) => w.id,
   fromRow: (r) => ({
     id: r.id as string,
     memberId: r.member_id as string,
     projectId: r.project_id as string,
     workDate: r.work_date as string,
-    hours: Number(r.hours),
-    description: opt(r.description as string),
+    description: (r.description as string | null) ?? "",
   }),
   toRow: (w) => ({
     id: w.id,
     member_id: w.memberId,
     project_id: w.projectId,
     work_date: w.workDate,
-    hours: w.hours,
     description: nul(w.description),
   }),
   dependsOn: ["members", "projects"],
@@ -461,8 +473,15 @@ const projectArtifacts: CollectionSpec<ProjectArtifact> = {
 const progressUpdates: CollectionSpec<ProgressUpdate> = {
   key: "progressUpdates",
   table: "progress_updates",
+  /*
+    `hours_this_period` is absent for the same reason as `work_logs.hours` —
+    the column stays, the app stops reading it. It is `not null default 0` in
+    SQL, so omitting it from an insert is safe; the 0 it lands on is now
+    meaningless rather than wrong, and the trigger that used to recompute it
+    from `update_entries` was dropped in migration 0039.
+  */
   columns:
-    "id, member_id, due_at, reminder_sent_at, late_notice_sent_at, submitted_at, status, general_note, hours_this_period, lead_id_at_submission, reviewed_at, reviewed_by",
+    "id, member_id, due_at, reminder_sent_at, late_notice_sent_at, submitted_at, status, general_note, lead_id_at_submission, reviewed_at, reviewed_by",
   identify: (u) => u.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -474,7 +493,6 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     status: r.status as ProgressUpdate["status"],
     entries: [],
     generalNote: opt(r.general_note as string),
-    hoursThisPeriod: Number(r.hours_this_period ?? 0),
     leadIdAtSubmission: opt(r.lead_id_at_submission as string),
     reviewedAt: opt(r.reviewed_at as string),
     reviewedBy: opt(r.reviewed_by as string),
@@ -488,7 +506,6 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     submitted_at: nul(u.submittedAt),
     status: u.status,
     general_note: nul(u.generalNote),
-    hours_this_period: u.hoursThisPeriod,
     lead_id_at_submission: nul(u.leadIdAtSubmission),
     reviewed_at: nul(u.reviewedAt),
     reviewed_by: nul(u.reviewedBy),
@@ -681,15 +698,20 @@ const certifications: CollectionSpec<MemberCertification> = {
 const clubSettings: CollectionSpec<ClubSettings> = {
   key: "clubSettings",
   table: "club_settings",
+  /*
+    The four tier-floor columns are absent, and the `tiers_in_order` /
+    `minimum_within_range` constraints from migration 0020 still guard them in
+    Postgres. That's fine as long as nothing writes them: an UPDATE that doesn't
+    mention a column leaves it alone, so the existing in-order values stay
+    in-order. Don't add them back to this spec without re-reading 0020 — a
+    partial write of three of the four would trip a constraint the app no longer
+    has any UI to satisfy.
+  */
   columns:
-    "id, core_hours, committed_hours, contributing_hours, minimum_hours, club_name, club_description, discord_invite_url, updated_at, updated_by",
+    "id, club_name, club_description, discord_invite_url, updated_at, updated_by",
   identify: () => "1",
   fromRow: (r) => ({
     id: String(r.id ?? "1"),
-    coreHours: Number(r.core_hours ?? 12),
-    committedHours: Number(r.committed_hours ?? 8),
-    contributingHours: Number(r.contributing_hours ?? 4),
-    minimumHours: Number(r.minimum_hours ?? 10),
     clubName: opt(r.club_name as string),
     clubDescription: opt(r.club_description as string),
     discordInviteUrl: opt(r.discord_invite_url as string),
@@ -698,10 +720,6 @@ const clubSettings: CollectionSpec<ClubSettings> = {
   }),
   toRow: (c) => ({
     id: 1,
-    core_hours: c.coreHours,
-    committed_hours: c.committedHours,
-    contributing_hours: c.contributingHours,
-    minimum_hours: c.minimumHours,
     club_name: nul(c.clubName),
     club_description: nul(c.clubDescription),
     discord_invite_url: nul(c.discordInviteUrl),

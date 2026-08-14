@@ -19,10 +19,9 @@ import { can } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getClubIdentity, getClubTiers } from "@/lib/data/settings";
+import { getClubIdentity } from "@/lib/data/settings";
 import { getViewer } from "@/lib/data/viewer";
 import { discordIsConfigured } from "@/lib/notify/discord";
-import { TIER_LABELS } from "@/lib/contribution";
 
 export const metadata = {
   title: "New here?",
@@ -62,10 +61,7 @@ export default async function GettingStartedPage() {
   const viewer = await getViewer();
   const guideSections = await getGuideSections("getting_started");
   const mayEditGuides = can.manageGuides(viewer.actor);
-  const [tiers, identity] = await Promise.all([
-    getClubTiers(),
-    getClubIdentity(),
-  ]);
+  const identity = await getClubIdentity();
   const firstName =
     viewer.member.preferredName ?? viewer.member.fullName.split(" ")[0];
   /*
@@ -203,16 +199,17 @@ export default async function GettingStartedPage() {
       </div>
 
       {/* ------------------------------------------------------------------
-          1. Hours. First because it's the smallest habit and the one the rest
-          of the app is built on: check-ins pre-fill from it, and the hours
-          figure on your profile is the only place effort is recorded at all.
+          1. The work log. First because it's the smallest habit and the one the
+          rest of the app is built on: the twice-weekly check-in drafts itself
+          from these entries, so a member who logs as they go writes almost
+          nothing later, and one who doesn't writes the whole thing by hand.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
           <SectionLabel>First thing</SectionLabel>
           <h2 className="text-ink mt-2 flex items-center gap-2.5 text-2xl font-bold">
             <Clock className="text-cardinal-600 size-6" strokeWidth={2.5} />
-            Log your hours as you go
+            Log what you did, as you go
           </h2>
 
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
@@ -223,8 +220,9 @@ export default async function GettingStartedPage() {
             >
               My Work
             </Link>
-            . Pick the project, the date, and how long you spent. It takes about
-            ten seconds and you can backdate up to a week.
+            . Pick the project and write one line about what you did — there are
+            no hours to fill in. It takes about ten seconds and you can backdate
+            up to a week.
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -249,11 +247,12 @@ export default async function GettingStartedPage() {
           <div className="rounded-tile bg-surface mt-4 px-4 py-3.5">
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">Why it matters:</span>{" "}
-              hours are the only record that you were here. They average over
-              the weeks the club is actually running — breaks and finals are
-              skipped, so a quiet December costs you nothing, and building over
-              a break only helps. The club&apos;s expectation is {tiers.minimum}
-              –{tiers.core} hours a week, and nobody is ranked against anybody
+              your check-in writes itself from these lines. Each project&apos;s
+              box arrives already filled in from what you logged against it, and
+              the only box you have to write is for a project you logged nothing
+              against. So this isn&apos;t extra paperwork — it&apos;s the same
+              writing, done in ten-second pieces while you still remember. The
+              club does not count hours and nobody is ranked against anybody
               else.
             </p>
           </div>
@@ -280,8 +279,11 @@ export default async function GettingStartedPage() {
             >
               days you choose
             </Link>
-            . You get a box per project you&apos;re on, with your hours already
-            filled in. A line each is enough.
+            . You get a box per project you&apos;re on, already written from
+            your work log — edit what needs it and send. The only box you have
+            to fill in yourself is for a project you logged nothing against, and
+            &ldquo;blocked&rdquo; or &ldquo;no time this week&rdquo; is a real
+            answer.
           </p>
 
           <div className="mt-4 space-y-2.5">
@@ -441,10 +443,10 @@ export default async function GettingStartedPage() {
               are <span className="text-ink font-semibold">public</span> —
               that&apos;s the project&apos;s history and it&apos;s how somebody
               spots a blocker they could clear. Your{" "}
-              <span className="text-ink font-semibold">total hours</span>,
-              reliability and personal record stay between you and your Lead.
-              How you&apos;re assessed is published in full — nothing about it
-              is hidden from you.
+              <span className="text-ink font-semibold">reliability</span> and
+              personal record stay between you and your Lead. How you&apos;re
+              assessed is published in full — nothing about it is hidden from
+              you.
             </Guide>
           </div>
         </CardBody>
@@ -454,16 +456,17 @@ export default async function GettingStartedPage() {
         <CardBody>
           <SectionLabel>The short version</SectionLabel>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Log your hours. Write two lines twice a week. Ask to join anything
-            that looks interesting. Say when you&apos;re stuck, early — that is
+            Log a line about what you did. Check in twice a week — mostly by
+            confirming what the log already says. Ask to join anything that
+            looks interesting. Say when you&apos;re stuck, early — that is
             genuinely the whole thing, and it&apos;s about fifteen minutes a
             week.
           </p>
           <p className="text-ink-muted mt-3 text-sm">
-            The tiers on your profile — {TIER_LABELS.contributing},{" "}
-            {TIER_LABELS.committed}, {TIER_LABELS.core} — are rungs, not grades.
-            Nobody is ranked against anybody else, and there is no leaderboard
-            anywhere in this app.
+            Your profile shows deliverables finished, check-ins on time, and the
+            roles you hold. No hours, no tier, no score. Nobody is ranked
+            against anybody else, and there is no leaderboard anywhere in this
+            app.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link

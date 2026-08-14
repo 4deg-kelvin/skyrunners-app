@@ -52,7 +52,6 @@ import {
   PROJECT_ROLE_LABELS,
 } from "@/lib/labels";
 import { can, isLeadership } from "@/lib/permissions";
-import { formatNumber } from "@/lib/utils";
 import { formatDay } from "@/lib/dates";
 
 export default async function ProjectDetailPage({
@@ -350,7 +349,6 @@ export default async function ProjectDetailPage({
                         )}
                       </span>
                       <span className="text-ink-muted shrink-0 text-sm tabular-nums">
-                        {formatNumber(log.hours, 1)} hrs ·{" "}
                         {new Date(
                           `${log.workDate}T00:00:00Z`
                         ).toLocaleDateString("en-US", {
@@ -479,7 +477,7 @@ export default async function ProjectDetailPage({
                     actionHref="/projects"
                   />
                 ) : (
-                  members.map(({ membership, member, hoursOnProject }) => (
+                  members.map(({ membership, member, daysWorked }) => (
                     <div
                       key={membership.memberId}
                       className="rounded-tile border-line flex flex-wrap items-start justify-between gap-3 border px-4 py-3"
@@ -503,21 +501,23 @@ export default async function ProjectDetailPage({
                           </p>
                         ) : null}
                         {/*
-                          Hours on THIS project, for the REs of it.
+                          Days worked on THIS project, for the REs of it.
 
                           The per-project half of the privacy split, and the
                           only effort figure an RE is allowed — never the
-                          person's total, reliability or record, which belong
-                          to them and their Lead.
+                          person's record or reliability, which belong to them
+                          and their Lead. See `can.viewMemberWorkOnProject`.
 
                           Counts from the moment they log, not from their next
-                          check-in: a check-in reports hours that already
-                          exist, it doesn't create them.
+                          check-in: a check-in reports work that already
+                          happened, it doesn't create it.
                         */}
-                        {mayManage && hoursOnProject > 0 ? (
+                        {mayManage && daysWorked > 0 ? (
                           <p className="text-ink-muted mt-0.5 flex items-center gap-1.5 text-sm">
                             <Clock className="size-3.5" />
-                            {formatNumber(hoursOnProject, 1)} hrs logged here
+                            {daysWorked === 1
+                              ? "worked here on 1 day"
+                              : `worked here on ${daysWorked} days`}
                           </p>
                         ) : null}
                       </div>
@@ -759,8 +759,7 @@ export default async function ProjectDetailPage({
                             {author?.fullName ?? "Unknown member"}
                           </p>
                           <span className="text-ink-muted text-xs">
-                            {formatDay(submittedAt)} ·{" "}
-                            {formatNumber(entry.hours, 1)} hrs
+                            {formatDay(submittedAt)}
                           </span>
                         </div>
                         <p className="text-ink-soft mt-1.5 text-sm">

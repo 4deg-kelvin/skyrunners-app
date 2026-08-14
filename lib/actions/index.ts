@@ -43,7 +43,6 @@ import {
   getMember,
   getProject,
   helpRequestById,
-  hoursOnProjectThisWeek,
   memberProjects,
   projectDeliverables,
 } from "@/lib/mock-data";
@@ -138,15 +137,14 @@ function refresh() {
 // Phase 3 — hours
 // ---------------------------------------------------------------------------
 
-async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
+async function logWorkAction$impl(formData: FormData): Promise<ActionResult> {
   const viewer = await getViewer();
   const projectId = String(formData.get("projectId") ?? "");
   const workDate = String(formData.get("workDate") ?? today());
-  const hours = Number(formData.get("hours"));
   const description = String(formData.get("description") ?? "");
 
-  if (!can.logOwnHours(viewer.actor, viewer.member.id)) {
-    return denied("log hours");
+  if (!can.logOwnWork(viewer.actor, viewer.member.id)) {
+    return denied("log work");
   }
 
   /*
@@ -154,13 +152,13 @@ async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
     validation failure.
 
     It follows directly from the calendar: somebody sees an open build session,
-    turns up, and helps on a project they aren't committed to. They worked
-    those hours. Refusing the log because they're not on the roster made the
-    honest answer impossible and the dishonest one — logging it against a
-    project they ARE on — the only way through.
+    turns up, and helps on a project they aren't committed to. They did that
+    work. Refusing the log because they're not on the roster made the honest
+    answer impossible and the dishonest one — logging it against a project they
+    ARE on — the only way through.
 
-    The per-project guard below still stands for hours claimed AGAINST a
-    project, which is what keeps those totals meaningful.
+    The per-project guard below still stands for work claimed AGAINST a project,
+    which is what keeps a project's diary trustworthy.
   */
   if (projectId) {
     const mine = memberProjects(viewer.member.id);
@@ -173,20 +171,19 @@ async function logHoursAction$impl(formData: FormData): Promise<ActionResult> {
     }
   }
 
-  const result = await ops.logHours({
+  const result = await ops.logWork({
     memberId: viewer.member.id,
     projectId: projectId || undefined,
     workDate,
-    hours,
     description,
     today: today(),
   });
 
   if (result.ok) refresh();
-  return toResult(result, `Logged ${hours} hrs.`);
+  return toResult(result, "Logged.");
 }
 
-async function deleteHoursAction$impl(
+async function deleteWorkAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
   const viewer = await getViewer();
@@ -1127,7 +1124,6 @@ async function submitCheckInAction$impl(
     progress: String(formData.get(`progress:${projectId}`) ?? ""),
     blockers: String(formData.get(`blockers:${projectId}`) ?? ""),
     nextSteps: String(formData.get(`nextSteps:${projectId}`) ?? ""),
-    hours: hoursOnProjectThisWeek(viewer.member.id, projectId),
   }));
 
   const result = await ops.submitCheckIn({
@@ -2543,16 +2539,14 @@ async function withdrawJoinRequestAction$impl(
  * that only shows up when someone clicks the button in production.
  */
 
-export async function logHoursAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => logHoursAction$impl(formData));
+export async function logWorkAction(formData: FormData): Promise<ActionResult> {
+  return withRequestStore(() => logWorkAction$impl(formData));
 }
 
-export async function deleteHoursAction(
+export async function deleteWorkAction(
   formData: FormData
 ): Promise<ActionResult> {
-  return withRequestStore(() => deleteHoursAction$impl(formData));
+  return withRequestStore(() => deleteWorkAction$impl(formData));
 }
 
 export async function createDeliverableAction(
@@ -2855,30 +2849,6 @@ export async function createEventAction(
   return withRequestStore(() => createEventAction$impl(formData));
 }
 
-async function updateClubTiersAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-
-  // Co-Lead only. This is the definition of the bar the entire club is
-  // measured against, so it sits with the other things that reshape the org.
-  if (!can.manageEngagementWeights(viewer.actor)) {
-    return denied("change the club's commitment expectations");
-  }
-
-  const num = (name: string) => Number(formData.get(name));
-  const result = await ops.updateClubTiers({
-    core: num("core"),
-    committed: num("committed"),
-    contributing: num("contributing"),
-    minimum: num("minimum"),
-    actorId: viewer.member.id,
-  });
-
-  if (result.ok) refresh();
-  return toResult(result, "Expectations updated — /how-we-lead now says so.");
-}
-
 async function updateClubIdentityAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -2980,12 +2950,6 @@ export async function updateClubIdentityAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => updateClubIdentityAction$impl(formData));
-}
-
-export async function updateClubTiersAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => updateClubTiersAction$impl(formData));
 }
 
 /**

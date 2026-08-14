@@ -49,14 +49,13 @@ process.on("exit", () => {
   }
 });
 
-describe("logging hours", () => {
+describe("logging work", () => {
   test("a normal entry is stored", async () => {
     const before = disk.readStore().workLogs.length;
-    const result = await ops.logHours({
+    const result = await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: TODAY,
-      hours: 3.5,
       description: "FEA runs",
       today: TODAY,
     });
@@ -64,17 +63,16 @@ describe("logging hours", () => {
     assert.equal(result.ok, true);
     assert.equal(disk.readStore().workLogs.length, before + 1);
     if (result.ok) {
-      assert.equal(result.value.hours, 3.5);
       assert.equal(result.value.description, "FEA runs");
     }
   });
 
   test("survives a reload — that's the whole point of the disk store", async () => {
-    await ops.logHours({
+    await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: TODAY,
-      hours: 2,
+      description: "Tooling prep",
       today: TODAY,
     });
     const count = disk.readStore().workLogs.length;
@@ -84,36 +82,70 @@ describe("logging hours", () => {
     assert.equal(disk.readStore().workLogs.length, count);
   });
 
-  test("zero and negative hours are refused", async () => {
-    for (const hours of [0, -1]) {
-      const r = await ops.logHours({
+  /*
+    The note is REQUIRED, where it used to be optional beside a required number.
+
+    That inversion is the whole point of removing hours, and it is the rule most
+    likely to get softened by somebody trying to make logging faster. It must
+    not be: the note is what pre-fills the member's next check-in, so an entry
+    without one does no work at all — it neither tells the RE anything nor saves
+    the member any typing later.
+  */
+  test("an entry with no note is refused", async () => {
+    for (const description of ["", "   ", "\n"]) {
+      const r = await ops.logWork({
         memberId: MEMBER,
         projectId: PROJECT,
         workDate: TODAY,
-        hours,
+        description,
         today: TODAY,
       });
-      assert.equal(r.ok, false);
+      assert.equal(r.ok, false, `"${description}" should be refused`);
     }
   });
 
-  test("an implausible entry is refused — 80 usually means 8.0", async () => {
-    const r = await ops.logHours({
+  test("the note is trimmed before it's stored", async () => {
+    const r = await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: TODAY,
-      hours: 80,
+      description: "  reran the FEA  ",
+      today: TODAY,
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.value.description, "reran the FEA");
+  });
+
+  test("an essay is refused — this lands in a check-in a Lead reads", async () => {
+    const r = await ops.logWork({
+      memberId: MEMBER,
+      projectId: PROJECT,
+      workDate: TODAY,
+      description: "x".repeat(501),
       today: TODAY,
     });
     assert.equal(r.ok, false);
   });
 
+  test("work with no project is allowed — that's misc", async () => {
+    // Somebody turns up to an open build session and helps on a project they
+    // aren't committed to. Refusing it makes the honest answer impossible.
+    const r = await ops.logWork({
+      memberId: MEMBER,
+      workDate: TODAY,
+      description: "helped at the open build session",
+      today: TODAY,
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.value.projectId, undefined);
+  });
+
   test("future dates are refused", async () => {
-    const r = await ops.logHours({
+    const r = await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: "2026-08-11",
-      hours: 2,
+      description: "time travel",
       today: TODAY,
     });
     assert.equal(r.ok, false);
@@ -121,22 +153,22 @@ describe("logging hours", () => {
 
   describe(`backdating stops at ${7} days`, () => {
     test("exactly 7 days back is allowed", async () => {
-      const r = await ops.logHours({
+      const r = await ops.logWork({
         memberId: MEMBER,
         projectId: PROJECT,
         workDate: "2026-08-03",
-        hours: 2,
+        description: "last week's layup",
         today: TODAY,
       });
       assert.equal(r.ok, true);
     });
 
     test("8 days back is refused, and says how far back you can go", async () => {
-      const r = await ops.logHours({
+      const r = await ops.logWork({
         memberId: MEMBER,
         projectId: PROJECT,
         workDate: "2026-08-02",
-        hours: 2,
+        description: "too long ago",
         today: TODAY,
       });
       assert.equal(r.ok, false);
@@ -150,43 +182,54 @@ describe("logging hours", () => {
   });
 });
 
-describe("hours lock once a check-in has reported them", () => {
+describe("the log locks once a check-in has reported it", () => {
   // m-sofia has a submitted update in the seed (u-1, submitted 2026-08-05).
   const SOFIA = "m-sofia";
 
   test("a day already covered by a submitted check-in is locked", () => {
-    assert.equal(ops.hoursAreLocked(SOFIA, "2026-08-04"), true);
+    assert.equal(ops.workIsLocked(SOFIA, "2026-08-04"), true);
   });
 
   test("logging into a locked day is refused", async () => {
-    const r = await ops.logHours({
+    const r = await ops.logWork({
       memberId: SOFIA,
       projectId: "p-layup",
       workDate: "2026-08-04",
-      hours: 2,
+      description: "more layup",
       today: "2026-08-06",
     });
     assert.equal(r.ok, false);
     if (!r.ok) assert.match(r.error, /locked/i);
   });
 
-  test("someone with no submitted check-in is never locked", () => {
-    // Otherwise a brand-new member couldn't log anything at all.
-    assert.equal(ops.hoursAreLocked("m-blake", "2026-08-04"), false);
+  /*
+    The submission day itself stays OPEN, and this is the half that pairs with
+    `checkInPeriodStart` in lib/checkin-draft.ts. You submit in the afternoon and
+    get another two hours in that evening; if this locked, that evening's work
+    could never be recorded, and the auto-fill window — which starts inclusively
+    on this same day — would have nothing to draft from.
+  */
+  test("the submission day itself is still open", () => {
+    assert.equal(ops.workIsLocked(SOFIA, "2026-08-05"), false);
   });
 
-  test("one member's check-in doesn't lock another's hours", () => {
-    assert.equal(ops.hoursAreLocked("m-tyler", "2026-07-01"), false);
+  test("someone with no submitted check-in is never locked", () => {
+    // Otherwise a brand-new member couldn't log anything at all.
+    assert.equal(ops.workIsLocked("m-blake", "2026-08-04"), false);
+  });
+
+  test("one member's check-in doesn't lock another's log", () => {
+    assert.equal(ops.workIsLocked("m-tyler", "2026-07-01"), false);
   });
 });
 
-describe("deleting hours", () => {
+describe("deleting a log entry", () => {
   test("you can delete your own unlocked entry", async () => {
-    const created = await ops.logHours({
+    const created = await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: TODAY,
-      hours: 1,
+      description: "a mistake",
       today: TODAY,
     });
     assert.equal(created.ok, true);
@@ -201,11 +244,11 @@ describe("deleting hours", () => {
   });
 
   test("you cannot delete someone else's", async () => {
-    const created = await ops.logHours({
+    const created = await ops.logWork({
       memberId: MEMBER,
       projectId: PROJECT,
       workDate: TODAY,
-      hours: 1,
+      description: "not yours",
       today: TODAY,
     });
     if (!created.ok) return;
@@ -656,11 +699,10 @@ describe("concurrent writes", () => {
 
     await Promise.all(
       Array.from({ length: 8 }, (_, i) =>
-        ops.logHours({
+        ops.logWork({
           memberId: MEMBER,
           projectId: PROJECT,
           workDate: TODAY,
-          hours: 1,
           description: `entry ${i}`,
           today: TODAY,
         })
@@ -995,6 +1037,165 @@ describe("asking a Lead for something", () => {
     const r = await ops.withdrawMemberRequest({
       requestId: created.value.id,
       memberId: MEMBER,
+    });
+    assert.equal(r.ok, false);
+  });
+});
+
+/**
+ * The check-in may not leave a committed project silent.
+ *
+ * The one rule `submitCheckIn` gained when hours were removed, and the one most
+ * likely to be softened later by somebody who hits it while testing. It is the
+ * reason the auto-fill is worth having: everything the log covers is free, and
+ * the single thing the member is asked for is a line about the project the app
+ * knows nothing about.
+ *
+ * Two fixture facts this suite depends on, both verified against the seed rather
+ * than assumed — an earlier version of these tests guessed wrong on both:
+ *
+ *   - `m-tyler` has a LATE check-in submitted 2026-08-06, and his two log
+ *     entries are dated the 3rd and the 5th. So they sit BEFORE his window
+ *     starts and are correctly already reported. Anything needing work "in the
+ *     period" has to log it fresh.
+ *   - `m-priya` is committed to two projects and has no logs and no submitted
+ *     check-in at all, which makes her the honest "nothing to go on" case.
+ */
+describe("submitCheckIn refuses to leave a committed project silent", () => {
+  /** Committed to something, never logged anything, never checked in. */
+  const SILENT_MEMBER = "m-priya";
+
+  test("a project with logged work needs no typing at all", async () => {
+    // Logged TODAY, so it's inside the window whatever his check-in history is.
+    const logged = await ops.logWork({
+      memberId: MEMBER,
+      projectId: PROJECT,
+      workDate: TODAY,
+      description: "reran the FEA with the new layup",
+      today: TODAY,
+    });
+    assert.equal(logged.ok, true);
+
+    const r = await ops.submitCheckIn({
+      memberId: MEMBER,
+      entries: [{ projectId: PROJECT, progress: "" }],
+      generalNote: "nothing else to add",
+      leadId: null,
+      today: TODAY,
+    });
+    // Accepted: the log speaks for the project. The empty section is dropped,
+    // which is the pre-existing behaviour and still correct — clearing a
+    // pre-filled box is a member choosing not to add anything.
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+  });
+
+  test("work already reported by an earlier check-in does NOT count", async () => {
+    /*
+      The subtle half of the rule, and the reason the window is anchored to the
+      last submission rather than to a fixed 7 days.
+
+      Tyler's seeded entries are dated before his 2026-08-06 check-in, so they
+      have been reported once already. Letting them satisfy this check would mean
+      a member could go silent for a fortnight and still submit, because work
+      from before their last report kept answering for them.
+    */
+    const r = await ops.submitCheckIn({
+      memberId: MEMBER,
+      entries: [{ projectId: PROJECT, progress: "" }],
+      generalNote: "nothing else to add",
+      leadId: null,
+      today: TODAY,
+    });
+    assert.equal(r.ok, false);
+  });
+
+  test("a project with NOTHING logged is refused, and is named", async () => {
+    // Refused naming the project, rather than "a field is required" to somebody
+    // looking at five identical boxes.
+    const store = disk.readStore();
+    const membership = store.projectMemberships.find(
+      (pm) => pm.memberId === SILENT_MEMBER && pm.commitment === "committed"
+    );
+    // Guard rather than a silent pass: if the seed changes, this test would
+    // otherwise assert nothing at all.
+    if (!membership) {
+      assert.fail(`seed no longer has ${SILENT_MEMBER} committed to a project`);
+    }
+
+    const name = store.projects.find(
+      (p) => p.id === membership.projectId
+    )?.name;
+
+    const r = await ops.submitCheckIn({
+      memberId: SILENT_MEMBER,
+      entries: [{ projectId: membership.projectId, progress: "  " }],
+      generalNote: "busy with midterms",
+      leadId: null,
+      today: TODAY,
+    });
+
+    assert.equal(r.ok, false);
+    if (!r.ok && name) assert.match(r.error, new RegExp(name));
+  });
+
+  test("writing the line makes it go through", async () => {
+    const store = disk.readStore();
+    const membership = store.projectMemberships.find(
+      (pm) => pm.memberId === SILENT_MEMBER && pm.commitment === "committed"
+    );
+    if (!membership) assert.fail("seed changed");
+
+    const r = await ops.submitCheckIn({
+      memberId: SILENT_MEMBER,
+      entries: [
+        {
+          projectId: membership.projectId,
+          progress: "Blocked on the vacuum pump seal.",
+        },
+      ],
+      leadId: null,
+      today: TODAY,
+    });
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+  });
+
+  /*
+    A project the member is NOT committed to can never block a submission.
+
+    The composer deliberately keeps already-written text from a project somebody
+    has left — usually the handover note — and marks it optional. A server rule
+    stricter than the form is the worst failure of the two: the button does
+    nothing and the reason is never shown on the page.
+  */
+  test("a project they're not committed to is not demanded", async () => {
+    const store = disk.readStore();
+    const notMine = store.projects.find(
+      (p) =>
+        !store.projectMemberships.some(
+          (pm) => pm.memberId === MEMBER && pm.projectId === p.id
+        )
+    );
+    if (!notMine) assert.fail("seed has m-tyler on every project");
+
+    const r = await ops.submitCheckIn({
+      memberId: MEMBER,
+      entries: [
+        { projectId: PROJECT, progress: "spar work continues" },
+        { projectId: notMine.id, progress: "" },
+      ],
+      leadId: null,
+      today: TODAY,
+    });
+    assert.equal(r.ok, true);
+  });
+
+  test("a wholly empty check-in is still refused", async () => {
+    // Pre-existing rule, kept: an empty check-in tells a Lead nothing.
+    const r = await ops.submitCheckIn({
+      memberId: MEMBER,
+      entries: [],
+      leadId: null,
+      today: TODAY,
     });
     assert.equal(r.ok, false);
   });

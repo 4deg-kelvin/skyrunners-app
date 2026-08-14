@@ -1,7 +1,29 @@
 # Removing hours: the plan
 
-Status: **agreed, not started.** Written 2026-08-14 after scoping it and backing
-out a partial attempt.
+Status: **DONE, 2026-08-14.** Migration `0039_remove_hours.sql`. Kept as the
+record of why, not as work outstanding — the reasoning below is what stops the
+tiers being rebuilt by somebody who reads only the code.
+
+**What differs from the plan as written**, so nobody has to diff it:
+
+| Plan said | Shipped | Why |
+|---|---|---|
+| The check-in window starts at "the previous check-in's **due** date" | Starts at the last **submitted** check-in's date | The due date is wrong twice over: a LATE check-in would re-report entries it already covered, and a MISSED one would silently drop the week before it. Anchoring to the last submission makes the window mean exactly "everything not yet reported", which is also precisely what `workIsLocked` means — so the two rules can't drift. See `lib/checkin-draft.ts` |
+| `hoursOnProject` simply disappears | Became `daysWorkedOnProject` — distinct days, not entries | The per-project figure an RE is allowed to see is load-bearing (it's the public half of the privacy split). Counting entries would rebuild volume in a new unit; counting days won't, since three entries in one afternoon is one day |
+| `hoursThisWeek` on the dashboard disappears | Became `logsThisWeek`, a COUNT | A club-wide liveness reading — "is anyone logging?" — never per person, never divided by headcount |
+| — | `showHours` deleted from `/updates` | It gated nothing else once hours were gone. The privacy rule it protected is still enforced upstream in `can.viewMemberEffort` |
+| — | `updateClubTiers` deleted, and a latent bug recorded | It rebuilt the `club_settings` row from the four numbers alone, so saving tiers wiped `clubName`, `clubDescription` and `discordInviteUrl`. Same shape as the `updateTeam` bug in HANDOFF §8. Noted in `operations.ts` in case anything writes that row again |
+
+Two things the plan listed that turned out not to exist: there was no
+`TIER_THRESHOLDS` constant left to delete (already data since 0020), and
+`activeWeeksFor` had to go too — it existed only as the divisor of a rate nothing
+computes any more.
+
+Everything below is the plan as agreed, unchanged.
+
+---
+
+Written 2026-08-14 after scoping it and backing out a partial attempt.
 
 ## What the club decided
 

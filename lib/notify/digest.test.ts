@@ -159,7 +159,7 @@ describe("a quiet project says how long", () => {
         memberId: re,
         projectId: project.id,
         workDate: "2026-08-08",
-        hours: 2,
+        description: "last thing anyone did here",
       });
       return { ok: true as const, value: null };
     });
@@ -188,7 +188,6 @@ describe("a quiet project says how long", () => {
         memberId: re,
         projectId: project.id,
         workDate: TODAY,
-        hours: 3,
         description: "ran the tensile coupons",
       });
       return { ok: true as const, value: null };
@@ -245,7 +244,6 @@ describe("a future-dated entry is not a quiet project", () => {
         projectId: project.id,
         // One day AFTER `TODAY`.
         workDate: "2026-08-13",
-        hours: 2,
         description: "logged ahead",
       });
       return { ok: true as const, value: null };
@@ -456,7 +454,6 @@ describe("message length", () => {
           memberId: re,
           projectId: project.id,
           workDate: TODAY,
-          hours: 1,
           description: `a fairly long description of work number ${i}`,
         });
       }

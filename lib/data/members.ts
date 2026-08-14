@@ -14,7 +14,7 @@ import {
   contributionInputsFor,
   getMember,
   getProject,
-  hoursOnProject,
+  daysWorkedOnProject,
   isOverdue,
   memberProjects,
   myRequestsToLeads,
@@ -26,8 +26,6 @@ import { readStore } from "@/lib/store/disk";
 import { isAdvisor } from "@/lib/permissions";
 import {
   buildContributionRecord,
-  commitmentTier,
-  type CommitmentTier,
   type ContributionRecord,
 } from "@/lib/contribution";
 import type {
@@ -83,9 +81,17 @@ export interface RosterRow {
   deliverablesCompleted: number;
   openDeliverables: number;
   overdueDeliverables: number;
-  /** Shown only where the viewer is allowed to see effort data. */
-  tier: CommitmentTier;
-  hoursPerWeek: number;
+  /*
+    A `tier` and an `hoursPerWeek` used to sit here, gated on the viewer being
+    allowed to see effort data. Both went with the commitment tiers on
+    2026-08-14.
+
+    Nothing replaced them, deliberately. The roster is a "who do I ask about
+    this?" page, and thirty rows each ending in a number is a leaderboard
+    whatever the header says — which is the one thing `lib/contribution.ts` has
+    always refused to build. Delivered counts stay because they're facts about
+    finished work; a rate per person does not.
+  */
 }
 
 /**
@@ -191,9 +197,6 @@ export async function getRoster(): Promise<RosterRow[]> {
     .map((member) => {
       const mine = memberProjects(member.id);
       const deliverables = myDeliverables(member.id);
-      const inputs = contributionInputsFor(member.id);
-      const hoursPerWeek =
-        inputs.activeWeeks > 0 ? inputs.hoursTotal / inputs.activeWeeks : 0;
 
       return {
         member,
@@ -206,8 +209,6 @@ export async function getRoster(): Promise<RosterRow[]> {
         openDeliverables: deliverables.filter((d) => d.status !== "done")
           .length,
         overdueDeliverables: deliverables.filter(isOverdue).length,
-        tier: commitmentTier(hoursPerWeek, inputs.isPaused),
-        hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
       };
     });
 }
@@ -217,7 +218,16 @@ export interface MemberProjectRow {
   membership: ProjectMembership;
   breadcrumb: BreadcrumbNode[];
   res: Member[];
-  hoursLogged: number;
+  /**
+   * Distinct days this member logged work against this project. `0` when the
+   * viewer isn't allowed to see their effort data.
+   *
+   * Was `hoursLogged`. Same permission gate, same reasoning — this is the
+   * per-project half of the privacy model, which an RE may see for their own
+   * project and nobody else may — just no longer a duration. See
+   * `can.viewMemberWorkOnProject`.
+   */
+  daysWorked: number;
   /** What this person owns here — concrete, not a text field. */
   deliverables: Deliverable[];
   /** Days until the project's target. Negative once passed, undefined if unset. */
@@ -314,8 +324,8 @@ export async function getMemberProfile(
           membership: pm,
           breadcrumb: projectBreadcrumb(pm.project.id),
           res: projectREs(pm.project.id),
-          hoursLogged: canViewEffort
-            ? hoursOnProject(memberId, pm.project.id)
+          daysWorked: canViewEffort
+            ? daysWorkedOnProject(memberId, pm.project.id)
             : 0,
           deliverables: myDeliverables(memberId).filter(
             (d) => d.projectId === pm.project!.id

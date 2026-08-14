@@ -21,7 +21,7 @@
  * people in your chain. `flaggedProjects` stays club-wide on purpose — a blocked
  * project is exactly the thing a passing person should be able to unblock.
  *
- * PHASE 1 NOTE: `compliance` and `hoursThisWeek` map onto `v_update_compliance`
+ * PHASE 1 NOTE: `compliance` and `logsThisWeek` map onto `v_update_compliance`
  * and `v_member_hours_weekly` in docs/DATA_MODEL.md, but both now need a member
  * filter. Views should take the scoped id set rather than aggregating globally.
  */
@@ -35,12 +35,11 @@ import {
   requestsAwaitingLead,
   getProject,
   memberProjects,
-  recentWorkLogs,
-  lastWorkLogs,
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
-import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
+import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
+import { workToShow, type MyWorkView } from "./my-work";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
 import {
   escalationsFor,
@@ -59,7 +58,6 @@ import type {
   ProgressUpdate,
   ProjectNotice,
   UpdateEntry,
-  WorkLog,
 } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 import { getTrainingQueue, type TrainingQueueItem } from "@/lib/data/trainings";
@@ -127,24 +125,32 @@ export interface DashboardView {
     pending: number;
     fraction: number;
   };
-  /** Hours logged this week by people the viewer oversees. */
-  hoursThisWeek: number;
+  /**
+   * Work-log entries written this week by people the viewer oversees.
+   *
+   * Was `hoursThisWeek`, a sum. A COUNT of entries now — a liveness reading
+   * ("is my part of the club logging anything?"), never divided by headcount and
+   * never shown per person. See the warning in `lib/contribution.ts` about
+   * rebuilding the removed signal in a new unit.
+   */
+  logsThisWeek: number;
   /** Reports written TO the viewer and not yet read. Oldest first. */
   reviewQueue: ReviewQueueItem[];
   /** Leads under the viewer who are leaving their people unheard. */
   escalations: LeadEscalation[];
   /** Club-wide, deliberately: anyone may help with a blocked project. */
   flaggedProjects: FlaggedProject[];
-  /** The viewer's own committed projects, so they can log hours from here. */
+  /** The viewer's own committed projects, so they can log work from here. */
   myProjects: { id: string; name: string }[];
-  /** Their own recent hours, so a mistyped entry can be removed from here too. */
-  recentHours: {
-    log: WorkLog;
-    project?: Project;
-    locked: boolean;
-    /** Older than the fortnight window — a reminder, not something to edit. */
-    stale: boolean;
-  }[];
+  /**
+   * Their own recent entries, grouped by day, so a wrong one can be removed
+   * from here too.
+   *
+   * Typed as My Work's field rather than restated, because it feeds the same
+   * `LogWorkForm` component and is produced by the same `workToShow`. Restating
+   * the shape here is what let the two drift before.
+   */
+  recentWork: MyWorkView["recentWork"];
   /**
    * Projects completed recently that named the viewer in the chain.
    *
@@ -198,7 +204,7 @@ export interface DashboardView {
     reports: number;
     unread: number;
     worstUnreadDays: number;
-    hoursThisWeek: number;
+    logsThisWeek: number;
     quietCount: number;
   }[];
   /**
@@ -412,9 +418,9 @@ export async function getDashboard(
   const totalDue = onTime + late + missed;
 
   const weekStart = startOfWeek(today());
-  const hoursThisWeek = workLogs
-    .filter((w) => countedIds.has(w.memberId) && w.workDate >= weekStart)
-    .reduce((sum, w) => sum + w.hours, 0);
+  const logsThisWeek = workLogs.filter(
+    (w) => countedIds.has(w.memberId) && w.workDate >= weekStart
+  ).length;
 
   // Trainings this viewer is the verifier for. `overseen` is their reporting
   // subtree, which is exactly who `can.verifyTraining` covers.
@@ -481,15 +487,20 @@ export async function getDashboard(
 
   // --- who has gone quiet --------------------------------------------------
   //
-  // Zero hours this week while still holding open work. Not a missed check-in
-  // — that's already visible — but the person who simply stopped, which is
-  // what the club actually loses people to.
+  // Logged NOTHING this week while still holding open work. Not a missed
+  // check-in — that's already visible — but the person who simply stopped, which
+  // is what the club actually loses people to.
+  //
+  // The test used to be "zero hours". It is now "no entries at all", which is a
+  // slightly WIDER net in one useful direction: somebody who used to log 0.5
+  // hours as a placeholder no longer registers as active. One line in the diary
+  // is the bar, and one line is also all the check-in needs.
   const goneQuiet = overseen
     .map((member) => {
-      const hours = workLogs
-        .filter((w) => w.memberId === member.id && w.workDate >= weekStart)
-        .reduce((sum, w) => sum + w.hours, 0);
-      if (hours > 0) return null;
+      const logged = workLogs.some(
+        (w) => w.memberId === member.id && w.workDate >= weekStart
+      );
+      if (logged) return null;
 
       const openDeliverables = store.deliverables.filter(
         (d) => d.ownerId === member.id && d.status !== "done"
@@ -542,11 +553,9 @@ export async function getDashboard(
             reports: theirReports.length,
             unread: unread.length,
             worstUnreadDays: unread[0]?.ageDays ?? 0,
-            hoursThisWeek: workLogs
-              .filter(
-                (w) => reportIds.has(w.memberId) && w.workDate >= weekStart
-              )
-              .reduce((sum, w) => sum + w.hours, 0),
+            logsThisWeek: workLogs.filter(
+              (w) => reportIds.has(w.memberId) && w.workDate >= weekStart
+            ).length,
             quietCount: goneQuiet.filter((q) => reportIds.has(q.member.id))
               .length,
           };
@@ -575,7 +584,7 @@ export async function getDashboard(
       // people have nothing due yet is not a Lead at 0% compliance.
       fraction: totalDue === 0 ? 0 : onTime / totalDue,
     },
-    hoursThisWeek,
+    logsThisWeek,
     reviewQueue,
     escalations: escalationsFor(
       actor.id,
@@ -587,20 +596,15 @@ export async function getDashboard(
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
     /*
-      Same fallback as My Work: when the fortnight is empty, show the last few
-      entries whatever their age so somebody back from a break sees what they
-      were on rather than a blank space.
+      Literally the same function My Work uses, not a copy of it.
+
+      This block used to be a duplicate of `workToShow` — same fortnight window,
+      same stale fallback, same `locked` lookup, written out twice. It mounts the
+      same `LogWorkForm` component, so the two had to agree, and a copy that has
+      to agree is a copy that eventually won't: the day-by-day grouping would
+      have been added on My Work and quietly missing here.
     */
-    recentHours: (() => {
-      const recent = recentWorkLogs(actor.id);
-      const stale = recent.length === 0;
-      return (stale ? lastWorkLogs(actor.id) : recent).map((log) => ({
-        log,
-        project: log.projectId ? getProject(log.projectId) : undefined,
-        locked: hoursAreLocked(actor.id, log.workDate),
-        stale,
-      }));
-    })(),
+    recentWork: workToShow(actor.id),
     // Addressed to this person, newest first, and only the last fortnight.
     // Older than that it's history rather than news, and the project pages and
     // the completed sections on /projects are where history belongs.

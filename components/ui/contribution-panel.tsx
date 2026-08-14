@@ -1,21 +1,27 @@
-import { Badge } from "./badge";
 import { SectionLabel } from "./section-label";
 import { StatTile } from "./stat-tile";
-import {
-  tierDescriptions,
-  TIER_LABELS,
-  type ContributionRecord,
-} from "@/lib/contribution";
-import { TIER_TONES } from "@/lib/labels";
-import { formatNumber, formatPercent } from "@/lib/utils";
+import { type ContributionRecord } from "@/lib/contribution";
+import { formatPercent } from "@/lib/utils";
 
 /**
- * The contribution record, as four separate signals.
+ * The contribution record, as three separate signals.
  *
  * There is no composite number here on purpose. A single score invites
- * optimization; four honest columns invite judgment. Delivered comes first
- * because finished work is the only signal that can't be inflated — someone can
- * sit in the lab for twelve hours and ship nothing.
+ * optimization; a few honest columns invite judgment. Delivered comes first
+ * because finished work is the only signal that can't be inflated.
+ *
+ * ---------------------------------------------------------------------------
+ * There was a fourth tile, and a tier badge above it
+ * ---------------------------------------------------------------------------
+ *
+ * "Hours / week", with a Core / Committed / Contributing badge and a "2.4 more
+ * to reach Contributing" hint. All of it went on 2026-08-14 when the club
+ * decided deliverables are the measure — see `lib/contribution.ts`.
+ *
+ * Three tiles, not four, and nothing was promoted to fill the gap. The grid is
+ * `lg:grid-cols-3` now rather than 4: stretching three tiles across a
+ * four-column layout leaves a hole where the hours used to be, which invites the
+ * next person to fill it.
  *
  * Members see their own. Nobody sees a ranking.
  */
@@ -26,7 +32,7 @@ export function ContributionPanel({
   record: ContributionRecord;
   isOwnRecord: boolean;
 }) {
-  const { delivered, commitment, reliability, scope } = record;
+  const { delivered, reliability, scope } = record;
 
   return (
     <div>
@@ -34,17 +40,10 @@ export function ContributionPanel({
         <SectionLabel>
           {isOwnRecord ? "My Contribution" : "Contribution"}
         </SectionLabel>
-        <Badge tone={TIER_TONES[commitment.tier]}>
-          {TIER_LABELS[commitment.tier]}
-        </Badge>
       </div>
 
-      <p className="text-ink-soft mt-2 text-sm">
-        {tierDescriptions(commitment.tiers)[commitment.tier]}
-      </p>
-
       {/* Delivered leads, because it's the signal that matters most */}
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatTile
           label="Deliverables done"
           value={delivered.deliverablesCompleted}
@@ -58,24 +57,6 @@ export function ContributionPanel({
           label="Projects completed"
           value={delivered.projectsCompleted}
           hint="carried to the finish"
-        />
-        <StatTile
-          label="Hours / week"
-          value={formatNumber(commitment.hoursPerWeek, 1)}
-          /*
-            The NEXT rung, never the top one.
-
-            This used to say "10.5 more to reach Core" to somebody at 1.6
-            hrs/week, which is a verdict wearing the clothes of encouragement —
-            and the tier model exists precisely so a below-bar member reads as
-            a rung rather than a failure. The next threshold up is reachable by
-            construction; Core, from the bottom, is not.
-          */
-          hint={
-            commitment.nextTier
-              ? `${formatNumber(commitment.nextTier.hoursAway, 1)} more to reach ${TIER_LABELS[commitment.nextTier.tier]}`
-              : `at or above the ${commitment.tiers.core} hr target`
-          }
         />
         <StatTile
           label="Updates on time"

@@ -25,11 +25,11 @@
  * Privacy
  * ---------------------------------------------------------------------------
  *
- * The RE section reports hours on THEIR OWN projects — which is exactly what
- * `can.viewMemberHoursOnProject` allows, inheriting down the project tree. The
+ * The RE section reports work on THEIR OWN projects — which is exactly what
+ * `can.viewMemberWorkOnProject` allows, inheriting down the project tree. The
  * Lead section reports their direct reports' effort, which is
  * `can.viewMemberEffort`. Neither section crosses into the other's data: an RE
- * who isn't somebody's Lead never sees that person's total hours, only what
+ * who isn't somebody's Lead never sees that person's whole record, only what
  * they did on the RE's project.
  *
  * ---------------------------------------------------------------------------
@@ -116,8 +116,8 @@ interface Activity {
  *
  * Five signals, because "activity" means different things to different people
  * and using only one of them produces confidently wrong silence — a project
- * where somebody spent all Saturday writing the test report and logged no
- * hours is not quiet.
+ * where somebody spent all Saturday writing the test report and logged nothing
+ * is not quiet.
  */
 function projectActivity(projectId: string, today: string): Activity {
   const store = readStore();
@@ -133,8 +133,22 @@ function projectActivity(projectId: string, today: string): Activity {
     seen(log.workDate);
     if (isCurrent(log.workDate, today)) {
       const who = store.members.find((m) => m.id === log.memberId)?.fullName;
+      /*
+        The DESCRIPTION is the line now, not a suffix on a number.
+
+        This used to read "Sofia Reyes logged 3 hrs — Coupon layup", and the
+        hours were the part that carried no information: three hours of what?
+        Now it reads "Sofia Reyes: Coupon layup", which is the sentence a Lead
+        skimming a digest actually needs.
+
+        The fallback matters — rows written before the note was required have no
+        description, and a bare name with a dangling colon reads as a rendering
+        bug rather than as missing data.
+      */
       lines.push(
-        `${who ?? "Someone"} logged ${log.hours} hrs${log.description ? ` — ${log.description}` : ""}`
+        log.description
+          ? `${who ?? "Someone"}: ${log.description}`
+          : `${who ?? "Someone"} logged work (no note)`
       );
     }
   }
@@ -303,17 +317,33 @@ function leadSection(reports: Member[], today: string): string {
 
   for (const person of reports) {
     const logs = store.workLogs.filter((w) => w.memberId === person.id);
-    const todayHours = logs
-      .filter((w) => isCurrent(w.workDate, today))
-      .reduce((sum, w) => sum + w.hours, 0);
+    const todayLogs = logs.filter((w) => isCurrent(w.workDate, today));
 
     const checkedInToday = store.progressUpdates.some(
       (u) => u.memberId === person.id && isCurrent(u.submittedAt, today)
     );
 
-    if (todayHours > 0 || checkedInToday) {
-      const bits = [];
-      if (todayHours > 0) bits.push(`${todayHours} hrs`);
+    if (todayLogs.length > 0 || checkedInToday) {
+      /*
+        What they DID, not how long for.
+
+        The first entry's note is quoted rather than a count of entries, because
+        a Lead reading this wants the specific thing — "reran the FEA" tells them
+        whether to ask a question; "2 entries" tells them nothing. A second entry
+        is acknowledged as a tail rather than listed, to keep one line per
+        person: the digest is scanned, not read.
+      */
+      const bits: string[] = [];
+      const first = todayLogs.find((w) => w.description.trim());
+      if (first) {
+        bits.push(
+          todayLogs.length > 1
+            ? `${first.description} (+${todayLogs.length - 1} more)`
+            : first.description
+        );
+      } else if (todayLogs.length > 0) {
+        bits.push("logged work");
+      }
       if (checkedInToday) bits.push("checked in");
       out.push(`• ${person.fullName} — ${bits.join(", ")}`);
       continue;

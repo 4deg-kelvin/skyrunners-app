@@ -277,18 +277,17 @@ describe("editing and cancelling", () => {
   });
 });
 
-describe("hours logged to misc", () => {
-  test("hours with no project are accepted", async () => {
+describe("work logged to misc", () => {
+  test("work with no project is accepted", async () => {
     /*
       Follows directly from the calendar: somebody sees an open build session,
-      turns up, and works three hours on a project they aren't committed to.
-      Those hours are real, and refusing them left "log it against the wrong
-      project" as the only way through.
+      turns up, and spends an afternoon on a project they aren't committed to.
+      That work is real, and refusing it left "log it against the wrong project"
+      as the only way through.
     */
-    const result = await ops.logHours({
+    const result = await ops.logWork({
       memberId: OTHER,
       workDate: TODAY,
-      hours: 3,
       description: "Helped with the spar layup",
       today: TODAY,
     });
@@ -297,22 +296,24 @@ describe("hours logged to misc", () => {
     if (result.ok) assert.equal(result.value.projectId, undefined);
   });
 
-  test("misc hours still obey the backdating limit", async () => {
+  test("misc work still obeys the backdating limit", async () => {
     // Misc is a missing project, not a way around the other rules.
-    const result = await ops.logHours({
+    const result = await ops.logWork({
       memberId: OTHER,
       workDate: "2026-06-01",
-      hours: 3,
+      description: "Helped with something months ago",
       today: TODAY,
     });
     assert.equal(result.ok, false);
   });
 
-  test("misc hours still obey the per-entry ceiling", async () => {
-    const result = await ops.logHours({
+  test("misc work still needs a note", async () => {
+    // The note is what makes an entry worth anything — it drafts the check-in.
+    // Leaving the project off must not also let the note go.
+    const result = await ops.logWork({
       memberId: OTHER,
       workDate: TODAY,
-      hours: 80,
+      description: "",
       today: TODAY,
     });
     assert.equal(result.ok, false);

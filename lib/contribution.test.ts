@@ -5,6 +5,13 @@
  * every property test it had while ranking an absent member (45) almost as high
  * as a reliable contributor (50). Property tests confirm arithmetic; personas
  * catch a model that's describing real people absurdly.
+ *
+ * Roughly half of this file used to test the commitment tiers — the ladder, the
+ * configurable floors, the "next rung" gap. All of that is gone with the tiers
+ * (2026-08-14). What replaces it is one small suite at the bottom asserting the
+ * tier CANNOT come back by accident, because the failure mode being guarded
+ * against is somebody re-adding a volume signal in a new unit rather than
+ * literally restoring `commitmentTier`.
  */
 
 import assert from "node:assert/strict";
@@ -12,26 +19,15 @@ import { test, describe } from "node:test";
 
 import {
   buildContributionRecord,
-  commitmentTier,
   LEADERSHIP_RUBRIC,
-  TIER_LABELS,
-  WEEKLY_HOURS_EXPECTATION,
-  WEEKLY_HOURS_MINIMUM,
-  DEFAULT_TIERS,
-  nextTierGap,
-  tierDescriptions,
   type ContributionInputs,
 } from "./contribution.ts";
 
 const blank: ContributionInputs = {
-  tiers: DEFAULT_TIERS,
-  activeWeeks: 10,
-  isPaused: false,
   deliverablesCompleted: 0,
   deliverablesOpen: 0,
   deliverablesOverdue: 0,
   projectsCompleted: 0,
-  hoursTotal: 0,
   updatesDue: 0,
   updatesOnTime: 0,
   updatesLate: 0,
@@ -44,109 +40,6 @@ const persona = (o: Partial<ContributionInputs>): ContributionInputs => ({
   ...o,
 });
 
-describe("commitment tiers", () => {
-  /*
-    The club's stated expectation as of 2026-08-10: 10–12 a week is committed,
-    16+ is core. `committed` is the LOW end of the published range, so somebody
-    doing exactly 10 has met the bar the club actually states.
-  */
-  test("tiers follow the club's stated expectation", () => {
-    assert.equal(commitmentTier(20), "core");
-    assert.equal(commitmentTier(16), "core");
-    assert.equal(commitmentTier(15), "committed");
-    assert.equal(commitmentTier(10), "committed");
-    assert.equal(commitmentTier(9), "contributing");
-    assert.equal(commitmentTier(5), "contributing");
-    assert.equal(commitmentTier(1), "light");
-  });
-
-  test("a paused member is paused regardless of hours", () => {
-    assert.equal(commitmentTier(0, true), "paused");
-    assert.equal(commitmentTier(20, true), "paused");
-  });
-
-  test("every tier has a human-readable label", () => {
-    for (const tier of Object.keys(TIER_LABELS)) {
-      assert.ok(TIER_LABELS[tier as keyof typeof TIER_LABELS].length > 0);
-    }
-  });
-
-  test("the minimum is at or below the full expectation", () => {
-    assert.ok(WEEKLY_HOURS_MINIMUM <= WEEKLY_HOURS_EXPECTATION);
-  });
-});
-
-describe("the gap shown is to the NEXT rung, not the top one", () => {
-  test("somebody at 7/wk is measured against Committed, not Core", () => {
-    const r = buildContributionRecord(persona({ hoursTotal: 70 })); // 7/wk
-    assert.equal(r.commitment.hoursPerWeek, 7);
-    assert.equal(r.commitment.nextTier?.tier, "committed");
-    // The next rung is 10, not the 16 at the top. Showing the top would tell
-    // somebody three hours short that they're nine hours short.
-    assert.equal(r.commitment.nextTier?.hoursAway, 3);
-    assert.equal(r.commitment.meetsMinimum, false);
-  });
-
-  test("somebody far below the bar gets a reachable rung", () => {
-    /*
-      The bug this replaced. At 1.6 hrs/week the panel said "10.5 more to reach
-      Core", which is a verdict dressed as encouragement — and the whole point
-      of naming tiers instead of scoring people is that a below-bar member sees
-      a rung rather than a failure.
-    */
-    const r = buildContributionRecord(persona({ hoursTotal: 16 })); // 1.6/wk
-    assert.equal(r.commitment.nextTier?.tier, "contributing");
-    assert.equal(r.commitment.nextTier?.hoursAway, 2.4);
-  });
-
-  test("null once at the top", () => {
-    // 18/wk — past Core's 16. There is no rung above, so there is no gap to
-    // show, and inventing one would mean the top tier still reads as falling
-    // short of something.
-    const r = buildContributionRecord(persona({ hoursTotal: 180 }));
-    assert.equal(r.commitment.tier, "core");
-    assert.equal(r.commitment.nextTier, null);
-    assert.equal(r.commitment.meetsMinimum, true);
-  });
-
-  test("a paused member is shown no gap at all", () => {
-    // Nothing is owed during a pause, so a "you need N more hours" line would
-    // be the app contradicting its own promise.
-    const r = buildContributionRecord(
-      persona({ hoursTotal: 16, isPaused: true })
-    );
-    assert.equal(r.commitment.tier, "paused");
-    assert.equal(r.commitment.nextTier, null);
-  });
-});
-
-describe("the tiers are configuration, not constants", () => {
-  const lowered = { core: 8, committed: 6, contributing: 3, minimum: 6 };
-
-  test("a lowered bar changes which tier somebody lands in", () => {
-    const at7 = persona({ hoursTotal: 70 }); // 7/wk
-    assert.equal(buildContributionRecord(at7).commitment.tier, "contributing");
-    assert.equal(
-      buildContributionRecord({ ...at7, tiers: lowered }).commitment.tier,
-      "committed"
-    );
-  });
-
-  test("the published descriptions follow the numbers", () => {
-    // /how-we-lead prints these. If they were still hard-coded strings, the
-    // rubric would state a bar nobody is actually measured against.
-    assert.match(tierDescriptions(DEFAULT_TIERS).core, /16\+ hrs\/week/);
-    assert.match(tierDescriptions(lowered).core, /8\+ hrs\/week/);
-    assert.match(tierDescriptions(lowered).contributing, /3–6 hrs\/week/);
-  });
-
-  test("the gap is measured against the configured rungs", () => {
-    assert.equal(nextTierGap(4, DEFAULT_TIERS)?.tier, "committed");
-    assert.equal(nextTierGap(4, lowered)?.tier, "committed");
-    assert.equal(nextTierGap(7, lowered)?.tier, "core");
-  });
-});
-
 describe("no data is never scored as failure", () => {
   test("a brand new member with nothing assigned has null rates, not zeros", () => {
     const r = buildContributionRecord(blank);
@@ -154,21 +47,19 @@ describe("no data is never scored as failure", () => {
     assert.equal(r.reliability.onTimeRate, null);
   });
 
+  /*
+    A paused member no longer needs an `isPaused` input to be described fairly.
+
+    That flag existed for the tier ("On academic pause" was a tier value). What
+    actually protects a paused member is upstream: a pause generates no check-in
+    obligations, so `updatesDue` is 0 and Reliability reports null — "nothing
+    due" — on its own. This test pins that, because the temptation when reading
+    the record code is to think the pause was forgotten.
+  */
   test("a paused member owes nothing and is not marked missed", () => {
-    const r = buildContributionRecord(
-      persona({ isPaused: true, updatesDue: 0 })
-    );
-    assert.equal(r.commitment.tier, "paused");
+    const r = buildContributionRecord(persona({ updatesDue: 0 }));
     assert.equal(r.reliability.missed, 0);
     assert.equal(r.reliability.onTimeRate, null);
-  });
-
-  test("activeWeeks of zero does not produce NaN or Infinity", () => {
-    const r = buildContributionRecord(
-      persona({ activeWeeks: 0, hoursTotal: 20 })
-    );
-    assert.ok(Number.isFinite(r.commitment.hoursPerWeek));
-    assert.equal(r.commitment.hoursPerWeek, 0);
   });
 });
 
@@ -189,24 +80,29 @@ describe("missed updates are derived, never negative", () => {
 });
 
 describe("personas — the record must describe real people sensibly", () => {
-  /** Ships work, hits the bar, reliable. Not an RE. */
+  /** Ships work, reliable. Not an RE. */
   const workhorse = persona({
     deliverablesCompleted: 9,
     deliverablesOpen: 2,
     projectsCompleted: 2,
-    hoursTotal: 130, // 13/wk
     updatesDue: 20,
     updatesOnTime: 19,
     updatesLate: 1,
     projectsCommitted: 2,
   });
 
-  /** Lots of hours, nothing finished. The pattern the model must expose. */
+  /**
+   * Around constantly, nothing finished.
+   *
+   * This persona used to be defined by `hoursTotal: 200` — the whole point was
+   * that hours made him look like the top tier while he delivered nothing. With
+   * hours gone he is defined by what remains true: plenty assigned, none
+   * finished, several overdue. The assertion below is what always mattered.
+   */
   const grinder = persona({
     deliverablesCompleted: 0,
     deliverablesOpen: 8,
     deliverablesOverdue: 5,
-    hoursTotal: 200, // 20/wk
     updatesDue: 20,
     updatesOnTime: 18,
     updatesLate: 2,
@@ -218,7 +114,6 @@ describe("personas — the record must describe real people sensibly", () => {
     deliverablesCompleted: 1,
     deliverablesOpen: 6,
     deliverablesOverdue: 4,
-    hoursTotal: 40, // 4/wk
     updatesDue: 20,
     updatesOnTime: 10,
     updatesLate: 2,
@@ -226,36 +121,38 @@ describe("personas — the record must describe real people sensibly", () => {
     projectsCommitted: 2,
   });
 
-  /** Absent all term, correctly paused. */
-  const paused = persona({ isPaused: true });
-
-  /*
-    13/wk. Under the club's stated expectation — 10–12 committed, 16+ core —
-    that is comfortably Committed and not Core, which is the honest reading:
-    they meet the bar the club publishes without living in the lab.
-  */
-  test("the workhorse meets the club's bar and is clearly productive", () => {
+  test("the workhorse reads as clearly productive", () => {
     const r = buildContributionRecord(workhorse);
-    assert.equal(r.commitment.tier, "committed");
-    assert.equal(r.commitment.meetsMinimum, true);
     assert.equal(r.delivered.projectsCompleted, 2);
     assert.ok(r.delivered.completionRate !== null);
     assert.ok(r.delivered.completionRate > 0.8);
+    assert.ok(r.reliability.onTimeRate !== null);
+    assert.ok(r.reliability.onTimeRate > 0.9);
   });
 
-  test("hours alone cannot make someone look productive", () => {
+  /*
+    The assertion this file exists for, and the one the removal makes stronger.
+
+    Being present and being productive used to be two signals sitting side by
+    side, and the panel showed the grinder at the TOP tier on hours next to a
+    zero delivery count. Now nothing in the record can make him look productive
+    at all, because nothing in the record measures presence.
+  */
+  test("turning up cannot make someone look productive", () => {
     const g = buildContributionRecord(grinder);
-    // Top tier on hours...
-    assert.equal(g.commitment.tier, "core");
-    // ...but delivery tells the truth, which is what leadership reads first.
     assert.equal(g.delivered.deliverablesCompleted, 0);
     assert.equal(g.delivered.completionRate, 0);
     assert.equal(g.delivered.overdue, 5);
 
+    // Being reliable about check-ins does NOT bleed into delivery. He files
+    // them faithfully and still reads as delivering nothing, which is correct.
+    assert.ok(g.reliability.onTimeRate !== null);
+    assert.ok(g.reliability.onTimeRate > 0.8);
+
     const w = buildContributionRecord(workhorse);
     assert.ok(
       w.delivered.deliverablesCompleted > g.delivered.deliverablesCompleted,
-      "the person who ships must be distinguishable from the person who only logs hours"
+      "the person who ships must be distinguishable from the person who is merely present"
     );
   });
 
@@ -267,14 +164,6 @@ describe("personas — the record must describe real people sensibly", () => {
       t.delivered.completionRate < 0.2,
       "scope is reported, but delivery is reported separately and honestly"
     );
-    assert.equal(t.commitment.tier, "contributing");
-  });
-
-  test("a paused member is not portrayed as failing", () => {
-    const p = buildContributionRecord(paused);
-    assert.equal(p.reliability.missed, 0);
-    assert.equal(p.delivered.completionRate, null);
-    assert.equal(p.commitment.tier, "paused");
   });
 
   test("there is no composite score anywhere in the record", () => {
@@ -283,8 +172,54 @@ describe("personas — the record must describe real people sensibly", () => {
     assert.ok(!("score" in (r as unknown as Record<string, unknown>)));
     assert.ok(
       !flat.includes('"score"'),
-      "a single number invites optimization; keep the four signals separate"
+      "a single number invites optimization; keep the signals separate"
     );
+  });
+});
+
+/**
+ * The regression guard for the whole change.
+ *
+ * These tests would all have passed before the removal too — that's deliberate.
+ * They don't check that the tier is absent by name; they check the SHAPE that
+ * made it wrong, so they also fail if somebody adds `daysLogged`,
+ * `sessionsAttended` or `entriesWritten` as a fourth signal. Re-read the header
+ * of `lib/contribution.ts` before deleting any of them.
+ */
+describe("the record measures outcomes, not volume of time", () => {
+  test("no field in the record counts time or presence", () => {
+    const r = buildContributionRecord(
+      persona({ deliverablesCompleted: 3, updatesDue: 4, updatesOnTime: 4 })
+    );
+
+    const banned = [
+      "hours",
+      "hoursTotal",
+      "hoursPerWeek",
+      "tier",
+      "commitment",
+      "daysWorked",
+      "daysLogged",
+      "sessions",
+      "entriesWritten",
+      "activeWeeks",
+    ];
+    const flat = JSON.stringify(r);
+    for (const key of banned) {
+      assert.ok(
+        !flat.includes(`"${key}"`),
+        `"${key}" is back in the contribution record — it measures presence, not outcomes. See docs/HOURS_REMOVAL_PLAN.md.`
+      );
+    }
+  });
+
+  test("exactly three signals, and Delivered is one of them", () => {
+    const r = buildContributionRecord(blank);
+    assert.deepEqual(Object.keys(r).sort(), [
+      "delivered",
+      "reliability",
+      "scope",
+    ]);
   });
 });
 
@@ -297,6 +232,24 @@ describe("leadership rubric is published, ordered, and led by delivery", () => {
     for (const row of LEADERSHIP_RUBRIC) {
       assert.ok(row.what.length > 10);
       assert.ok(row.why.length > 10);
+    }
+  });
+
+  /*
+    The rubric is PUBLISHED at /how-we-lead, so a criterion referring to
+    something the app no longer measures is worse than a missing criterion: it
+    tells a member they're being judged on a scale that doesn't exist.
+
+    The "Sustained commitment" row said "Core or Committed tier held across a
+    full quarter". This is the test that would have caught it being left behind.
+  */
+  test("no criterion refers to hours or to a tier", () => {
+    const flat = JSON.stringify(LEADERSHIP_RUBRIC).toLowerCase();
+    for (const word of ["hour", "hrs", "tier", "core or committed"]) {
+      assert.ok(
+        !flat.includes(word),
+        `the published rubric mentions "${word}", which the club no longer measures`
+      );
     }
   });
 });

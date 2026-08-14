@@ -22,7 +22,6 @@ import type {
   TermKind,
   UpdateStatus,
 } from "./types";
-import type { CommitmentTier } from "./contribution";
 import type { BadgeTone } from "@/components/ui/badge";
 
 // ---------------------------------------------------------------------------
@@ -208,22 +207,15 @@ export const DELIVERABLE_STATUS_TONES: Record<DeliverableStatus, BadgeTone> = {
   done: "ok",
 };
 
-// ---------------------------------------------------------------------------
-// Commitment tiers
-// ---------------------------------------------------------------------------
+/*
+  `TIER_TONES` lived here — badge tones for the Core / Committed / Contributing
+  commitment tiers. The tiers were removed on 2026-08-14 (hours are not the
+  measure; deliverables are), so the tones went with them.
 
-/**
- * Tiers read as rungs on a ladder, never as a pass/fail. Someone at 6 hrs/week
- * during midterms is "Contributing" — a real category with somewhere to go, not
- * a failure state.
- */
-export const TIER_TONES: Record<CommitmentTier, BadgeTone> = {
-  core: "cardinal",
-  committed: "ok",
-  contributing: "neutral",
-  light: "neutral",
-  paused: "neutral",
-};
+  Nothing replaced it. If you find yourself adding a per-member badge tone map
+  back into this file, read `lib/contribution.ts` first: the record is three
+  signals and none of them is a rung a person sits on.
+*/
 
 // ---------------------------------------------------------------------------
 // Project attention flags

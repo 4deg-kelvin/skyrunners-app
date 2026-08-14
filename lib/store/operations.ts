@@ -43,6 +43,7 @@
 import { mutate, readStore, type StoreShape } from "./disk.ts";
 import { todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
+import { checkInPeriodStart, workByProject } from "../checkin-draft.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
   ArtifactKind,
@@ -74,12 +75,12 @@ import type {
 } from "../types.ts";
 
 /**
- * How far back hours can be dated.
+ * How far back a work-log entry can be dated.
  *
  * Seven days covers "I forgot to log all week and it's Sunday", which is the
- * real behaviour, while keeping the numbers close enough to the work that
- * they're worth trusting. Beyond a week people are guessing, and a guessed
- * number that looks precise is worse than a missing one.
+ * real behaviour, while keeping the entry close enough to the work that it's
+ * worth trusting. Beyond a week people are reconstructing from memory, and a
+ * confidently-written wrong account is worse than a missing one.
  */
 export const MAX_BACKDATE_DAYS = 7;
 
@@ -91,8 +92,15 @@ export const MAX_BACKDATE_DAYS = 7;
  */
 export const OWNER_LEFT_NOTE = "Owner left the project — needs reassigning.";
 
-/** Sanity ceiling on a single entry. Catches 80 meaning 8.0. */
-const MAX_HOURS_PER_ENTRY = 16;
+/**
+ * Ceiling on one entry's note.
+ *
+ * Not a data-integrity rule — Postgres would take far more — but a shape rule.
+ * This is a diary line that pre-fills a check-in section, and an essay pasted
+ * here lands verbatim in front of a Lead reading twelve of them. Generous enough
+ * that nobody hits it describing a real day's work.
+ */
+const MAX_DESCRIPTION_CHARS = 500;
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -150,72 +158,88 @@ function daysBetween(fromIso: string, toIso: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 3 — hours
+// The work log — a diary, not a timesheet
 // ---------------------------------------------------------------------------
 
 /**
- * True once a submitted check-in has already reported hours for this date.
+ * True once a submitted check-in has already reported this date.
  *
- * Hours that a Lead has already read must not change underneath them. Without
- * this, someone could submit "3 hours this week", have it reviewed, then edit it
- * to 12 — and the report the Lead acted on would no longer exist anywhere.
+ * What a Lead has already read must not change underneath them. Without this,
+ * somebody could submit "rebuilt the seal, all good", have it reviewed, then
+ * rewrite the underlying entry — and the report the Lead acted on would no
+ * longer exist anywhere.
+ *
+ * Renamed from `hoursAreLocked` when hours were removed. The rule is unchanged.
  */
-export function hoursAreLocked(memberId: string, workDate: string): boolean {
+export function workIsLocked(memberId: string, workDate: string): boolean {
   const { progressUpdates } = readStore();
   return progressUpdates.some(
     (u) =>
       u.memberId === memberId &&
       (u.status === "submitted" || u.status === "reviewed") &&
       !!u.submittedAt &&
-      // STRICTLY before. Hours dated the same day as the check-in stay
-      // editable: you submit in the afternoon and then do three more hours in
-      // the evening, and refusing to record them means the total is wrong in
-      // the direction that discourages people. Only days already closed out by
-      // a submitted check-in are locked.
+      // STRICTLY before. An entry dated the same day as the check-in stays
+      // editable: you submit in the afternoon and then get another two hours in
+      // that evening, and refusing to record it means the diary is wrong in the
+      // direction that discourages people. Only days already closed out by a
+      // submitted check-in are locked.
       workDate.slice(0, 10) < u.submittedAt.slice(0, 10)
   );
 }
 
-export async function logHours(input: {
+/**
+ * Record what you did on a day. The highest-frequency write in the app.
+ *
+ * Was `logHours`, and the change is not just the name. It used to take a number
+ * and an OPTIONAL note; it now takes a REQUIRED note and no number. That
+ * inversion is the whole point of the change: the note is the thing the club
+ * actually wanted, and it was the field people skipped.
+ *
+ * The note carries real weight downstream — it pre-fills that project's section
+ * of the next check-in — so an entry without one is now worthless rather than
+ * merely thin, which is what justifies refusing it here instead of accepting a
+ * blank.
+ */
+export async function logWork(input: {
   memberId: string;
   /**
    * Omit for "misc" — helping on something you aren't committed to.
    *
    * Follows directly from the calendar: somebody sees an open build session,
-   * turns up, and works three hours on a project they're not on the roster
-   * for. Those hours are real. Refusing them made the honest answer impossible
-   * and left logging against the wrong project as the only way through.
+   * turns up, and spends an afternoon on a project they're not on the roster
+   * for. That work is real. Refusing it made the honest answer impossible and
+   * left logging against the wrong project as the only way through.
    */
   projectId?: string;
   workDate: string;
-  hours: number;
-  description?: string;
+  description: string;
   /** Today, passed in so this stays testable and render-stable. */
   today: string;
 }): Promise<Result<WorkLog>> {
-  const { memberId, projectId, workDate, hours, description, today } = input;
+  const { memberId, projectId, workDate, description, today } = input;
 
-  if (!Number.isFinite(hours) || hours <= 0) {
-    return fail("Enter how many hours you worked.");
+  const note = description.trim();
+  if (!note) {
+    return fail("Say what you did — a line is enough.");
   }
-  if (hours > MAX_HOURS_PER_ENTRY) {
+  if (note.length > MAX_DESCRIPTION_CHARS) {
     return fail(
-      `That's over ${MAX_HOURS_PER_ENTRY} hours in one go — is it a typo?`
+      `That's ${note.length} characters. Keep it under ${MAX_DESCRIPTION_CHARS} — this is a note, and it goes into your check-in.`
     );
   }
 
   const age = daysBetween(workDate, today);
   if (age < 0) {
-    return fail("You can't log hours for a future date.");
+    return fail("You can't log work for a future date.");
   }
   if (age > MAX_BACKDATE_DAYS) {
     return fail(
       `That's ${age} days ago. You can log up to ${MAX_BACKDATE_DAYS} days back — ask your Lead to add anything older.`
     );
   }
-  if (hoursAreLocked(memberId, workDate)) {
+  if (workIsLocked(memberId, workDate)) {
     return fail(
-      "You've already submitted a check-in covering that day, so those hours are locked. Log it against today instead."
+      "You've already submitted a check-in covering that day, so it's locked. Log it against today instead."
     );
   }
 
@@ -224,8 +248,7 @@ export async function logHours(input: {
     memberId,
     projectId,
     workDate: workDate.slice(0, 10),
-    hours,
-    description: description?.trim() || undefined,
+    description: note,
   };
 
   return guarded((store) => {
@@ -244,10 +267,10 @@ export async function deleteWorkLog(
 
   if (!log) return fail("That entry no longer exists.");
   // Ownership is re-checked here as well as in the action. Cheap, and the cost
-  // of getting it wrong is someone deleting another member's hours.
+  // of getting it wrong is someone deleting another member's log entry.
   if (log.memberId !== memberId) return fail("That isn't your entry.");
-  if (hoursAreLocked(memberId, log.workDate)) {
-    return fail("Those hours are part of a check-in you've already submitted.");
+  if (workIsLocked(memberId, log.workDate)) {
+    return fail("That entry is part of a check-in you've already submitted.");
   }
   void today;
 
@@ -1572,8 +1595,6 @@ export interface CheckInEntryInput {
   progress: string;
   blockers?: string;
   nextSteps?: string;
-  /** Hours on this project for the period, pre-computed from work logs. */
-  hours: number;
 }
 
 /**
@@ -1583,10 +1604,38 @@ export interface CheckInEntryInput {
  * update row is generated when it becomes due, and writing a second one would
  * both double-count their reliability and leave the original showing as missed.
  *
- * Empty sections are dropped. Somebody who worked on three projects and has
- * something to say about one shouldn't be forced to type "n/a" twice — and a
- * blank section is worse than no section, because it reads to their Lead as "no
- * progress" rather than "not touched this week".
+ * ---------------------------------------------------------------------------
+ * The one rule that changed when hours were removed
+ * ---------------------------------------------------------------------------
+ *
+ * **A check-in may not leave a committed project completely silent.** Either the
+ * work log speaks for it, or the member does.
+ *
+ * Before, every section was optional, because the section was seeded from hours
+ * and hours arrived on their own. Now the composer pre-fills a project's box
+ * from that project's log entries, so a project with entries needs no typing —
+ * and a project with NO entries is the only thing the app has no information
+ * about. That is exactly the case most worth hearing: blocked, waiting on a
+ * part, buried in midterms.
+ *
+ * Two deliberate softenings, so this stays a prompt rather than a wall:
+ *
+ *   - **The rule only reaches projects the member was actually shown.** It is
+ *     checked against the submitted entries, not against their whole roster, so
+ *     a project that finished mid-period or one they've left can't block a
+ *     submission.
+ *   - **Clearing a pre-filled box is allowed.** If the log spoke for a project
+ *     and the member deleted the draft, that's them choosing not to add
+ *     anything, and the entries are still on the project's own feed. The
+ *     section is dropped, as before. Only *nothing logged AND nothing written*
+ *     is refused.
+ *
+ * The check runs against the store rather than trusting a flag from the form.
+ * A hidden "this one had logs" field would be forgeable, and worse, it would
+ * drift from what the composer displayed.
+ *
+ * Empty sections are still dropped. A blank section is worse than no section,
+ * because it reads to a Lead as "no progress" rather than "not touched".
  */
 export async function submitCheckIn(input: {
   memberId: string;
@@ -1601,6 +1650,72 @@ export async function submitCheckIn(input: {
   if (written.length === 0 && !input.generalNote?.trim()) {
     return fail(
       "Write at least one line about one project — an empty check-in tells your Lead nothing."
+    );
+  }
+
+  /*
+    Refuse before writing anything, naming the projects.
+
+    "Fill in the required boxes" in front of somebody on five projects is a
+    puzzle. Naming them turns it into a task, and the composer has already
+    marked the same boxes required — this is the server half of one rule, not a
+    second rule.
+  */
+  const store = readStore();
+  const periodStart = checkInPeriodStart(
+    store.progressUpdates.filter((u) => u.memberId === input.memberId),
+    input.today
+  );
+  const logged = workByProject(
+    store.workLogs.filter((w) => w.memberId === input.memberId),
+    periodStart,
+    input.today
+  );
+
+  /*
+    Scoped to projects they are COMMITTED to and that are still RUNNING — which
+    is exactly the set the composer renders a required box for
+    (`lib/data/my-work.ts` filters `commitment === "committed"` then
+    `phase !== "complete"`).
+
+    Both halves matter, and getting either wrong produces the same bug in
+    opposite directions:
+
+      - A project they've LEFT can still carry an entry, because the composer
+        deliberately keeps already-written text from a project somebody has left
+        — usually the handover note. Demanding they account for work there is
+        refusing a submission over something they cannot act on.
+      - A project that FINISHED mid-period has nothing to report on, and the
+        composer stops rendering it at all.
+
+    Neither is marked required by the form, so neither may be refused here. A
+    server rule stricter than the form is the worst of the two failures: the
+    submit button does nothing and the reason is never shown on the page.
+  */
+  const owed = new Set(
+    store.projectMemberships
+      .filter(
+        (pm) => pm.memberId === input.memberId && pm.commitment === "committed"
+      )
+      .map((pm) => pm.projectId)
+      .filter(
+        (pid) => store.projects.find((p) => p.id === pid)?.phase !== "complete"
+      )
+  );
+
+  const silent = input.entries
+    .filter(
+      (e) =>
+        owed.has(e.projectId) && !e.progress.trim() && !logged.has(e.projectId)
+    )
+    .map((e) => store.projects.find((p) => p.id === e.projectId)?.name)
+    .filter((name): name is string => !!name);
+
+  if (silent.length > 0) {
+    return fail(
+      silent.length === 1
+        ? `You logged nothing on ${silent[0]} this period, so there's nothing to go on — write a line about it, even if that line is "blocked" or "no time this week".`
+        : `You logged nothing on ${silent.join(" or ")} this period. Write a line about each — "blocked" or "no time this week" is a real answer.`
     );
   }
 
@@ -1624,7 +1739,6 @@ export async function submitCheckIn(input: {
       dueAt: `${input.today}T23:59`,
       status: "pending",
       entries: [],
-      hoursThisPeriod: 0,
     };
 
     update.entries = written.map((e, i) => ({
@@ -1634,11 +1748,9 @@ export async function submitCheckIn(input: {
       progress: e.progress.trim(),
       blockers: e.blockers?.trim() || undefined,
       nextSteps: e.nextSteps?.trim() || undefined,
-      hours: e.hours,
     }));
 
     update.generalNote = input.generalNote?.trim() || undefined;
-    update.hoursThisPeriod = written.reduce((sum, e) => sum + e.hours, 0);
     update.submittedAt = input.today;
     update.leadIdAtSubmission = input.leadId ?? undefined;
 
@@ -4172,66 +4284,19 @@ export async function markDiscordVerified(input: {
 // Club-wide configuration
 // ---------------------------------------------------------------------------
 
-/**
- * Move the commitment tier floors.
- *
- * Guarded here rather than only by the DB constraint, because the constraint's
- * error message is `violates check constraint "tiers_in_order"` and the person
- * reading it is a Co-Lead who typed 8 into the wrong box.
- *
- * The ordering rule isn't fussiness: `commitmentTier` walks the rungs highest
- * first and returns the first one you clear. Out of order, everybody lands in
- * whichever tier happens to sit at the top of the list, silently, and the
- * published rubric prints a ladder that goes downwards.
- */
-export async function updateClubTiers(input: {
-  core: number;
-  committed: number;
-  contributing: number;
-  minimum: number;
-  actorId: string;
-}): Promise<Result<ClubSettings>> {
-  const { core, committed, contributing, minimum } = input;
+/*
+  `updateClubTiers` lived here — it moved the four commitment-tier floors on
+  `club_settings` and validated their order, because `commitmentTier` walked the
+  rungs highest-first and an out-of-order ladder silently put every member in
+  whichever tier sat at the top.
 
-  for (const [name, value] of Object.entries({
-    core,
-    committed,
-    contributing,
-    minimum,
-  })) {
-    if (!Number.isFinite(value) || value < 0 || value > 168) {
-      return fail<ClubSettings>(
-        `${name} has to be a number of hours between 0 and 168.`
-      );
-    }
-  }
-
-  if (!(core > committed && committed > contributing)) {
-    return fail<ClubSettings>(
-      "The tiers have to go up: Core above Committed above Contributing. As written, everybody would land in whichever one sits highest."
-    );
-  }
-  if (minimum > core || minimum < contributing) {
-    return fail<ClubSettings>(
-      "The minimum has to sit inside the range — between Contributing and Core."
-    );
-  }
-
-  return guarded((store) => {
-    const row = store.clubSettings[0];
-    const next: ClubSettings = {
-      id: row?.id ?? "1",
-      coreHours: core,
-      committedHours: committed,
-      contributingHours: contributing,
-      minimumHours: minimum,
-      updatedAt: new Date().toISOString(),
-      updatedBy: input.actorId,
-    };
-    store.clubSettings = [next];
-    return ok(next);
-  });
-}
+  Deleted with the tiers on 2026-08-14. Worth recording one latent bug it had, in
+  case anything like it is ever written against this row again: it built the
+  replacement `ClubSettings` from the four numbers and `id` ALONE, so saving the
+  tiers wiped `clubName`, `clubDescription` and `discordInviteUrl`. Exactly the
+  shape of the `updateTeam` bug in docs/HANDOFF.md section 8. `updateClubIdentity`
+  below spreads the existing row; anything new touching `club_settings` must too.
+*/
 
 /**
  * Set exactly who is on an event. The organiser's call, not the attendee's.
@@ -4277,10 +4342,9 @@ export async function setEventGuestList(input: {
 /**
  * Rename the club, or reword what it says it does.
  *
- * Separate from `updateClubTiers` even though both write the same row: they're
- * different decisions with different blast radius. Renaming is cosmetic and
- * reversible; moving the tier floors changes how every member is described.
- * One form for both would invite doing the second while meaning the first.
+ * It used to share this row with `updateClubTiers`, kept separate because
+ * renaming is cosmetic and reversible while moving the tier floors changed how
+ * every member was described. The tiers are gone; this is now the only writer.
  */
 export async function updateClubIdentity(input: {
   name: string;

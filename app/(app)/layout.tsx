@@ -113,7 +113,7 @@ export default async function AppLayout({
       alertCount =
         (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
       nudgeToLogHours =
-        !myWork.hasEverLoggedHours &&
+        !myWork.hasEverLoggedWork &&
         daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;
     } catch {
       // Fail quiet on both counts. A nav badge and a nudge are never worth a

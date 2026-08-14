@@ -7,7 +7,6 @@ import { ProfileForm } from "@/components/forms/profile-form";
 import { McpTokens } from "@/components/forms/mcp-tokens";
 import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
-import { TierAdminForm } from "@/components/forms/tier-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
 import { ThemeToggle } from "@/components/forms/theme-toggle";
 import { discordIsConfigured } from "@/lib/notify/discord";
@@ -22,17 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
-import {
-  getClubIdentity,
-  getClubTiers,
-  getSettings,
-} from "@/lib/data/settings";
+import { getClubIdentity, getSettings } from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
-import { TIER_LABELS } from "@/lib/contribution";
 import { can } from "@/lib/permissions";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
@@ -55,10 +49,9 @@ function termRange(startsOn: string, endsOn: string): string {
 export default async function SettingsPage() {
   const viewer = await getViewer();
   const theme = await getThemeChoice();
-  const [view, catalogue, tiers, identity, mcpTokens] = await Promise.all([
+  const [view, catalogue, identity, mcpTokens] = await Promise.all([
     getSettings(viewer.member.id),
     getCatalogue(),
-    getClubTiers(),
     getClubIdentity(),
     listMyTokens(),
   ]);
@@ -130,7 +123,7 @@ export default async function SettingsPage() {
         The way into the guide editor.
 
         A link rather than the editor itself: this page already carries the
-        profile, check-in days, the pause, the AI connection, the tiers, the
+        profile, check-in days, the pause, the AI connection, the
         academic calendar and the trainings catalogue. A two-page content
         editor inline would bury everything a plain member came here for.
       */}
@@ -314,37 +307,18 @@ export default async function SettingsPage() {
       ) : null}
 
       {/*
-        The commitment expectations.
+        A "Commitment Expectations" card stood here: the club's four tier floors
+        in hours per week, visible to everyone and editable by Co-Leads through
+        `TierAdminForm`.
 
-        Visible to everyone, editable by Co-Leads. Members see it here for the
-        same reason /how-we-lead exists at all: a bar that decides how you're
-        described, kept where you can't read it, is a performance review with a
-        concealed scale.
+        Both are gone (2026-08-14 — hours are not the measure; deliverables are).
+        The card is NOT replaced by a card saying the same thing without numbers:
+        the expectation the club actually publishes now lives at /how-we-lead in
+        prose, and duplicating it into a settings panel is how the two drift.
+
+        `can.manageEngagementWeights` still exists and still gates the academic
+        calendar and the catalogue above. It is not dead.
       */}
-      <Card>
-        <CardBody>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <SectionLabel>Commitment Expectations</SectionLabel>
-            {mayEditTiers ? <TierAdminForm tiers={tiers} /> : null}
-          </div>
-
-          <h3 className="text-ink mt-3 text-[17px] font-bold">
-            {tiers.minimum}–{tiers.core} hours a week
-          </h3>
-          <p className="text-ink-soft mt-2 text-[15px]">
-            {TIER_LABELS.core} is {tiers.core}+, {TIER_LABELS.committed} is{" "}
-            {tiers.committed}+, {TIER_LABELS.contributing} is{" "}
-            {tiers.contributing}+. Hours are averaged over the in-session weeks
-            since you joined — breaks and finals are skipped, so working over a
-            break only helps.
-          </p>
-          <p className="text-ink-muted mt-2 text-sm">
-            {mayEditTiers
-              ? "Changing these updates /how-we-lead and every contribution panel immediately. It renames tiers; it doesn't recalculate anybody's hours."
-              : "Co-Leads set these. The full rubric is published at /how-we-lead."}
-          </p>
-        </CardBody>
-      </Card>
 
       {/*
         Discord used to have its own card here, holding the status and the test

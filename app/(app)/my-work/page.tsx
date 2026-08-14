@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, Eye, TriangleAlert } from "lucide-react";
+import { Clock, Eye, PenLine, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
-import { LogHoursForm } from "@/components/forms/log-hours-form";
+import { LogWorkForm } from "@/components/forms/log-work-form";
 import { CheckInForm } from "@/components/forms/check-in-form";
 import {
   JoinRequestDecision,
@@ -33,7 +33,6 @@ import {
   UPDATE_STATUS_TONES,
 } from "@/lib/labels";
 import { can, isAdvisor } from "@/lib/permissions";
-import { formatNumber } from "@/lib/utils";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MyWorkPage() {
@@ -43,7 +42,7 @@ export default async function MyWorkPage() {
     Advisors have no work of their own, so this page has nothing to show them.
 
     Not access control — nothing here is secret — but every section would be an
-    empty state: no projects, no deliverables, no check-in, no hours, no
+    empty state: no projects, no deliverables, no check-in, no work log, no
     contribution record. Redirected rather than merely hidden from the nav, for
     the same reason `/dashboard` redirects: `/` points here, so an advisor
     typing the club's URL would land on a page that looks broken before they
@@ -81,7 +80,7 @@ export default async function MyWorkPage() {
     (c) => c.project.phase === "complete"
   );
 
-  const mayLogHours = can.logOwnHours(viewer.actor, me.id);
+  const mayLogWork = can.logOwnWork(viewer.actor, me.id);
   const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
 
   // "Sunday check-in" said nothing about whether Sunday had already been and
@@ -96,8 +95,8 @@ export default async function MyWorkPage() {
         title={`Hi, ${firstName}`}
         description="What you own, what you owe, and how your effort is adding up."
         action={
-          mayLogHours ? (
-            <LogHoursForm
+          mayLogWork ? (
+            <LogWorkForm
               projects={committed.map((c) => ({
                 id: c.project.id,
                 name: c.project.name,
@@ -105,7 +104,7 @@ export default async function MyWorkPage() {
               defaultProjectId={committed[0]?.project.id}
               today={today}
               maxBackdateDays={maxBackdateDays}
-              recent={view.recentHours}
+              recent={view.recentWork}
             />
           ) : undefined
         }
@@ -330,16 +329,16 @@ export default async function MyWorkPage() {
                 {currentUpdate.inSession ? (
                   <>
                     {currentUpdate.updatesPerWeek} a week, on the days you
-                    picked. Your hours and open deliverables are already filled
-                    in — write a line under each project so your RE knows where
-                    things stand.
+                    picked. Each project&apos;s section is already written from
+                    your work log — the only boxes left are for projects you
+                    logged nothing against.
                   </>
                 ) : (
                   <>
                     No check-ins are generated during{" "}
                     {currentUpdate.termName ?? "this period"} — nothing counts
                     against you and there&apos;s no backlog waiting. You can
-                    still log hours and write one if you want to.
+                    still log work and write one if you want to.
                   </>
                 )}
               </p>
@@ -361,35 +360,64 @@ export default async function MyWorkPage() {
                 actionHref="/projects"
               />
             ) : (
-              currentUpdate.sections.map(({ entry, project, breadcrumb }) => (
-                <div
-                  key={entry.id}
-                  className="rounded-tile border-line border px-4 py-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Breadcrumb trail={breadcrumb} className="mb-1" />
-                      <Link
-                        href={`/projects/${project.slug}`}
-                        className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                      >
-                        {project.name}
-                      </Link>
+              currentUpdate.sections.map(
+                ({
+                  entry,
+                  project,
+                  breadcrumb,
+                  draftProgress,
+                  loggedWork,
+                  needsWriting,
+                }) => (
+                  <div
+                    key={entry.id}
+                    className="rounded-tile border-line border px-4 py-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Breadcrumb trail={breadcrumb} className="mb-1" />
+                        <Link
+                          href={`/projects/${project.slug}`}
+                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                        >
+                          {project.name}
+                        </Link>
+                      </div>
+                      {/*
+                      Says where this section's text came from, or that it needs
+                      writing. The preview is the only place a member sees the
+                      draft before opening the composer, so "already done for
+                      you" has to be legible from here or they won't open it.
+                    */}
+                      {needsWriting ? (
+                        <span className="text-ink-muted flex shrink-0 items-center gap-1.5 text-sm font-semibold">
+                          <PenLine className="size-3.5" />
+                          Needs a line
+                        </span>
+                      ) : (
+                        <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-sm font-semibold">
+                          <Clock className="size-3.5" />
+                          {loggedWork.length === 1
+                            ? "1 log entry"
+                            : loggedWork.length + " log entries"}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                      <Clock className="size-3.5" />
-                      {formatNumber(entry.hours, 1)} hrs
-                    </span>
-                  </div>
 
-                  <div className="rounded-tile border-line mt-3 border border-dashed px-3.5 py-3">
-                    <p className="text-ink-muted text-sm">
-                      {entry.progress ||
-                        "No progress written yet for this project."}
-                    </p>
+                    <div className="rounded-tile border-line mt-3 border border-dashed px-3.5 py-3">
+                      {/*
+                      `whitespace-pre-line`, because the draft is newline-joined
+                      — one line per log entry. Without it a week of work renders
+                      as one run-on paragraph and the diary reads as a blob.
+                    */}
+                      <p className="text-ink-muted text-sm whitespace-pre-line">
+                        {draftProgress ||
+                          "Nothing logged against this project — write a line in the composer below."}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              )
             )}
           </div>
 
@@ -399,8 +427,9 @@ export default async function MyWorkPage() {
                 sections={currentUpdate.sections.map((s) => ({
                   projectId: s.project.id,
                   projectName: s.project.name,
-                  hours: s.entry.hours,
-                  lastProgress: s.entry.progress || undefined,
+                  draftProgress: s.draftProgress,
+                  loggedCount: s.loggedWork.length,
+                  needsWriting: s.needsWriting,
                 }))}
                 dueLabel={due.phrase}
                 readerName={myLead?.preferredName ?? myLead?.fullName}
@@ -532,7 +561,7 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
     membership,
     breadcrumb,
     res,
-    hoursLogged,
+    daysWorked,
     myDeliverables: mine,
     overdueCount,
     progress,
@@ -604,15 +633,18 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
       ) : null}
 
       <div className="text-ink-muted mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-        <span className="flex items-center gap-1.5">
-          <Clock className="size-3.5" />
-          {formatNumber(hoursLogged, 1)} hrs logged
-        </span>
         {/*
-          Days, right beside the hours. The two together answer "how much have
-          I put in, and how long have I got" — which the target date alone
-          never did, because a date needs arithmetic before it means anything.
+          Days WORKED, not hours logged. Answers "have I actually been touching
+          this?" — which is the honest question a diary can answer — and sits
+          beside the countdown so the pair reads as "I've been on it four days,
+          and there are nine left".
         */}
+        {daysWorked > 0 ? (
+          <span className="flex items-center gap-1.5">
+            <Clock className="size-3.5" />
+            {daysWorked === 1 ? "1 day worked" : daysWorked + " days worked"}
+          </span>
+        ) : null}
         <DueCountdown
           daysLeft={card.daysToTarget}
           done={project.phase === "complete"}

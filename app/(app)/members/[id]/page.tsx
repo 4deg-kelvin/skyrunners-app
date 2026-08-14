@@ -28,7 +28,6 @@ import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead, isLeadership } from "@/lib/permissions";
-import { formatNumber } from "@/lib/utils";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MemberProfilePage({
@@ -324,10 +323,9 @@ export default async function MemberProfilePage({
                             </p>
                             <div className="flex items-center gap-3">
                               <p className="text-ink-muted text-xs">
-                                {update.hoursThisPeriod} hrs
                                 {reviewedBy
-                                  ? ` · read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
-                                  : " · not yet read"}
+                                  ? `Read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
+                                  : "Not yet read"}
                               </p>
                               {/*
                               Your own, or a Co-Lead clearing up. Anything a
@@ -469,14 +467,14 @@ function MemberProjectCard({
   canViewEffort,
 }: {
   row: MemberProjectRow;
-  /** Hours only. The due countdown is public — see the note inside. */
+  /** Days worked only. The due countdown is public — see the note inside. */
   canViewEffort: boolean;
 }) {
   const {
     project,
     membership,
     breadcrumb,
-    hoursLogged,
+    daysWorked,
     deliverables,
     daysToTarget,
   } = row;
@@ -528,17 +526,17 @@ function MemberProjectCard({
       ) : null}
 
       {/*
-        Hours are gated on `canViewEffort`; the countdown
-        isn't. When a project is due is a fact about the
-        project, and the whole club can already read it on
+        Days worked are gated on `canViewEffort`; the
+        countdown isn't. When a project is due is a fact about
+        the project, and the whole club can already read it on
         the project page — hiding it here would be privacy
         theatre that costs the page its point.
       */}
       <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-        {canViewEffort ? (
+        {canViewEffort && daysWorked > 0 ? (
           <span className="flex items-center gap-1.5">
             <Clock className="size-3.5" />
-            {formatNumber(hoursLogged, 1)} hrs logged
+            {daysWorked === 1 ? "1 day worked" : daysWorked + " days worked"}
           </span>
         ) : null}
         <DueCountdown

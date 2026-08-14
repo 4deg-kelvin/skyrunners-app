@@ -6,13 +6,11 @@
 
 import {
   clubIdentity,
-  clubTiers,
   getMember,
   scheduleFor,
   today,
   termFor,
 } from "@/lib/mock-data";
-import type { TierThresholds } from "@/lib/contribution";
 import { readStore } from "@/lib/store/disk";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
@@ -87,19 +85,14 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
   };
 }
 
-/**
- * The club's commitment tier floors.
- *
- * Its own function rather than a field on `getSettings`, because the two
- * readers are different pages with nothing else in common: the Settings editor
- * and the published rubric at `/how-we-lead`. Folding it into the settings view
- * model would make `/how-we-lead` load a member's check-in schedule to print a
- * table of hours.
- */
-export async function getClubTiers(): Promise<TierThresholds> {
-  await preloadLiveStore();
-  return clubTiers();
-}
+/*
+  `getClubTiers()` used to live here, reading the four tier floors out of
+  `club_settings` for the Settings editor and the published rubric. Both callers
+  are gone — the tiers were removed on 2026-08-14 — so it went too rather than
+  becoming a data function nothing calls, which `npm run sweep` would flag.
+
+  The columns are still in Postgres. See `ClubSettings` in lib/types.ts.
+*/
 
 /** The club's own name and description, for the Co-Lead editor. */
 export async function getClubIdentity(): Promise<{

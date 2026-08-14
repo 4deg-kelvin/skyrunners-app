@@ -50,7 +50,6 @@ function update(
     submittedAt,
     status,
     entries: [],
-    hoursThisPeriod: 0,
   };
 }
 

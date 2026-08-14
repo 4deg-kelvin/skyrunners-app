@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { MarkReviewedButton } from "@/components/forms/review-actions";
 import { getUpdates, type UpdateCard } from "@/lib/data/updates";
 import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
-import { formatNumber } from "@/lib/utils";
+
 import { formatDay } from "@/lib/dates";
 
 export const metadata = { title: "Check-ins" };
@@ -33,19 +33,23 @@ function formatDue(iso: string) {
 /**
  * One check-in, rendered in full.
  *
- * `showHours` is the privacy line drawn in the UI. The per-project text is the
- * project's history and is public; the hours attached to it are effort data.
- * On this page the viewer is always either the author or their Lead, so hours
- * are shown — but the flag has to exist, because this card is the obvious thing
- * to reuse on a project page, where they must not be.
+ * There was a `showHours` prop here, and it was the privacy line drawn in the
+ * UI: the per-project text is the project's history and public, while the hours
+ * attached to it were effort data that had to be hidden if this card were ever
+ * reused on a project page.
+ *
+ * It went with the hours on 2026-08-14, because it gated nothing else. Every
+ * field this card now renders is the public half of a check-in. **The privacy
+ * rule itself has not changed** — the personal half (reliability, the review
+ * record) is still Lead-chain-only, and it is enforced where it always was, in
+ * `can.viewMemberEffort` deciding whether the page loads this data at all. If
+ * you add a private field to this card, gate it there, not with a new flag here.
  */
 function CheckInCard({
   card,
-  showHours,
   action,
 }: {
   card: UpdateCard;
-  showHours: boolean;
   action?: React.ReactNode;
 }) {
   const { update, author, sections, ageDays, escalated } = card;
@@ -80,12 +84,6 @@ function CheckInCard({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {showHours && update.hoursThisPeriod > 0 ? (
-            <span className="text-ink-muted flex items-center gap-1.5 text-sm">
-              <Clock className="size-3.5" />
-              {formatNumber(update.hoursThisPeriod, 1)} hrs
-            </span>
-          ) : null}
           <Badge tone={UPDATE_STATUS_TONES[update.status]}>
             {UPDATE_STATUS_LABELS[update.status]}
           </Badge>
@@ -114,11 +112,6 @@ function CheckInCard({
                     Unknown project
                   </span>
                 )}
-                {showHours ? (
-                  <span className="text-ink-muted text-xs">
-                    {formatNumber(entry.hours, 1)} hrs
-                  </span>
-                ) : null}
               </div>
               <p className="text-ink-soft mt-1.5 text-sm">{entry.progress}</p>
               {entry.blockers ? (
@@ -219,7 +212,6 @@ export default async function UpdatesPage() {
                   <CheckInCard
                     key={card.update.id}
                     card={card}
-                    showHours
                     action={
                       <MarkReviewedButton
                         updateId={card.update.id}
@@ -248,7 +240,7 @@ export default async function UpdatesPage() {
             <SectionLabel>Already Read</SectionLabel>
             <div className="mt-4 space-y-3">
               {reviewed.slice(0, 5).map((card) => (
-                <CheckInCard key={card.update.id} card={card} showHours />
+                <CheckInCard key={card.update.id} card={card} />
               ))}
             </div>
           </CardBody>
@@ -280,7 +272,7 @@ export default async function UpdatesPage() {
               />
             ) : (
               mine.map((card) => (
-                <CheckInCard key={card.update.id} card={card} showHours />
+                <CheckInCard key={card.update.id} card={card} />
               ))
             )}
           </div>

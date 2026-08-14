@@ -17,7 +17,7 @@ import {
   divisionForProject,
   getMember,
   getProject,
-  hoursOnProject,
+  daysWorkedOnProject,
   isOverdue,
   pendingRequestsFor,
   projectAdvisors,
@@ -193,21 +193,25 @@ export interface ProjectMemberRow {
   membership: ProjectMembership;
   member?: Member;
   /**
-   * What this person has logged ON THIS PROJECT.
+   * Distinct days this person has logged work ON THIS PROJECT.
    *
-   * `can.viewMemberHoursOnProject` has existed since the privacy model was
+   * `can.viewMemberWorkOnProject` has existed since the privacy model was
    * written and was referenced by nothing but its own tests — so the one thing
    * an RE is explicitly allowed to see about somebody's effort was computable,
    * permitted, and displayed nowhere.
    *
-   * This is the per-project half of the split: an RE sees time spent on their
-   * own work, and never the person's total, reliability or record. Those
-   * belong to the member and their Lead.
+   * This is the per-project half of the split: an RE sees engagement with their
+   * own work, and never the person's record, reliability or anything about
+   * projects they don't run. Those belong to the member and their Lead.
+   *
+   * Was a sum of hours until 2026-08-14. Days rather than entries, so three
+   * entries in one afternoon read as one day — counting entries would rebuild
+   * the volume metric that was just removed, in a new unit.
    *
    * Live off `work_logs`, so it moves the moment somebody logs — it does NOT
-   * wait for a check-in. A check-in reports hours that were already there.
+   * wait for a check-in.
    */
-  hoursOnProject: number;
+  daysWorked: number;
 }
 
 export interface DeliverableRowData {
@@ -412,7 +416,7 @@ export async function getProjectBySlug(
     members: projectMembers(project.id).map((pm) => ({
       membership: pm,
       member: pm.member,
-      hoursOnProject: hoursOnProject(pm.memberId, project.id),
+      daysWorked: daysWorkedOnProject(pm.memberId, project.id),
     })),
     advisors: projectAdvisors(project.id),
     advisorChoices: advisorOptions()

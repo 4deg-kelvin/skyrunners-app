@@ -85,7 +85,7 @@ server alone.
 ## Current state
 
 **Phases 0–8 are built and live on Supabase**, migrations `0001`–`0019` applied. Members
-find work, ask to join, log hours and mark work done; REs assign, sign off and manage
+find work, ask to join, log what they did and mark work done; REs assign, sign off and manage
 their roster; Leads get a scoped review queue with escalation; there's a calendar, a
 trainings/facility-access catalogue, an academic-term editor, division archiving, and a
 help-wanted board on Find Work.
@@ -222,51 +222,55 @@ Five minutes of RE upkeep buys: what each member owns, update auto-drafts, real 
 percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
 add dependencies or sub-tasks, re-read this paragraph.
 
-## ⚠️ The tiers below are being REMOVED — read the plan first
+## There are no hours. The tiers are gone. (Done 2026-08-14)
 
-The club decided on 2026-08-14 that **hours are not the measure; deliverables
-are.** The whole tier ladder, the hours-per-week figure it runs on, and the
-`Commitment` signal are all going. `docs/HOURS_REMOVAL_PLAN.md` is the agreed
-plan and supersedes this section.
+The club decided **hours are not the measure; deliverables are.** Shipped in
+migration `0039` — the tier ladder, the hours-per-week figure, the `Commitment`
+signal, `getClubTiers`, `TierAdminForm` and `WorkLog.hours` are all deleted.
+`docs/HOURS_REMOVAL_PLAN.md` is the plan it followed.
 
-Everything below still describes the code as it stands today, so it's accurate
-until that lands — but don't build anything new on it, and don't "fix" the tier
-system.
+**The work log is now a diary, not a timesheet.** `WorkLog` is
+`{ memberId, projectId?, workDate, description }` — the note is REQUIRED, where
+it used to be an optional field beside a required number. That inversion is the
+whole point, so don't soften it to make logging faster.
 
-One thing from the plan worth knowing before you touch any of it: **hours
-removal and tier removal cannot be sequenced.** `commitmentTier` is hours over a
-rolling window, so stopping collection without removing the tiers makes every
-member's tier decay toward Light on their own profile for no reason.
+Two behaviours depend on it, and they're the reason the removal added something
+rather than only taking things away:
 
-## The commitment tiers are DATA, not constants
+- **The check-in drafts itself.** Each project's section is pre-filled from that
+  project's log entries since the member's last *submitted* check-in. The only
+  box they must write is for a project they logged nothing against.
+  `lib/checkin-draft.ts` is a pure module and is called by BOTH the composer
+  (`lib/data/my-work.ts`) and `submitCheckIn` — if those two ever disagree, the
+  form demands a box the server accepts, or accepts one it refuses with a reason
+  the page never showed.
+- **Day by day.** The log renders grouped by day on My Work, with the weekday in
+  the heading.
 
-`club_settings` holds four numbers — the Core / Committed / Contributing floors
-and the club's stated minimum — and a Co-Lead edits them from Settings. There
-was a `TIER_THRESHOLDS` constant here once, printed verbatim by the published
-rubric at `/how-we-lead`; it went for the same reason `TrainingCategory` did.
-**The club adjusts its expectations faster than anyone ships a deploy**, and a
-rubric stating a bar nobody is measured against is worse than no rubric.
+**Don't reintroduce a duration in any unit**, and don't add a fourth contribution
+signal built on volume of anything — days logged, entries written, sessions
+attended. Each is the same inflatable signal in new clothes.
+`lib/contribution.test.ts` has a test that fails on those field names.
 
-Read them through `getClubTiers()`. The order rule is enforced in three places
-because breaking it is silent: `commitmentTier` walks the rungs highest first
-and returns the first one you clear, so an out-of-order ladder puts every member
-in whichever tier happens to sit at the top.
+Historical hours are **still in Postgres** and simply unselected: `work_logs.hours`,
+`update_entries.hours`, `progress_updates.hours_this_period` and the four
+`club_settings` tier floors all survive with explanatory column comments. Nothing
+was deleted, because the decision to stop counting is a club decision that could
+be revisited and a dropped column can't be un-dropped.
 
-**Hours/week is averaged over in-session weeks since the member joined**, never
-a fixed number — it was hard-coded to 10 for everybody once, which made the
-whole roster read as inactive for two months of every quarter. Off-session hours
-still count in full while those weeks add nothing to the divisor, so working
-over a break is deliberately rewarded and resting over one is not punished.
+**Why it had to ship as one change:** `commitmentTier` was hours ÷ in-session
+weeks — a rolling average. Stopping collection while keeping the ladder would
+have decayed every member's tier toward the bottom rung over the following
+weeks, on their own profile, with no new data causing it.
 
 ## There is no engagement score
 
-`lib/contribution.ts` reports **four independent signals** and deliberately computes no
+`lib/contribution.ts` reports **three independent signals** and deliberately computes no
 composite number.
 
 | Signal | Notes |
 |---|---|
 | **Delivered** | Deliverables and projects completed. **Primary** — can't be inflated |
-| **Commitment** | Hours/week vs the 10–12 hr expectation, as a named tier |
 | **Reliability** | Updates on time |
 | **Scope** | RE roles held. Reported, **never blended in** |
 
@@ -283,7 +287,7 @@ Rules that must not regress:
 ## Updates are per-project, not one blob
 
 `progress_updates` is an envelope (who, when, status). Content lives in **`update_entries`**
-— one row per project, each with its own progress, blockers, next steps, and hours.
+— one row per project, each with its own progress, blockers and next steps.
 
 Members are on multiple projects by design, so a single text field would be ambiguous to
 a Lead overseeing several of their projects, and an RE couldn't tell whether a blocker was
@@ -374,7 +378,7 @@ its project.
   UTC and the browser doesn't, which is both a wrong date and a hydration
   mismatch. Compare dates as **strings** (`dueDate < today`), never by
   constructing two `Date`s
-- Mobile-responsive from the start — hours get logged in the lab, on phones
+- Mobile-responsive from the start — the work log gets written in the lab, on phones
 - Empty states use `EmptyState`, which requires a next action
 - Auth: Google OAuth, `@stanford.edu` enforced. No passwords.
 
@@ -415,8 +419,8 @@ its project.
   | Thing | Who sees it | Rule |
   |---|---|---|
   | Per-project entry (progress, blockers, next steps) | **Everyone** — it's the project's history | `can.viewProjectUpdates` |
-  | Hours on one project | That project's REs, inheriting **down** the tree | `can.viewMemberHoursOnProject` |
-  | The personal report, total hours, reliability | The member and their **Lead chain only** | `can.viewMemberEffort`, `can.reviewUpdate` |
+  | What they logged on one project | That project's REs, inheriting **down** the tree | `can.viewMemberWorkOnProject` |
+  | The personal report and reliability | The member and their **Lead chain only** | `can.viewMemberEffort`, `can.reviewUpdate` |
 
   **REs deliberately cannot read someone's personal report.** They get the per-project half
   publicly instead. Reviewing is one named person's obligation — that's what makes the
@@ -428,7 +432,7 @@ its project.
   reports, twenty-six of which aren't theirs, cannot tell what they owe — and the design
   target is a 15-minute weekly obligation. `/dashboard` also redirects anyone who oversees
   nobody; hiding the nav link is not access control.
-- **Engagement is a flashlight, not a scoreboard.** Outcomes outweigh hours; no
+- **Engagement is a flashlight, not a scoreboard.** Outcomes are all that count; no
   leaderboard function exists, deliberately. See `lib/engagement.ts`.
 - **Calendar sync is opt-in**, Google and Apple.
 - **An event links to a project, both ways.** The calendar row links to the

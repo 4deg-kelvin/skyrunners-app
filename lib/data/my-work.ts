@@ -7,18 +7,19 @@
  * walk, so it would be several.
  */
 
-import { hoursAreLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
+import { workIsLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
+  allWorkLogsFor,
   contributionInputsFor,
   daysUntil,
+  daysWorkedOnProject,
   getMember,
   getProject,
-  hoursOnProject,
   inSession,
   isOverdue,
   joinRequestsAwaitingMe,
   deliverableTodos,
-  hasLoggedAnyHours,
+  hasLoggedAnyWork,
   lastEntryForProject,
   myDeliverablesOn,
   myJoinRequests,
@@ -32,11 +33,17 @@ import {
   scheduleFor,
   termFor,
   today,
+  updatesFor,
 } from "@/lib/mock-data";
 import {
   buildContributionRecord,
   type ContributionRecord,
 } from "@/lib/contribution";
+import {
+  checkInPeriodStart,
+  draftProgressFrom,
+  workByProject,
+} from "@/lib/checkin-draft";
 import type {
   Deliverable,
   DeliverableTodo,
@@ -63,7 +70,19 @@ export interface MyProjectCard {
   breadcrumb: BreadcrumbNode[];
   /** Primary RE first. Who to ask about this project. */
   res: Member[];
-  hoursLogged: number;
+  /**
+   * Distinct days this member has logged work against this project.
+   *
+   * Replaces `hoursLogged`. A count of DAYS rather than of entries, because
+   * three entries on one afternoon is one day of work and counting them
+   * separately would rebuild the volume metric that was just removed — in a new
+   * unit, which is the specific trap named in `lib/contribution.ts`.
+   *
+   * It feeds nothing. Not a contribution signal, not sorted on, not compared
+   * between people: it sits on the card as context for the person whose card it
+   * is.
+   */
+  daysWorked: number;
   /** What this member last said about THIS project, if anything. */
   lastUpdate?: { entry: UpdateEntry; submittedAt: string };
   /** What this person owns here — the concrete answer, not a text field. */
@@ -81,11 +100,52 @@ export interface MyProjectCard {
   daysToTarget?: number;
 }
 
-/** A section of the current update, tied to a specific project. */
+/**
+ * A section of the current update, tied to a specific project.
+ *
+ * `draftProgress` and `needsWriting` are the check-in auto-fill — the reason
+ * hours removal added something instead of only taking things away. See
+ * `lib/checkin-draft.ts` for the window and the text.
+ */
 export interface UpdateDraftSection {
   entry: UpdateEntry;
   project: Project;
   breadcrumb: BreadcrumbNode[];
+  /**
+   * What this member logged against this project since their last check-in,
+   * oldest first. Rendered under the box so they can see what the draft is made
+   * of — a pre-filled field with no visible source reads as the app inventing
+   * words on their behalf.
+   */
+  loggedWork: WorkLog[];
+  /**
+   * The pre-filled text for the progress box. Empty when nothing was logged.
+   *
+   * Editable, deliberately: the log is raw notes, the check-in is what they want
+   * their Lead to read.
+   */
+  draftProgress: string;
+  /**
+   * True when nothing was logged against this project this period, so the member
+   * has to write the line themselves.
+   *
+   * This is the ONE thing the composer asks for, and it's the same condition
+   * `submitCheckIn` refuses on — both derive it from `workByProject`, so the
+   * form can't mark a box required that the server would accept, or vice versa.
+   */
+  needsWriting: boolean;
+}
+
+/** One day of the work log, with its entries. Newest day first. */
+export interface WorkLogDay {
+  /** `YYYY-MM-DD`. Format with `formatDay` at the render site. */
+  day: string;
+  entries: {
+    log: WorkLog;
+    project?: Project;
+    /** A submitted check-in already reported this day — it can't be removed. */
+    locked: boolean;
+  }[];
 }
 
 export interface MyWorkView {
@@ -140,32 +200,38 @@ export interface MyWorkView {
   /** Their own record — always visible to them. */
   contribution: ContributionRecord;
   /**
-   * The hours they've logged recently, newest first.
+   * What they've done recently, grouped by day and newest day first.
    *
-   * Logging hours was write-only: `deleteWorkLog` and `deleteHoursAction`
-   * existed, but nothing in the app ever listed a single entry, so there was no
-   * button to hang the delete on and a mistyped `80` instead of `8.0` was
-   * permanent. `locked` says which ones a submitted check-in has already
-   * reported — the operation refuses those, and the row explains itself rather
-   * than offering a button that fails.
+   * The day grouping is the second new behaviour of the hours removal: the log
+   * stopped being a timesheet, so it now reads as a diary — "Tuesday: reran the
+   * FEA; Wednesday: rebuilt the seal" — rather than as a column of numbers.
+   *
+   * Listing it at all matters for a second, older reason: logging used to be
+   * write-only. `deleteWorkLog` existed but nothing in the app ever showed a
+   * single entry, so there was no button to hang the delete on and a mistyped
+   * entry was permanent. `locked` says which ones a submitted check-in has
+   * already reported — the operation refuses those, and the row explains itself
+   * rather than offering a button that fails.
    */
-  recentHours: {
-    log: WorkLog;
-    project?: Project;
-    locked: boolean;
-    /** Older than the fortnight window — shown as a reminder, not for editing. */
+  recentWork: {
+    days: WorkLogDay[];
+    /**
+     * True when the fortnight window was empty and this is their last few
+     * entries whatever their age — shown as a reminder, not for editing.
+     */
     stale: boolean;
-  }[];
+  };
   /**
-   * Whether they have ever logged a single hour.
+   * Whether they have ever logged anything at all.
    *
-   * Not "recently" — see `hasLoggedAnyHours`. Somebody who has never logged has
-   * never met the habit the whole app is built on: check-ins pre-fill from
-   * hours, the commitment tier is hours/week, and their profile shows zero
-   * effort no matter how much work they've actually done. That is a different
-   * problem from being behind, and it needs saying once, plainly.
+   * Not "recently" — see `hasLoggedAnyWork`. Somebody who has never logged has
+   * never met the habit the app now leans on hardest: **the check-in drafts
+   * itself from the log**, so a member with an empty log has to write every
+   * section of every check-in by hand while somebody who logs as they go has to
+   * write none of them. That is a different problem from being behind, and it
+   * needs saying once, plainly.
    */
-  hasEverLoggedHours: boolean;
+  hasEverLoggedWork: boolean;
   /** Requests they've sent, so an ask is never invisible. */
   myRequests: {
     request: JoinRequest;
@@ -205,7 +271,7 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
         membership,
         breadcrumb: projectBreadcrumb(project.id),
         res: projectREs(project.id),
-        hoursLogged: hoursOnProject(memberId, project.id),
+        daysWorked: daysWorkedOnProject(memberId, project.id),
         lastUpdate: lastEntryForProject(memberId, project.id),
         myDeliverables: mine,
         overdueCount: mine.filter(isOverdue).length,
@@ -260,8 +326,26 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     currentUpdate.entries.map((entry) => [entry.projectId, entry])
   );
 
+  /*
+    The work log for the period this check-in covers.
+
+    Computed ONCE here, from the same two functions `submitCheckIn` uses, so the
+    form and the server agree about which projects have something to go on. If
+    they disagreed, the composer would mark a box required that the server would
+    accept — or, worse, accept a box the server then refuses, with the reason
+    never shown on the page.
+  */
+  const periodStart = checkInPeriodStart(updatesFor(memberId), today());
+  const loggedByProject = workByProject(
+    allWorkLogsFor(memberId),
+    periodStart,
+    today()
+  );
+
   const sections: UpdateDraftSection[] = projects.map((card) => {
     const existing = existingByProject.get(card.project.id);
+    const loggedWork = loggedByProject.get(card.project.id) ?? [];
+
     return {
       // A synthetic entry when there's no draft row yet. It carries the
       // project's real id, so submitting writes against the right project —
@@ -271,10 +355,22 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
         updateId: currentUpdate.id,
         projectId: card.project.id,
         progress: "",
-        hours: card.hoursLogged,
       },
       project: card.project,
       breadcrumb: card.breadcrumb,
+      loggedWork,
+      /*
+        Anything already saved on the row wins over the draft.
+
+        Only relevant if a member half-writes a check-in and comes back, but
+        getting it the other way round would silently overwrite their own words
+        with a machine-generated summary — the single least forgivable thing this
+        feature could do.
+      */
+      draftProgress: existing?.progress.trim()
+        ? existing.progress
+        : draftProgressFrom(loggedWork),
+      needsWriting: loggedWork.length === 0 && !existing?.progress.trim(),
     };
   });
 
@@ -294,14 +390,16 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
       …but a project that FINISHED mid-period only comes back if they'd
       already written something in it.
 
-      Two different rows end up here. One is a row seeded from logged hours,
-      empty, which is the thing the filter above exists to remove — letting it
-      back in through this loop would undo the fix. The other is a sentence
-      somebody typed before the project completed, and discarding that is
-      exactly what this loop was written to prevent.
+      Two different rows used to end up here. One was a row seeded from logged
+      hours, empty, which is the thing the filter above exists to remove —
+      letting it back in through this loop would undo the fix. The other is a
+      sentence somebody typed before the project completed, and discarding that
+      is exactly what this loop was written to prevent.
 
-      Hours alone aren't content: they're a fact the app recorded, not a thing
-      the member said.
+      Nothing seeds an empty row any more, so in practice only the second kind
+      arrives. The check stays because it costs nothing and the invariant it
+      protects — never show an empty box for finished work — is the one that got
+      this loop written in the first place.
     */
     const wroteSomething = Boolean(
       entry.progress.trim() || entry.blockers?.trim() || entry.nextSteps?.trim()
@@ -312,6 +410,18 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
       entry,
       project,
       breadcrumb: projectBreadcrumb(project.id),
+      /*
+        No draft, and never required.
+
+        This is a project they've LEFT or one that finished. Asking somebody to
+        account for work on a project they're no longer on would be the composer
+        blocking a submission over something the member can't act on — and
+        `needsWriting: false` is what keeps `submitCheckIn` from refusing it,
+        since both sides read this same condition.
+      */
+      loggedWork: [],
+      draftProgress: entry.progress,
+      needsWriting: false,
     });
   }
 
@@ -346,29 +456,54 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     contribution: buildContributionRecord(contributionInputsFor(memberId)),
     myRequests: myJoinRequests(memberId),
     requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
-    hasEverLoggedHours: hasLoggedAnyHours(memberId),
-    recentHours: hoursToShow(memberId),
+    hasEverLoggedWork: hasLoggedAnyWork(memberId),
+    recentWork: workToShow(memberId),
   };
 }
 
 /**
- * What to show beside the log-hours form.
+ * The work log, grouped into days.
  *
- * The fortnight window first, because its job is letting somebody fix a
- * mistyped number. When that's empty we fall back to their last few entries
- * whatever their age and mark them `stale`, so the form can say "you haven't
+ * The fortnight window first, because its main job is letting somebody fix or
+ * remove a wrong entry. When that's empty we fall back to their last few entries
+ * whatever their age and mark them `stale`, so the page can say "you haven't
  * logged in a while — last time you were on X doing Y" instead of showing a
  * blank space to the one person who most needs the reminder.
+ *
+ * Grouping happens here rather than in the component for the usual reason: the
+ * page renders identically whenever it renders, and `locked` is a store
+ * question the component isn't allowed to ask.
  */
-function hoursToShow(memberId: string) {
+export function workToShow(memberId: string): MyWorkView["recentWork"] {
   const recent = recentWorkLogs(memberId);
   const stale = recent.length === 0;
   const logs = stale ? lastWorkLogs(memberId) : recent;
 
-  return logs.map((log) => ({
-    log,
-    project: log.projectId ? getProject(log.projectId) : undefined,
-    locked: hoursAreLocked(memberId, log.workDate),
+  /*
+    A Map keyed by day, filled in the order the logs arrive.
+
+    Both sources are already sorted newest-first, so insertion order is the
+    display order and no second sort is needed. Building this with an object
+    would re-sort the keys as strings — which happens to be the same order for
+    `YYYY-MM-DD`, but only by luck, and it would break the day the format
+    changed.
+  */
+  const byDay = new Map<string, WorkLogDay["entries"]>();
+
+  for (const log of logs) {
+    const day = log.workDate.slice(0, 10);
+    const entry = {
+      log,
+      project: log.projectId ? getProject(log.projectId) : undefined,
+      locked: workIsLocked(memberId, log.workDate),
+    };
+    const bucket = byDay.get(day);
+    if (bucket) bucket.push(entry);
+    else byDay.set(day, [entry]);
+  }
+
+  return {
+    days: [...byDay].map(([day, entries]) => ({ day, entries })),
     stale,
-  }));
+  };
 }

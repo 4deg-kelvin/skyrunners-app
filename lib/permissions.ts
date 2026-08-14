@@ -575,9 +575,9 @@ export const can = {
   withdrawJoinRequest: (actor: Actor, requesterId: string) =>
     isSelf(actor, requesterId),
 
-  // --- Hours and updates ------------------------------------------------
+  // --- The work log and updates -----------------------------------------
 
-  logOwnHours: (actor: Actor, memberId: string) => isSelf(actor, memberId),
+  logOwnWork: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   submitOwnUpdate: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
@@ -585,23 +585,19 @@ export const can = {
   setOwnSchedule: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   /**
-   * Reading someone's hours and updates. Restricted, per the decision to keep
-   * raw individual effort data out of public view:
+   * A person's WHOLE record — reliability and their private twice-weekly report.
+   *
+   * Reporting chain only:
    *   - yourself
    *   - anyone up your reporting chain
-   *   - an RE of a project you contribute to (or any ancestor of it)
-   */
-  /**
-   * A person's WHOLE effort record — total hours, reliability, their private
-   * twice-weekly report.
+   *   - a Co-Lead
    *
-   * Reporting chain only. An RE used to qualify here via any shared project,
-   * which leaked more than it should: being RE of one project a person
-   * contributes to revealed their hours on every OTHER project, plus their
-   * compliance record. An RE needs to know what's happening on their project,
-   * not how someone is doing overall — that's the Lead's job.
+   * An RE used to qualify here via any shared project, which leaked more than it
+   * should: being RE of one project a person contributes to revealed their
+   * record on every OTHER project too. An RE needs to know what's happening on
+   * their project, not how someone is doing overall — that's the Lead's job.
    *
-   * For the narrower question, use `viewMemberHoursOnProject`.
+   * For the narrower question, use `viewMemberWorkOnProject`.
    */
   viewMemberEffort: (actor: Actor, graph: OrgGraph, memberId: string) =>
     isCoLead(actor) ||
@@ -609,14 +605,18 @@ export const can = {
     isLeadOfOrAbove(actor, graph, memberId),
 
   /**
-   * Hours ONE person logged on ONE project.
+   * What ONE person logged on ONE project.
    *
-   * The RE's legitimate need: "who is actually putting time into the thing I'm
+   * The RE's legitimate need: "who is actually working on the thing I'm
    * accountable for?" Scoped to that project, and inheriting down the project
-   * tree — an RE of a parent sees time on its children, because they're
+   * tree — an RE of a parent sees work on its children, because they're
    * accountable for that subtree.
+   *
+   * Renamed from `viewMemberHoursOnProject` on 2026-08-14. The rule is
+   * unchanged; there are simply no hours to see, so what it now permits is the
+   * count of days worked and the diary entries themselves.
    */
-  viewMemberHoursOnProject: (
+  viewMemberWorkOnProject: (
     actor: Actor,
     graph: OrgGraph,
     memberId: string,

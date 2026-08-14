@@ -9,19 +9,24 @@ where the last session stopped. It has the three outstanding items.
 ---
 ## Picking up right now? Read this box first
 
-Two things are agreed and NOT yet built, in priority order:
+1. ~~**Remove the hour-tracking system.**~~ **Done 2026-08-14**, migration
+   `0039`. The work log is a diary now: `WorkLog` has no `hours`, its
+   `description` is required, the twice-weekly check-in drafts itself from those
+   entries, and the log renders day by day on My Work. The Core / Committed /
+   Contributing tiers are deleted and the contribution record is three signals.
+   `docs/HOURS_REMOVAL_PLAN.md` records what shipped and where it differs from
+   the plan; the CLAUDE.md section is rewritten to match.
 
-1. **Remove the hour-tracking system.** Progress becomes deliverables met; the
-   log becomes a diary the check-in writes itself from. Agreed 2026-08-14, fully
-   scoped, not started. **docs/HOURS_REMOVAL_PLAN.md is the spec** — read it
-   before touching hours, tiers or the contribution record. The tier section in
-   CLAUDE.md is superseded by it.
+   **The one thing to know before touching any of it:** `lib/checkin-draft.ts` is
+   called by BOTH the composer and `submitCheckIn`, deliberately. If those two
+   ever compute the window differently, the form marks a box required that the
+   server accepts — or accepts one the server refuses with a reason the page
+   never showed.
+
 2. **Rewrite the two guide pages in detail** — /getting-started and /leading.
    The editable container for club material shipped (migration 0038,
-   /settings/guides); the built-in content still needs expanding.
-
-**docs/NEXT_SESSION_PROMPT.md** has the exact prompt, permissions and
-credentials handling for a fresh session on item 1.
+   /settings/guides); the built-in content still needs expanding. Both pages had
+   their hours copy rewritten in the removal, so they're accurate but still thin.
 
 Everything below is the older, still-accurate orientation.
 

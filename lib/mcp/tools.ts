@@ -13,7 +13,7 @@
  *    will try every tool to see what sticks — is the worst place to duplicate
  *    that logic.
  *
- * 2. **No tool returns another member's effort data.** No hours, no check-in
+ * 2. **No tool returns another member's effort data.** No work log, no check-in
  *    contents, no reliability, no personal report. See the header of
  *    `lib/mcp/viewer.ts`: the MCP snapshot is loaded past RLS, so the privacy
  *    boundary is enforced by which tools EXIST rather than by a filter that
@@ -29,14 +29,14 @@
  * ---------------------------------------------------------------------------
  *
  * Anything destructive or identity-shaped: deleting projects or members,
- * archiving divisions, changing someone's role or Lead, editing club settings,
- * commitment tiers or the academic calendar, removing people from projects,
- * and withdrawing a sign-off. Each is rare, hard to undo, and fine to do on a
- * website twice a term.
+ * archiving divisions, changing someone's role or Lead, editing club settings or
+ * the academic calendar, removing people from projects, and withdrawing a
+ * sign-off. Each is rare, hard to undo, and fine to do on a website twice a
+ * term.
  *
  * Submitting a check-in is absent for a different reason: the point of a
  * check-in is to prompt a conversation with your Lead, and one an assistant
- * wrote on your behalf is worse than none. Logging hours IS here — that's
+ * wrote on your behalf is worse than none. Logging work IS here — that's
  * bookkeeping, and making it frictionless is the whole reason to have an MCP.
  */
 
@@ -558,7 +558,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "list_members",
     description:
-      "The club roster — names, emails, roles, divisions and skills. Public information only; this never returns anyone's hours, check-ins or reliability.",
+      "The club roster — names, emails, roles, divisions and skills. Public information only; this never returns anyone's work log, check-ins or reliability.",
     inputSchema: schema({ search: { type: "string" } }),
     async handler(args, _viewer) {
       const roster = await getRoster();
@@ -611,7 +611,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "get_member",
     description:
-      "One person's public record — the projects they're on, what they own on each, their skills and any RE roles. Never their hours, check-ins or reliability; those are website-only.",
+      "One person's public record — the projects they're on, what they own on each, their skills and any RE roles. Never their work log, check-ins or reliability; those are website-only.",
     inputSchema: schema({ member: { type: "string" } }, ["member"]),
     async handler(args) {
       const m = requireMember(str(args.member));
@@ -1097,25 +1097,39 @@ export const TOOLS: McpTool[] = [
   },
 
   {
-    name: "log_hours",
+    /*
+      Was `log_hours`, taking a number and an optional note. The club removed
+      hours on 2026-08-14; this now takes the note and nothing else.
+
+      The rename is deliberate rather than keeping the old name for
+      compatibility. An agent that keeps calling `log_hours` with `hours: 3`
+      should get "no such tool" and re-read the list, not silently succeed while
+      dropping the number on the floor — which is what an alias would do, and
+      the member would never learn their timesheet wasn't being kept.
+    */
+    name: "log_work",
     description:
-      "Record time worked. Backdating is allowed up to 7 days. Include what you did — 'ran the tensile coupons' is worth far more to the RE than a bare number.",
+      "Record what you did on a project today. This is a diary entry, not a timesheet — there are no hours. The note is the whole point: 'ran the tensile coupons, two of five failed early' is what gets read. It also pre-fills that project's section of the member's next check-in, so a good note here means they write nothing later. Backdating is allowed up to 7 days.",
     write: true,
     inputSchema: schema(
       {
-        hours: { type: "number" },
+        description: {
+          type: "string",
+          description: "What you actually did. Required.",
+        },
         project: {
           type: "string",
           description: "Omit for miscellaneous club work",
         },
         date: { type: "string", description: "YYYY-MM-DD, defaults to today" },
-        description: { type: "string" },
       },
-      ["hours"]
+      ["description"]
     ),
     async handler(args, viewer) {
-      const hours = num(args.hours);
-      if (hours === undefined) refuse("How many hours?");
+      const description = str(args.description);
+      if (!description) {
+        refuse("What did you do? A line is enough, but it can't be empty.");
+      }
 
       const projectId = str(args.project)
         ? requireProject(str(args.project)).id
@@ -1133,17 +1147,16 @@ export const TOOLS: McpTool[] = [
       }
 
       ok(
-        await ops.logHours({
+        await ops.logWork({
           memberId: viewer.member.id,
           projectId,
           workDate: str(args.date) || today(),
-          hours,
-          description: str(args.description) || undefined,
+          description,
           today: today(),
         })
       );
 
-      return `Logged ${hours} hrs${projectId ? ` on ${getProject(projectId)?.name}` : " (misc)"}.`;
+      return `Logged${projectId ? ` on ${getProject(projectId)?.name}` : " (misc)"}: ${description}`;
     },
   },
 

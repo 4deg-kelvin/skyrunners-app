@@ -358,7 +358,7 @@ describe("effort visibility is restricted to the reporting chain", () => {
     // Changed deliberately. An RE used to qualify via any shared project, which
     // meant being RE of one thing revealed a person's hours on everything else
     // plus their reliability record. The RE's narrower, legitimate question is
-    // covered by viewMemberHoursOnProject below.
+    // covered by viewMemberWorkOnProject below.
     assert.equal(can.viewMemberEffort(actor("reRoot"), graph, "worker"), false);
   });
 
@@ -373,35 +373,35 @@ describe("effort visibility is restricted to the reporting chain", () => {
 describe("an RE sees time on their own project only", () => {
   test("RE of the project can see hours logged on it", () => {
     assert.equal(
-      can.viewMemberHoursOnProject(actor("reLeaf"), graph, "worker", "leaf"),
+      can.viewMemberWorkOnProject(actor("reLeaf"), graph, "worker", "leaf"),
       true
     );
   });
 
   test("RE of a PARENT can too — authority inherits down the tree", () => {
     assert.equal(
-      can.viewMemberHoursOnProject(actor("reRoot"), graph, "worker", "leaf"),
+      can.viewMemberWorkOnProject(actor("reRoot"), graph, "worker", "leaf"),
       true
     );
   });
 
   test("...but not on a project outside their subtree", () => {
     assert.equal(
-      can.viewMemberHoursOnProject(actor("reOther"), graph, "worker", "leaf"),
+      can.viewMemberWorkOnProject(actor("reOther"), graph, "worker", "leaf"),
       false
     );
   });
 
   test("the person themselves always can", () => {
     assert.equal(
-      can.viewMemberHoursOnProject(actor("worker"), graph, "worker", "leaf"),
+      can.viewMemberWorkOnProject(actor("worker"), graph, "worker", "leaf"),
       true
     );
   });
 
   test("the lead chain can, on any project", () => {
     assert.equal(
-      can.viewMemberHoursOnProject(actor("lead2"), graph, "worker", "other"),
+      can.viewMemberWorkOnProject(actor("lead2"), graph, "worker", "other"),
       true
     );
   });

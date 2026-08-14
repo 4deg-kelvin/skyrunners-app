@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { LogHoursForm } from "@/components/forms/log-hours-form";
+import { LogWorkForm } from "@/components/forms/log-work-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
@@ -20,7 +20,6 @@ import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { RequestDecision } from "@/components/forms/request-decision";
 import { MarkReviewedButton } from "@/components/forms/review-actions";
-import { formatNumber } from "@/lib/utils";
 
 export default async function DashboardPage({
   searchParams,
@@ -58,7 +57,7 @@ export default async function DashboardPage({
     redirect("/my-work");
   }
 
-  const mayLogHours = can.logOwnHours(viewer.actor, viewer.member.id);
+  const mayLogWork = can.logOwnWork(viewer.actor, viewer.member.id);
 
   return (
     <div className="space-y-6">
@@ -67,13 +66,13 @@ export default async function DashboardPage({
         title="Dashboard"
         description="What you owe as a Lead: check-ins waiting on you, work waiting on a sign-off, and anyone who has gone quiet. Scoped to your people — about fifteen minutes a week."
         action={
-          mayLogHours ? (
-            <LogHoursForm
+          mayLogWork ? (
+            <LogWorkForm
               projects={view.myProjects}
               defaultProjectId={view.myProjects[0]?.id}
               today={view.today}
               maxBackdateDays={view.maxBackdateDays}
-              recent={view.recentHours}
+              recent={view.recentWork}
             />
           ) : undefined
         }
@@ -210,9 +209,18 @@ export default async function DashboardPage({
               </div>
 
               <div className="mt-7 grid gap-4 sm:grid-cols-3">
+                {/*
+                  A COUNT of log entries, not a sum of hours.
+
+                  Its job is answering "is my part of the club actually logging
+                  anything?" — a liveness reading. Deliberately not divided by
+                  headcount and never broken down per person: that would be the
+                  hours signal again in a new unit, which is the trap named in
+                  `lib/contribution.ts`.
+                */}
                 <StatTile
-                  label="Hours logged this week"
-                  value={formatNumber(view.hoursThisWeek, 1)}
+                  label="Log entries this week"
+                  value={view.logsThisWeek}
                 />
                 <StatTile
                   label="Updates awaiting review"
@@ -607,7 +615,9 @@ export default async function DashboardPage({
                       </div>
                       <p className="text-ink-muted mt-1 text-sm">
                         {row.reports} {row.reports === 1 ? "report" : "reports"}{" "}
-                        · {formatNumber(row.hoursThisWeek, 1)} hrs this week
+                        · {row.logsThisWeek}{" "}
+                        {row.logsThisWeek === 1 ? "log entry" : "log entries"}{" "}
+                        this week
                         {row.quietCount > 0
                           ? ` · ${row.quietCount} gone quiet`
                           : ""}
@@ -752,9 +762,6 @@ export default async function DashboardPage({
                                       Unknown project
                                     </span>
                                   )}
-                                  <span className="text-ink-muted text-xs">
-                                    {formatNumber(entry.hours, 1)} hrs
-                                  </span>
                                 </div>
                                 <p className="text-ink-soft mt-1 line-clamp-2 text-sm">
                                   {entry.progress}

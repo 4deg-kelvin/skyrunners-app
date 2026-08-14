@@ -460,13 +460,34 @@ export interface Deliverable {
 // Work logging
 // ---------------------------------------------------------------------------
 
+/**
+ * One day's work on one project. A DIARY entry, not a timesheet line.
+ *
+ * There was an `hours: number` here until 2026-08-14. The club decided hours
+ * are not the measure — deliverables are — so the log stopped recording how
+ * long and started recording what. See `docs/HOURS_REMOVAL_PLAN.md`.
+ *
+ * Two consequences worth knowing before you add a field:
+ *
+ *   - `description` is REQUIRED, where it used to be optional. The whole value
+ *     of the row is now the sentence: it pre-fills that project's section of
+ *     the next check-in (`lib/data/my-work.ts`), and an entry saying only "I
+ *     worked on the spar on Tuesday" fills nothing in. Historical rows may
+ *     still have none — the SQL column stays nullable deliberately, because
+ *     inventing text for a real record is worse than a gap — so anything
+ *     reading old data must tolerate an empty string.
+ *   - **Don't reintroduce a duration in any unit.** Hours, minutes, half-days
+ *     and "sessions" are the same signal wearing different clothes, and the
+ *     tier ladder that used to consume it is gone precisely because volume of
+ *     time is inflatable and finished work isn't.
+ */
 export interface WorkLog {
   id: string;
   memberId: string;
   projectId?: string;
   workDate: string;
-  hours: number;
-  description?: string;
+  /** What they actually did. Required on write; may be "" for historical rows. */
+  description: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -532,8 +553,6 @@ export interface UpdateEntry {
   progress: string;
   blockers?: string;
   nextSteps?: string;
-  /** Hours on this project during the period. Auto-filled from work_logs. */
-  hours: number;
   /**
    * The RE's answer to THIS project's section.
    *
@@ -577,11 +596,15 @@ export interface ProgressUpdate {
   lateNoticeSentAt?: string;
   submittedAt?: string;
   status: UpdateStatus;
-  /** One entry per project worked on. Auto-seeded from logged hours. */
+  /**
+   * One entry per project. Pre-filled from that project's work-log entries for
+   * the period — see `lib/data/my-work.ts`. A project with nothing logged gets
+   * an empty section the member has to write, which is the only typing the
+   * check-in asks for.
+   */
   entries: UpdateEntry[];
   /** Anything not tied to a specific project. Optional. */
   generalNote?: string;
-  hoursThisPeriod: number;
   /**
    * Who this person reported to AT SUBMISSION. Mirrors
    * `progress_updates.lead_id_at_submission`.
@@ -848,19 +871,18 @@ export interface ProjectAttentionFlag {
 // ---------------------------------------------------------------------------
 
 /**
- * The commitment tier thresholds, editable by a Co-Lead.
+ * Club-wide configuration. Exactly one row (`id = 1`, enforced by a check).
  *
- * These were four constants in `lib/contribution.ts`, printed verbatim by the
- * published rubric at `/how-we-lead`. So the bar the whole club is measured
- * against needed a deploy to change — and the first time somebody adjusted the
- * expectation in a meeting without one, the rubric would be stating a number
- * nobody was actually using.
+ * This used to also carry the four commitment-tier floors, in hours per week,
+ * which a Co-Lead edited from Settings. The tiers are gone (2026-08-14 — hours
+ * are not the measure), so the app no longer reads or writes those columns and
+ * `getClubTiers` / `TierAdminForm` no longer exist.
  *
- * Same rule as the trainings catalogue: **the club changes its expectations
- * faster than anyone ships code.** Hours are per week.
- *
- * Exactly one row exists (`id = 1`, enforced by a check constraint). It is
- * club-wide configuration, not a record of anything.
+ * **The columns are still in Postgres**, holding whatever the club last set,
+ * because the never-hard-delete rule applies to configuration too and a dropped
+ * column can't be un-dropped if this decision is ever revisited. They are
+ * simply absent from the column spec in `lib/store/mapping.ts`, so
+ * `loadSnapshot` stops selecting them. Migration 0039 documents this.
  */
 export interface ClubSettings {
   id: string;
@@ -886,11 +908,6 @@ export interface ClubSettings {
    * so a pasted phishing URL is the failure worth designing against.
    */
   discordInviteUrl?: string;
-  coreHours: number;
-  committedHours: number;
-  contributingHours: number;
-  /** The floor the club calls "meeting the minimum" — the low end of 10–12. */
-  minimumHours: number;
   updatedAt?: string;
   updatedBy?: string;
 }

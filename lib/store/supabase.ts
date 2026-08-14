@@ -25,7 +25,7 @@
  * Two people writing at the same instant both diff against their own snapshot,
  * so the later write can revert a field the earlier one changed. Rows are
  * touched individually rather than wholesale, so the blast radius is one field
- * on one row, and the operations that matter (logging hours, submitting a
+ * on one row, and the operations that matter (logging work, submitting a
  * check-in) append rather than overwrite.
  *
  * That's an acceptable trade for a 35-person club and NOT one to keep if this
@@ -49,9 +49,15 @@ import type {
   UpdateEntry,
 } from "../types.ts";
 
-/** Columns for the entries table, which has no collection of its own. */
+/**
+ * Columns for the entries table, which has no collection of its own.
+ *
+ * `hours` is absent: the column stays in Postgres (`not null default 0`, so
+ * omitting it from an insert is safe) and the app stopped reading or writing it
+ * on 2026-08-14. See `docs/HOURS_REMOVAL_PLAN.md`.
+ */
 const ENTRY_COLUMNS =
-  "id, update_id, project_id, progress, blockers, next_steps, hours, response, responded_by, responded_at";
+  "id, update_id, project_id, progress, blockers, next_steps, response, responded_by, responded_at";
 
 function entryFromRow(r: Record<string, unknown>): UpdateEntry {
   return {
@@ -61,7 +67,6 @@ function entryFromRow(r: Record<string, unknown>): UpdateEntry {
     progress: (r.progress as string) ?? "",
     blockers: (r.blockers as string) ?? undefined,
     nextSteps: (r.next_steps as string) ?? undefined,
-    hours: Number(r.hours ?? 0),
     response: (r.response as string) ?? undefined,
     respondedBy: (r.responded_by as string) ?? undefined,
     respondedAt: (r.responded_at as string) ?? undefined,
@@ -76,7 +81,6 @@ function entryToRow(e: UpdateEntry) {
     progress: e.progress,
     blockers: e.blockers ?? null,
     next_steps: e.nextSteps ?? null,
-    hours: e.hours,
     response: e.response ?? null,
     responded_by: e.respondedBy ?? null,
     responded_at: e.respondedAt ?? null,

@@ -11,203 +11,64 @@
  *
  * That's a better instinct than the score was, and it changes the design:
  *
- *   A single number invites optimization. Four honest columns invite judgment.
+ *   A single number invites optimization. A few honest columns invite judgment.
  *
  * So there is deliberately NO composite score anywhere in this file. Leadership
- * sees four independent signals and forms a view. Members see their own, with
+ * sees three independent signals and forms a view. Members see their own, with
  * the expectations stated plainly, because "efforts are tracked and not wasted"
  * only lands if the member can actually see the tracking.
  *
  * ----------------------------------------------------------------------------
- * The four signals
+ * The three signals
  * ----------------------------------------------------------------------------
  *
  *   1. DELIVERED    — deliverables and projects completed.   ← the primary one
- *   2. COMMITMENT   — hours against the 12 hr/week expectation, as a tier
- *   3. RELIABILITY  — updates submitted on time
- *   4. SCOPE        — RE roles held. Reported, never blended in.
+ *   2. RELIABILITY  — updates submitted on time
+ *   3. SCOPE        — RE roles held. Reported, never blended in.
  *
- * DELIVERED is primary on purpose. Hours are the easiest signal to inflate and
- * the weakest evidence of contribution: someone can sit in the lab for twelve
- * hours and ship nothing. Finished work can't be faked. When the two disagree,
- * trust what shipped.
+ * DELIVERED is primary on purpose. Finished work can't be faked.
  *
  * SCOPE is reported separately rather than scored because it requires having
  * already been appointed. Blending it in would mean a metric used to pick future
  * leaders substantially measured having already been picked — which is how
  * leadership becomes a clique in a club with annual turnover.
+ *
+ * ----------------------------------------------------------------------------
+ * There used to be a fourth: COMMITMENT, hours against a weekly expectation,
+ * expressed as a Core / Committed / Contributing tier. It is gone.
+ * ----------------------------------------------------------------------------
+ *
+ * The club decided on 2026-08-14 that **hours are not the measure; deliverables
+ * are.** Two reasons it went rather than being merely de-emphasised:
+ *
+ *   1. It measured the wrong thing, and said so in its own comments: "someone
+ *      can sit in the lab for twelve hours and ship nothing." A signal the code
+ *      itself describes as weak evidence, printed on every member's profile
+ *      beside one that can't be faked, mostly teaches people to log hours.
+ *
+ *   2. It could not be left half-removed. The tier was hours ÷ in-session weeks
+ *      since joining — a ROLLING average. Stop collecting hours but keep the
+ *      ladder and every member's tier decays toward the bottom rung over the
+ *      following weeks, on their own profile and in the published rubric, with
+ *      no new data causing it. The app would have spent a month telling people
+ *      their commitment was collapsing because a feature was half-gone.
+ *
+ * So work logs still exist, but as a **diary** — what you did, on each project,
+ * day by day — not a timesheet. `WorkLog` carries no `hours` field at all now,
+ * which is what stops this signal being quietly reconstructed later. The diary
+ * feeds the check-in composer (`lib/data/my-work.ts` pre-fills each project's
+ * section from it) rather than feeding a number.
+ *
+ * **Don't add a fourth signal built on volume of anything** — days logged,
+ * entries written, sessions attended. Each is the same mistake in a new unit,
+ * and each is inflatable in the same way. See `docs/HOURS_REMOVAL_PLAN.md`.
  */
-
-// ---------------------------------------------------------------------------
-// Expectations
-// ---------------------------------------------------------------------------
-
-/**
- * The club's stated expectation: 10-12 hrs/week, preferably more.
- *
- * A real note on this number: 12 hrs/week on top of a Stanford course load is
- * roughly a part-time job. Serious teams do run this way (Formula SAE, Solar
- * Car) and it produces excellent results — but it works by SELF-SELECTION, not
- * by enforcement. It has to be stated at recruiting, not discovered in week six.
- *
- * Two consequences worth holding in mind:
- *   - This bar will shrink the club toward its committed core. That may be
- *     exactly what "high class team" means — but it is a different goal from
- *     "stop people quitting", and the two can pull against each other.
- *   - Below-bar members must read as a TIER, not as failing. Someone at 6
- *     hrs/week during midterms is a Contributor, not a delinquent. Tiers keep
- *     them in the club; a red X pushes them out of it.
- */
-/**
- * The club's stated range, as shipped.
- *
- * These are the DEFAULTS now, not the rule — a Co-Lead edits the live values in
- * Settings (`ClubSettings`, migration 0020). Read them from the settings row
- * rather than importing these, or a page will keep printing 12 after somebody
- * has moved the bar. Kept because they are the seed and the fallback.
- */
-export const WEEKLY_HOURS_EXPECTATION = 12;
-export const WEEKLY_HOURS_MINIMUM = 10;
-
-/**
- * Named tiers rather than a percentage.
- *
- * "You're a Contributor at 6.5 hrs/week; Core is 12+" gives someone a rung to
- * climb. "You scored 54" gives them a verdict.
- */
-export type CommitmentTier =
-  "core" | "committed" | "contributing" | "light" | "paused";
-
-export const TIER_LABELS: Record<CommitmentTier, string> = {
-  core: "Core",
-  committed: "Committed",
-  contributing: "Contributing",
-  light: "Getting started",
-  paused: "On academic pause",
-};
-
-/**
- * The tier floors, in hours per week.
- *
- * A Co-Lead edits these from Settings — they're a row in `club_settings`, not
- * constants, because the club adjusts its expectations faster than anyone
- * ships a deploy and a published rubric stating a number nobody uses is worse
- * than no rubric. See `ClubSettings` and migration 0020.
- *
- * `DEFAULT_TIERS` is the fallback for a store that predates the row, and the
- * seed value. It's the same set the numbers were hard-coded to.
- */
-export interface TierThresholds {
-  core: number;
-  committed: number;
-  contributing: number;
-  /** The low end of the club's stated 10–12 range. */
-  minimum: number;
-}
-
-/**
- * The club's expectations as of 2026-08-10: **10–12 hours a week is committed,
- * 16+ is core.**
- *
- * `committed` is the LOW end of the stated range, not the middle — a member
- * doing 10 has met the expectation the club actually publishes, and a floor of
- * 11 would quietly tell them they hadn't.
- *
- * These are only the fallback and the seed. The live numbers are four columns
- * on `club_settings` that a Co-Lead edits from Settings, because the club
- * adjusts its expectations faster than anybody ships a deploy — changing these
- * constants does NOT change what the club is measured against. Read them
- * through `getClubTiers()`.
- */
-export const DEFAULT_TIERS: TierThresholds = {
-  core: 16,
-  committed: 10,
-  contributing: 4,
-  minimum: 10,
-};
-
-/**
- * Descriptions built FROM the thresholds rather than written next to them.
- *
- * They used to be a literal `Record` saying "12+ hrs/week". The moment the
- * numbers moved, `/how-we-lead` would have gone on printing the old ones — the
- * page whose entire job is telling members what the bar is.
- */
-export function tierDescriptions(
-  t: TierThresholds = DEFAULT_TIERS
-): Record<CommitmentTier, string> {
-  return {
-    core: `${t.core}+ hrs/week — meeting the team's full expectation`,
-    committed: `${t.committed}–${t.core} hrs/week — close to the bar`,
-    contributing: `${t.contributing}–${t.committed} hrs/week — contributing, room to grow`,
-    light: `Under ${t.contributing} hrs/week — just getting started, or stretched thin`,
-    paused: "Paused for academics. Nothing counted, nothing owed.",
-  };
-}
-
-/** Highest first, which is the order `commitmentTier` depends on. */
-export function tierThresholds(
-  t: TierThresholds = DEFAULT_TIERS
-): { tier: CommitmentTier; minHoursPerWeek: number }[] {
-  return [
-    { tier: "core", minHoursPerWeek: t.core },
-    { tier: "committed", minHoursPerWeek: t.committed },
-    { tier: "contributing", minHoursPerWeek: t.contributing },
-    { tier: "light", minHoursPerWeek: 0 },
-  ];
-}
-
-export function commitmentTier(
-  hoursPerWeek: number,
-  isPaused = false,
-  t: TierThresholds = DEFAULT_TIERS
-): CommitmentTier {
-  if (isPaused) return "paused";
-  for (const { tier, minHoursPerWeek } of tierThresholds(t)) {
-    if (hoursPerWeek >= minHoursPerWeek) return tier;
-  }
-  return "light";
-}
-
-/**
- * The next rung up, and how far away it is. Null once they're at the top.
- *
- * "10.5 more to reach Core" in front of somebody at 1.6 hrs/week reads as a
- * verdict, not a rung — the exact thing the tier model exists to avoid. So the
- * gap is only worth showing for the NEXT tier, which is always within reach by
- * construction.
- */
-export function nextTierGap(
-  hoursPerWeek: number,
-  t: TierThresholds = DEFAULT_TIERS
-): { tier: CommitmentTier; hoursAway: number } | null {
-  const rungs = [...tierThresholds(t)].reverse(); // lowest first
-  for (const { tier, minHoursPerWeek } of rungs) {
-    if (hoursPerWeek < minHoursPerWeek) {
-      return {
-        tier,
-        hoursAway: Math.round((minHoursPerWeek - hoursPerWeek) * 10) / 10,
-      };
-    }
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Inputs
 // ---------------------------------------------------------------------------
 
 export interface ContributionInputs {
-  /**
-   * In-session weeks since this member joined. Never below 1.
-   *
-   * Breaks and finals are skipped, which makes working out of session a
-   * genuine bonus: those hours are all in `hoursTotal`, and the weeks they
-   * happened in add nothing to the divisor.
-   */
-  activeWeeks: number;
-  isPaused: boolean;
-
   deliverablesCompleted: number;
   deliverablesOpen: number;
   /** Open, past their due date. */
@@ -221,8 +82,6 @@ export interface ContributionInputs {
    */
   projectsCompleted: number;
 
-  hoursTotal: number;
-
   /**
    * Check-ins whose moment has PASSED. A pending one that isn't late yet is
    * not due — counting it dropped reliability before the member had a chance
@@ -234,17 +93,10 @@ export interface ContributionInputs {
 
   reRoleCount: number;
   projectsCommitted: number;
-
-  /**
-   * The club's configured tier floors. Carried on the inputs so every caller
-   * of `buildContributionRecord` gets them for free and none of them has to
-   * remember to look the settings row up.
-   */
-  tiers: TierThresholds;
 }
 
 // ---------------------------------------------------------------------------
-// Output — four signals, no composite
+// Output — three signals, no composite
 // ---------------------------------------------------------------------------
 
 export interface Delivered {
@@ -254,23 +106,6 @@ export interface Delivered {
   overdue: number;
   /** null when nothing has been assigned — not a zero the member earned. */
   completionRate: number | null;
-}
-
-export interface Commitment {
-  hoursTotal: number;
-  hoursPerWeek: number;
-  tier: CommitmentTier;
-  /**
-   * The rung immediately above, and how far off it is. Null at the top.
-   *
-   * Replaces a flat `hoursToCore`, which put "10.5 more to reach Core" in
-   * front of somebody at 1.6 hrs/week — a verdict dressed as encouragement.
-   * The next rung is by definition the reachable one.
-   */
-  nextTier: { tier: CommitmentTier; hoursAway: number } | null;
-  meetsMinimum: boolean;
-  /** What the tiers currently are, so the UI can describe them honestly. */
-  tiers: TierThresholds;
 }
 
 export interface Reliability {
@@ -288,7 +123,6 @@ export interface Scope {
 
 export interface ContributionRecord {
   delivered: Delivered;
-  commitment: Commitment;
   reliability: Reliability;
   scope: Scope;
 }
@@ -297,8 +131,6 @@ export function buildContributionRecord(
   i: ContributionInputs
 ): ContributionRecord {
   const assigned = i.deliverablesCompleted + i.deliverablesOpen;
-  const hoursPerWeek = i.activeWeeks > 0 ? i.hoursTotal / i.activeWeeks : 0;
-  const tier = commitmentTier(hoursPerWeek, i.isPaused, i.tiers);
   const missed = Math.max(0, i.updatesDue - i.updatesOnTime - i.updatesLate);
 
   return {
@@ -308,14 +140,6 @@ export function buildContributionRecord(
       open: i.deliverablesOpen,
       overdue: i.deliverablesOverdue,
       completionRate: assigned > 0 ? i.deliverablesCompleted / assigned : null,
-    },
-    commitment: {
-      hoursTotal: i.hoursTotal,
-      hoursPerWeek: Math.round(hoursPerWeek * 10) / 10,
-      tier,
-      nextTier: i.isPaused ? null : nextTierGap(hoursPerWeek, i.tiers),
-      meetsMinimum: hoursPerWeek >= i.tiers.minimum,
-      tiers: i.tiers,
     },
     reliability: {
       onTimeRate: i.updatesDue > 0 ? i.updatesOnTime / i.updatesDue : null,
@@ -350,10 +174,23 @@ export const LEADERSHIP_RUBRIC = [
     what: "Deliverables finished and projects carried to completion",
     why: "Finished work is the only signal that can't be faked. This dominates everything below it.",
   },
+  /*
+    This row used to read "Core or Committed tier held across a full quarter" —
+    a tier that no longer exists, computed from hours the club no longer
+    collects. It could not simply be deleted: "sustained" is the criterion the
+    other three don't cover, and dropping it would let one heroic week read the
+    same as a quarter of steady work.
+
+    So it is restated against something the app still records and a member can
+    still see: deliverables finished in MORE THAN ONE period, and check-ins that
+    kept arriving late in the quarter. Both are facts about spread over time
+    rather than volume — which is the half of the old tier worth keeping, minus
+    the hours.
+  */
   {
-    signal: "Sustained commitment",
-    what: "Core or Committed tier held across a full quarter, not one heroic week",
-    why: "Leading requires showing up in week eight, not just week one.",
+    signal: "Sustained over a quarter",
+    what: "Work finished in several different weeks, and check-ins still arriving in week eight",
+    why: "Leading requires showing up late in the quarter, not just at the start. Spread over time is the part one heroic week can't fake.",
   },
   {
     signal: "Reliability",
