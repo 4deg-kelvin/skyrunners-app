@@ -6,7 +6,7 @@ import { todayInClubTime } from "@/lib/dates";
 
 /**
  * ============================================================================
- * The evening digest — 8pm California, every day
+ * The evening digest — 10pm California, every day
  * ============================================================================
  *
  * ---------------------------------------------------------------------------
@@ -42,23 +42,24 @@ import { todayInClubTime } from "@/lib/dates";
  * debug the app.
  *
  * ---------------------------------------------------------------------------
- * 03:00 UTC, and what that means through the year
+ * 05:00 UTC, and what that means through the year
  * ---------------------------------------------------------------------------
  *
  * Vercel schedules in UTC and has no notion of daylight saving, so a fixed
  * cron drifts against California by an hour twice a year:
  *
- *   PDT (mid-Mar → early Nov):  03:00 UTC = 8pm the previous day
- *   PST (early Nov → mid-Mar):  03:00 UTC = 7pm the previous day
+ *   PDT (mid-Mar → early Nov):  05:00 UTC = 10pm the previous day
+ *   PST (early Nov → mid-Mar):  05:00 UTC =  9pm the previous day
  *
- * 8pm in term time is the point of it — late enough that an evening in the lab
- * is over and today's hours are logged. The winter hour of drift lands at 7pm,
- * which is still after the working day, so it is left alone rather than
- * chasing DST with two schedules.
+ * 10pm is late enough that an evening in the lab is over and the day's hours
+ * are logged — which is the whole point, since a digest sent at 6pm reports a
+ * day that hasn't finished. The winter hour of drift lands at 9pm, still after
+ * the working day, so it is left alone rather than chasing DST with two
+ * schedules.
  *
  * What the drift must NOT do is change which day gets summarised, and it
  * doesn't: `todayInClubTime()` resolves the club's calendar day in Pacific, so
- * at 03:00 UTC it returns the day that has just ended in California under
+ * at 05:00 UTC it returns the day that has just ended in California under
  * either offset. Using `new Date()` here instead would file a Tuesday evening
  * under Wednesday and then refuse to send Wednesday's — see `lib/dates.ts`.
  */
