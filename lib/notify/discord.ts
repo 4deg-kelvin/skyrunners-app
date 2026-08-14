@@ -148,7 +148,7 @@ export const discordMessages = {
   joinRequestDeclined: (opts: { projectName: string; note?: string }) =>
     `Your request to join **${opts.projectName}** wasn't taken up this time.` +
     (opts.note ? `\n> ${opts.note}` : "") +
-    `\nThere's plenty else going — have a look at Find Work.`,
+    `\nThere's plenty else going — have a look at Projects.`,
 
   checkInSubmitted: (opts: {
     memberName: string;

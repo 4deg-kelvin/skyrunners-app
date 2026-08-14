@@ -94,7 +94,7 @@ export function CreateProjectForm({
         <textarea
           name="description"
           rows={2}
-          placeholder="One sentence someone browsing Find Work would understand."
+          placeholder="One sentence someone browsing Projects would understand."
           className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>

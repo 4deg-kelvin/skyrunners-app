@@ -239,7 +239,7 @@ export function ProjectEditForm({
         <p className="text-ink-muted mt-3 mb-2.5 text-xs">
           Stage is where this sits in the lifecycle. How it&apos;s going is
           separate — a project can be at flight test and still blocked. Help
-          wanted is matched against people&apos;s skills on Find Work.
+          wanted is matched against people&apos;s skills on Projects.
         </p>
 
         <button

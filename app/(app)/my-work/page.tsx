@@ -358,7 +358,7 @@ export default async function MyWorkPage() {
               <EmptyState
                 message="You're not on any projects yet, so there's nothing project-specific to report."
                 actionLabel="Find something to join"
-                actionHref="/find-work"
+                actionHref="/projects"
               />
             ) : (
               currentUpdate.sections.map(({ entry, project, breadcrumb }) => (
@@ -442,23 +442,23 @@ export default async function MyWorkPage() {
             <EmptyState
               className="mt-5 py-8"
               /*
-                Find Work, not the project tree.
+                the top of Projects, not the raw tree.
 
-                Find Work ranks by where a member would actually help —
+                Projects ranks by where a member would actually help —
                 unstaffed and stuck first — which is the whole reason it
                 exists. The tree is sorted by org structure, so it puts a
                 newcomer in front of a hierarchy rather than an opportunity.
               */
-              message="You're not on a project yet. Find Work lists everything the club is building, with the places that most need people first — pick one and ask to join."
+              message="You're not on a project yet. Projects lists everything the club is building, with the places that most need people first — pick one and ask to join."
               actionLabel="Find something to work on"
-              actionHref="/find-work"
+              actionHref="/projects"
             />
           ) : liveProjects.length === 0 ? (
             <EmptyState
               className="mt-5 py-8"
               message="Everything you're on is finished. Nice — now find the next thing."
               actionLabel="Find work"
-              actionHref="/find-work"
+              actionHref="/projects"
             />
           ) : (
             <div className="mt-5 space-y-3">

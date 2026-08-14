@@ -156,8 +156,8 @@ export function ProfileForm({
           className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
         <span className="text-ink-muted mt-1 block text-xs">
-          Comma-separated. Find Work uses these to put the projects you&apos;d
-          help most with at the top, so it&apos;s worth filling in.
+          Comma-separated. Projects uses these to put the work you&apos;d help
+          most with at the top, so it&apos;s worth filling in.
         </span>
       </label>
 
