@@ -37,6 +37,8 @@ import { can, isCoLead } from "@/lib/permissions";
 import {
   today,
   blockerAudience,
+  projectEscalationAudience,
+  raiserLeadAudience,
   getEvent,
   getMember,
   getProject,
@@ -350,11 +352,34 @@ async function setDeliverableStatusAction$impl(
 }
 
 /**
- * DM whoever has to clear a blocker. Fire-and-forget, like every other notify.
+ * DM everyone a blocker concerns. Fire-and-forget, like every other notify.
  *
  * `what` names the deliverable, or the project itself when the whole thing is
  * blocked. The message carries the project name either way, because a DM
  * arrives with no context around it.
+ *
+ * ---------------------------------------------------------------------------
+ * Three audiences, three different messages, nobody gets two
+ * ---------------------------------------------------------------------------
+ *
+ *   1. WHO CLEARS IT — `blockerAudience`. The project's REs, minus the raiser,
+ *      climbing one level if that empties the list. Unchanged, and still the
+ *      only group asked to *do* something. Telling five people to fix one
+ *      thing produces the bystander effect, which is why this list stays short.
+ *
+ *   2. WHO OWNS THE WORK ABOVE — `projectEscalationAudience`, and only when a
+ *      whole PROJECT is blocked. A stopped project changes what the person
+ *      above promised, so they hear about it even if the project still has
+ *      other REs who could clear it. A single blocked deliverable does not
+ *      earn this.
+ *
+ *   3. WHO LOOKS AFTER THE PERSON — `raiserLeadAudience`. One step up the
+ *      REPORTING tree, told as awareness rather than a task.
+ *
+ * The `sent` set is what keeps them exclusive. Somebody who is both the RE
+ * above and the raiser's Lead gets the more actionable message once, not two
+ * DMs about the same event — which is exactly how a bot teaches people that
+ * its messages are safe to skim.
  */
 function notifyBlocked(input: {
   projectId: string;
@@ -362,13 +387,25 @@ function notifyBlocked(input: {
   raiserName: string;
   what: string;
   note: string;
+  /** True when the project itself is blocked, not one deliverable on it. */
+  wholeProject?: boolean;
 }): void {
   const project = getProject(input.projectId);
   if (!project) return;
 
-  for (const recipientId of blockerAudience(input.projectId, input.raiserId)) {
-    notify(
-      getMember(recipientId)?.discordUserId,
+  const url = appUrl(`/projects/${project.slug}`);
+  const sent = new Set<string>([input.raiserId]);
+
+  const send = (recipientId: string, content: string) => {
+    if (sent.has(recipientId)) return;
+    sent.add(recipientId);
+    notify(getMember(recipientId)?.discordUserId, content);
+  };
+
+  // 1. The people who can actually clear it.
+  for (const id of blockerAudience(input.projectId, input.raiserId)) {
+    send(
+      id,
       discordMessages.blockerRaised({
         memberName: input.raiserName,
         projectName:
@@ -376,7 +413,40 @@ function notifyBlocked(input: {
             ? project.name
             : `${input.what} (${project.name})`,
         note: input.note,
-        url: appUrl(`/projects/${project.slug}`),
+        url,
+      })
+    );
+  }
+
+  // 2. Accountable for the work this sits inside — projects only.
+  if (input.wholeProject) {
+    const parent = project.parentId ? getProject(project.parentId) : undefined;
+    for (const id of projectEscalationAudience(
+      input.projectId,
+      input.raiserId
+    )) {
+      send(
+        id,
+        discordMessages.projectBlockedAbove({
+          memberName: input.raiserName,
+          projectName: project.name,
+          parentName: parent?.name,
+          url,
+        })
+      );
+    }
+  }
+
+  // 3. The raiser's own Lead. Awareness, not a task.
+  for (const id of raiserLeadAudience(input.raiserId)) {
+    send(
+      id,
+      discordMessages.reportBlocked({
+        memberName: input.raiserName,
+        what: input.what,
+        projectName: project.name,
+        note: input.note,
+        url,
       })
     );
   }
@@ -1467,6 +1537,7 @@ async function updateProjectAction$impl(
       raiserName: viewer.member.preferredName ?? viewer.member.fullName,
       what: result.value.name,
       note: "The whole project is marked blocked — see the project page.",
+      wholeProject: true,
     });
   }
 
@@ -1911,6 +1982,33 @@ async function respondToUpdateEntryAction$impl(
 
   if (result.ok) refresh();
   return toResult(result, "Answer sent.");
+}
+
+/**
+ * Turn your own daily digest on or off.
+ *
+ * Only ever your own — the member id comes from the session and the form has
+ * no say in it. Somebody else's notification preferences are not an
+ * administrative concern.
+ */
+async function setDailyDigestAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  const result = await ops.setDailyDigest({
+    memberId: viewer.member.id,
+    // An unchecked box posts nothing, so absence is off.
+    optOut: formData.get("optOut") === "on",
+  });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    result.ok && result.value.dailyDigestOptOut
+      ? "Daily digest off. Blocker alerts and check-in reminders still come through."
+      : "Daily digest on — one message each evening."
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2422,6 +2520,12 @@ export async function attachArtifactAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => attachArtifactAction$impl(formData));
+}
+
+export async function setDailyDigestAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setDailyDigestAction$impl(formData));
 }
 
 export async function createMcpTokenAction(
