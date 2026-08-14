@@ -222,6 +222,22 @@ Five minutes of RE upkeep buys: what each member owns, update auto-drafts, real 
 percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
 add dependencies or sub-tasks, re-read this paragraph.
 
+## ⚠️ The tiers below are being REMOVED — read the plan first
+
+The club decided on 2026-08-14 that **hours are not the measure; deliverables
+are.** The whole tier ladder, the hours-per-week figure it runs on, and the
+`Commitment` signal are all going. `docs/HOURS_REMOVAL_PLAN.md` is the agreed
+plan and supersedes this section.
+
+Everything below still describes the code as it stands today, so it's accurate
+until that lands — but don't build anything new on it, and don't "fix" the tier
+system.
+
+One thing from the plan worth knowing before you touch any of it: **hours
+removal and tier removal cannot be sequenced.** `commitmentTier` is hours over a
+rolling window, so stopping collection without removing the tiers makes every
+member's tier decay toward Light on their own profile for no reason.
+
 ## The commitment tiers are DATA, not constants
 
 `club_settings` holds four numbers — the Core / Committed / Contributing floors
