@@ -110,7 +110,7 @@ export default async function SettingsPage() {
           <h2 className="text-ink mt-2 text-2xl font-bold">Your details</h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
             Everything here is optional except what you want people to see.
-            Skills matter most — Find Work uses them to rank projects by where
+            Skills matter most — Projects uses them to rank work by where
             you&apos;d help.
           </p>
           <div className="mt-5">

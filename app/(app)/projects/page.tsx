@@ -12,8 +12,13 @@ import {
 import { DivisionExtras } from "@/components/ui/division-extras";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DivisionProjectList } from "@/components/ui/project-tree";
+import { HelpWanted } from "@/components/ui/help-wanted";
+import { WorkSpotlight } from "@/components/ui/work-spotlight";
+import { AskForHelpForm } from "@/components/forms/help-request-actions";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getDivisionExtras } from "@/lib/data/deadlines";
+import { getAskProjectOptions, getOpenAsks } from "@/lib/data/blockers";
+import { getFindWork } from "@/lib/data/find-work";
 import {
   countArchivedDivisions,
   getOrphanedProjects,
@@ -38,19 +43,37 @@ function countCompleted(nodes: ProjectTreeNode[]): number {
 
 export default async function ProjectsPage() {
   const viewer = await getViewer();
-  const [tree, orphans, formOptions, archivedCount, extras] = await Promise.all(
-    [
-      getProjectTree(),
-      getOrphanedProjects(),
-      // Scoped to what this viewer may actually create — a Lead only sees
-      // divisions they lead, so the dropdown can't offer a failing option.
-      getProjectFormOptions(viewer),
-      countArchivedDivisions(),
-      // Deadlines and blocked work, folded in here rather than being two
-      // separate pages. Computed in one pass and looked up per division.
-      getDivisionExtras(),
-    ]
-  );
+  const [
+    tree,
+    orphans,
+    formOptions,
+    archivedCount,
+    extras,
+    work,
+    asks,
+    askProjects,
+  ] = await Promise.all([
+    getProjectTree(),
+    getOrphanedProjects(),
+    // Scoped to what this viewer may actually create — a Lead only sees
+    // divisions they lead, so the dropdown can't offer a failing option.
+    getProjectFormOptions(viewer),
+    countArchivedDivisions(),
+    // Deadlines and blocked work, folded in here rather than being two
+    // separate pages. Computed in one pass and looked up per division.
+    getDivisionExtras(),
+    /*
+        The three things that used to be `/find-work`.
+
+        That page was removed because "Projects" and "Find Work" are two doors
+        to the same room, and a new member has no way to guess which one to
+        open. Its ranking logic is the part that mattered and it is unchanged —
+        it just renders at the top of this page now. See `WorkSpotlight`.
+      */
+    getFindWork(viewer.member.id, viewer.member.skills ?? []),
+    getOpenAsks(viewer.actor),
+    getAskProjectOptions(),
+  ]);
 
   /*
     Can they file work ANYWHERE?
@@ -75,11 +98,18 @@ export default async function ProjectsPage() {
     <HideCompletedProvider>
       <div className="space-y-6">
         <PageHeader
-          label="All Divisions"
+          label="The Club's Work"
           title="Projects"
-          description="Everything the club is building, grouped by division. Follow anything to keep an eye on it; to actually join, ask the project's RE — they decide, and the ask is tracked."
+          description="Everything the club is building. The top of this page is where you'd help most; the divisions below are the full tree. To join anything, ask its RE — they decide, and the ask is tracked."
           action={
             <div className="flex flex-wrap items-center gap-2">
+              {/*
+                Posting an ask moved here with the rest of `/find-work`. It's
+                the route to being useful that doesn't depend on one RE reading
+                their inbox, so it belongs beside the projects, not on a page
+                of its own.
+              */}
+              <AskForHelpForm projects={askProjects} />
               {/*
               Available to everyone, not just leadership. Reading the page is
               the one thing every member does here, and how much finished work
@@ -105,6 +135,18 @@ export default async function ProjectsPage() {
             </div>
           }
         />
+
+        {/*
+          People who are stuck, and then where to help — both above the tree.
+
+          Order is deliberate. An unanswered ask is a person waiting on
+          somebody, which beats any project card for urgency; the ranked
+          shortlist is second; the full division tree is for browsing and
+          comes last.
+        */}
+        <HelpWanted asks={asks} />
+
+        <WorkSpotlight view={work} />
 
         {/* Data-integrity warning rather than silently hiding work */}
         {orphans.length > 0 ? (
@@ -154,7 +196,7 @@ export default async function ProjectsPage() {
                     A division is a top-level part of the club — Airframe,
                     Avionics, Autonomy — and every project lives inside one.
                     Create the first, then add projects to it. Members will see
-                    them on Find Work straight away.
+                    them at the top of this page straight away.
                   </p>
                   <div className="mt-4">
                     <CreateTeamForm
@@ -166,8 +208,8 @@ export default async function ProjectsPage() {
               ) : (
                 <EmptyState
                   message="The club hasn't set up any divisions yet, so there are no projects to show. A Co-Lead does that, and everything appears here once they have."
-                  actionLabel="See what needs doing"
-                  actionHref="/find-work"
+                  actionLabel="See your work"
+                  actionHref="/my-work"
                 />
               )}
             </CardBody>

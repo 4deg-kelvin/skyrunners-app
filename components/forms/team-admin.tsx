@@ -21,7 +21,7 @@ export interface TeamOption {
 /**
  * Point a project at the division that owns it.
  *
- * `/find-work` and `/projects` both group by division, and they resolve it by
+ * Both halves of `/projects` group by division, and they resolve it by
  * walking up from the project's team. A project with no team resolves to no
  * division and quietly appears on neither page — which is the opposite of what
  * an app built around discoverability should do. The dashboard warns about it;
@@ -63,7 +63,7 @@ export function ProjectTeamForm({
       {!currentDivisionName ? (
         <p className="text-warn-fg mb-2 text-sm">
           No division set, so this project doesn&apos;t appear on Projects or
-          Find Work.
+          Projects.
         </p>
       ) : null}
 

@@ -178,7 +178,7 @@ bare number.
 
 **Getting started as a new member**
 \`whoami\` lists what's missing from their profile. Fix it with
-\`update_my_profile\` — skills matter most, because Find Work ranks projects by
+\`update_my_profile\` — skills matter most, because Projects ranks work by
 them, and Discord matters second, because it's how the club actually reaches
 people. Then \`find_work\` for where to help, and tell them to ask the RE named
 on the project.`;

@@ -23,6 +23,23 @@ const nextConfig: NextConfig = {
    * `npm run build` (what Vercel and CI run) is unchanged.
    */
   distDir: process.env.NEXT_DIST_DIR || ".next",
+
+  /**
+   * `/find-work` was merged into `/projects`.
+   *
+   * A redirect rather than a 404, because that URL is in people's history, in
+   * Discord messages the bot has already sent, and in screenshots from the
+   * club's onboarding. Somebody following a three-week-old link should land on
+   * the page that now does the job, not on an error that suggests the feature
+   * was deleted — it wasn't, it moved to the top of Projects.
+   *
+   * Permanent (308), so browsers and crawlers stop asking.
+   */
+  async redirects() {
+    return [
+      { source: "/find-work", destination: "/projects", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

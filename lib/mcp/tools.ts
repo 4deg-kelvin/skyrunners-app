@@ -206,7 +206,7 @@ function profileNudges(viewer: McpViewer): string[] {
   }
   if (!m.skills || m.skills.length === 0) {
     todo.push(
-      "Add your skills — Find Work ranks projects by them, so an empty list means worse suggestions. `update_my_profile` takes them."
+      "Add your skills — Projects ranks work by them, so an empty list means worse suggestions. `update_my_profile` takes them."
     );
   }
   if (!m.major) todo.push("Add your major.");
@@ -874,7 +874,7 @@ export const TOOLS: McpTool[] = [
         })
       );
 
-      return `Posted "${str(args.title)}" to the help board. It shows on Find Work for the whole club.`;
+      return `Posted "${str(args.title)}" to the help board. It shows at the top of Projects for the whole club.`;
     },
   },
 

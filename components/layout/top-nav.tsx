@@ -18,12 +18,17 @@ const NAV_ITEMS = [
     Projects instead.
   */
   { href: "/my-work", label: "My Work", hideFromAdvisors: true },
-  // High in the nav on purpose: "I have nothing to do" is the club's biggest
-  // retention problem, and this page is the answer to it. Advisors keep it —
-  // the "I'm stuck" board lives there, and unsticking somebody is the single
-  // most useful thing an advisor can do in an afternoon.
-  { href: "/find-work", label: "Find Work" },
   { href: "/dashboard", label: "Dashboard", leadershipOnly: true },
+  /*
+    "Find Work" used to sit above this, and its job now happens here.
+
+    It was high in the nav for a good reason — "I have nothing to do" is the
+    club's biggest retention problem — but it and Projects were two doors to
+    the same room. Both were lists of projects, and nothing on the outside told
+    a first-week member which one to open, so the answer to their question was
+    behind a coin flip. The ranked shortlist and the "I'm stuck" board are both
+    at the top of Projects now, above the division tree.
+  */
   { href: "/projects", label: "Projects" },
   { href: "/members", label: "Members" },
   { href: "/calendar", label: "Calendar" },

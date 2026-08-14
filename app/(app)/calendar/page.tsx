@@ -105,7 +105,7 @@ export default async function CalendarPage() {
             <EmptyState
               message="Nothing scheduled in the next two months. If you're working on something, put it up — somebody may well join you."
               actionLabel="See what needs doing"
-              actionHref="/find-work"
+              actionHref="/projects"
             />
           </CardBody>
         </Card>
