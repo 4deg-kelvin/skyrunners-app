@@ -122,3 +122,24 @@ comment on column club_settings.contributing_hours is
 
 comment on column club_settings.minimum_hours is
   'Orphaned by 0039 (2026-08-14). See core_hours.';
+
+-- ---------------------------------------------------------------------------
+-- 4. Two views now aggregate a dead column
+-- ---------------------------------------------------------------------------
+--
+-- `v_member_hours_weekly` (0001) is `sum(hours)` grouped by week, and
+-- `v_member_contribution` (0002) carries an `hours_total`. Both are Phase-1
+-- plumbing the application never wired up — it reads whole-table snapshots
+-- through `lib/store/supabase.ts` instead — so nothing breaks either way.
+--
+-- Left in place rather than dropped, for consistency with the columns above and
+-- because a view holds no data to lose. But they are misleading to anyone
+-- querying the database directly: `sum()` skips NULLs, so from today they report
+-- only the historical total and it will never move again. Hence the comments —
+-- a stale number with no explanation beside it is how somebody rebuilds the
+-- tiers by accident, thinking the data is still live.
+comment on view v_member_hours_weekly is
+  'HISTORICAL ONLY since 0039 (2026-08-14). work_logs.hours is no longer written, so this reports a frozen total that will never change. Unused by the app. Do not build on it.';
+
+comment on view v_member_contribution is
+  'Its hours_total column is HISTORICAL ONLY since 0039 (2026-08-14) and frozen. The live contribution record is three signals with no hours at all — see lib/contribution.ts. Unused by the app.';
