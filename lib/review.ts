@@ -88,6 +88,49 @@ export interface UnreadReport {
  * feature — the thing most likely to have gone stale is the thing you see, so a
  * Lead working top-down is always fixing the worst case.
  */
+/**
+ * Who this person's review queue should cover.
+ *
+ * Direct reports, plus — for a Co-Lead only — everybody else who has no Lead.
+ *
+ * ---------------------------------------------------------------------------
+ * The bug this fixes: a Co-Lead's check-in was addressed to nobody
+ * ---------------------------------------------------------------------------
+ *
+ * `lead_id_at_submission` is snapshotted from the author's `leadId`, and a
+ * Co-Lead sits at the top of the reporting tree with `leadId = null`. So a
+ * Co-Lead's check-in named no reviewer, appeared in no queue, and could never
+ * be marked read — it stayed `submitted` forever, quietly dragging down the
+ * club's compliance number with no way for anyone to clear it.
+ *
+ * Co-Leads reviewing each other is the natural answer, and the permission rule
+ * already allowed it: `can.reviewUpdate` is
+ * `isCoLead(actor) || isLeadOfOrAbove(...)`. Only the QUEUE was missing them.
+ * It's the same shape as the Co-Lead escape hatch on `completeProject` — the
+ * top of a tree needs a peer, or it deadlocks.
+ *
+ * Excludes the viewer themselves. Reviewing your own check-in would make the
+ * reliability record meaningless, and it's the one thing a peer review is for.
+ */
+export function withLeaderlessPeers(
+  actor: { id: string; globalRole: string },
+  directReports: Member[],
+  everyone?: Member[]
+): Member[] {
+  if (actor.globalRole !== "co_lead" || !everyone) return directReports;
+
+  const already = new Set(directReports.map((m) => m.id));
+  const peers = everyone.filter(
+    (m) =>
+      !m.leadId &&
+      m.id !== actor.id &&
+      m.status === "active" &&
+      !already.has(m.id)
+  );
+
+  return [...directReports, ...peers];
+}
+
 export function unreadReportsFor(
   leadId: string,
   updates: ProgressUpdate[],

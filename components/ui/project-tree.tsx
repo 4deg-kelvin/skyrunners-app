@@ -7,8 +7,7 @@ import { ChevronDown, ChevronRight, CornerDownRight } from "lucide-react";
 import { Badge } from "./badge";
 import { ProjectBadges } from "./project-badges";
 import { EmptyState } from "./empty-state";
-import { SectionLabel } from "./section-label";
-import { useHideCompleted } from "./completed-filter";
+import { CompletedProjectsSection, useHideCompleted } from "./completed-filter";
 import type { ProjectTreeNode } from "@/lib/data/projects";
 
 /**
@@ -184,17 +183,29 @@ export function DivisionProjectList({ roots }: { roots: ProjectTreeNode[] }) {
         )}
       </div>
 
+      {/*
+        Collapsed by default, with its own control.
+
+        This used to be a bare "Completed · N" heading with the finished work
+        always expanded underneath, and the only way to get rid of it was a
+        toggle in the page header — a long way from what it affects, and easy
+        to miss entirely. It also sat directly above "7 upcoming dates (show)",
+        so the one thing on the card that looked like a label was the one thing
+        taking up the most room.
+
+        The page-header switch still works and still wins: it removes these
+        sections everywhere and remembers the choice. This is the local
+        version, for the far commoner case of wanting one division's history
+        out of the way right now.
+      */}
       {finished.length > 0 && !hideCompleted ? (
-        <div className="border-line mt-6 border-t pt-5">
-          <SectionLabel tone="muted">
-            Completed · {finished.length}
-          </SectionLabel>
+        <CompletedProjectsSection count={finished.length}>
           <div className="mt-3 space-y-3">
             {finished.map((node) => (
               <ProjectNode key={node.project.id} node={node} depth={0} />
             ))}
           </div>
-        </div>
+        </CompletedProjectsSection>
       ) : null}
     </>
   );
