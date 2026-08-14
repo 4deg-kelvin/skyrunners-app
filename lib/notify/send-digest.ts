@@ -5,17 +5,8 @@
  * — what a quiet project says, who gets nothing — are testable without a
  * database or Discord.
  *
- * ---------------------------------------------------------------------------
- * Why this rides on the check-in cron instead of its own
- * ---------------------------------------------------------------------------
- *
- * Vercel's Hobby plan allows a cron to run at most once a day, and it rejects
- * the whole DEPLOY rather than just the cron when you break that. An unrelated
- * schedule string once stopped the site updating for four commits, and the
- * symptom was "my change isn't live" — pointing nowhere near `vercel.json`.
- *
- * Adding a second cron entry is the obvious move and is exactly the thing not
- * to do. One route, three passes.
+ * Called from `/api/cron/daily-digest`, which owns the schedule and explains
+ * why it is a second cron rather than another pass on the check-in job.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,19 +19,21 @@ export interface DigestRun {
   sent: number;
   considered: number;
   skipped: number;
+  /** Member ids Discord refused, so a name can be chased rather than a count. */
+  failed: string[];
 }
 
 /**
  * Build and send today's digests.
  *
- * `today` is the CLUB's day, not UTC's. The cron fires at 19:30 UTC, which is
- * already the next calendar day in UTC for part of the year but is still the
- * same working evening in California — writing `now()::date` here would file a
- * Tuesday evening's digest under Wednesday and then refuse to send Wednesday's.
+ * `today` is the CLUB's day, not UTC's. The cron fires at 05:00 UTC, which is
+ * already the next calendar day in UTC but is still the same working evening in
+ * California — writing `now()::date` here would file a Tuesday evening's digest
+ * under Wednesday and then refuse to send Wednesday's.
  */
 export async function sendDailyDigests(today: string): Promise<DigestRun> {
   const admin = createAdminClient();
-  if (!admin) return { sent: 0, considered: 0, skipped: 0 };
+  if (!admin) return { sent: 0, considered: 0, skipped: 0, failed: [] };
 
   /*
     Who is already handled: opted out, or already had today's.
@@ -68,6 +61,7 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
   });
 
   let sent = 0;
+  const failed: string[] = [];
 
   for (const digest of digests) {
     /*
@@ -76,8 +70,8 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
       duplicate on every retry, and a bot that repeats itself daily is one
       people mute.
 
-      The `.is(... , null).or(...)` guard makes the claim atomic: two concurrent
-      invocations race for the same row and only one updates it.
+      The `.or(...)` guard makes the claim atomic: two concurrent invocations
+      race for the same row and only one updates it.
     */
     const { data: claimed } = await admin
       .from("profiles")
@@ -88,8 +82,39 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
 
     if (!claimed || claimed.length === 0) continue;
 
-    if (await sendDiscordDM(digest.discordUserId, digest.body)) sent++;
+    if (await sendDiscordDM(digest.discordUserId, digest.body)) {
+      sent++;
+      continue;
+    }
+
+    /*
+      RELEASE the claim when Discord refused it.
+
+      Claim-before-send stops duplicates, but on its own it also means a failed
+      delivery silently burns the day: the row says "sent", nobody got
+      anything, and the next run skips them. The first night this shipped,
+      four rows were claimed and at least one member received nothing — and
+      there was no way to tell from the database whether that was a delivery
+      failure or a bug, because success and failure looked identical.
+
+      Clearing it is safe. `sendDiscordDM` returns false only when Discord
+      rejected the request outright — no message was delivered — so a retry
+      cannot duplicate anything. The cost of being wrong here is one repeated
+      digest; the cost of the old behaviour was a member silently dropped from
+      a daily message with no trace.
+    */
+    await admin
+      .from("profiles")
+      .update({ daily_digest_sent_on: null })
+      .eq("id", digest.memberId);
+
+    failed.push(digest.memberId);
   }
 
-  return { sent, considered: digests.length, skipped: skip.size };
+  /*
+    Named in the response, not just counted. "sent: 3, failed: 1" with an id is
+    something Kelvin can act on from the Vercel log; "sent: 3" alone leaves the
+    missing person invisible.
+  */
+  return { sent, considered: digests.length, skipped: skip.size, failed };
 }
