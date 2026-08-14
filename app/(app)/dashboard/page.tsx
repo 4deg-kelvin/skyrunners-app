@@ -19,6 +19,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { RequestDecision } from "@/components/forms/request-decision";
+import { MarkReviewedButton } from "@/components/forms/review-actions";
 import { formatNumber } from "@/lib/utils";
 
 export default async function DashboardPage({
@@ -769,6 +770,30 @@ export default async function DashboardPage({
                               </div>
                             ))}
                           </div>
+
+                          {/*
+                            Clear it from here.
+
+                            The button used to live only on /updates, which is
+                            not in the nav — reachable solely through a link on
+                            this page. So the dashboard showed you a queue with
+                            an escalation clock on it and no way to act, and the
+                            honest reaction was "how do I get rid of this?".
+
+                            Reading the check-in is the obligation and the whole
+                            check-in is right here; making somebody navigate to
+                            press a button about what they just read is the kind
+                            of friction that turns a 15-minute weekly job into a
+                            skipped one.
+                          */}
+                          {author ? (
+                            <div className="border-line-soft mt-3 border-t pt-3">
+                              <MarkReviewedButton
+                                updateId={update.id}
+                                authorId={author.id}
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       )
                     )
