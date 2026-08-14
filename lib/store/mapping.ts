@@ -588,7 +588,9 @@ const projectDeadlineChanges: CollectionSpec<ProjectDeadlineChange> = {
     changed_by: nul(c.changedById),
     changed_at: c.changedAt,
   }),
-  dependsOn: ["members", "projects"],
+  // `deliverables` too, since 0042: a row may reference one, and inserting
+  // before it exists would violate the foreign key.
+  dependsOn: ["members", "projects", "deliverables"],
 };
 
 /**

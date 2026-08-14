@@ -892,7 +892,7 @@ export default async function ProjectDetailPage({
                 {view.deadlineHistory.length > 0 ? (
                   <div className="border-line mt-4 border-t pt-3">
                     <p className="text-ink-muted text-[11px] font-semibold tracking-wide uppercase">
-                      Target moved{" "}
+                      Deadlines moved{" "}
                       {view.deadlineHistory.length === 1
                         ? "once"
                         : `${view.deadlineHistory.length} times`}
@@ -900,8 +900,20 @@ export default async function ProjectDetailPage({
 
                     <ul className="mt-2 space-y-2.5">
                       {view.deadlineHistory.map(
-                        ({ change, actor, daysMoved }) => (
+                        ({ change, actor, daysMoved, deliverableTitle }) => (
                           <li key={change.id} className="text-xs">
+                            {/*
+                              Which thing moved. Absent for the project's own
+                              target, because "SkyBeta Kits" above the list
+                              already says that — and repeating it on every row
+                              would bury the deliverable rows that are the
+                              interesting ones.
+                            */}
+                            {deliverableTitle ? (
+                              <p className="text-cardinal-600 font-semibold">
+                                {deliverableTitle}
+                              </p>
+                            ) : null}
                             <p className="text-ink font-semibold">
                               {change.fromDate
                                 ? `${formatDay(change.fromDate)} → ${formatDay(change.toDate)}`

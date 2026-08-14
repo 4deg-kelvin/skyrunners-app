@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions";
 import type { Deliverable } from "@/lib/types";
 import { formatDay } from "@/lib/dates";
+import { PushDeadlineForm } from "./push-deadline";
 
 /**
  * The controls on one deliverable.
@@ -418,6 +419,34 @@ export function DeliverableActions({
         >
           Edit
         </button>
+      ) : null}
+
+      {/*
+        Push the deadline back, with a reason, recorded.
+
+        Beside Edit rather than inside it, because they are different acts: Edit
+        changes the facts of the deliverable, and this one admits the schedule
+        slipped and says why. Edit can still move a date silently — that is the
+        ordinary case, a day either way — and this is the path that writes a line
+        in the project's history.
+
+        Only when there IS a date to push back and the work isn't signed off.
+        Signed-off dates are part of the record and the operation refuses them, so
+        offering a control that always fails would be a dead button.
+
+        `relative` on the wrapper so the popover anchors here rather than to the
+        row — the same reason the Target tile carries it.
+      */}
+      {canSignOff && deliverable.dueDate && deliverable.status !== "done" ? (
+        <span className="relative inline-flex">
+          <PushDeadlineForm
+            projectId={projectId}
+            projectName={deliverable.title}
+            currentTarget={deliverable.dueDate}
+            parentTargetDate={projectTargetDate}
+            deliverableId={id}
+          />
+        </span>
       ) : null}
     </div>
   );

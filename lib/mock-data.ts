@@ -3478,6 +3478,16 @@ export function baselineTargetDate(projectId: string): string | undefined {
   let earliest: string | undefined;
   for (const c of live().projectDeadlineChanges) {
     if (c.projectId !== projectId || !c.fromDate) continue;
+    /*
+      The PROJECT's own moves only — never a deliverable's.
+
+      Since migration 0042 this table holds both, distinguished by
+      `deliverableId`. Without this line a deliverable pushed from June to July
+      would set the project's Gantt baseline to June, drawing a ghost marker for
+      a date the project was never due on. The chart would be confidently wrong,
+      which is the one thing `lib/gantt.ts` exists to avoid.
+    */
+    if (c.deliverableId) continue;
     if (!earliest || c.fromDate < earliest) earliest = c.fromDate;
   }
   return earliest;

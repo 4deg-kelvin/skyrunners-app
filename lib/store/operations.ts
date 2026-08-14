@@ -1786,6 +1786,115 @@ export async function changeProjectDeadline(input: {
   });
 }
 
+/**
+ * Push back a deliverable's due date, keeping the old one.
+ *
+ * The deliverable-level twin of `changeProjectDeadline`, and deliberately the same
+ * shape: a required reason, an append-only history row, and the constraint checked
+ * rather than cascaded.
+ *
+ * Two differences from the project version, both following from what a deliverable
+ * is:
+ *
+ *   - **It is bounded by the project, and by nothing below it.** A deliverable has
+ *     no children — that is the whole task model — so the only constraint is
+ *     `dueAfterProject`, the same helper `createDeliverable` and `updateDeliverable`
+ *     already use. Work inside a project cannot land after the project does, and
+ *     the error names the project and its date.
+ *   - **No notice is sent.** A project slipping changes what a division plans
+ *     against; one deliverable moving inside its project does not, and notifying
+ *     up the chain for each would train people to ignore the notice that matters.
+ *     It is still recorded, and it still shows in the project's history.
+ *
+ * `updateDeliverable` remains the way to change a title or an owner, and it can
+ * still move a date without a reason. Same asymmetry as the project editor: this
+ * is the path that produces good history, and the other one is labelled in the UI
+ * as having none.
+ */
+export async function changeDeliverableDeadline(input: {
+  deliverableId: string;
+  dueDate: string;
+  reason: string;
+  actorId: string;
+  today: string;
+}): Promise<Result<Deliverable>> {
+  const newDue = input.dueDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDue)) {
+    return fail<Deliverable>("Pick a date for the new deadline.");
+  }
+
+  const reason = input.reason.trim();
+  if (!reason) {
+    return fail<Deliverable>(
+      "Say why it's moving — whoever is waiting on this will read it."
+    );
+  }
+  if (reason.length > MAX_DEADLINE_REASON_CHARS) {
+    return fail<Deliverable>(
+      `That's ${reason.length} characters. Keep it under ${MAX_DEADLINE_REASON_CHARS} — it goes into the project's history.`
+    );
+  }
+
+  return guarded((store) => {
+    const deliverable = store.deliverables.find(
+      (d) => d.id === input.deliverableId
+    );
+    if (!deliverable) {
+      return fail<Deliverable>("That deliverable no longer exists.");
+    }
+
+    /*
+      Nothing to push back if it never had a date.
+
+      Same reasoning as the project version: setting a FIRST deadline is not a
+      slip, and recording it as one would put the deliverable into the "has
+      slipped" history on the day somebody first dated it. Edit sets a first date.
+    */
+    if (!deliverable.dueDate) {
+      return fail<Deliverable>(
+        "This has no deadline yet, so there's nothing to push back. Set one with Edit."
+      );
+    }
+
+    if (deliverable.dueDate.slice(0, 10) === newDue) {
+      return fail<Deliverable>(`It's already due ${newDue}.`);
+    }
+
+    /*
+      Signed-off work keeps its dates.
+
+      `done` means an RE confirmed it, and moving the deadline afterwards would
+      rewrite whether it was delivered on time — which feeds the Delivered signal.
+      Reopening is the honest route if the work genuinely restarted.
+    */
+    if (deliverable.status === "done") {
+      return fail<Deliverable>(
+        "This is signed off, so its dates are part of the record. Reopen it first if the work has actually restarted."
+      );
+    }
+
+    // The one constraint: work inside a project can't land after the project.
+    const clash = dueAfterProject(store, deliverable.projectId, newDue);
+    if (clash) return fail<Deliverable>(clash);
+
+    const fromDate = deliverable.dueDate.slice(0, 10);
+    deliverable.dueDate = newDue;
+
+    store.projectDeadlineChanges.push({
+      id: newId("pdc"),
+      projectId: deliverable.projectId,
+      deliverableId: deliverable.id,
+      fromDate,
+      toDate: newDue,
+      reason,
+      changedById: input.actorId,
+      changedAt: new Date().toISOString(),
+    });
+
+    return ok(deliverable);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Writing a check-in
 // ---------------------------------------------------------------------------
@@ -2014,6 +2123,17 @@ export async function deleteDeliverable(
       (d) => d.id !== deliverableId
     );
     cascadeTodos(store);
+    /*
+      Its deadline history goes with it, matching the `on delete cascade` in
+      migration 0042.
+
+      The project's OWN history rows are untouched — they have a null
+      `deliverableId` — so deleting one piece of work never erases the record of
+      the project's target moving.
+    */
+    store.projectDeadlineChanges = store.projectDeadlineChanges.filter(
+      (c) => c.deliverableId !== deliverableId
+    );
     return ok(null);
   });
 }

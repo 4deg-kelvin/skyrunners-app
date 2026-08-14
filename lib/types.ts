@@ -309,6 +309,15 @@ export interface ProjectDeadlineChange {
   id: string;
   projectId: string;
   /**
+   * Set when this row records a DELIVERABLE's due date moving; undefined when it
+   * records the project's own target moving.
+   *
+   * One table for both, deliberately — see migration 0042. The question people
+   * ask is about the project as a whole ("this slipped three weeks, what moved?"),
+   * and two tables would make that a union in every reader.
+   */
+  deliverableId?: string;
+  /**
    * The date it moved FROM. Undefined would mean the project had no target at
    * all beforehand — `changeProjectDeadline` refuses that case, because setting
    * a first date is not a slip, so in practice this is always set.

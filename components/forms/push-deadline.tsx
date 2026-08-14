@@ -4,7 +4,10 @@ import { useState } from "react";
 import { CalendarClock, X } from "lucide-react";
 
 import { ActionForm } from "./action-form";
-import { pushDeadlineAction } from "@/lib/actions";
+import {
+  pushDeadlineAction,
+  pushDeliverableDeadlineAction,
+} from "@/lib/actions";
 import { addDays, formatDay } from "@/lib/dates";
 
 /**
@@ -31,49 +34,63 @@ export function PushDeadlineForm({
   projectName,
   currentTarget,
   parentTargetDate,
+  deliverableId,
 }: {
   projectId: string;
+  /** What is being pushed back — a project name, or a deliverable title. */
   projectName: string;
   /** The date being moved. The control only renders when one exists. */
   currentTarget: string;
   /**
-   * The parent project's target, when there is one.
+   * The date this one cannot go past, when there is one.
    *
-   * Used as the picker's `max`, so the constraint `changeProjectDeadline`
-   * enforces is visible in the widget rather than arriving as a rejection after
-   * somebody has typed a reason. Same rule, stated twice — and the server is
-   * still the one that decides.
+   * For a PROJECT that is its parent project's target; for a DELIVERABLE it is
+   * its own project's. Both are the same rule — work inside a thing cannot land
+   * after the thing does — and both are enforced on the server regardless. This
+   * only sets the picker's `max`, so the constraint is visible in the widget
+   * instead of arriving as a rejection after somebody has typed a reason.
    */
   parentTargetDate?: string;
+  /**
+   * Set to push back a DELIVERABLE instead of the project's own target.
+   *
+   * One component for both, because they are the same interaction with the same
+   * rules and the same history. A second copy would drift, and the drift would be
+   * in the validation — the half that matters.
+   */
+  deliverableId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const isDeliverable = Boolean(deliverableId);
 
   if (!open) {
     /*
-      A BORDERED button, not a bare text link, and the label says what moves.
+      Quiet grey text, and the label is the thing that had to change.
 
-      The first version of this was grey text reading just "Move", on the theory
-      that a slipped deadline should not be encouraged by a loud control. That
-      went too far: Anish could not find it on his own project page and reported
-      the feature as missing. A control nobody can see has the same value as one
-      that was never built.
+      This went through all three states, which is worth recording so it does not
+      go round again:
 
-      The placement was right and has not changed — it belongs on the Target tile,
-      beside the number it changes. What changed is that it now reads as pressable:
-      a border, and "Move date" rather than "Move", which next to the word "Target"
-      was ambiguous about what would move.
+        1. Grey text reading "Move" — Anish could not find it and reported the
+           feature as missing.
+        2. A bordered button reading "Move date" — findable, but it read as
+           another action competing with "Edit project".
+        3. Grey text reading "Push back deadline" — this one.
 
-      Still secondary rather than cardinal. Slipping a date is honest and should be
-      easy, but it is not the primary action on a project page and should not
-      compete with "Add a deliverable".
+      The diagnosis in (1) was wrong. The styling was never the problem; **"Move"
+      next to the word "Target" was**, because it says nothing about what moves or
+      why you would. A label that names the action needs no border to be found,
+      and Anish explicitly preferred the blended-in text once it said what it did.
+
+      Which is the general lesson: when a control is hard to find, try naming it
+      properly before making it louder.
     */
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-tile border-line hover:bg-surface hover:text-cardinal-600 text-ink-soft inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-semibold transition-colors"
+        className="text-ink-muted hover:text-cardinal-600 inline-flex items-center gap-1 text-xs font-semibold transition-colors"
       >
         <CalendarClock className="size-3.5" />
-        Move date
+        Push back deadline
       </button>
     );
   }
@@ -106,7 +123,9 @@ export function PushDeadlineForm({
     */
     <div className="rounded-tile border-line bg-card absolute left-0 z-10 mt-2 w-[19rem] max-w-[calc(100vw-3rem)] border p-3.5 shadow-lg">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="text-ink text-sm font-bold">Move the target date</p>
+        <p className="text-ink text-sm font-bold">
+          {isDeliverable ? "Push back this deadline" : "Push back the target"}
+        </p>
         <button
           onClick={() => setOpen(false)}
           aria-label="Close"
@@ -122,7 +141,9 @@ export function PushDeadlineForm({
       </p>
 
       <ActionForm
-        action={pushDeadlineAction}
+        action={
+          isDeliverable ? pushDeliverableDeadlineAction : pushDeadlineAction
+        }
         submitLabel="Move it"
         submittingLabel="Moving…"
         className="space-y-3"
@@ -138,6 +159,9 @@ export function PushDeadlineForm({
         {/* `ActionForm` posts the form's own FormData, so the id rides along
             as a hidden field rather than a prop. */}
         <input type="hidden" name="projectId" value={projectId} />
+        {deliverableId ? (
+          <input type="hidden" name="deliverableId" value={deliverableId} />
+        ) : null}
 
         <label className="block">
           <span className="text-ink mb-1 block text-xs font-semibold">
@@ -145,7 +169,7 @@ export function PushDeadlineForm({
           </span>
           <input
             type="date"
-            name="targetDate"
+            name={isDeliverable ? "dueDate" : "targetDate"}
             required
             defaultValue={earliest}
             min={earliest}

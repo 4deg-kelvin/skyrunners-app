@@ -1502,6 +1502,43 @@ async function pushDeadlineAction$impl(
   );
 }
 
+/**
+ * Push back one deliverable's deadline, with a reason.
+ *
+ * `manageDeliverables` — Co-Lead or RE of this project or above. Deliberately NOT
+ * the owner: `updateDeliverable` already lets the person doing the work change
+ * their own date, and that is right for the ordinary case. This path writes a
+ * permanent line in the project's history saying the schedule slipped and why, and
+ * that is the RE's call, not something somebody should be able to enter about
+ * their own work unreviewed.
+ */
+async function pushDeliverableDeadlineAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("push back this deadline");
+  }
+
+  const result = await ops.changeDeliverableDeadline({
+    deliverableId: String(formData.get("deliverableId") ?? ""),
+    dueDate: String(formData.get("dueDate") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    actorId: viewer.member.id,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    result.ok
+      ? `Moved to ${result.value.dueDate}. The old date stays on the record.`
+      : ""
+  );
+}
+
 async function updateProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -2920,6 +2957,12 @@ export async function updateProjectAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => updateProjectAction$impl(formData));
+}
+
+export async function pushDeliverableDeadlineAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => pushDeliverableDeadlineAction$impl(formData));
 }
 
 export async function pushDeadlineAction(

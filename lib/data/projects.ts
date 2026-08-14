@@ -367,6 +367,17 @@ export interface ProjectDetailView {
     actor?: Member;
     /** Days the date moved. Negative when it was pulled IN. */
     daysMoved: number;
+    /**
+     * The deliverable this row is about, when it is about one.
+     *
+     * Undefined means the row records the PROJECT's own target moving. Since
+     * migration 0042 one list covers both, which is the point — "this slipped
+     * three weeks, and here is which work slipped with it" is one question.
+     *
+     * Resolved here rather than in the page: a lookup per row inside a render
+     * loop is a query per row once this is Postgres.
+     */
+    deliverableTitle?: string;
   }[];
   /**
    * The first date ever committed to, when it differs from the current target.
@@ -500,6 +511,10 @@ export async function getProjectBySlug(
     deadlineHistory: deadlineChanges(project.id).map((change) => ({
       change,
       actor: change.changedById ? getMember(change.changedById) : undefined,
+      deliverableTitle: change.deliverableId
+        ? readStore().deliverables.find((d) => d.id === change.deliverableId)
+            ?.title
+        : undefined,
       /*
         Computed here, not in the page, for the usual reason: the component
         renders identically whenever it renders and never does date arithmetic
