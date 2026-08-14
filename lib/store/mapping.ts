@@ -223,7 +223,19 @@ const projectMemberships: CollectionSpec<ProjectMembership> = {
   key: "projectMemberships",
   table: "project_members",
   columns:
-    "project_id, member_id, role, responsibility, joined_at, left_at, added_by",
+    /*
+      `left_at` is deliberately NOT selected, and that is a real decision.
+
+      The column exists in SQL from 0001, but leaving a project DELETES the row —
+      see `removeProjectMember` — so nothing ever sets it and `ProjectMembership`
+      carries no `leftAt` field. It was in this list for a while, selected and then
+      mapped nowhere: pure waste, and misleading to anybody reading the spec to
+      find out what the app knows about a membership.
+
+      Flagged by `lib/store/mapping.test.ts`, which requires every selected column
+      to be written back.
+    */
+    "project_id, member_id, role, responsibility, joined_at, added_by",
   // No surrogate id in the app's shape, so identity is the pair — which is
   // also the unique constraint added in 0013. That constraint is what this
   // upsert conflicts on; without it, changing an existing membership (making
@@ -568,11 +580,29 @@ const projectNotices: CollectionSpec<ProjectNotice> = {
 const projectDeadlineChanges: CollectionSpec<ProjectDeadlineChange> = {
   key: "projectDeadlineChanges",
   table: "project_deadline_changes",
-  columns: "id, project_id, from_date, to_date, reason, changed_by, changed_at",
+  /*
+    `deliverable_id` was missing from all three of these for one deploy, and it is
+    worth recording what that looked like — because it is invisible in the one
+    place people test.
+
+    The app wrote `deliverableId` onto the store object correctly, `toRow` dropped
+    it, and Postgres took the insert happily with a NULL. So every deliverable
+    push was recorded as a PROJECT push: the deliverable's Gantt marker never
+    appeared (nothing matched on `deliverableId`), and the project's marker showed
+    the DELIVERABLE's old date, which is worse than nothing.
+
+    **Demo mode cannot catch this.** It runs on `lib/store/disk.ts` and never
+    touches this file, so the feature worked perfectly in a local demo and failed
+    on production. `lib/store/mapping.test.ts` now round-trips every collection
+    for exactly this reason.
+  */
+  columns:
+    "id, project_id, deliverable_id, from_date, to_date, reason, changed_by, changed_at",
   identify: (c) => c.id,
   fromRow: (r) => ({
     id: r.id as string,
     projectId: r.project_id as string,
+    deliverableId: opt(r.deliverable_id as string),
     fromDate: opt(r.from_date as string),
     toDate: r.to_date as string,
     reason: (r.reason as string) ?? "",
@@ -582,6 +612,7 @@ const projectDeadlineChanges: CollectionSpec<ProjectDeadlineChange> = {
   toRow: (c) => ({
     id: c.id,
     project_id: c.projectId,
+    deliverable_id: nul(c.deliverableId),
     from_date: nul(c.fromDate),
     to_date: c.toDate,
     reason: c.reason,
