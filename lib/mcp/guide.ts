@@ -171,10 +171,17 @@ Owner marks it done on the website or via \`set_deliverable_status\`; an RE then
 phase "complete" — it refuses if any sub-project is still open, and completing
 freezes the project's document record.
 
-**Log time**
-\`log_work\`, with a description of what was actually done — the description is required, and there are no hours. Backdating up to 7
-days. "3.5 hrs — ran the tensile coupons" is worth far more to the RE than a
-bare number.
+**Log what you did**
+\`log_work\`, with a description of the work. **The description is required and
+there are no hours** — the club stopped counting time on 2026-08-14, so never
+ask the member how long something took and never put a duration in the note.
+Backdating up to 7 days.
+
+The note is not bookkeeping: each project's section of the member's next
+twice-weekly check-in is pre-filled from these entries, and the only section they
+have to write themselves is for a project they logged nothing against. So "ran
+the tensile coupons, two of five failed early" saves them writing it again later;
+"worked on the wing" does not.
 
 **Getting started as a new member**
 \`whoami\` lists what's missing from their profile. Fix it with

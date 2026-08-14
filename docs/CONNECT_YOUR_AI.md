@@ -20,7 +20,7 @@ Go to **Settings → Connect your AI** on the website and press **New token**.
 - Choose what it may do:
   - **Read only** — ask questions, change nothing. Start here.
   - **Read and write** — also assign deliverables, move dates, update project
-    status, log hours.
+    status, and log what you did.
 
 **Copy the token immediately.** It's shown once and never again — only a hash of
 it is stored, so nobody, including whoever runs the site, can recover it. Lost
@@ -30,10 +30,10 @@ Tokens last 180 days.
 
 ### 2. Add it to Claude
 
-The same box in Settings shows the **server URL**. It looks like:
+The same box in Settings shows the **server URL**. It is:
 
 ```
-https://<the-club-site>/api/mcp
+https://skyrunners-app.vercel.app/api/mcp
 ```
 
 Add it as an **HTTP MCP server** with your token as the bearer credential.
@@ -41,8 +41,10 @@ Add it as an **HTTP MCP server** with your token as the bearer credential.
 **Claude Code** — one command, from anywhere:
 
 ```bash
-claude mcp add --transport http skyrunners https://<the-club-site>/api/mcp --header "Authorization: Bearer skr_your_token_here"
+claude mcp add --transport http skyrunners https://skyrunners-app.vercel.app/api/mcp --header "Authorization: Bearer skr_your_token_here"
 ```
+
+Note the `-app`. `skyrunners.vercel.app` is somebody else's site.
 
 **Claude Desktop / claude.ai** — Settings → Connectors → Add custom connector,
 paste the URL, and put `Bearer skr_your_token_here` in the Authorization header.
@@ -82,8 +84,27 @@ gives the assistant the whole picture.
 > Put Kevin on the test stand, owning the load cell wiring
 > Start a new project under Wing Spar called "Rib Tooling"
 > Post on the help board — I need someone who knows Onshape
-> Log 3 hours on Wing Spar yesterday, ran the tensile coupons
 > Add my skills: composites, CAD, structural analysis
+
+**Logging what you did** (needs a write token)
+
+There are no hours — the club stopped counting time in August 2026. You describe
+the work, and the description is the whole point:
+
+> Log on Wing Spar: ran the tensile coupons, two of five failed early
+> Log yesterday on the layup: vacuum-bagged the second coupon
+> Log misc: helped at the open build session, cable-managed the test stand
+
+**This is worth the ten seconds.** Each project's section of your next
+twice-weekly check-in arrives *pre-filled from these entries*, and the only box
+you have to write yourself is for a project you logged nothing against. So a
+member who logs as they go barely writes a check-in at all; a member who doesn't
+writes the whole thing from memory.
+
+Which makes this a good standing instruction to give your assistant:
+
+> At the end of any session where we worked on club stuff, log it to SkyRunners
+> for me — one line per project, describing what actually changed.
 
 ---
 
@@ -119,7 +140,7 @@ and none of them is something you do more than a couple of times a term:
 - Deleting anything — projects, people, divisions
 - Archiving a division
 - Changing someone's role, or who they report to
-- Club settings, commitment tiers, the academic calendar
+- Club settings and the academic calendar
 - Removing someone from a project
 - Withdrawing a sign-off
 - Uploading files (links work fine; uploads need the browser)
@@ -128,12 +149,14 @@ Two more worth explaining:
 
 **Submitting a check-in.** The point of a check-in is to start a conversation
 with your Lead. One your assistant wrote for you is worse than not writing one,
-so it isn't offered. Logging *hours* is fine — that's bookkeeping, and the
-assistant makes it fast.
+so it isn't offered.
 
-**Reading anyone's hours or check-in contents but your own.** The club's privacy
-model says effort data belongs to the member and their Lead chain. Rather than
-try to reproduce that rule out here, the MCP simply doesn't expose it — for
+Logging your *work* is fine, and is the single most useful thing to hand to an
+assistant — see the note below.
+
+**Reading anyone's work log or check-in contents but your own.** The club's
+privacy model says that record belongs to the member and their Lead chain. Rather
+than try to reproduce that rule out here, the MCP simply doesn't expose it — for
 anybody, at any role. Use the website, where you're properly signed in.
 
 Your assistant knows all of this and will tell you to open the site.
@@ -178,11 +201,55 @@ confirm before it changes anything that isn't yours.
 
 ---
 
+## Checking the server itself, without an AI client
+
+Worth doing before debugging a client, because it separates "the server is
+broken" from "my client is misconfigured" — and the two look identical from
+inside Claude.
+
+`initialize` needs no token, so this answers even with nothing set up:
+
+```bash
+curl -s -X POST https://skyrunners-app.vercel.app/api/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+A healthy server returns `"protocolVersion":"2024-11-05"` and a long
+`instructions` string. Two failures to recognise:
+
+- **`307` to `/login`** — the endpoint has fallen behind the auth middleware.
+  `api/mcp` must be excluded from the matcher in `middleware.ts`. This has
+  happened before, to the cron routes.
+- **A sentence about `SUPABASE_SERVICE_ROLE_KEY`** — the env var is missing on
+  the deployment. The endpoint says so rather than half-working.
+
+Then, with your own token, the one call that proves auth end to end:
+
+```bash
+curl -s -X POST https://skyrunners-app.vercel.app/api/mcp -H "Content-Type: application/json" -H "Authorization: Bearer skr_your_token_here" -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
+```
+
+Your name comes back in `result.content[0].text`. A bad token gives a readable
+sentence with `"isError":true` — deliberately, not an HTTP 403, because the model
+has to be able to read it and tell you what to do.
+
+**`tools/list` answers without a valid token, on purpose.** Tool names and
+descriptions aren't secret, and a client that can list before authenticating
+gives a much better error. Nothing is *callable* without a real token.
+
+---
+
 ## For whoever maintains this
 
 The server is `app/api/mcp/route.ts`; tools are in `lib/mcp/tools.ts`. Before
 adding a tool, read the header of `lib/mcp/viewer.ts` — the privacy boundary is
 enforced by which tools exist, not by a filter, and that's load-bearing.
+
+The model's instructions and the long-form `guide` tool both live in
+`lib/mcp/guide.ts`, deliberately in one file. **When a club rule changes, that
+file is the easiest thing in the repo to forget** — it is prose, nothing
+typechecks it, and a stale sentence there quietly teaches every member's
+assistant the old rule. The hours removal left one behind ("3.5 hrs — ran the
+tensile coupons") and only a grep for `hrs` found it.
 
 It needs `SUPABASE_SERVICE_ROLE_KEY` set on the deployment. Without it the
 endpoint answers every call with a sentence saying so, rather than half-working.
