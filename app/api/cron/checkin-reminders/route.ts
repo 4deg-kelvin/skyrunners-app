@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendDiscordDM, discordIsConfigured } from "@/lib/notify/discord";
+import { sendDailyDigests } from "@/lib/notify/send-digest";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 /**
@@ -183,10 +184,26 @@ export async function GET(request: Request) {
     );
   }
 
+  /*
+    Third pass: the daily digest for REs and Leads.
+
+    Runs BEFORE the early return below, and that placement is the whole point.
+    On any evening where nobody happens to have a check-in due, the two passes
+    above find nothing and bail — and the digest would silently never go out,
+    on exactly the quiet days it's most worth reading.
+
+    Its own failures don't fail the run: a Discord outage must not stop the
+    check-in reminders, which are the older and more load-bearing job.
+  */
+  const digest = await sendDailyDigests(todayInClubTime()).catch((error) => {
+    console.error("[cron] daily digest failed", error);
+    return { sent: 0, considered: 0, skipped: 0 };
+  });
+
   const aheadRows = (ahead.data ?? []) as Pending[];
   const lateRows = (late.data ?? []) as Pending[];
   if (aheadRows.length === 0 && lateRows.length === 0) {
-    return NextResponse.json({ ok: true, reminded: 0, chased: 0 });
+    return NextResponse.json({ ok: true, reminded: 0, chased: 0, digest });
   }
 
   /*
@@ -304,6 +321,7 @@ export async function GET(request: Request) {
     reminded,
     chased,
     considered: aheadRows.length + lateRows.length,
+    digest,
   });
 }
 

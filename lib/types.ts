@@ -99,6 +99,15 @@ export interface Member {
    * the address, not to invite them again.
    */
   lastActiveAt?: string;
+  /**
+   * They turned the daily Discord digest off.
+   *
+   * Opt-OUT, because the digest goes to people holding responsibility — an RE
+   * whose project has gone quiet, a Lead whose report is stuck — and those are
+   * exactly the people who would never go and enable a feature they have never
+   * seen. Migration 0037.
+   */
+  dailyDigestOptOut?: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { McpTokens } from "@/components/forms/mcp-tokens";
+import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { TierAdminForm } from "@/components/forms/tier-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
@@ -26,6 +27,7 @@ import {
   getSettings,
 } from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
+import { getLeadershipRoles } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
@@ -60,6 +62,21 @@ export default async function SettingsPage() {
     listMyTokens(),
   ]);
   const { schedule, currentTerm, inSession, terms, calendarRunsOut } = view;
+
+  /*
+    Why this person would get a digest — used both to decide whether to show
+    the toggle at all and to say, in the toggle's own words, what they'd be
+    turning off. `getLeadershipRoles` is the same helper the profile page uses,
+    so the count can't drift from what's shown elsewhere.
+  */
+  const roles = await getLeadershipRoles(viewer.member.id);
+  const digestReasons = [
+    roles.isRE ? "an RE" : "",
+    roles.divisionsLed.length
+      ? `Division Lead for ${roles.divisionsLed.join(" and ")}`
+      : "",
+    roles.hasReports ? "a Lead with reports" : "",
+  ].filter(Boolean);
 
   const mayEdit = can.setOwnSchedule(viewer.actor, viewer.member.id);
   const mayEditCalendar = can.manageTerms(viewer.actor);
@@ -107,6 +124,32 @@ export default async function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/*
+        Only for people who'd actually receive one. A toggle for a message a
+        plain member never gets is a setting that does nothing.
+      */}
+      {digestReasons.length > 0 ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Daily Digest</SectionLabel>
+            <h2 className="text-ink mt-2 text-2xl font-bold">
+              One message each evening
+            </h2>
+            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+              Because you hold responsibility for work or people, Discord sends
+              you a summary each evening — what moved, what&apos;s gone quiet
+              and for how long, and anything due inside a week.
+            </p>
+            <div className="mt-5">
+              <DigestToggle
+                optedOut={viewer.member.dailyDigestOptOut ?? false}
+                reasons={digestReasons}
+              />
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {/*
         Directly under the profile, because the person most likely to want it

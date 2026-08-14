@@ -2221,6 +2221,26 @@ export async function deleteProject(
   });
 }
 
+/**
+ * Turn the daily Discord digest on or off for yourself.
+ *
+ * Its own operation rather than a field on `ProfileEdits`, because the profile
+ * form posts every field it knows about — a preference living there would be
+ * silently reset to the form's default by anyone editing their major.
+ */
+export async function setDailyDigest(input: {
+  memberId: string;
+  optOut: boolean;
+}): Promise<Result<Member>> {
+  return guarded((store) => {
+    const member = store.members.find((m) => m.id === input.memberId);
+    if (!member) return fail<Member>("That member no longer exists.");
+
+    member.dailyDigestOptOut = input.optOut;
+    return ok(member);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The engineering record
 //

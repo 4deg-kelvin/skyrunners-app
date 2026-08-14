@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql
 
 
 -- ==========================================================================
@@ -4428,4 +4428,75 @@ create policy mcp_tokens_own_delete on mcp_tokens
 
 -- ==========================================================================
 -- END 0036_mcp_tokens.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0037_daily_digest.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0037_daily_digest.sql
+--
+-- Bookkeeping for the daily Discord digest that REs and Leads receive.
+--
+-- Two columns on `profiles`, both about the SAME failure: a bot that says too
+-- much gets muted, and a muted bot is worse than no bot, because everything
+-- else the club sends goes with it.
+--
+--   daily_digest_opt_out   somebody decided they don't want it.
+--   daily_digest_sent_on   the last day one actually went out.
+--
+-- Ordering: depends on 0001 (profiles). Additive, idempotent.
+-- ===========================================================================
+
+-- --------------------------------------------------------------------------
+-- The off switch
+--
+-- Opt-OUT rather than opt-in, deliberately. The digest is for people holding
+-- responsibility — an RE whose project has gone quiet, a Lead whose report is
+-- blocked — and those are exactly the people who won't go and enable a feature
+-- they've never seen. Default on, one checkbox in Settings to stop it.
+--
+-- A plain member who is neither an RE nor a Lead never receives one at all, so
+-- this column is irrelevant to most of the club.
+-- --------------------------------------------------------------------------
+
+alter table profiles
+  add column if not exists daily_digest_opt_out boolean not null default false;
+
+-- --------------------------------------------------------------------------
+-- Send-once memory
+--
+-- A DATE, not a timestamp: the question is "has today's gone out", and a
+-- timestamp invites arithmetic that gets timezones wrong. The club runs on
+-- Pacific and the database is UTC, so the value written is the club-time day
+-- from `todayInClubTime()`, never `now()::date`.
+--
+-- Written BEFORE the DM, same as `reminder_sent_at` in 0027: a crash between
+-- the two costs one missed digest, where the other order costs a duplicate on
+-- every retry. Missing one is much cheaper than a bot that repeats itself.
+-- --------------------------------------------------------------------------
+
+alter table profiles
+  add column if not exists daily_digest_sent_on date;
+
+-- Anyone who hasn't had today's yet, cheaply.
+create index if not exists profiles_digest_idx
+  on profiles (daily_digest_sent_on)
+  where daily_digest_opt_out = false;
+
+-- ===========================================================================
+-- Verify:
+--
+--   select column_name, data_type, column_default
+--   from information_schema.columns
+--   where table_name = 'profiles'
+--     and column_name like 'daily_digest%';
+--   -- expect two: boolean default false, and date.
+-- ===========================================================================
+
+
+-- ==========================================================================
+-- END 0037_daily_digest.sql
 -- ==========================================================================

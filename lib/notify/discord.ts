@@ -191,6 +191,54 @@ ${opts.answeredBy} said: ${opts.response}`
   }) =>
     `**${opts.memberName}** is blocked on **${opts.projectName}**.\n` +
     `> ${opts.note}\n${opts.url}`,
+
+  /**
+   * The same event, told to the raiser's Lead.
+   *
+   * Deliberately worded as awareness rather than a task. The RE is being asked
+   * to go clear something; the Lead is being told one of their people is
+   * stuck, which is a conversation. If both messages said "please unblock
+   * this" the Lead would either duplicate the RE's work or ignore it, and
+   * ignoring is the habit that spreads to every other message the bot sends.
+   */
+  reportBlocked: (opts: {
+    memberName: string;
+    what: string;
+    projectName: string;
+    note: string;
+    url: string;
+  }) =>
+    `Heads up — **${opts.memberName}** (one of your reports) is blocked on **${opts.what}** in ${opts.projectName}.\n` +
+    `> ${opts.note}\n` +
+    `The project's RE has been asked to clear it. Worth a word if it sits.\n${opts.url}`,
+
+  /**
+   * A whole project stopped, told to whoever is accountable above it.
+   *
+   * Separate from `blockerRaised` because the scope is different and the
+   * recipient's question is different: an RE on the project asks "what do I
+   * unblock", the RE above asks "does this change what I promised".
+   */
+  projectBlockedAbove: (opts: {
+    memberName: string;
+    projectName: string;
+    parentName?: string;
+    url: string;
+  }) =>
+    `**${opts.projectName}** has been marked blocked by ${opts.memberName}.\n` +
+    (opts.parentName
+      ? `It sits under **${opts.parentName}**, which you own.\n`
+      : "") +
+    `Nothing under it will move until it clears.\n${opts.url}`,
+
+  /**
+   * The daily digest. Built in `lib/notify/digest.ts`, sent as-is.
+   *
+   * A pass-through rather than a template, because the body is assembled from
+   * a dozen conditional sections and threading all of them through an options
+   * object would put the formatting in two files.
+   */
+  dailyDigest: (body: string) => body,
 };
 
 /**

@@ -3324,6 +3324,79 @@ export function blockerAudience(projectId: string, raiserId: string): string[] {
 }
 
 /**
+ * The REs one level UP the project tree — always, not only as a fallback.
+ *
+ * `blockerAudience` deliberately stops at the nearest level that has somebody,
+ * because a blocked deliverable is a request and telling five people produces
+ * the bystander effect. A blocked PROJECT is a different claim: the whole thing
+ * has stopped, and the person accountable for the work containing it needs to
+ * know even when the project still has other REs who could clear it.
+ *
+ * So this is additive, not a replacement. A blocked project notifies its own
+ * REs (via `blockerAudience`) AND the level above (via this). A blocked
+ * deliverable notifies only the former.
+ *
+ * Climbs until it finds somebody, so a sub-project three levels under the only
+ * staffed parent still reaches them, and falls back to the Division Lead —
+ * whose division it is — rather than nobody.
+ */
+export function projectEscalationAudience(
+  projectId: string,
+  raiserId: string
+): string[] {
+  const store = live();
+  const project = store.projects.find((p) => p.id === projectId);
+  if (!project) return [];
+
+  const seen = new Set<string>([projectId]);
+  let parentId = project.parentId;
+
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = store.projects.find((p) => p.id === parentId);
+    if (!parent) break;
+
+    const above = [
+      ...new Set(
+        [parent.primaryReId, ...parent.reIds].filter(
+          (id) => id && id !== raiserId
+        )
+      ),
+    ];
+    if (above.length > 0) return above;
+    parentId = parent.parentId;
+  }
+
+  const divisionLeadId = divisionForProject(projectId)?.leadId;
+  return divisionLeadId && divisionLeadId !== raiserId ? [divisionLeadId] : [];
+}
+
+/**
+ * Whoever the raiser reports to. One step, not the whole chain.
+ *
+ * A completely different axis from `blockerAudience`, which walks the PROJECT
+ * tree to find who can clear the blocker. This walks the REPORTING tree to find
+ * who should know their person is stuck — which is a conversation, not a task.
+ *
+ * The two lists overlap sometimes and that's fine; the caller de-duplicates and
+ * sends whichever message is more actionable. Keeping them separate matters
+ * because the messages are different: an RE is being asked to unblock
+ * something, a Lead is being told to check in on somebody.
+ *
+ * One step deliberately. A Lead's Lead hearing about every blocker in their
+ * sub-tree is the noise that gets a bot muted, and the club already escalates
+ * on AGE through `lib/review.ts` when something actually sits.
+ */
+export function raiserLeadAudience(raiserId: string): string[] {
+  const store = live();
+  const leadId = store.members.find((m) => m.id === raiserId)?.leadId;
+  if (!leadId || leadId === raiserId) return [];
+
+  const lead = store.members.find((m) => m.id === leadId);
+  return lead && lead.status === "active" ? [lead.id] : [];
+}
+
+/**
  * Requests waiting on this Lead, oldest first.
  *
  * Age-ordered like every other queue in the app: "Kenji has been waiting six
