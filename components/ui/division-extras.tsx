@@ -62,7 +62,31 @@ export function DivisionExtras({
   today: string;
 }) {
   const hideCompleted = useHideCompleted();
-  const rows = hideCompleted ? timelineLiveRows : timelineRows;
+
+  /*
+    Finished projects are off the chart by DEFAULT, not just when the page-wide
+    switch is on.
+
+    The chart's question is "what is this division about to have to deliver",
+    and a completed bar cannot answer it — it's a green rectangle taking a full
+    row to say something already true. A division with three years behind it
+    would open as mostly history with the two live bars squeezed at the bottom,
+    which is the same "buries the work you came for" problem the history window
+    already solves in the other axis.
+
+    Local rather than folded into `useHideCompleted`, because they are different
+    questions: the page-wide switch is about the project LISTS, and somebody can
+    reasonably want the completed list visible while still wanting a chart of
+    live work only. Turning the page switch on still forces this off, so the
+    stronger preference always wins.
+  */
+  const [showCompletedBars, setShowCompletedBars] = useState(false);
+  const liveOnly = hideCompleted || !showCompletedBars;
+  const rows = liveOnly ? timelineLiveRows : timelineRows;
+
+  /** How many bars the default is holding back, so the toggle can say. */
+  const completedCount =
+    (timelineRows?.length ?? 0) - (timelineLiveRows?.length ?? 0);
 
   const [showDeadlines, setShowDeadlines] = useState(false);
   const [showBlocked, setShowBlocked] = useState(false);
@@ -133,8 +157,8 @@ export function DivisionExtras({
                     chart={shownTimeline}
                     caption={
                       historyFrom
-                        ? `${hideCompleted ? "Live projects" : "Every project"} in this division from ${historyFrom}. The red line is today.`
-                        : hideCompleted
+                        ? `${liveOnly ? "Live projects" : "Every project"} in this division from ${historyFrom}. The red line is today.`
+                        : liveOnly
                           ? "Live projects in this division, from today on. The red line is today."
                           : "Every project in this division, from today on. The red line is today."
                     }
@@ -197,6 +221,24 @@ export function DivisionExtras({
                         Show history →
                       </button>
                     )}
+
+                    {/*
+                      Only offered when it would change something, and hidden
+                      entirely while the page-wide switch is on — that one is a
+                      stronger statement, and a control that visibly does
+                      nothing is worse than no control.
+                    */}
+                    {completedCount > 0 && !hideCompleted ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCompletedBars((v) => !v)}
+                        aria-pressed={showCompletedBars}
+                        className="text-ink-soft hover:text-ink text-xs font-semibold"
+                      >
+                        {showCompletedBars ? "Hide" : "Show"} {completedCount}{" "}
+                        completed
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
