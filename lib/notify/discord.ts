@@ -142,6 +142,34 @@ export const discordMessages = {
     `**${opts.addedBy}** added you to **${opts.projectName}**.\n` +
     `You'll see it on My Work, and any deliverables you own there.\n${opts.url}`,
 
+  /**
+   * Somebody put you on a meeting or session.
+   *
+   * This exists because the CALENDAR cannot tell them. A subscription is a pull:
+   * the event appears silently on the next fetch — minutes on Apple, hours on
+   * Google — and nothing pings. So being added to a session was completely silent
+   * until now, which for a meeting tomorrow is the difference between turning up
+   * and not.
+   *
+   * Deliberately NOT sent when somebody RSVPs to a session themselves. They
+   * already know; a DM confirming their own click is the kind of notification
+   * that teaches people to mute the bot.
+   *
+   * Says when it is, because that is the actual question, and says the calendar
+   * will follow — so a member who has subscribed doesn't wonder why it isn't
+   * there yet.
+   */
+  addedToEvent: (opts: {
+    eventTitle: string;
+    when: string;
+    addedBy: string;
+    repeats?: string;
+    url: string;
+  }) =>
+    `**${opts.addedBy}** added you to **${opts.eventTitle}** — ${opts.when}.` +
+    (opts.repeats ? `\nIt ${opts.repeats}.` : "") +
+    `\nIf you've connected your calendar it'll show up there within a few hours.\n${opts.url}`,
+
   joinRequestApproved: (opts: { projectName: string; url: string }) =>
     `Your request to join **${opts.projectName}** was approved — you're on it.\n${opts.url}`,
 

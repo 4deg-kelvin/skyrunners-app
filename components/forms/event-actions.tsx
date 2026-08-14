@@ -45,6 +45,109 @@ const LEADERSHIP_KINDS: EventKind[] = [
   "one_on_one",
 ];
 
+/**
+ * Does it repeat, and until when.
+ *
+ * Shared by the create and edit forms so the two cannot drift — the edit form
+ * having a different set of cadences from the create form is the kind of thing
+ * nobody notices until somebody can't turn a weekly meeting into a fortnightly
+ * one.
+ *
+ * ---------------------------------------------------------------------------
+ * Why the END DATE is required once it repeats
+ * ---------------------------------------------------------------------------
+ *
+ * An open-ended weekly meeting would expand forever, and a calendar feed has to
+ * stop somewhere. Requiring it also matches how a club actually plans: the team
+ * meeting runs to the end of the quarter, not to the end of time. Anish asked to
+ * be able to "easily edit and change" the range, and a range with a real end is
+ * the thing that can be edited — you extend it next quarter.
+ *
+ * The `min` is the event's own start date, so the picker cannot express a range
+ * that ends before it begins. `repeatProblem` enforces the same rule on the
+ * server, and its message names the mistake.
+ */
+function RepeatFields({
+  defaultUntil,
+  defaultEveryWeeks,
+  startDate,
+}: {
+  defaultUntil?: string;
+  defaultEveryWeeks?: number;
+  /** `YYYY-MM-DD`, used as the earliest end date the picker offers. */
+  startDate: string;
+}) {
+  const [repeats, setRepeats] = useState(Boolean(defaultUntil));
+
+  return (
+    <div className="rounded-tile border-line bg-surface border px-3.5 py-3">
+      <label className="flex items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={repeats}
+          onChange={(e) => setRepeats(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0"
+        />
+        <span>
+          <span className="text-ink block text-sm font-semibold">
+            It repeats
+          </span>
+          <span className="text-ink-muted block text-xs">
+            For the team meeting or the townhall. One entry, not ten — and
+            anyone who says they&apos;re coming gets every week in their own
+            calendar.
+          </span>
+        </span>
+      </label>
+
+      {repeats ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-ink mb-1 block text-xs font-semibold">
+              How often
+            </span>
+            <select
+              name="repeatEveryWeeks"
+              defaultValue={defaultEveryWeeks === 2 ? "2" : "1"}
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+            >
+              <option value="1">Every week</option>
+              <option value="2">Every other week</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-ink mb-1 block text-xs font-semibold">
+              Last one on
+            </span>
+            <input
+              type="date"
+              name="repeatUntil"
+              required
+              min={startDate}
+              defaultValue={defaultUntil?.slice(0, 10)}
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+            />
+            <span className="text-ink-muted mt-1 block text-xs">
+              End of the quarter is the usual answer. You can extend it later.
+            </span>
+          </label>
+        </div>
+      ) : (
+        /*
+          An explicit empty value when the box is unchecked.
+
+          Without it the field is simply absent from the FormData, which the EDIT
+          action reads as "leave the repeat alone" — so unticking the box would
+          silently fail to stop a meeting repeating. The create action treats empty
+          and absent identically, so this is harmless there.
+        */
+        <input type="hidden" name="repeatUntil" value="" />
+      )}
+    </div>
+  );
+}
+
 export function CreateEventForm({
   myProjects,
   people,
@@ -180,6 +283,8 @@ export function CreateEventForm({
           />
         </label>
 
+        <RepeatFields startDate={today} />
+
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">
             Where <span className="text-ink-muted font-normal">(optional)</span>
@@ -306,18 +411,43 @@ export function CreateEventForm({
 export function AttendToggle({
   eventId,
   attending,
+  repeats = false,
 }: {
   eventId: string;
   attending: boolean;
+  /** True for a series, so the note can say every week is covered. */
+  repeats?: boolean;
 }) {
   return (
-    <ActionButton
-      action={setEventAttendanceAction}
-      fields={{ eventId, attending: attending ? "no" : "yes" }}
-      label={attending ? "Not coming" : "I'll be there"}
-      pendingLabel="Saving…"
-      tone={attending ? "default" : "primary"}
-    />
+    <div className="flex flex-col items-start gap-1">
+      <ActionButton
+        action={setEventAttendanceAction}
+        fields={{ eventId, attending: attending ? "no" : "yes" }}
+        label={attending ? "Not coming" : "I'll be there"}
+        pendingLabel="Saving…"
+        tone={attending ? "default" : "primary"}
+      />
+
+      {/*
+        Say what happens next, and how long it takes.
+
+        Anish asked for exactly this: no notification on RSVP, just a small note
+        that the calendar will catch up. It matters because the delay is real and
+        invisible — a subscription is a pull, so nothing appears the moment you
+        press this, and a member who checks their phone straight away and sees
+        nothing concludes the feature is broken.
+
+        Only shown once they're actually coming. Before that it would be a promise
+        about something they haven't done.
+      */}
+      {attending ? (
+        <span className="text-ink-muted text-xs">
+          {repeats
+            ? "Every week is in your calendar — it can take a few hours to show up."
+            : "It'll appear in your calendar within a few hours."}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -351,6 +481,9 @@ export function EditEventForm({
     importanceWeight: number;
     projectId?: string;
     isOpen: boolean;
+    /** Set when it repeats, so the range comes back pre-filled and editable. */
+    repeatUntil?: string;
+    repeatEveryWeeks?: number;
   };
   /** Leadership. Gates the wider kind list and the importance dial. */
   canSetImportance: boolean;
@@ -494,6 +627,12 @@ export function EditEventForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
         </label>
+
+        <RepeatFields
+          startDate={event.startsAt.slice(0, 10)}
+          defaultUntil={event.repeatUntil}
+          defaultEveryWeeks={event.repeatEveryWeeks}
+        />
 
         {canSetImportance ? (
           <label className="block">

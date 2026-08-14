@@ -16,6 +16,7 @@ import {
   occurrenceDates,
   occurrenceEnd,
   occurrenceStart,
+  exdatesFor,
   repeatProblem,
   rruleFor,
   type RepeatingEvent,
@@ -235,5 +236,104 @@ describe("the RRULE the feed emits", () => {
     const dates = occurrenceDates(e, ...WIDE);
     const rule = rruleFor(e)!;
     assert.ok(rule.includes(dates[dates.length - 1].replace(/-/g, "")));
+  });
+});
+
+describe("every other week, for the townhall", () => {
+  test("interval 2 skips a week each time", () => {
+    assert.deepEqual(
+      occurrenceDates(
+        weekly({ repeatEveryWeeks: 2, repeatWeeklyUntil: "2026-10-27" }),
+        ...WIDE
+      ),
+      ["2026-09-01", "2026-09-15", "2026-09-29", "2026-10-13", "2026-10-27"]
+    );
+  });
+
+  test("it stays on the same weekday", () => {
+    const dates = occurrenceDates(
+      weekly({ repeatEveryWeeks: 2, repeatWeeklyUntil: "2027-03-30" }),
+      ...WIDE
+    );
+    const weekdays = new Set(
+      dates.map((d) => new Date(`${d}T00:00:00Z`).getUTCDay())
+    );
+    assert.equal(weekdays.size, 1);
+  });
+
+  test("0 and negatives fall back to weekly rather than hanging", () => {
+    // A 0 would make the loop produce the same date MAX_OCCURRENCES times.
+    for (const bad of [0, -1, 1.5, undefined]) {
+      const dates = occurrenceDates(
+        weekly({ repeatEveryWeeks: bad as number }),
+        ...WIDE
+      );
+      assert.equal(dates.length, 5, `repeatEveryWeeks=${bad}`);
+    }
+  });
+
+  test("the RRULE carries INTERVAL only when it is not 1", () => {
+    assert.equal(
+      rruleFor(weekly({ repeatEveryWeeks: 2 })),
+      "RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20260929T235959Z"
+    );
+    assert.ok(!rruleFor(weekly({ repeatEveryWeeks: 1 }))!.includes("INTERVAL"));
+  });
+
+  test("the RRULE and the expansion agree on the cadence", () => {
+    // If they disagreed, the website and the member's phone would show different
+    // meeting weeks — unfalsifiable from either side.
+    const e = weekly({ repeatEveryWeeks: 2, repeatWeeklyUntil: "2026-10-27" });
+    const dates = occurrenceDates(e, ...WIDE);
+    const gaps = dates
+      .slice(1)
+      .map(
+        (d, i) =>
+          (Date.parse(`${d}T00:00:00Z`) - Date.parse(`${dates[i]}T00:00:00Z`)) /
+          86_400_000
+      );
+    assert.deepEqual(new Set(gaps), new Set([14]));
+    assert.match(rruleFor(e)!, /INTERVAL=2/);
+  });
+});
+
+describe("EXDATE clears a cancelled week", () => {
+  const toUtc = (iso: string) =>
+    `${new Date(iso).toISOString().slice(0, 19).replace(/[-:]/g, "")}Z`;
+
+  test("nothing when the event does not repeat", () => {
+    assert.equal(
+      exdatesFor({ startsAt: "2026-09-01T18:00:00.000Z" }, toUtc),
+      null
+    );
+  });
+
+  test("nothing when no week was cancelled", () => {
+    assert.equal(exdatesFor(weekly(), toUtc), null);
+  });
+
+  test("one EXDATE line carrying the event's own TIME", () => {
+    /*
+      A date-only EXDATE against a timed series matches nothing, so the cancelled
+      week stays in everybody's calendar. The time is what makes it bite.
+    */
+    const line = exdatesFor(weekly({ skippedDates: ["2026-09-15"] }), toUtc);
+    assert.equal(line, "EXDATE:20260915T180000Z");
+  });
+
+  test("several cancelled weeks are comma-joined", () => {
+    const line = exdatesFor(
+      weekly({ skippedDates: ["2026-09-08", "2026-09-22"] }),
+      toUtc
+    );
+    assert.equal(line, "EXDATE:20260908T180000Z,20260922T180000Z");
+  });
+
+  test("what EXDATE excludes matches what the expansion drops", () => {
+    // The two halves of the same decision: the website hides the week and the
+    // feed cancels it. If they disagreed, one of them would be lying.
+    const e = weekly({ skippedDates: ["2026-09-15"] });
+    assert.ok(!occurrenceDates(e, ...WIDE).includes("2026-09-15"));
+    assert.match(exdatesFor(e, toUtc)!, /20260915/);
   });
 });

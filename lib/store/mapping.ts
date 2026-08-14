@@ -418,7 +418,7 @@ const events: CollectionSpec<ClubEvent> = {
   key: "events",
   table: "events",
   columns:
-    "id, title, kind, importance_weight, starts_at, ends_at, location, project_id, created_by, attendee_ids, is_open, notes",
+    "id, title, kind, importance_weight, starts_at, ends_at, location, project_id, created_by, attendee_ids, is_open, notes, repeat_until, repeat_every_weeks, skipped_dates",
   identify: (e) => e.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -435,6 +435,10 @@ const events: CollectionSpec<ClubEvent> = {
     // up to, which is the behaviour this calendar exists for.
     isOpen: (r.is_open as boolean) ?? true,
     notes: opt(r.notes as string),
+    repeatUntil: opt(r.repeat_until as string),
+    repeatEveryWeeks: opt(r.repeat_every_weeks as number),
+    // A date[] comes back as an array of ISO date strings.
+    skippedDates: (r.skipped_dates as string[]) ?? [],
   }),
   toRow: (e) => ({
     id: e.id,
@@ -449,6 +453,9 @@ const events: CollectionSpec<ClubEvent> = {
     attendee_ids: e.attendeeIds,
     is_open: e.isOpen,
     notes: nul(e.notes),
+    repeat_until: nul(e.repeatUntil),
+    repeat_every_weeks: nul(e.repeatEveryWeeks),
+    skipped_dates: e.skippedDates ?? [],
   }),
   dependsOn: ["members", "projects"],
 };

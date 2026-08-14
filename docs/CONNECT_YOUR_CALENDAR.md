@@ -58,6 +58,41 @@ step.
 
 ---
 
+## Repeating meetings
+
+The team meeting and the townhall are **one entry each**, not one per week.
+
+Tick **It repeats** when you create or edit them, pick *every week* or *every other
+week*, and set the last date — end of the quarter is the usual answer. You can come
+back and extend it any time; that's the point of the range being editable.
+
+**Say you're coming once and every week lands in your calendar.** The feed sends the
+repeat as a rule rather than fifty-two copies, so your calendar app works out the
+dates itself. Extending the range or cancelling a week updates what's already there.
+
+**No meeting one week?** Cancel that single week rather than deleting the series —
+deleting it throws away everyone's RSVP. A cancelled week disappears from
+subscribers' calendars too.
+
+---
+
+## Will I get a notification?
+
+Two different things, and it's worth being precise:
+
+- **When you're added to a meeting, you get a Discord DM.** The calendar can't tell
+  you — a subscription is a pull, so the event appears silently on the next refresh
+  and nothing pings. The bot covers that gap, and says when the meeting is.
+- **When you RSVP yourself, nothing pings** — you already know. The entry just
+  appears in your calendar within a few hours.
+- **Before the event itself, your own device reminds you**, 30 minutes ahead. That's
+  built into every entry the feed sends, so it works on Apple, Google and Outlook
+  without the club doing anything.
+
+So: added to something → Discord. About to happen → your own calendar alarm.
+
+---
+
 ## The one honest limitation
 
 **Your calendar app decides how often to check for changes, and we can't change

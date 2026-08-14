@@ -44,6 +44,7 @@ import { mutate, readStore, type StoreShape } from "./disk.ts";
 import { todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
 import { checkInPeriodStart, workByProject } from "../checkin-draft.ts";
+import { repeatProblem } from "../calendar/recurrence.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
   ArtifactKind,
@@ -3379,6 +3380,10 @@ export async function createEvent(input: {
   isOpen?: boolean;
   notes?: string;
   importanceWeight?: number;
+  /** Last date the repeat may land on. Omit for a one-off. */
+  repeatUntil?: string;
+  /** 1 weekly, 2 fortnightly. Ignored without `repeatUntil`. */
+  repeatEveryWeeks?: number;
 }): Promise<Result<ClubEvent>> {
   const title = input.title.trim();
   if (!title) return fail<ClubEvent>("Give it a name.");
@@ -3386,6 +3391,18 @@ export async function createEvent(input: {
   if (input.endsAt && input.endsAt < input.startsAt) {
     return fail<ClubEvent>("It ends before it starts.");
   }
+
+  /*
+    Recurrence, validated by the SAME function the form uses.
+
+    `repeatProblem` lives in `lib/calendar/recurrence.ts` so the picker and the
+    server cannot drift — the same arrangement as `checkLinkPermanence` for
+    artifacts and `workByProject` for check-ins. Its message names the real
+    mistake ("that would repeat 5,214 times, over 100 years"), which a CHECK
+    constraint could never do.
+  */
+  const repeatProblemMessage = repeatProblem(input.startsAt, input.repeatUntil);
+  if (repeatProblemMessage) return fail<ClubEvent>(repeatProblemMessage);
 
   const importance =
     input.importanceWeight ?? DEFAULT_EVENT_IMPORTANCE[input.kind] ?? 3;
@@ -3418,6 +3435,18 @@ export async function createEvent(input: {
       ].filter(Boolean),
       isOpen: input.isOpen ?? input.kind !== "one_on_one",
       notes: input.notes?.trim() || undefined,
+      repeatUntil: input.repeatUntil?.slice(0, 10) || undefined,
+      /*
+        The interval is only meaningful alongside an end date, and storing one
+        without the other is the state migration 0043's CHECK refuses. Normalised
+        here so the app never depends on the constraint to catch it.
+      */
+      repeatEveryWeeks: input.repeatUntil
+        ? input.repeatEveryWeeks === 2
+          ? 2
+          : 1
+        : undefined,
+      skippedDates: [],
     };
 
     store.events.push(event);
@@ -3442,11 +3471,28 @@ export async function updateEvent(input: {
   projectId?: string | null;
   /** `false` makes it invite-only. Undefined leaves it as it is. */
   isOpen?: boolean;
+  /**
+   * Change the repeat range. `null` stops it repeating; `undefined` leaves it.
+   *
+   * The three-way distinction matters, exactly as it does for `projectId`: an
+   * edit form that didn't render the field would otherwise silently turn every
+   * weekly meeting it saved into a one-off. Anish asked to be able to "easily edit
+   * and change" the range, so this is the field that does it.
+   */
+  repeatUntil?: string | null;
+  /** 1 weekly, 2 fortnightly. Undefined leaves it. */
+  repeatEveryWeeks?: number;
 }): Promise<Result<ClubEvent>> {
   const title = input.title.trim();
   if (!title) return fail<ClubEvent>("Give it a name.");
   if (input.endsAt && input.endsAt < input.startsAt) {
     return fail<ClubEvent>("It ends before it starts.");
+  }
+
+  // Same validator as the create path and the form. See `createEvent`.
+  if (input.repeatUntil) {
+    const problem = repeatProblem(input.startsAt, input.repeatUntil);
+    if (problem) return fail<ClubEvent>(problem);
   }
 
   return guarded((store) => {
@@ -3485,6 +3531,70 @@ export async function updateEvent(input: {
       with one extra name on it, and the organiser can remove them explicitly.
     */
     if (input.isOpen !== undefined) event.isOpen = input.isOpen;
+
+    /*
+      Changing the range, and what happens to cancelled weeks.
+
+      `null` stops it repeating, which also clears `skippedDates` — those name
+      occurrences that no longer exist, and leaving them would mean a one-off event
+      carrying a list of cancelled dates that can never apply. Shortening a range
+      leaves them alone: a week cancelled inside the new range is still cancelled,
+      and one outside it is already gone from the expansion.
+    */
+    if (input.repeatUntil !== undefined) {
+      if (input.repeatUntil === null) {
+        event.repeatUntil = undefined;
+        event.repeatEveryWeeks = undefined;
+        event.skippedDates = [];
+      } else {
+        event.repeatUntil = input.repeatUntil.slice(0, 10);
+        event.repeatEveryWeeks =
+          (input.repeatEveryWeeks ?? event.repeatEveryWeeks) === 2 ? 2 : 1;
+      }
+    } else if (input.repeatEveryWeeks !== undefined && event.repeatUntil) {
+      // Cadence changed without touching the range.
+      event.repeatEveryWeeks = input.repeatEveryWeeks === 2 ? 2 : 1;
+    }
+
+    return ok(event);
+  });
+}
+
+/**
+ * Cancel or restore ONE occurrence of a repeating event.
+ *
+ * "No meeting during finals" without deleting the series and losing its attendee
+ * list — which is the only alternative the app had, and it takes the RSVPs with it.
+ *
+ * Toggles, deliberately: cancelling and un-cancelling are the same decision made
+ * twice, and a separate restore action would be a second button doing the inverse
+ * of the first with no extra information.
+ */
+export async function toggleEventOccurrence(input: {
+  eventId: string;
+  /** The occurrence date, `YYYY-MM-DD`. */
+  day: string;
+}): Promise<Result<ClubEvent>> {
+  const day = input.day.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return fail<ClubEvent>("Which week?");
+  }
+
+  return guarded((store) => {
+    const event = store.events.find((e) => e.id === input.eventId);
+    if (!event) return fail<ClubEvent>("That event no longer exists.");
+    if (!event.repeatUntil) {
+      return fail<ClubEvent>(
+        "This isn't a repeating event, so there's no single week to cancel. Delete it instead."
+      );
+    }
+
+    const skipped = new Set(event.skippedDates ?? []);
+    if (skipped.has(day)) skipped.delete(day);
+    else skipped.add(day);
+    // Sorted so the stored list, the UI and the EXDATE line all read the same
+    // way — an unordered array here would make a diff look like a change.
+    event.skippedDates = [...skipped].sort();
 
     return ok(event);
   });

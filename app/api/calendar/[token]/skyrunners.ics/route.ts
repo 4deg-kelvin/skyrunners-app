@@ -176,7 +176,20 @@ export async function GET(
         // A malformed date would otherwise become an Invalid Date in DTSTART and
         // make a client drop the whole calendar.
         if (Number.isNaN(at)) return false;
-        return at >= from && at <= until;
+        /*
+          A REPEATING event is judged on where its SERIES ends, not where it began.
+
+          A weekly meeting that started in September is still running in November,
+          and every one of its occurrences lives on that single row. Windowing on
+          `startsAt` alone would drop the whole series from the feed the moment its
+          first occurrence fell out of the 30-day tail — silently removing a
+          recurring meeting from everybody's calendar a month after it started,
+          which is the worst possible time for it to vanish.
+        */
+        const seriesEnd = event.repeatUntil
+          ? Date.parse(`${event.repeatUntil.slice(0, 10)}T23:59:59Z`)
+          : at;
+        return seriesEnd >= from && at <= until;
       })
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map((event): IcsEvent => ({
@@ -189,6 +202,23 @@ export async function GET(
         // Back to the club calendar, where the attendee list and the turn-up
         // button live. A calendar entry that can't be acted on is a dead end.
         url: appUrl("/calendar"),
+        /*
+          The repeat, passed through as ONE VEVENT with an RRULE.
+
+          This is what makes "RSVP once to the weekly meeting" work: every
+          occurrence lands in the member's calendar because the client expands the
+          rule itself. Only set when the event actually repeats, so a one-off
+          emits no RRULE at all.
+        */
+        repeat: event.repeatUntil
+          ? {
+              startsAt: event.startsAt,
+              endsAt: event.endsAt,
+              repeatWeeklyUntil: event.repeatUntil,
+              repeatEveryWeeks: event.repeatEveryWeeks,
+              skippedDates: event.skippedDates,
+            }
+          : undefined,
       }));
 
     return { events, knownClients };

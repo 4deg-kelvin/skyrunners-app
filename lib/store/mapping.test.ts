@@ -270,7 +270,6 @@ describe("project_deadline_changes carries the deliverable link", () => {
   });
 
   test("deliverable_id survives toRow", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const row = spec!.toRow({
       id: "c1",
       projectId: "p1",

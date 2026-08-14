@@ -856,6 +856,24 @@ export interface ClubEvent {
   /** Anyone can turn up to an open session; a 1:1 is the two people in it. */
   isOpen: boolean;
   notes?: string;
+  /**
+   * Last date a repeat may land on, inclusive. Undefined means a one-off.
+   *
+   * ONE row per series, expanded on read — see `lib/calendar/recurrence.ts` and
+   * migration 0043. Ten rows would fragment `attendeeIds` ten ways, and "I come to
+   * the weekly meeting" has to be one answer in one place.
+   */
+  repeatUntil?: string;
+  /** 1 = weekly, 2 = fortnightly. Undefined reads as weekly. */
+  repeatEveryWeeks?: number;
+  /**
+   * Occurrence dates the club cancelled, `YYYY-MM-DD`.
+   *
+   * Cancelling one week without deleting the series and losing its attendee list.
+   * Becomes EXDATE in the feed, which is what actually clears that week from a
+   * subscriber's calendar.
+   */
+  skippedDates?: string[];
 }
 
 /** Default prominence by kind, so nobody has to think about it every time. */

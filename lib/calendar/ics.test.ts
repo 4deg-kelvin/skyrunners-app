@@ -276,3 +276,91 @@ describe("duration and status", () => {
     assert.match(ics, /TRANSP:OPAQUE/);
   });
 });
+
+describe("a repeating meeting in the feed", () => {
+  const weekly = (over = {}) =>
+    event({
+      repeat: {
+        startsAt: "2026-09-01T18:00:00.000Z",
+        repeatWeeklyUntil: "2026-09-29",
+        ...over,
+      },
+    });
+
+  test("one VEVENT carries the whole series", () => {
+    /*
+      The point of RRULE over fifty-two VEVENTs: RSVPing once puts every occurrence
+      in a member's calendar, because the client expands the rule itself.
+    */
+    const ics = build([weekly()]);
+    assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, 1);
+    assert.match(ics, /RRULE:FREQ=WEEKLY;UNTIL=20260929T235959Z/);
+  });
+
+  test("fortnightly carries INTERVAL=2", () => {
+    const ics = build([weekly({ repeatEveryWeeks: 2 })]);
+    assert.match(ics, /RRULE:FREQ=WEEKLY;INTERVAL=2/);
+  });
+
+  test("a one-off emits no RRULE at all", () => {
+    assert.ok(!build([event()]).includes("RRULE"));
+  });
+
+  test("a cancelled week emits EXDATE with the event's time", () => {
+    // A date-only EXDATE against a timed series matches nothing, so the cancelled
+    // week would stay in everybody's calendar.
+    const ics = build([weekly({ skippedDates: ["2026-09-15"] })]);
+    assert.match(ics, /EXDATE:20260915T180000Z/);
+  });
+
+  test("changing the range changes SEQUENCE", () => {
+    /*
+      Without this a client treats the revision as a duplicate and keeps the old
+      schedule — so extending a series, or cancelling next week, would never reach
+      anybody's phone.
+    */
+    const a = sequenceFor(weekly());
+    const b = sequenceFor(weekly({ repeatWeeklyUntil: "2026-10-27" }));
+    const c = sequenceFor(weekly({ repeatEveryWeeks: 2 }));
+    const d = sequenceFor(weekly({ skippedDates: ["2026-09-15"] }));
+    assert.equal(new Set([a, b, c, d]).size, 4, "all four must differ");
+  });
+
+  test("the material is joined with a separator, so fields can't blur", () => {
+    // "AB"+"C" must not hash the same as "A"+"BC".
+    assert.notEqual(
+      sequenceFor(event({ title: "AB", location: "C" })),
+      sequenceFor(event({ title: "A", location: "BC" }))
+    );
+  });
+});
+
+describe("reminders", () => {
+  test("every event carries a VALARM", () => {
+    /*
+      The answer to "will they get a notification". Nothing pings when an event
+      APPEARS — a subscription is a pull — but the member's own device fires this
+      before the event, on every client, including Apple where we have no API.
+    */
+    const ics = build([event()]);
+    assert.match(ics, /BEGIN:VALARM/);
+    assert.match(ics, /ACTION:DISPLAY/);
+    assert.match(ics, /TRIGGER:-PT30M/);
+    assert.match(ics, /END:VALARM/);
+  });
+
+  test("the alarm is INSIDE the event", () => {
+    // A VALARM outside a VEVENT is invalid and some clients reject the whole file.
+    const ics = build([event()]);
+    const ev = ics.indexOf("BEGIN:VEVENT");
+    const al = ics.indexOf("BEGIN:VALARM");
+    const end = ics.indexOf("END:VEVENT");
+    assert.ok(ev < al && al < end, "VALARM must be nested in VEVENT");
+  });
+
+  test("alarm blocks are balanced", () => {
+    const ics = build([event({ id: "a" }), event({ id: "b" })]);
+    assert.equal((ics.match(/BEGIN:VALARM/g) ?? []).length, 2);
+    assert.equal((ics.match(/END:VALARM/g) ?? []).length, 2);
+  });
+});

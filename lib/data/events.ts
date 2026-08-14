@@ -37,6 +37,11 @@ import {
 import { readStore } from "@/lib/store/disk";
 import { preloadLiveStore } from "@/lib/store/request";
 import {
+  occurrenceDates,
+  occurrenceEnd,
+  occurrenceStart,
+} from "@/lib/calendar/recurrence";
+import {
   isCoLead,
   isREofOrAbove,
   type Actor,
@@ -166,9 +171,40 @@ export async function getCalendar(input: {
     CHECK-IN obligations and nothing else — treating it as "the club is closed"
     would hide exactly the summer build sessions people show up to.
   */
-  const inWindow = store.events.filter((e) => {
-    const day = dateOf(e.startsAt);
-    return day >= now && day <= until;
+  /*
+    Every OCCURRENCE in the window, not every event row.
+
+    A repeating meeting is one row (migration 0043), so filtering on `startsAt`
+    would show the club's weekly meeting exactly once — on the day the series
+    began, possibly months ago and therefore not at all.
+
+    `occurrenceDates` expands it, and each occurrence is presented as a synthetic
+    event carrying the series' id. That id is what every control needs: RSVPing
+    joins the SERIES, which is the whole point — one answer covers every week.
+
+    The `key` is what makes two occurrences of one series distinct to React
+    without pretending they are different events.
+  */
+  const inWindow = store.events.flatMap((e) => {
+    const days = occurrenceDates(
+      {
+        startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        repeatWeeklyUntil: e.repeatUntil,
+        repeatEveryWeeks: e.repeatEveryWeeks,
+        skippedDates: e.skippedDates,
+      },
+      now,
+      until
+    );
+
+    return days.map((day) => ({
+      ...e,
+      startsAt: occurrenceStart({ startsAt: e.startsAt }, day),
+      endsAt: e.endsAt
+        ? occurrenceEnd({ startsAt: e.startsAt, endsAt: e.endsAt }, day)
+        : undefined,
+    }));
   });
 
   /*

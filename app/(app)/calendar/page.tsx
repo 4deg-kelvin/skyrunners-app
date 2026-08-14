@@ -265,7 +265,12 @@ function EventRow({
             the two people in it, so there's nothing to drop in on.
           */}
           {event.isOpen ? (
-            <AttendToggle eventId={event.id} attending={isAttending} />
+            <AttendToggle
+              eventId={event.id}
+              attending={isAttending}
+              // So the note can say every week is covered, not just this one.
+              repeats={Boolean(event.repeatUntil)}
+            />
           ) : null}
         </div>
       </div>

@@ -75,6 +75,18 @@ export interface RepeatingEvent {
    */
   repeatWeeklyUntil?: string;
   /**
+   * Weeks between occurrences. 1 = weekly, 2 = every other week.
+   *
+   * Exists because the club runs both: a weekly team meeting and a fortnightly
+   * townhall. Undefined or 0 reads as 1, so a row written before this field
+   * existed still means weekly.
+   *
+   * Deliberately not an `interval` on a general `freq`. Two cadences cover what a
+   * student club does, and every extra shape is one the expansion, the RRULE and
+   * the form all have to agree about.
+   */
+  repeatEveryWeeks?: number;
+  /**
    * Occurrence dates that were cancelled, as `YYYY-MM-DD`.
    *
    * "No meeting during finals" without deleting the series and losing its
@@ -92,6 +104,17 @@ export interface RepeatingEvent {
  * expand to five thousand occurrences inside a request that renders a page.
  */
 export const MAX_OCCURRENCES = 104;
+
+/**
+ * Weeks between occurrences, guarded.
+ *
+ * Guards against 0 and negatives, which would make the expansion loop produce the
+ * same date `MAX_OCCURRENCES` times — a hang-shaped bug rather than a wrong answer.
+ */
+function intervalWeeks(event: RepeatingEvent): number {
+  const raw = event.repeatEveryWeeks;
+  return Number.isInteger(raw) && (raw as number) > 0 ? (raw as number) : 1;
+}
 
 /** The date part of a stored datetime, which may be zoneless or an instant. */
 function dayOf(iso: string): string {
@@ -125,6 +148,7 @@ export function occurrenceDates(
 
   const skipped = new Set(event.skippedDates ?? []);
   const lastAllowed = event.repeatWeeklyUntil.slice(0, 10);
+  const every = intervalWeeks(event);
 
   /*
     Walk in UTC from the first occurrence.
@@ -139,7 +163,9 @@ export function occurrenceDates(
 
   const out: string[] = [];
   for (let i = 0; i < MAX_OCCURRENCES; i++) {
-    const day = new Date(startMs + i * WEEK_MS).toISOString().slice(0, 10);
+    const day = new Date(startMs + i * every * WEEK_MS)
+      .toISOString()
+      .slice(0, 10);
     if (day > lastAllowed) break;
     if (day > until) break;
     if (day < from) continue;
@@ -239,5 +265,45 @@ export function repeatProblem(
 export function rruleFor(event: RepeatingEvent): string | null {
   if (!event.repeatWeeklyUntil) return null;
   const last = event.repeatWeeklyUntil.slice(0, 10).replace(/-/g, "");
-  return `RRULE:FREQ=WEEKLY;UNTIL=${last}T235959Z`;
+  const every = intervalWeeks(event);
+  /*
+    INTERVAL is omitted when it is 1, which is the RFC's default.
+
+    Emitting `INTERVAL=1` is legal and harmless, but leaving it out matches what
+    every other calendar produces — which matters when somebody is reading a feed
+    by hand to work out why a client is unhappy.
+  */
+  const interval = every > 1 ? `;INTERVAL=${every}` : "";
+  return `RRULE:FREQ=WEEKLY${interval};UNTIL=${last}T235959Z`;
+}
+
+/**
+ * EXDATE lines for cancelled occurrences, or null when there are none.
+ *
+ * The counterpart to `skippedDates`, and the reason a cancelled week actually
+ * clears from somebody's phone. Without it the client expands the RRULE itself and
+ * shows a meeting the club called off — and no amount of refetching fixes that,
+ * because the feed never said otherwise.
+ *
+ * Each date carries the event's own start TIME, because an EXDATE has to match the
+ * occurrence it cancels exactly. A date-only EXDATE against a timed series is the
+ * classic way this silently does nothing.
+ *
+ * `toUtc` is injected rather than imported so this module stays free of the ICS
+ * formatting rules — the same separation that lets it be tested without them.
+ */
+export function exdatesFor(
+  event: RepeatingEvent,
+  toUtc: (iso: string) => string
+): string | null {
+  if (!event.repeatWeeklyUntil) return null;
+  const skipped = event.skippedDates ?? [];
+  if (skipped.length === 0) return null;
+
+  const stamps = skipped
+    .map((day) => toUtc(occurrenceStart(event, day)))
+    .filter(Boolean);
+  if (stamps.length === 0) return null;
+
+  return `EXDATE:${stamps.join(",")}`;
 }

@@ -52,6 +52,7 @@ import { checkUpload } from "@/lib/storage";
 import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
 import { revokeMyFeed, rotateMyFeed } from "@/lib/calendar/store";
 import { appUrl } from "@/lib/urls";
+import { formatClock, formatDay } from "@/lib/dates";
 import {
   removeDocument,
   uploadDocument,
@@ -1751,6 +1752,11 @@ async function createEventAction$impl(
     attendeeIds,
     notes: String(formData.get("notes") ?? ""),
     importanceWeight: importanceRaw ? Number(importanceRaw) : undefined,
+    // Empty means it doesn't repeat. `createEvent` normalises the cadence and
+    // `repeatProblem` validates the range with the same function the form uses.
+    repeatUntil: String(formData.get("repeatUntil") ?? "") || undefined,
+    repeatEveryWeeks:
+      String(formData.get("repeatEveryWeeks") ?? "") === "2" ? 2 : 1,
     /*
       Invite-only, and Co-Lead only.
 
@@ -1806,6 +1812,19 @@ async function updateEventAction$impl(
     projectId: formData.has("projectId")
       ? String(formData.get("projectId") ?? "") || null
       : undefined,
+    /*
+      Three-way, exactly like `projectId` above.
+
+      The form always sends the field — empty when the "it repeats" box is
+      unticked — so "" is a deliberate STOP repeating, and absent means leave it
+      alone. Without the empty-string hidden input in `RepeatFields`, unticking the
+      box would silently fail to stop a weekly meeting.
+    */
+    repeatUntil: formData.has("repeatUntil")
+      ? String(formData.get("repeatUntil") ?? "") || null
+      : undefined,
+    repeatEveryWeeks:
+      String(formData.get("repeatEveryWeeks") ?? "") === "2" ? 2 : 1,
     isOpen,
   });
 
@@ -3117,12 +3136,60 @@ async function setEventGuestListAction$impl(
     return denied("change who's on this event");
   }
 
-  const result = await ops.setEventGuestList({
-    eventId,
-    memberIds: formData.getAll("attendeeIds").map(String).filter(Boolean),
-  });
+  const memberIds = formData.getAll("attendeeIds").map(String).filter(Boolean);
 
-  if (result.ok) refresh();
+  /*
+    Who is NEW, worked out before the write.
+
+    Only they get a DM. Re-saving a guest list to change one name must not DM the
+    five people who were already on it — that is how a useful notification becomes
+    one everybody mutes.
+  */
+  const alreadyOn = new Set(existing.attendeeIds);
+  const added = memberIds.filter((id) => !alreadyOn.has(id));
+
+  const result = await ops.setEventGuestList({ eventId, memberIds });
+
+  if (result.ok) {
+    refresh();
+
+    /*
+      Tell them on Discord, because the CALENDAR cannot.
+
+      A subscription is a pull: the event appears on the next fetch, silently,
+      minutes later on Apple and hours later on Google. So being added to a
+      session was completely silent — and for a meeting tomorrow that is the
+      difference between turning up and not.
+
+      Never the person doing the adding, even if they add themselves.
+    */
+    const who = viewer.member.preferredName ?? viewer.member.fullName;
+    const when = `${formatDay(existing.startsAt, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    })} at ${formatClock(existing.startsAt)}`;
+    const repeats = existing.repeatUntil
+      ? `repeats ${existing.repeatEveryWeeks === 2 ? "every other week" : "weekly"} until ${formatDay(existing.repeatUntil)}`
+      : undefined;
+
+    for (const id of added) {
+      if (id === viewer.member.id) continue;
+      const member = getMember(id);
+      if (!member) continue;
+      notify(
+        member.discordUserId,
+        discordMessages.addedToEvent({
+          eventTitle: existing.title,
+          when,
+          addedBy: who,
+          repeats,
+          url: appUrl("/calendar"),
+        })
+      );
+    }
+  }
+
   return toResult(result, "Guest list updated.");
 }
 
