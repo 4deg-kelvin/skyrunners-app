@@ -317,8 +317,20 @@ export function buildGantt(
       pushed and later pulled back to where it started. The history still records
       both moves; the chart has nothing to show, because nothing net-moved.
     */
+    /*
+      Deliverables get one too, since migration 0042.
+
+      This was `r.kind === "project"` and the comment on `baselineEnd` said
+      deliverables have no baseline "because nothing records moves of its due
+      date". That stopped being true the moment deliverables became pushable, and
+      the symptom was Anish pushing one back and seeing no change on the chart —
+      the whole point of drawing a baseline is that a slip is visible.
+
+      No kind check at all now: a row has a baseline or it doesn't, and the caller
+      decides. Events still never pass one.
+    */
     let baselineEndPct: number | undefined;
-    if (r.kind === "project" && r.baselineEnd && hasEnd) {
+    if (r.baselineEnd && hasEnd) {
       const baseMs = utc(r.baselineEnd);
       if (baseMs >= min && baseMs <= max && baseMs !== utc(r.end!)) {
         baselineEndPct = pct(baseMs);

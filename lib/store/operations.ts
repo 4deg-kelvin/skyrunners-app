@@ -1891,6 +1891,39 @@ export async function changeDeliverableDeadline(input: {
       changedAt: new Date().toISOString(),
     });
 
+    /*
+      It goes in the project's activity feed, with an EMPTY audience.
+
+      This is the fix to a real complaint: the first version wrote no notice at
+      all, on the grounds that one deliverable moving inside its project is not
+      worth telling a Lead about. That reasoning was right about NOTIFYING and
+      wrong about RECORDING — it meant the reason somebody typed appeared only in
+      a sidebar panel, and Anish went looking for it in "Recent Updates On This
+      Project", which is exactly where a change to the project's schedule belongs.
+
+      `notifiedMemberIds: []` is what separates the two. The notice renders in the
+      feed like every other one, and reaches nobody's dashboard — the dashboard
+      blocks filter on `notifiedMemberIds.includes(actor.id)`, so an empty list is
+      genuinely invisible there rather than merely quiet.
+
+      The PROJECT-level version still notifies up the chain, because a project
+      slipping does change what other people plan against.
+    */
+    const actor = store.members.find((m) => m.id === input.actorId);
+    const who = actor?.preferredName || actor?.fullName || "Someone";
+    const days = daysBetween(fromDate, newDue);
+    const later = newDue > fromDate;
+
+    store.projectNotices.push({
+      id: newId("pn"),
+      projectId: deliverable.projectId,
+      kind: "deadline_pushed",
+      body: `${who} moved "${deliverable.title}" from ${fromDate} to ${newDue} — ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ${later ? "later" : "earlier"}. Reason: ${reason}`,
+      createdById: input.actorId,
+      createdAt: `${input.today}T12:00:00.000Z`,
+      notifiedMemberIds: [],
+    });
+
     return ok(deliverable);
   });
 }

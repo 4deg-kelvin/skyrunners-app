@@ -24,6 +24,7 @@ import {
   advisorOptions,
   projectAttentionFlags,
   projectBreadcrumb,
+  baselineDueDate,
   baselineTargetDate,
   deadlineChanges,
   projectDeliverables,
@@ -753,6 +754,15 @@ function projectTimeline(project: Project): GanttChart | null {
         id: d.id,
         name: d.title,
         end: d.dueDate,
+        /*
+          Its ORIGINAL due date, when it has been pushed back.
+
+          Drawn as a hollow diamond beside the solid one, so a slipped piece of
+          work shows the slip rather than silently redrawing itself. Same
+          mechanism as the project bar's baseline — see `baselineEnd` in
+          `lib/gantt.ts`.
+        */
+        baselineEnd: baselineDueDate(d.id),
         depth: depth + 1,
         /*
           Past its date is RED, not amber.

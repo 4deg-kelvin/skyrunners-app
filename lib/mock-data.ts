@@ -3493,6 +3493,23 @@ export function baselineTargetDate(projectId: string): string | undefined {
   return earliest;
 }
 
+/**
+ * The first due date a DELIVERABLE was ever given, if it has since moved.
+ *
+ * The deliverable twin of `baselineTargetDate`, and separated by `deliverableId`
+ * for the same reason that one filters it out: both kinds of move live in one
+ * table since migration 0042, and mixing them would put a deliverable's old date
+ * on the project's bar or vice versa.
+ */
+export function baselineDueDate(deliverableId: string): string | undefined {
+  let earliest: string | undefined;
+  for (const c of live().projectDeadlineChanges) {
+    if (c.deliverableId !== deliverableId || !c.fromDate) continue;
+    if (!earliest || c.fromDate < earliest) earliest = c.fromDate;
+  }
+  return earliest;
+}
+
 export function projectNotices(projectId: string) {
   return live()
     .projectNotices.filter((n) => n.projectId === projectId)

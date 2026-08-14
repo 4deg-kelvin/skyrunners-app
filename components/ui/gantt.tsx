@@ -213,28 +213,6 @@ export function Gantt({
                   compact ? "h-3.5 w-full" : "h-5 min-w-0 flex-1"
                 }`}
               >
-                {/*
-                  Where this project was ORIGINALLY due.
-
-                  Drawn UNDER the bar (before it in source order, so the bar
-                  paints over it) as a hollow outline rather than a filled shape:
-                  it's a date that no longer applies, and a solid marker would
-                  compete with the real one. An open ring reads as "this used to
-                  be here".
-
-                  `buildGantt` returns this only when it falls inside the window,
-                  so there is no clamping to do here — a marker on a date the
-                  chart doesn't cover would read as "due now", which is the one
-                  wrong thing it could say.
-                */}
-                {bar.baselineEndPct !== undefined ? (
-                  <span
-                    className="border-ink-muted/70 absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border bg-transparent"
-                    style={{ left: `${bar.baselineEndPct}%` }}
-                    title={`Originally due ${bar.baselineEnd} — the date has since moved`}
-                  />
-                ) : null}
-
                 {bar.kind !== "project" || bar.widthPct === 0 ? (
                   /*
                     A point, not a span. Deliverables are a diamond (one owner,
@@ -278,6 +256,43 @@ export function Gantt({
                     ) : null}
                   </div>
                 )}
+
+                {/*
+                  Where this originally landed, before it was pushed back.
+
+                  ---------------------------------------------------------------
+                  LAST in source order, and that is the bug fix
+                  ---------------------------------------------------------------
+
+                  This used to be rendered FIRST, with a comment claiming it sat
+                  "under the bar so the bar paints over it". That was exactly
+                  wrong: a project's baseline is by construction earlier than its
+                  current end and later than its start, so it falls INSIDE the
+                  bar's span — and the bar is an opaque later sibling, so it
+                  covered the marker completely. The feature looked broken because
+                  it was invisible.
+
+                  Absolutely-positioned siblings paint in source order, so being
+                  last is what puts it on top. No z-index needed, and none wanted:
+                  a z-index here would create a stacking context that the today
+                  line would then have to compete with.
+
+                  A hollow outline rather than a filled shape, because it is a date
+                  that no longer applies — an open diamond reads as "this used to
+                  be here" without competing with the real marker.
+
+                  `buildGantt` only returns a percentage when the date is genuinely
+                  inside the window, so there is nothing to clamp here: a marker on
+                  a date the chart doesn't cover would read as "due now", which is
+                  the one wrong thing it could say.
+                */}
+                {bar.baselineEndPct !== undefined ? (
+                  <span
+                    className="border-ink-soft absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border-[1.5px] bg-transparent"
+                    style={{ left: `${bar.baselineEndPct}%` }}
+                    title={`Originally due ${bar.baselineEnd} — pushed back since`}
+                  />
+                ) : null}
               </div>
             </div>
           ))}

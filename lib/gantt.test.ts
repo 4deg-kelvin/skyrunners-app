@@ -420,9 +420,17 @@ describe("the baseline marker for a pushed deadline", () => {
     assert.equal(c.bars[0].baselineEndPct, undefined);
   });
 
-  test("deliverables never get one", () => {
-    // Nothing records moves of a deliverable's due date, so a baseline on one
-    // could only be a mistake by the caller. Ignored rather than drawn.
+  test("deliverables get one too, since they became pushable", () => {
+    /*
+      This test asserted the OPPOSITE until migration 0042 made deliverable due
+      dates pushable with recorded history. The old rule — "nothing records moves
+      of a deliverable's due date, so a baseline could only be a caller mistake" —
+      simply stopped being true, and the symptom was pushing one back and seeing no
+      change on the chart at all.
+
+      Kept as a test rather than deleted, because the interesting assertion is
+      still there: a row gets a baseline if and only if the caller supplies one.
+    */
     const c = buildGantt(
       [
         row({
@@ -431,6 +439,18 @@ describe("the baseline marker for a pushed deadline", () => {
           baselineEnd: "2026-09-01",
         }),
       ],
+      TODAY
+    );
+    assert.ok(
+      c.bars[0].baselineEndPct !== undefined,
+      "a pushed deliverable must show its original date"
+    );
+  });
+
+  test("a deliverable with no baseline still gets no marker", () => {
+    // The overwhelmingly common case: most deliverables have never moved.
+    const c = buildGantt(
+      [row({ kind: "deliverable", end: "2026-10-01" })],
       TODAY
     );
     assert.equal(c.bars[0].baselineEndPct, undefined);
