@@ -1586,6 +1586,206 @@ export async function setPrimaryRE(input: {
   });
 }
 
+/**
+ * Why `newTarget` can't be this project's date, or null if it can.
+ *
+ * Extracted from `updateProject` so `changeProjectDeadline` enforces the SAME
+ * rule rather than a second copy of it. Two copies of a date constraint is how
+ * one path ends up permitting a schedule the other refuses, and the symptom is a
+ * project whose dates are illegal but which saves fine through one form.
+ *
+ * Checked in BOTH directions, because the same mistake arrives two ways —
+ * moving a child later, or pulling a parent in over children already dated.
+ * Refused rather than cascaded, for the same reason completion is: quietly
+ * rewriting dates on projects other REs own is how a schedule stops being
+ * believed.
+ *
+ * Callers must only invoke this when the date actually moves. See the note in
+ * `updateProject`: validating unconditionally lets one pre-existing violation
+ * freeze every other edit on the project.
+ */
+function targetDateClash(
+  store: StoreShape,
+  project: Project,
+  newTarget: string
+): string | null {
+  if (project.parentId) {
+    const parent = store.projects.find((p) => p.id === project.parentId);
+    if (parent?.targetDate && newTarget > parent.targetDate) {
+      return `${parent.name} is due ${parent.targetDate}, so this can't be due ${newTarget}. Move the parent's date first, or bring this one in.`;
+    }
+  }
+
+  /*
+    …and against this project's own deliverables.
+
+    The descendant loop below catches nested PROJECTS. Without this, pulling a
+    target in would leave the project's own deliverables dated past it — the
+    exact state `createDeliverable` refuses, arriving from the other direction.
+  */
+  const lateWork = store.deliverables.filter(
+    (d) =>
+      d.projectId === project.id &&
+      d.status !== "done" &&
+      d.dueDate &&
+      d.dueDate > newTarget
+  );
+  if (lateWork.length > 0) {
+    const names = lateWork
+      .slice(0, 3)
+      .map((d) => `${d.title} (${d.dueDate})`)
+      .join(", ");
+    const rest = lateWork.length > 3 ? ` and ${lateWork.length - 3} more` : "";
+    return `${lateWork.length} deliverable${lateWork.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${lateWork.length === 1 ? "it" : "them"} in first.`;
+  }
+
+  const late = descendantProjects(store, project.id).filter(
+    (p) => p.targetDate && p.targetDate > newTarget
+  );
+  if (late.length > 0) {
+    const names = late
+      .slice(0, 3)
+      .map((p) => `${p.name} (${p.targetDate})`)
+      .join(", ");
+    const rest = late.length > 3 ? ` and ${late.length - 3} more` : "";
+    return `${late.length} sub-project${late.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${late.length === 1 ? "it" : "them"} in first — work inside this can't land after it does.`;
+  }
+
+  return null;
+}
+
+/** Ceiling on a slip reason. Matches the CHECK in migration 0040. */
+const MAX_DEADLINE_REASON_CHARS = 400;
+
+/**
+ * Move a project's target date, keeping the old one.
+ *
+ * The dedicated path for a slip, as opposed to `updateProject`, which changes
+ * everything about a project at once. Three things make it worth its own
+ * operation rather than a flag on that one:
+ *
+ *   1. **The reason is required.** Same asymmetry as declining a member request
+ *      or rejecting a signed-off deliverable — the action that makes the record
+ *      worse has to be explained. A date that moved for no recorded reason is
+ *      the thing `project_deadline_changes` exists to prevent.
+ *   2. **It needs no other field.** Reusing `updateProject` would mean the
+ *      caller resending name, phase, health and open roles to move one date,
+ *      and every one of those is a chance to overwrite something with a stale
+ *      value from a form somebody opened ten minutes ago.
+ *   3. **It announces itself.** A slipped deadline changes what everybody else
+ *      can plan against, so it goes up the project tree like a completion does.
+ *
+ * Deliberately allows moving the date EARLIER as well as later. The UI control
+ * is "push", and its date picker starts the day after the current target — but
+ * pulling a date in is also a change worth recording, and refusing it here
+ * would push somebody back to the editor, which is the path with no reason
+ * attached.
+ */
+export async function changeProjectDeadline(input: {
+  projectId: string;
+  /** The new target. `YYYY-MM-DD`. */
+  targetDate: string;
+  reason: string;
+  actorId: string;
+  /** Today, passed in so this stays testable and render-stable. */
+  today: string;
+}): Promise<Result<Project>> {
+  const newTarget = input.targetDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newTarget)) {
+    return fail<Project>("Pick a date for the new target.");
+  }
+
+  const reason = input.reason.trim();
+  if (!reason) {
+    return fail<Project>(
+      "Say why the date is moving — everyone planning around this project will read it."
+    );
+  }
+  if (reason.length > MAX_DEADLINE_REASON_CHARS) {
+    return fail<Project>(
+      `That's ${reason.length} characters. Keep it under ${MAX_DEADLINE_REASON_CHARS} — it goes into the project's history and up the chain.`
+    );
+  }
+
+  return guarded((store) => {
+    const project = store.projects.find((p) => p.id === input.projectId);
+    if (!project) return fail<Project>("That project no longer exists.");
+
+    /*
+      No existing target means this isn't a slip, it's the first schedule.
+
+      Setting a first date belongs in the project editor: there is no old date to
+      keep, nothing has moved, and recording it as a change would put a project
+      into the "has slipped" list on the day somebody first dated it.
+    */
+    if (!project.targetDate) {
+      return fail<Project>(
+        `${project.name} has no target date yet, so there's nothing to move. Set one in Edit project.`
+      );
+    }
+
+    if (project.targetDate === newTarget) {
+      return fail<Project>(`${project.name} is already due ${newTarget}.`);
+    }
+
+    /*
+      A finished project's schedule is history, not a plan.
+
+      Completing freezes the record (see `attachArtifact`), and moving the target
+      of something already delivered would rewrite what it looks like it
+      achieved. Reopen it first if the work genuinely restarted.
+    */
+    if (project.phase === "complete") {
+      return fail<Project>(
+        `${project.name} is complete, so its dates are part of the record. Reopen it first if the work has actually restarted.`
+      );
+    }
+
+    const clash = targetDateClash(store, project, newTarget);
+    if (clash) return fail<Project>(clash);
+
+    const fromDate = project.targetDate;
+    project.targetDate = newTarget;
+
+    store.projectDeadlineChanges.push({
+      id: newId("pdc"),
+      projectId: project.id,
+      fromDate,
+      toDate: newTarget,
+      reason,
+      changedById: input.actorId,
+      changedAt: new Date().toISOString(),
+    });
+
+    /*
+      Announced up the project tree, the same audience a completion reaches.
+
+      Only when the date moves LATER. Pulling a deadline in is good news and
+      needs no announcement — and notifying on it would train people to ignore
+      the notice, which is the one thing that must not happen to the one that
+      says a project is late.
+    */
+    if (newTarget > fromDate) {
+      const actor = store.members.find((m) => m.id === input.actorId);
+      const who = actor?.preferredName || actor?.fullName || "Someone";
+      const days = daysBetween(fromDate, newTarget);
+      const audience = completionAudience(store, project, input.actorId);
+
+      store.projectNotices.push({
+        id: newId("pn"),
+        projectId: project.id,
+        kind: "deadline_pushed",
+        body: `${who} moved ${project.name}'s target from ${fromDate} to ${newTarget} — ${days} day${days === 1 ? "" : "s"} later. Reason: ${reason}`,
+        createdById: input.actorId,
+        createdAt: `${input.today}T12:00:00.000Z`,
+        notifiedMemberIds: audience,
+      });
+    }
+
+    return ok(project);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Writing a check-in
 // ---------------------------------------------------------------------------
@@ -2174,58 +2374,31 @@ export async function updateProject(input: {
     */
     const targetMoved = newTarget !== project.targetDate;
 
-    if (targetMoved && newTarget && project.parentId) {
-      const parent = store.projects.find((p) => p.id === project.parentId);
-      if (parent?.targetDate && newTarget > parent.targetDate) {
-        return fail<Project>(
-          `${parent.name} is due ${parent.targetDate}, so this can't be due ${newTarget}. Move the parent's date first, or bring this one in.`
-        );
-      }
+    if (targetMoved && newTarget) {
+      const clash = targetDateClash(store, project, newTarget);
+      if (clash) return fail<Project>(clash);
     }
 
     /*
-      …and the same check against this project's own deliverables.
+      A move through the full editor is recorded too, with no reason attached.
 
-      The sub-project loop below catches nested PROJECTS. Without this, pulling
-      a target in would leave the project's own deliverables dated past it —
-      the exact state `createDeliverable` refuses, arriving from the other
-      direction.
+      `changeProjectDeadline` is the intended path and requires one. But if only
+      that path recorded history, an RE could move the date through this form
+      instead and the slip would leave no trace — a hole of exactly the shape
+      this repo keeps finding (see the `for update` RLS policy, and the dead
+      controls sweep). A row with an empty reason is worse history than a row
+      with a good one and far better than none, and the UI labels it as such.
     */
-    if (targetMoved && newTarget) {
-      const lateWork = store.deliverables.filter(
-        (d) =>
-          d.projectId === project.id &&
-          d.status !== "done" &&
-          d.dueDate &&
-          d.dueDate > newTarget
-      );
-      if (lateWork.length > 0) {
-        const names = lateWork
-          .slice(0, 3)
-          .map((d) => `${d.title} (${d.dueDate})`)
-          .join(", ");
-        const rest =
-          lateWork.length > 3 ? ` and ${lateWork.length - 3} more` : "";
-        return fail<Project>(
-          `${lateWork.length} deliverable${lateWork.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${lateWork.length === 1 ? "it" : "them"} in first.`
-        );
-      }
-    }
-
-    if (targetMoved && newTarget) {
-      const late = descendantProjects(store, project.id).filter(
-        (p) => p.targetDate && p.targetDate > newTarget
-      );
-      if (late.length > 0) {
-        const names = late
-          .slice(0, 3)
-          .map((p) => `${p.name} (${p.targetDate})`)
-          .join(", ");
-        const rest = late.length > 3 ? ` and ${late.length - 3} more` : "";
-        return fail<Project>(
-          `${late.length} sub-project${late.length === 1 ? " is" : "s are"} due after ${newTarget}: ${names}${rest}. Bring ${late.length === 1 ? "it" : "them"} in first — work inside this can't land after it does.`
-        );
-      }
+    if (targetMoved && newTarget && project.targetDate && input.actorId) {
+      store.projectDeadlineChanges.push({
+        id: newId("pdc"),
+        projectId: project.id,
+        fromDate: project.targetDate,
+        toDate: newTarget,
+        reason: "",
+        changedById: input.actorId,
+        changedAt: new Date().toISOString(),
+      });
     }
 
     project.name = name;
@@ -2325,6 +2498,18 @@ export async function deleteProject(
     store.workLogs = store.workLogs.filter((w) => w.projectId !== projectId);
     store.projectArtifacts = store.projectArtifacts.filter(
       (a) => a.projectId !== projectId
+    );
+    /*
+      The deadline history goes with the project.
+
+      It is append-only while the project lives — nothing in the app edits or
+      removes a single row, because a slip its author can tidy away is worth
+      nothing — but there is no project left to hold a schedule for. Matches the
+      `on delete cascade` in migration 0040, and `lib/data/rls.test.ts` checks
+      the DELETE policy exists to make the cascade reachable.
+    */
+    store.projectDeadlineChanges = store.projectDeadlineChanges.filter(
+      (c) => c.projectId !== projectId
     );
     store.projectNotices = store.projectNotices.filter(
       (n) => n.projectId !== projectId

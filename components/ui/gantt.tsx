@@ -213,6 +213,28 @@ export function Gantt({
                   compact ? "h-3.5 w-full" : "h-5 min-w-0 flex-1"
                 }`}
               >
+                {/*
+                  Where this project was ORIGINALLY due.
+
+                  Drawn UNDER the bar (before it in source order, so the bar
+                  paints over it) as a hollow outline rather than a filled shape:
+                  it's a date that no longer applies, and a solid marker would
+                  compete with the real one. An open ring reads as "this used to
+                  be here".
+
+                  `buildGantt` returns this only when it falls inside the window,
+                  so there is no clamping to do here — a marker on a date the
+                  chart doesn't cover would read as "due now", which is the one
+                  wrong thing it could say.
+                */}
+                {bar.baselineEndPct !== undefined ? (
+                  <span
+                    className="border-ink-muted/70 absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border bg-transparent"
+                    style={{ left: `${bar.baselineEndPct}%` }}
+                    title={`Originally due ${bar.baselineEnd} — the date has since moved`}
+                  />
+                ) : null}
+
                 {bar.kind !== "project" || bar.widthPct === 0 ? (
                   /*
                     A point, not a span. Deliverables are a diamond (one owner,
@@ -286,6 +308,19 @@ export function Gantt({
           </span>
           Darker = work signed off
         </span>
+        {/*
+          Only when something on this chart actually slipped.
+
+          A standing legend entry for a marker that isn't drawn teaches people to
+          ignore the key — the same reason the completions card on the dashboard
+          renders nothing rather than "0 completed".
+        */}
+        {chart.bars.some((b) => b.baselineEndPct !== undefined) ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="border-ink-muted/70 inline-block size-2 rotate-45 border" />
+            Original target
+          </span>
+        ) : null}
       </div>
 
       {/*

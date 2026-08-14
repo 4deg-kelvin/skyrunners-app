@@ -270,7 +270,46 @@ export interface ProjectArtifact {
 // Project notices — the app writing in the project's own feed
 // ---------------------------------------------------------------------------
 
-export type ProjectNoticeKind = "completed" | "reopened" | "re_paused";
+export type ProjectNoticeKind =
+  "completed" | "reopened" | "re_paused" | "deadline_pushed";
+
+/**
+ * One move of a project's target date, with the old date kept.
+ *
+ * Before this existed an RE could change `targetDate` through the project
+ * editor and nothing recorded that it had moved — so a project that slipped
+ * three times read identically to one that was always due in March. The
+ * schedule stayed believable only because nobody could check it.
+ *
+ * **This is history, not configuration: rows are append-only.** Nothing in the
+ * app edits or deletes one, and that is the point — a record of a slip that the
+ * person who slipped can tidy away is worth nothing. They go only when the
+ * project itself is deleted, on cascade.
+ *
+ * The Gantt's baseline is `min(fromDate)` across a project's changes, derived
+ * rather than stored, so it cannot drift from the history it summarises.
+ */
+export interface ProjectDeadlineChange {
+  id: string;
+  projectId: string;
+  /**
+   * The date it moved FROM. Undefined would mean the project had no target at
+   * all beforehand — `changeProjectDeadline` refuses that case, because setting
+   * a first date is not a slip, so in practice this is always set.
+   */
+  fromDate?: string;
+  toDate: string;
+  /**
+   * Why. **Required**, unlike most free text in this app.
+   *
+   * Same asymmetry as declining a member request or rejecting a signed-off
+   * deliverable: the action that makes the record worse has to be explained.
+   */
+  reason: string;
+  /** Snapshotted — REs change over a project's life. */
+  changedById?: string;
+  changedAt: string;
+}
 
 /**
  * A milestone the app announced, rather than a person writing it.

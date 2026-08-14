@@ -44,6 +44,7 @@ import { EVENT_KIND_LABELS } from "@/lib/labels";
 import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
+import { PushDeadlineForm } from "@/components/forms/push-deadline";
 import { getProjectBySlug } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
 import {
@@ -52,7 +53,7 @@ import {
   PROJECT_ROLE_LABELS,
 } from "@/lib/labels";
 import { can, isLeadership } from "@/lib/permissions";
-import { formatDay } from "@/lib/dates";
+import { daysBetweenDays, formatDay } from "@/lib/dates";
 
 export default async function ProjectDetailPage({
   params,
@@ -281,10 +282,60 @@ export default async function ProjectDetailPage({
               */}
 
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                {/*
+                  `relative` so the move-date popover anchors to THIS tile.
+
+                  Without it the panel positions against the grid and lands under
+                  whichever tile happens to be first, which looks like a CSS
+                  accident rather than a control belonging to a number.
+                */}
                 <StatTile
+                  className="relative"
                   label="Target"
                   value={
                     project.targetDate ? formatDay(project.targetDate) : "—"
+                  }
+                  action={
+                    mayManage &&
+                    project.targetDate &&
+                    project.phase !== "complete" ? (
+                      <PushDeadlineForm
+                        projectId={project.id}
+                        projectName={project.name}
+                        currentTarget={project.targetDate}
+                        parentTargetDate={view.parent?.targetDate}
+                      />
+                    ) : undefined
+                  }
+                  /*
+                    The slip, stated on the tile itself.
+
+                    This is the whole reason the history is worth recording: the
+                    current date alone cannot tell you the project has moved
+                    three times. Absent entirely when nothing has moved — a
+                    standing "on the original schedule" line would be noise on
+                    every project that has never slipped.
+                  */
+                  hint={
+                    view.baselineTargetDate && project.targetDate ? (
+                      <>
+                        Originally {formatDay(view.baselineTargetDate)} —{" "}
+                        <span className="text-cardinal-600 font-semibold">
+                          {(() => {
+                            const d = daysBetweenDays(
+                              view.baselineTargetDate,
+                              project.targetDate
+                            );
+                            // "1 days later" is the kind of small wrongness that
+                            // makes people distrust the numbers next to it.
+                            return `${d} ${d === 1 ? "day" : "days"} later`;
+                          })()}
+                        </span>
+                        {view.deadlineHistory.length > 1
+                          ? `, across ${view.deadlineHistory.length} moves`
+                          : ""}
+                      </>
+                    ) : undefined
                   }
                 />
                 <StatTile
@@ -311,23 +362,23 @@ export default async function ProjectDetailPage({
           {/*
             What people have actually been doing here.
 
-            REs only. This is the per-project half of the effort split — time
-            spent on THIS work, with the note the person wrote — and never
-            their total, reliability or record, which belong to them and their
-            Lead.
+            REs only. This is the per-project half of the effort split — work on
+            THIS project, in the words of the person who did it — and never their
+            record or reliability, which belong to them and their Lead.
 
-            The descriptions are the point. "3.5 hrs" says somebody was busy;
-            "3.5 hrs — ran the tensile coupons" says what happened, and the
-            field has existed since hours logging shipped while being rendered
-            on exactly one screen: the member's own list of their own entries.
+            The descriptions ARE the content now, not an annotation on a number.
+            This used to read "3.5 hrs — ran the tensile coupons", and the hours
+            were the part carrying no information: three hours of what? Since
+            2026-08-14 there is no duration to show, which is the whole point.
           */}
           {mayManage && view.recentHours.length > 0 ? (
             <Card>
               <CardBody>
                 <SectionLabel>Recent Work</SectionLabel>
                 <p className="text-ink-muted mt-2 text-sm">
-                  Hours logged here in the last three weeks. Appears as soon as
-                  somebody logs — it doesn&apos;t wait for their check-in.
+                  What people logged here in the last three weeks. Appears as
+                  soon as somebody logs — it doesn&apos;t wait for their
+                  check-in.
                 </p>
                 <div className="mt-4 space-y-2">
                   {view.recentHours.map(({ log, member }) => (
@@ -829,6 +880,76 @@ export default async function ProjectDetailPage({
                     caption="Diamonds are deliverable due dates. The red line is today."
                   />
                 </div>
+
+                {/*
+                  The schedule's history, directly under the chart that draws it.
+
+                  Here rather than in its own card because it explains the hollow
+                  markers a few pixels above — a "Deadline history" card further
+                  down the sidebar would be a list of dates with nothing to
+                  attach them to. Absent entirely when nothing has moved.
+                */}
+                {view.deadlineHistory.length > 0 ? (
+                  <div className="border-line mt-4 border-t pt-3">
+                    <p className="text-ink-muted text-[11px] font-semibold tracking-wide uppercase">
+                      Target moved{" "}
+                      {view.deadlineHistory.length === 1
+                        ? "once"
+                        : `${view.deadlineHistory.length} times`}
+                    </p>
+
+                    <ul className="mt-2 space-y-2.5">
+                      {view.deadlineHistory.map(
+                        ({ change, actor, daysMoved }) => (
+                          <li key={change.id} className="text-xs">
+                            <p className="text-ink font-semibold">
+                              {change.fromDate
+                                ? `${formatDay(change.fromDate)} → ${formatDay(change.toDate)}`
+                                : `Set to ${formatDay(change.toDate)}`}
+                              {daysMoved !== 0 ? (
+                                <span
+                                  className={
+                                    daysMoved > 0
+                                      ? "text-cardinal-600 font-normal"
+                                      : "text-ok-fg font-normal"
+                                  }
+                                >
+                                  {" · "}
+                                  {`${Math.abs(daysMoved)} ${
+                                    Math.abs(daysMoved) === 1 ? "day" : "days"
+                                  } ${daysMoved > 0 ? "later" : "earlier"}`}
+                                </span>
+                              ) : null}
+                            </p>
+                            {/*
+                              A move made through the full project editor carries
+                              no reason — only `changeProjectDeadline` requires
+                              one. Saying so is better than an empty line: it
+                              tells the reader the gap is a route somebody took,
+                              not data that went missing.
+                            */}
+                            {change.reason ? (
+                              <p className="text-ink-soft mt-0.5">
+                                {change.reason}
+                              </p>
+                            ) : (
+                              <p className="text-ink-muted mt-0.5 italic">
+                                No reason recorded — changed from Edit project.
+                              </p>
+                            )}
+                            <p className="text-ink-muted mt-0.5">
+                              {actor
+                                ? (actor.preferredName ?? actor.fullName)
+                                : "Someone"}
+                              {" · "}
+                              {formatDay(change.changedAt)}
+                            </p>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
               </CardBody>
             </Card>
           ) : null}

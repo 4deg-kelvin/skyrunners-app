@@ -45,6 +45,7 @@ import type {
   ProjectAdvisor,
   HelpRequest,
   MemberCertification,
+  ProjectDeadlineChange,
   ProjectNotice,
   TrainingSection,
   UpdateSchedule,
@@ -116,6 +117,8 @@ export interface StoreShape {
   projectArtifacts: ProjectArtifact[];
   /** Milestones the app announced in a project's feed — see `ProjectNotice`. */
   projectNotices: ProjectNotice[];
+  /** Append-only record of every target-date move — see `ProjectDeadlineChange`. */
+  projectDeadlineChanges: ProjectDeadlineChange[];
   /** Free-form asks on the blocker board — see `HelpRequest`. */
   helpRequests: HelpRequest[];
   /** Club-written material on the guide pages — see GuideBlock. */
@@ -191,6 +194,15 @@ function seed(): StoreShape {
     // Nothing to seed: a notice only exists because somebody completed a
     // project inside the app.
     projectNotices: [],
+    /*
+      Nothing to seed either, and deliberately so.
+
+      A seeded slip would put a fabricated excuse ("waiting on the laser
+      cutter") into the sample club's history, attributed to a sample member.
+      The demo is meant to show the feature existing, not to invent a story
+      about a project failing.
+    */
+    projectDeadlineChanges: [],
     // Likewise — an ask only exists because a member posted one.
     helpRequests: [],
     // Nothing to seed: the club writes these, and inventing sample links

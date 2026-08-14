@@ -38,6 +38,7 @@ export default async function DashboardPage({
     escalations,
     flaggedProjects,
     completions,
+    deadlinesMoved,
     reQueue,
     goneQuiet,
     rollUp,
@@ -99,7 +100,7 @@ export default async function DashboardPage({
                   Check-ins only generate inside a term the club has entered.
                   Until one covers today, nobody is prompted to write one,
                   nothing shows in your review queue, and reliability
-                  doesn&apos;t start counting. Everything else — hours,
+                  doesn&apos;t start counting. Everything else — the work log,
                   projects, deliverables — works normally.
                 </p>
                 <Link
@@ -654,6 +655,64 @@ export default async function DashboardPage({
                     <div
                       key={notice.id}
                       className="rounded-tile border-ok-fg/25 bg-ok-bg border px-4 py-3.5"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        {project ? (
+                          <Link
+                            href={`/projects/${project.slug}`}
+                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                          >
+                            {project.name}
+                          </Link>
+                        ) : (
+                          <span className="text-ink-muted text-[15px] font-bold">
+                            A project that has since been removed
+                          </span>
+                        )}
+                        <span className="text-ink-muted text-sm">
+                          {ageDays === 0
+                            ? "today"
+                            : `${ageDays} ${ageDays === 1 ? "day" : "days"} ago`}
+                        </span>
+                      </div>
+                      <p className="text-ink-soft mt-1.5 text-sm">
+                        {notice.body}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            Deadlines that moved under this person.
+
+            A separate card from "Finished Recently" rather than a wider filter on
+            it. That one is green — a completion is good news — and a slip is not,
+            so merging them would either colour a slip as an achievement or drain
+            the colour out of a real completion. Amber, the tone this app already
+            uses for "keep an eye on this".
+
+            Only pushes arrive here. `changeProjectDeadline` writes no notice when
+            a date is pulled IN, because a notification about good news trains
+            people to ignore the notification.
+          */}
+          {deadlinesMoved.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Deadlines Moved</SectionLabel>
+                <p className="text-ink-soft mt-2 text-[15px]">
+                  Projects below you whose target date was pushed out. You were
+                  told because you&apos;re above them in the chain — the old
+                  date is still on the project&apos;s timeline.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {deadlinesMoved.map(({ notice, project, ageDays }) => (
+                    <div
+                      key={notice.id}
+                      className="rounded-tile border-warn-fg/25 bg-warn-bg border px-4 py-3.5"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         {project ? (

@@ -24,6 +24,8 @@ import {
   advisorOptions,
   projectAttentionFlags,
   projectBreadcrumb,
+  baselineTargetDate,
+  deadlineChanges,
   projectDeliverables,
   projectMembers,
   projectNotices,
@@ -34,6 +36,7 @@ import {
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { daysBetweenDays } from "@/lib/dates";
 import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
   ClubEvent,
@@ -45,6 +48,7 @@ import type {
   ProjectArtifact,
   ProjectAttentionFlag,
   ProjectMembership,
+  ProjectDeadlineChange,
   ProjectNotice,
   Team,
   WorkLog,
@@ -341,6 +345,28 @@ export interface ProjectDetailView {
     notified: Member[];
   }[];
   /**
+   * Every move of this project's target date, newest first, with who did it.
+   *
+   * The whole point of recording slips is that somebody can read them, so this
+   * is unconditional — no permission gate. A schedule is the public per-project
+   * half of the transparency rule, and a slip nobody outside the project can see
+   * is how a division plans against a date that was abandoned weeks ago.
+   */
+  deadlineHistory: {
+    change: ProjectDeadlineChange;
+    actor?: Member;
+    /** Days the date moved. Negative when it was pulled IN. */
+    daysMoved: number;
+  }[];
+  /**
+   * The first date ever committed to, when it differs from the current target.
+   *
+   * Derived from `deadlineHistory` rather than stored — see
+   * `baselineTargetDate`. Undefined means the schedule has never moved, which
+   * the UI says out loud rather than showing an empty history panel.
+   */
+  baselineTargetDate?: string;
+  /**
    * Sub-projects at any depth that aren't complete yet.
    *
    * The operation refuses a completion while this is non-empty. Surfacing it
@@ -461,6 +487,21 @@ export async function getProjectBySlug(
         .map((id) => getMember(id))
         .filter((m): m is Member => Boolean(m)),
     })),
+    deadlineHistory: deadlineChanges(project.id).map((change) => ({
+      change,
+      actor: change.changedById ? getMember(change.changedById) : undefined,
+      /*
+        Computed here, not in the page, for the usual reason: the component
+        renders identically whenever it renders and never does date arithmetic
+        of its own. Both dates are `YYYY-MM-DD`, parsed as UTC — a Pacific day
+        is 23 or 25 hours twice a year, so day counts are done in UTC per
+        `lib/dates.ts`.
+      */
+      daysMoved: change.fromDate
+        ? daysBetweenDays(change.fromDate, change.toDate)
+        : 0,
+    })),
+    baselineTargetDate: baselineTargetDate(project.id),
     incompleteDescendants: descendantsOf(project.id)
       .filter((p) => p.phase !== "complete")
       .map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
@@ -659,6 +700,16 @@ function projectTimeline(project: Project): GanttChart | null {
       href: p.id === project.id ? undefined : `/projects/${p.slug}`,
       start: p.startDate,
       end: p.targetDate,
+      /*
+        The original date, so the chart shows the schedule MOVING.
+
+        Only on the project chart, which is the one that runs with
+        `clipToToday` off precisely because "its own history is half the
+        answer". `buildGantt` drops a baseline that falls outside a narrowed
+        window rather than clamping it, so passing it here is safe even when a
+        caller does clip.
+      */
+      baselineEnd: baselineTargetDate(p.id),
       depth,
       tone: projectTone(
         p.phase,

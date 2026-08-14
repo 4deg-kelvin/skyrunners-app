@@ -68,6 +68,7 @@ const liveSnapshot = {
   events: [],
   projectArtifacts: [],
   projectNotices: [],
+  projectDeadlineChanges: [],
   helpRequests: [],
   trainingSections: [],
   catalogueItems: [],

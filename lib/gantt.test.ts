@@ -346,3 +346,136 @@ describe("clipToToday", () => {
     }
   });
 });
+
+/**
+ * The baseline marker — where a project was ORIGINALLY due.
+ *
+ * The point of drawing it is that a Gantt which silently redraws itself every
+ * time a date is pushed cannot show that a project keeps slipping. These tests
+ * pin the two ways that could go wrong quietly: a marker on a date the chart
+ * doesn't cover, and a marker that appears when nothing moved.
+ */
+describe("the baseline marker for a pushed deadline", () => {
+  test("sits at the original date, left of the current end", () => {
+    const c = buildGantt(
+      [
+        row({
+          start: "2026-08-01",
+          end: "2026-10-01",
+          baselineEnd: "2026-09-01",
+        }),
+      ],
+      TODAY
+    );
+    const bar = c.bars[0];
+    assert.ok(bar.baselineEndPct !== undefined, "a slip must draw a marker");
+    // Strictly inside the bar, and before its right edge — a baseline that
+    // rendered at or past the end would say the project hadn't slipped.
+    assert.ok(bar.baselineEndPct > bar.leftPct);
+    assert.ok(bar.baselineEndPct < bar.leftPct + bar.widthPct);
+  });
+
+  test("the window widens to cover the original date", () => {
+    // The baseline is earlier than everything else present. If it weren't
+    // counted as content it would clamp to 0 and point off-chart.
+    const c = buildGantt(
+      [
+        row({
+          start: "2026-09-10",
+          end: "2026-10-01",
+          baselineEnd: "2026-09-05",
+        }),
+      ],
+      TODAY
+    );
+    assert.ok(c.windowStart <= "2026-09-05");
+    assert.ok(c.bars[0].baselineEndPct !== undefined);
+    assert.ok(c.bars[0].baselineEndPct > 0, "not glued to the left edge");
+  });
+
+  test("no baseline means no marker", () => {
+    const c = buildGantt(
+      [row({ start: "2026-08-01", end: "2026-10-01" })],
+      TODAY
+    );
+    assert.equal(c.bars[0].baselineEndPct, undefined);
+  });
+
+  test("a date pushed out and pulled back draws nothing", () => {
+    /*
+      The history still records both moves — that's the table's job. But the
+      chart has nothing to show, because nothing net-moved, and a marker sitting
+      exactly under the bar's right edge would read as a slip that didn't happen.
+    */
+    const c = buildGantt(
+      [
+        row({
+          start: "2026-08-01",
+          end: "2026-10-01",
+          baselineEnd: "2026-10-01",
+        }),
+      ],
+      TODAY
+    );
+    assert.equal(c.bars[0].baselineEndPct, undefined);
+  });
+
+  test("deliverables never get one", () => {
+    // Nothing records moves of a deliverable's due date, so a baseline on one
+    // could only be a mistake by the caller. Ignored rather than drawn.
+    const c = buildGantt(
+      [
+        row({
+          kind: "deliverable",
+          end: "2026-10-01",
+          baselineEnd: "2026-09-01",
+        }),
+      ],
+      TODAY
+    );
+    assert.equal(c.bars[0].baselineEndPct, undefined);
+  });
+
+  test("a baseline outside a narrowed window is omitted, not clamped", () => {
+    /*
+      The trap this exists to avoid. On the division chart the window opens at
+      today; a project originally due months ago would clamp to leftPct 0 and
+      render a marker on a date the chart does not cover — indistinguishable to
+      the reader from "due right now".
+    */
+    const c = buildGantt(
+      [
+        row({
+          start: "2026-08-25",
+          end: "2026-12-01",
+          baselineEnd: "2026-06-01",
+          tone: "ok",
+        }),
+      ],
+      TODAY,
+      { clipToToday: true }
+    );
+    assert.ok(c.windowStart >= TODAY, "the window should have been clipped");
+    assert.equal(
+      c.bars[0].baselineEndPct,
+      undefined,
+      "a baseline before the window must be dropped, never clamped to 0"
+    );
+  });
+
+  test("every drawn marker is inside the chart", () => {
+    // The invariant that makes the marker safe to render without the component
+    // re-checking it.
+    for (const baselineEnd of ["2026-08-02", "2026-09-15", "2026-11-30"]) {
+      const c = buildGantt(
+        [row({ start: "2026-08-01", end: "2026-12-01", baselineEnd })],
+        TODAY
+      );
+      const p = c.bars[0].baselineEndPct;
+      assert.ok(
+        p !== undefined && p >= 0 && p <= 100,
+        `${baselineEnd} -> ${p}`
+      );
+    }
+  });
+});

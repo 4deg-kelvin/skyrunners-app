@@ -167,6 +167,21 @@ export interface DashboardView {
     ageDays: number;
   }[];
   /**
+   * Projects below the viewer whose target date moved LATER, recently.
+   *
+   * The other half of "notify up the chain": a completion changes what a
+   * division has achieved, a slip changes what everybody else can plan against,
+   * and a Lead needs the second at least as much as the first. Only pushes reach
+   * here — `changeProjectDeadline` writes no notice when a date is pulled IN,
+   * because good news that notifies trains people to ignore the notice.
+   */
+  deadlinesMoved: {
+    notice: ProjectNotice;
+    project?: Project;
+    actor?: Member;
+    ageDays: number;
+  }[];
+  /**
    * The RE half of the exception feed — what's waiting on YOU as an RE.
    *
    * Separate from `reviewQueue`, which is the Lead half. Two obligations, two
@@ -612,6 +627,29 @@ export async function getDashboard(
       .projectNotices.filter(
         (n) =>
           n.kind === "completed" &&
+          n.notifiedMemberIds.includes(actor.id) &&
+          daysSince(n.createdAt) <= COMPLETION_NOTICE_DAYS
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((notice) => ({
+        notice,
+        project: getProject(notice.projectId),
+        actor: getMember(notice.createdById),
+        ageDays: daysSince(notice.createdAt),
+      })),
+    /*
+      Deadlines that moved under this person, newest first.
+
+      A SIBLING of `completions` rather than a widening of it, deliberately. That
+      block renders in a green "Finished Recently" card, and a slipped deadline
+      is not good news — putting the two in one list would either colour a slip
+      as an achievement or drain the colour out of a real completion. Same
+      window and same audience rule; different meaning, so different card.
+    */
+    deadlinesMoved: readStore()
+      .projectNotices.filter(
+        (n) =>
+          n.kind === "deadline_pushed" &&
           n.notifiedMemberIds.includes(actor.id) &&
           daysSince(n.createdAt) <= COMPLETION_NOTICE_DAYS
       )

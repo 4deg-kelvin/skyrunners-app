@@ -29,6 +29,7 @@ import type {
   Project,
   ProjectArtifact,
   ProjectMembership,
+  ProjectDeadlineChange,
   ProjectNotice,
   Team,
   Term,
@@ -549,6 +550,39 @@ const projectNotices: CollectionSpec<ProjectNotice> = {
 };
 
 /**
+ * Target-date moves. Append-only — see `ProjectDeadlineChange`.
+ *
+ * `identify` is the row id rather than a natural key, because a project can
+ * legitimately move the same date twice (out, back in, out again) and a
+ * composite key would make the second move overwrite the first.
+ */
+const projectDeadlineChanges: CollectionSpec<ProjectDeadlineChange> = {
+  key: "projectDeadlineChanges",
+  table: "project_deadline_changes",
+  columns: "id, project_id, from_date, to_date, reason, changed_by, changed_at",
+  identify: (c) => c.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    projectId: r.project_id as string,
+    fromDate: opt(r.from_date as string),
+    toDate: r.to_date as string,
+    reason: (r.reason as string) ?? "",
+    changedById: opt(r.changed_by as string),
+    changedAt: r.changed_at as string,
+  }),
+  toRow: (c) => ({
+    id: c.id,
+    project_id: c.projectId,
+    from_date: nul(c.fromDate),
+    to_date: c.toDate,
+    reason: c.reason,
+    changed_by: nul(c.changedById),
+    changed_at: c.changedAt,
+  }),
+  dependsOn: ["members", "projects"],
+};
+
+/**
  * Help requests carry their replies inline, the same shape `progressUpdates`
  * uses for entries: two tables, one object. `supabase.ts` stitches on read and
  * splits on write.
@@ -857,6 +891,7 @@ export const COLLECTIONS = [
   projectArtifacts,
   progressUpdates,
   projectNotices,
+  projectDeadlineChanges,
   helpRequests,
   trainingSections,
   catalogueItems,

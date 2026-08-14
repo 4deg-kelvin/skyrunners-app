@@ -54,6 +54,19 @@ export interface GanttRow {
   /** Missing start means "we don't know" — see `hasStart` on the output. */
   start?: string;
   end?: string;
+  /**
+   * The date this project was ORIGINALLY due, when that differs from `end`.
+   *
+   * `min(fromDate)` across the project's `project_deadline_changes` — the first
+   * date anybody committed to, before any slip. Drawn as a ghost marker so the
+   * chart shows the schedule moving rather than only its current state; a Gantt
+   * that silently redraws itself every time a date is pushed is a chart nobody
+   * can use to notice that a project keeps slipping.
+   *
+   * Projects only. A deliverable has no baseline because nothing records moves
+   * of its due date — if that ever changes, this field generalises unchanged.
+   */
+  baselineEnd?: string;
   /** 0 for a division's own projects, 1 for their children, and so on. */
   depth: number;
   tone: GanttTone;
@@ -83,6 +96,16 @@ export interface GanttBar extends GanttRow {
    */
   hasStart: boolean;
   hasEnd: boolean;
+  /**
+   * Where the original due date sits, as a percent of the window.
+   *
+   * Undefined when the project never slipped, when it has no baseline, OR when
+   * the baseline falls outside a narrowed window. That last case matters: a
+   * clamped marker would sit glued to the left edge pointing at a date the chart
+   * doesn't cover, which reads as "due now" — the same trap the `drawn` filter
+   * below exists to avoid for finished rows.
+   */
+  baselineEndPct?: number;
 }
 
 export interface GanttChart {
@@ -167,6 +190,17 @@ export function buildGantt(
   for (const r of visible) {
     if (r.start) dates.push(utc(r.start));
     if (r.end) dates.push(utc(r.end));
+    /*
+      A baseline counts as content, so the window always covers it.
+
+      Without this the original date could fall left of the window and clamp to
+      0, drawing a marker on a date the chart doesn't show. It cannot widen the
+      window the wrong way — a baseline is by construction EARLIER than the
+      current end, so `max` is untouched — and it cannot defeat the division
+      chart's clipping either, because `clipToToday` derives `min` from today and
+      the earliest overdue row rather than from `naturalMin`.
+    */
+    if (r.baselineEnd) dates.push(utc(r.baselineEnd));
   }
   // Today is always inside the window. A chart of past deadlines with no "now"
   // on it can't answer the only question people bring to it.
@@ -271,10 +305,31 @@ export function buildGantt(
     const left = clamp(pct(Math.min(startMs, endMs)));
     const right = clamp(pct(Math.max(startMs, endMs)));
 
+    /*
+      The original due date, only when it is genuinely on the chart.
+
+      NOT clamped, deliberately — omitted instead. A clamped baseline would draw
+      at the window edge on a date the chart doesn't cover, and a marker pointing
+      at the wrong date is worse than no marker: the reader has no way to tell
+      the difference. `undefined` lets the component simply not draw it.
+
+      Also skipped when it equals the current end, which happens if a date was
+      pushed and later pulled back to where it started. The history still records
+      both moves; the chart has nothing to show, because nothing net-moved.
+    */
+    let baselineEndPct: number | undefined;
+    if (r.kind === "project" && r.baselineEnd && hasEnd) {
+      const baseMs = utc(r.baselineEnd);
+      if (baseMs >= min && baseMs <= max && baseMs !== utc(r.end!)) {
+        baselineEndPct = pct(baseMs);
+      }
+    }
+
     return {
       ...r,
       leftPct: left,
       widthPct: Math.max(0, right - left),
+      baselineEndPct,
       /*
         A project that began before the window reads as open-ended on the left,
         the same way one with no recorded start does. Both mean "it didn't start

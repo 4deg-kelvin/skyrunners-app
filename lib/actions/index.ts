@@ -1464,6 +1464,43 @@ async function updateDeliverableAction$impl(
   return toResult(result, "Saved.");
 }
 
+/**
+ * Move a project's target date, with a reason, keeping the old one.
+ *
+ * `manageProject` — the same right as editing the project, which this is a
+ * narrower version of. Deliberately NOT `completeProject`: moving a date is
+ * running the project, not reviewing it, and the assigned RE is exactly who
+ * should be able to say "this is going to take longer". Making them ask the RE
+ * above would mean the honest answer needs somebody else's diary, and the
+ * dishonest one — leaving a date everyone knows is wrong — stays free.
+ */
+async function pushDeadlineAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageProject(viewer.actor, viewer.graph, projectId)) {
+    return denied("move this project's target date");
+  }
+
+  const result = await ops.changeProjectDeadline({
+    projectId,
+    targetDate: String(formData.get("targetDate") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+    actorId: viewer.member.id,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+  return toResult(
+    result,
+    result.ok
+      ? `Target moved to ${result.value.targetDate}. The old date stays on the record.`
+      : ""
+  );
+}
+
 async function updateProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -2823,6 +2860,12 @@ export async function updateProjectAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => updateProjectAction$impl(formData));
+}
+
+export async function pushDeadlineAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => pushDeadlineAction$impl(formData));
 }
 
 export async function deleteProjectAction(

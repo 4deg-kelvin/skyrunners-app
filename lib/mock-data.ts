@@ -3454,6 +3454,35 @@ export function lastEntryForProject(memberId: string, projectId: string) {
 
 /** All entries about a project, from anyone — the project's activity feed. */
 /** Automatic announcements on a project, newest first. See `ProjectNotice`. */
+/** One project's target-date moves, newest first. */
+export function deadlineChanges(projectId: string) {
+  return live()
+    .projectDeadlineChanges.filter((c) => c.projectId === projectId)
+    .sort((a, b) => b.changedAt.localeCompare(a.changedAt));
+}
+
+/**
+ * The first date this project was ever committed to, or undefined if it hasn't
+ * moved.
+ *
+ * `min(fromDate)` across its changes, DERIVED rather than stored. A
+ * `baselineTargetDate` column beside `targetDate` would be a second source of
+ * truth for the same fact, and the two would drift the first time a row was
+ * written without it.
+ *
+ * Compared as strings — they're `YYYY-MM-DD`, so lexical order is chronological
+ * order, and building `Date` objects to compare two calendar dates is how the
+ * timezone bugs in `lib/dates.ts` got started.
+ */
+export function baselineTargetDate(projectId: string): string | undefined {
+  let earliest: string | undefined;
+  for (const c of live().projectDeadlineChanges) {
+    if (c.projectId !== projectId || !c.fromDate) continue;
+    if (!earliest || c.fromDate < earliest) earliest = c.fromDate;
+  }
+  return earliest;
+}
+
 export function projectNotices(projectId: string) {
   return live()
     .projectNotices.filter((n) => n.projectId === projectId)
