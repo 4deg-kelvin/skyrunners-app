@@ -36,6 +36,7 @@ import {
   getProject,
   memberProjects,
   recentWorkLogs,
+  lastWorkLogs,
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
@@ -137,7 +138,13 @@ export interface DashboardView {
   /** The viewer's own committed projects, so they can log hours from here. */
   myProjects: { id: string; name: string }[];
   /** Their own recent hours, so a mistyped entry can be removed from here too. */
-  recentHours: { log: WorkLog; project?: Project; locked: boolean }[];
+  recentHours: {
+    log: WorkLog;
+    project?: Project;
+    locked: boolean;
+    /** Older than the fortnight window — a reminder, not something to edit. */
+    stale: boolean;
+  }[];
   /**
    * Projects completed recently that named the viewer in the chain.
    *
@@ -579,11 +586,21 @@ export async function getDashboard(
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
-    recentHours: recentWorkLogs(actor.id).map((log) => ({
-      log,
-      project: log.projectId ? getProject(log.projectId) : undefined,
-      locked: hoursAreLocked(actor.id, log.workDate),
-    })),
+    /*
+      Same fallback as My Work: when the fortnight is empty, show the last few
+      entries whatever their age so somebody back from a break sees what they
+      were on rather than a blank space.
+    */
+    recentHours: (() => {
+      const recent = recentWorkLogs(actor.id);
+      const stale = recent.length === 0;
+      return (stale ? lastWorkLogs(actor.id) : recent).map((log) => ({
+        log,
+        project: log.projectId ? getProject(log.projectId) : undefined,
+        locked: hoursAreLocked(actor.id, log.workDate),
+        stale,
+      }));
+    })(),
     // Addressed to this person, newest first, and only the last fortnight.
     // Older than that it's history rather than news, and the project pages and
     // the completed sections on /projects are where history belongs.

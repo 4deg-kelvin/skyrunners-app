@@ -173,3 +173,69 @@ describe("the check-in composer offers a box per live committed project", () => 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// What the log-hours form shows beside itself
+// ---------------------------------------------------------------------------
+
+describe("hours history for the log form", () => {
+  test("recent entries carry the project and the note", async () => {
+    /*
+      The whole reason the list exists: "3 hrs" tells you nothing a week later,
+      "3 hrs on Wing Spar — ran the tensile coupons" tells you where to pick up.
+    */
+    const view = await getMyWork(NOAH);
+    for (const row of view.recentHours) {
+      assert.ok(
+        "project" in row,
+        "project must be joined, not looked up later"
+      );
+      assert.ok("locked" in row);
+      assert.ok("stale" in row);
+    }
+  });
+
+  test("falls back to older entries when the fortnight is empty", async () => {
+    /*
+      The returning-member case. Before this, somebody back from midterms saw
+      an empty list — at exactly the moment "which project was I on, and what
+      had I done" is the question they have. An empty space there reads as
+      "you have never done anything here".
+    */
+    const store = disk.readStore();
+    const mine = store.workLogs.filter((w) => w.memberId === NOAH);
+    if (mine.length === 0) return; // fixture has none to age
+
+    // Push every entry well outside the 14-day window.
+    await disk.mutate((s) => {
+      for (const w of s.workLogs) {
+        if (w.memberId === NOAH) w.workDate = "2026-01-05";
+      }
+      return { ok: true as const, value: null };
+    });
+
+    const view = await getMyWork(NOAH);
+    assert.ok(
+      view.recentHours.length > 0,
+      "an old logger must still see where they left off"
+    );
+    assert.equal(
+      view.recentHours.every((r) => r.stale),
+      true,
+      "those rows must be marked stale so the form retitles the section"
+    );
+  });
+
+  test("somebody who has never logged still sees nothing", async () => {
+    // The fallback must not invent rows. `hasEverLoggedHours` is the signal
+    // for this person, and it needs a different prompt entirely.
+    await disk.mutate((s) => {
+      s.workLogs = s.workLogs.filter((w) => w.memberId !== NOAH);
+      return { ok: true as const, value: null };
+    });
+
+    const view = await getMyWork(NOAH);
+    assert.equal(view.recentHours.length, 0);
+    assert.equal(view.hasEverLoggedHours, false);
+  });
+});

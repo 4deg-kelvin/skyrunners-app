@@ -28,6 +28,7 @@ import {
   projectProgress,
   projectREs,
   recentWorkLogs,
+  lastWorkLogs,
   scheduleFor,
   termFor,
   today,
@@ -152,6 +153,8 @@ export interface MyWorkView {
     log: WorkLog;
     project?: Project;
     locked: boolean;
+    /** Older than the fortnight window — shown as a reminder, not for editing. */
+    stale: boolean;
   }[];
   /**
    * Whether they have ever logged a single hour.
@@ -344,10 +347,28 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     myRequests: myJoinRequests(memberId),
     requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
     hasEverLoggedHours: hasLoggedAnyHours(memberId),
-    recentHours: recentWorkLogs(memberId).map((log) => ({
-      log,
-      project: log.projectId ? getProject(log.projectId) : undefined,
-      locked: hoursAreLocked(memberId, log.workDate),
-    })),
+    recentHours: hoursToShow(memberId),
   };
+}
+
+/**
+ * What to show beside the log-hours form.
+ *
+ * The fortnight window first, because its job is letting somebody fix a
+ * mistyped number. When that's empty we fall back to their last few entries
+ * whatever their age and mark them `stale`, so the form can say "you haven't
+ * logged in a while — last time you were on X doing Y" instead of showing a
+ * blank space to the one person who most needs the reminder.
+ */
+function hoursToShow(memberId: string) {
+  const recent = recentWorkLogs(memberId);
+  const stale = recent.length === 0;
+  const logs = stale ? lastWorkLogs(memberId) : recent;
+
+  return logs.map((log) => ({
+    log,
+    project: log.projectId ? getProject(log.projectId) : undefined,
+    locked: hoursAreLocked(memberId, log.workDate),
+    stale,
+  }));
 }
