@@ -19,6 +19,7 @@ import {
   REVIEW_GRACE_DAYS,
   unreadReportsFor,
   reviewRecordFor,
+  withLeaderlessPeers,
 } from "@/lib/review";
 import type { Member, Project, ProgressUpdate, UpdateEntry } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
@@ -90,10 +91,16 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
     (m) => m.leadId === actor.id && m.status === "active"
   );
 
+  const reviewable = withLeaderlessPeers(
+    actor,
+    directReports,
+    readStore().members
+  );
+
   const toReview: UpdateCard[] = unreadReportsFor(
     actor.id,
     progressUpdates,
-    directReports,
+    reviewable,
     today()
   ).map((r) => ({
     update: r.update,
@@ -103,7 +110,7 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
     escalated: r.escalated,
   }));
 
-  const reportIds = new Set(directReports.map((m) => m.id));
+  const reportIds = new Set(reviewable.map((m) => m.id));
   const reviewed: UpdateCard[] = progressUpdates
     .filter((u) => u.status === "reviewed" && reportIds.has(u.memberId))
     .map((update) => ({
@@ -119,10 +126,10 @@ export async function getUpdates(actor: Actor): Promise<UpdatesView> {
     mine,
     toReview,
     reviewed,
-    record: reviewRecordFor(actor.id, progressUpdates, directReports, today()),
+    record: reviewRecordFor(actor.id, progressUpdates, reviewable, today()),
     // Co-Leads see the section even with no direct reports, because they still
     // need to know the mechanism exists.
-    isReviewer: directReports.length > 0 || isCoLead(actor),
+    isReviewer: reviewable.length > 0 || isCoLead(actor),
     graceDays: REVIEW_GRACE_DAYS,
     today: today(),
   };
