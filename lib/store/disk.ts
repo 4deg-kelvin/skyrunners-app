@@ -31,6 +31,7 @@ import type {
   Member,
   Project,
   ProjectArtifact,
+  GuideBlock,
   Team,
   Term,
   Deliverable,
@@ -117,6 +118,8 @@ export interface StoreShape {
   projectNotices: ProjectNotice[];
   /** Free-form asks on the blocker board — see `HelpRequest`. */
   helpRequests: HelpRequest[];
+  /** Club-written material on the guide pages — see GuideBlock. */
+  guideBlocks: GuideBlock[];
   /**
    * The trainings catalogue and who holds what.
    *
@@ -190,6 +193,9 @@ function seed(): StoreShape {
     projectNotices: [],
     // Likewise — an ask only exists because a member posted one.
     helpRequests: [],
+    // Nothing to seed: the club writes these, and inventing sample links
+    // would put fake Google Docs in front of a real new member.
+    guideBlocks: [],
     trainingSections: seedTrainingSections,
     catalogueItems: seedCatalogueItems,
     // Nobody holds anything until they say so and a Lead verifies it.

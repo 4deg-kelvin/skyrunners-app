@@ -985,3 +985,40 @@ export interface MemberRequest {
   respondedAt?: string;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Guide pages — club-written material a Co-Lead can edit without a deploy
+// ---------------------------------------------------------------------------
+
+/** Which guide page a block belongs to. Matches the check in migration 0038. */
+export type GuidePage = "getting_started" | "leading";
+
+export const GUIDE_PAGES: GuidePage[] = ["getting_started", "leading"];
+
+/**
+ * One piece of club-written content on a guide page.
+ *
+ * The DIVIDING LINE, because it's the thing to get right: how the APP works
+ * stays hard-coded on those pages, because it has to track the code or it
+ * starts describing buttons that no longer exist. How the CLUB works lives
+ * here, because the club changes it faster than anybody ships a deploy — the
+ * same argument that made the trainings catalogue data rather than an enum.
+ *
+ * A `link` points somewhere outside the app (a Google Doc explaining Fusion
+ * setup, a Drive folder of templates). A `note` is prose the club wants said.
+ */
+export interface GuideBlock {
+  id: string;
+  page: GuidePage;
+  kind: "link" | "note";
+  title: string;
+  /** One line of "what is this" for a link; the whole content for a note. */
+  body?: string;
+  /** Required for a link, absent for a note. Enforced in SQL too. */
+  url?: string;
+  /** A heading the club invents — "Software setup", "Shop safety". */
+  category?: string;
+  sortOrder: number;
+  updatedAt: string;
+  updatedById?: string;
+}
