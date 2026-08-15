@@ -1541,6 +1541,72 @@ async function pushDeliverableDeadlineAction$impl(
   );
 }
 
+/**
+ * Delete a batch of one person's empty projects.
+ *
+ * ---------------------------------------------------------------------------
+ * The recovery path for a bulk write, and why it's shaped like this
+ * ---------------------------------------------------------------------------
+ *
+ * An assistant on the MCP server created ~4,000 empty projects. There was no way
+ * to undo that from the UI, and there is no realistic number of times somebody
+ * will press a per-project delete button.
+ *
+ * Three deliberate constraints:
+ *
+ *   - **Co-Lead only** (`purgeEmptyProjects`), not `deleteProject`'s per-project
+ *     rule, which would let an RE reach across divisions.
+ *   - **It names the person whose projects go**, so it can never be a
+ *     "delete all empty projects" button that catches somebody else's.
+ *   - **It confirms by typed count.** The client sends the number it displayed;
+ *     if the real number has changed since the page rendered, the action refuses
+ *     rather than deleting a set the Co-Lead never saw. That is the check that
+ *     makes a stale tab harmless.
+ */
+async function purgeEmptyProjectsAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.purgeEmptyProjects(viewer.actor)) {
+    return denied("bulk-delete projects");
+  }
+
+  const creatorId = String(formData.get("creatorId") ?? "");
+  if (!creatorId) return { ok: false, error: "Say whose projects to remove." };
+
+  /*
+    What the page showed, compared with what is there now.
+
+    Not paranoia: the incident that produced this feature was still adding rows
+    while it was being looked at, so "the number moved" is the expected case, not
+    the exotic one.
+  */
+  const expected = Number(String(formData.get("expected") ?? ""));
+  const actual = ops.emptyProjectsCreatedBy(readStore(), creatorId).length;
+  if (!Number.isFinite(expected) || expected !== actual) {
+    return {
+      ok: false,
+      error: `The count changed — it was ${Number.isFinite(expected) ? expected : "unknown"} and is now ${actual}. Reload and check before deleting.`,
+    };
+  }
+
+  const result = await ops.purgeEmptyProjectsCreatedBy({
+    creatorId,
+    limit: Number(String(formData.get("limit") ?? "")) || 250,
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+  refresh();
+
+  const { deleted, remaining } = result.value;
+  return {
+    ok: true,
+    message: remaining
+      ? `Deleted ${deleted}. ${remaining} still to go — press again.`
+      : `Deleted ${deleted}. Nothing empty left for them.`,
+  };
+}
+
 async function updateProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -2981,6 +3047,12 @@ export async function pushDeadlineAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => pushDeadlineAction$impl(formData));
+}
+
+export async function purgeEmptyProjectsAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => purgeEmptyProjectsAction$impl(formData));
 }
 
 export async function deleteProjectAction(

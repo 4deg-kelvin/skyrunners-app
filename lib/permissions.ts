@@ -957,6 +957,21 @@ export const can = {
   manageTeams: (actor: Actor) => isCoLead(actor),
 
   /**
+   * Bulk-delete the empty projects one actor created.
+   *
+   * Co-Lead only, and NOT `deleteProject`'s rule, even though it deletes
+   * projects. `deleteProject` is scoped to one project you are the RE of or
+   * above; this operates across the whole club by author, so an RE could
+   * otherwise reach projects in a division they have nothing to do with.
+   *
+   * It exists because an assistant on the MCP server created ~4,000 empty
+   * projects, and clicking delete four thousand times is not a recovery plan.
+   * The safety is in `emptyProjectsCreatedBy`, which will only offer up projects
+   * that carry no work at all — so the worst this can destroy is shells.
+   */
+  purgeEmptyProjects: (actor: Actor) => isCoLead(actor),
+
+  /**
    * Moving the commitment tier floors.
    *
    * Co-Lead only, for the same reason as `manageTeams`: this is the definition

@@ -6,6 +6,7 @@ import { PauseControls } from "@/components/forms/check-in-form";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { McpTokens } from "@/components/forms/mcp-tokens";
 import { CalendarFeed } from "@/components/forms/calendar-feed";
+import { PurgeProjects } from "@/components/forms/purge-projects";
 import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
@@ -23,7 +24,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { UpdateScheduleForm } from "./update-schedule-form";
-import { getClubIdentity, getSettings } from "@/lib/data/settings";
+import {
+  getBulkCreationReport,
+  getClubIdentity,
+  getSettings,
+} from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
@@ -83,6 +88,17 @@ export default async function SettingsPage() {
     so the count can't drift from what's shown elsewhere.
   */
   const roles = await getLeadershipRoles(viewer.member.id);
+
+  /*
+    Only fetched for somebody who can act on it.
+
+    `getBulkCreationReport` walks every member against every project, so it is
+    the most expensive thing on this page. A plain member can neither see nor use
+    the result, so computing it for them would be pure waste on every visit.
+  */
+  const bulkCreators = can.purgeEmptyProjects(viewer.actor)
+    ? await getBulkCreationReport()
+    : [];
   const digestReasons = [
     roles.isRE ? "an RE" : "",
     roles.divisionsLed.length
@@ -95,6 +111,7 @@ export default async function SettingsPage() {
   const mayEditCalendar = can.manageTerms(viewer.actor);
   const mayEditCatalogue = can.manageTrainingCatalogue(viewer.actor);
   const mayEditTiers = can.manageEngagementWeights(viewer.actor);
+  const mayPurge = can.purgeEmptyProjects(viewer.actor);
   const isPaused = !!schedule.pausedUntil;
   const todayIso = todayInClubTime();
 
@@ -347,6 +364,33 @@ export default async function SettingsPage() {
             <p className="text-ink-soft mt-1 text-[15px]">
               {identity.description}
             </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/*
+        Cleaning up after a bulk write. Co-Lead only.
+
+        Rendered only when there is something to clean, so it is invisible in the
+        normal case rather than a permanent delete button sitting in Settings. It
+        earned its place: an assistant on the MCP server created ~4,000 empty
+        projects, and the website had no way to undo that at all.
+      */}
+      {mayPurge && bulkCreators.length > 0 ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Cleanup</SectionLabel>
+            <h2 className="text-ink mt-2 text-2xl font-bold">
+              Projects with nothing on them
+            </h2>
+            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+              Usually this means somebody was testing, or an assistant connected
+              to the club&apos;s MCP server ran away with itself. Only projects
+              carrying no work at all appear here.
+            </p>
+            <div className="mt-5">
+              <PurgeProjects rows={bulkCreators} />
+            </div>
           </CardBody>
         </Card>
       ) : null}

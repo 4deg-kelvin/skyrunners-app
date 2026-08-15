@@ -103,6 +103,18 @@ export const OWNER_LEFT_NOTE = "Owner left the project — needs reassigning.";
  */
 const MAX_DESCRIPTION_CHARS = 500;
 
+/**
+ * How many projects one person may create in a day and leave with no work on them.
+ *
+ * Set after an assistant connected to the MCP server created ~4,000 empty
+ * projects in one run. See the long note in `createProject` for why the ceiling
+ * counts EMPTY projects rather than requests, and why it lives in this file.
+ *
+ * Twenty-five is far above a planning session and far below a loop. It's a
+ * backstop, not a quota — the number should never be reached by a person.
+ */
+export const MAX_EMPTY_PROJECTS_PER_DAY = 25;
+
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function fail<T>(error: string): Result<T> {
@@ -1349,7 +1361,55 @@ export async function createProject(input: {
     return fail("Every project needs a Responsible Engineer.");
   }
 
-  const { projects } = readStore();
+  const store = readStore();
+  const { projects } = store;
+
+  /*
+    ---------------------------------------------------------------------------
+    The runaway guard. This exists because of a real incident.
+    ---------------------------------------------------------------------------
+
+    A member connected an assistant to the MCP server and it created ~4,000
+    empty projects called "Project ABCX", "Project ABDG" and so on. Nothing was
+    bypassed: he was entitled to create projects in his own division, and every
+    individual call was legitimate. The failure was that there was no ceiling,
+    and an agent in a loop reaches a scale no human hand ever would.
+
+    Why it's HERE and not in the MCP layer: `operations.ts` is the only write
+    choke point, so this covers the website, the MCP server and anything added
+    later. A limit that lives in one caller is a limit the next caller doesn't
+    have.
+
+    Why "empty projects created today" rather than a request rate limit:
+
+      - A rate limit needs shared state across serverless invocations, which
+        means a table and a migration. This needs neither, and reads data the
+        store has already loaded.
+      - It targets the thing that is actually wrong. A lead legitimately filing
+        eight projects in a planning session is fine; twenty-five UNTOUCHED ones
+        in a day is not a person working, and a real one clears the way by
+        putting a deliverable on them or deleting them.
+      - It degrades honestly: the ceiling is per-creator per-day, so one runaway
+        assistant cannot deny the feature to anybody else.
+
+    A project stops counting the moment it has a deliverable, so the limit never
+    blocks somebody doing real work — only somebody accumulating shells.
+  */
+  const createdTodayEmpty = store.projectMemberships.filter(
+    (m) =>
+      m.addedBy === input.createdBy &&
+      m.joinedAt === input.today &&
+      m.role === "re" &&
+      !store.deliverables.some((d) => d.projectId === m.projectId)
+  ).length;
+
+  if (createdTodayEmpty >= MAX_EMPTY_PROJECTS_PER_DAY) {
+    return fail<Project>(
+      `You've created ${createdTodayEmpty} projects today that still have no deliverables on them. ` +
+        `That's the daily ceiling, and it exists because an assistant in a loop once made four thousand of them. ` +
+        `Add a deliverable to the ones you meant, or delete the rest, and this clears immediately.`
+    );
+  }
 
   // Same nesting rule as `updateProject`. Enforced on the way in as well, or
   // the constraint is one edit away from being bypassed: create the child with
@@ -1416,6 +1476,14 @@ export async function createProject(input: {
     */
     datesOverridden: Boolean(input.targetDate),
     isOpenToJoin: true,
+    /*
+      Recorded from now on. The column was always there; nothing wrote it.
+
+      `input.createdBy` was already being passed in by every caller and used only
+      for the membership's `addedBy`, so this is the same value finally landing
+      where somebody looking for "who made this" would go first.
+    */
+    createdBy: input.createdBy,
   };
 
   return guarded((store) => {
@@ -2608,6 +2676,175 @@ export async function updateProject(input: {
  * project is refused, because that history IS worth keeping. Archive those by
  * setting the phase to complete.
  */
+// ---------------------------------------------------------------------------
+// Cleaning up after a bulk write
+// ---------------------------------------------------------------------------
+
+/** One project the purge would remove. Enough to show a list before pressing. */
+export interface PurgeCandidate {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+/**
+ * Projects attributable to one person that carry NO trace of work.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this is defined by emptiness and not by name, date or count
+ * ---------------------------------------------------------------------------
+ *
+ * An assistant connected to the MCP server created ~4,000 projects called
+ * "Project ABCX", "Project ABDG" and so on. The obvious cleanup — match the
+ * name, or delete everything created in that hour — is the dangerous one: it
+ * decides what to destroy from a pattern in a string, and the club's real
+ * projects were created in exactly the same way through the same code path.
+ *
+ * So the test is **has anything happened here**. A project a person actually
+ * meant has a deliverable, a document, a log entry, a session, a join request or
+ * a second member. One that has none of those things, and whose only membership
+ * rows were created by the same actor, is a shell — and deleting a shell removes
+ * no history, which is what makes this compatible with the rule in CLAUDE.md
+ * that history must survive.
+ *
+ * Every collection carrying a `projectId` is checked, deliberately including the
+ * ones a bulk writer would never touch. The cost of an extra check is nothing;
+ * the cost of a missed one is somebody's work.
+ *
+ * Attribution accepts either source, because the two eras differ:
+ *   - `project.createdBy` for rows created after it started being written;
+ *   - the primary RE's `project_members.added_by` for everything before, which
+ *     is all 4,000 of them.
+ */
+export function emptyProjectsCreatedBy(
+  store: Pick<
+    StoreShape,
+    | "projects"
+    | "projectMemberships"
+    | "deliverables"
+    | "projectArtifacts"
+    | "workLogs"
+    | "joinRequests"
+    | "events"
+    | "projectNotices"
+    | "projectDeadlineChanges"
+    | "projectAdvisors"
+    | "helpRequests"
+    | "progressUpdates"
+  >,
+  creatorId: string
+): PurgeCandidate[] {
+  if (!creatorId) return [];
+
+  const entryProjectIds = new Set(
+    store.progressUpdates.flatMap((u) => u.entries.map((e) => e.projectId))
+  );
+
+  return store.projects
+    .filter((project) => {
+      const memberships = store.projectMemberships.filter(
+        (m) => m.projectId === project.id
+      );
+
+      /*
+        Attributable to this person, and to nobody else.
+
+        The membership half is what makes it safe: if ANY row on the project was
+        added by somebody other than the creator, another human has touched it and
+        it is out of scope, whatever its name looks like.
+      */
+      const primary = memberships.find(
+        (m) => m.memberId === project.primaryReId
+      );
+      const mine =
+        project.createdBy === creatorId || primary?.addedBy === creatorId;
+      if (!mine) return false;
+      if (memberships.some((m) => m.addedBy && m.addedBy !== creatorId)) {
+        return false;
+      }
+
+      // Anything at all having happened disqualifies it.
+      if (store.projects.some((p) => p.parentId === project.id)) return false;
+      if (store.deliverables.some((d) => d.projectId === project.id))
+        return false;
+      if (store.projectArtifacts.some((a) => a.projectId === project.id)) {
+        return false;
+      }
+      if (store.workLogs.some((w) => w.projectId === project.id)) return false;
+      if (store.joinRequests.some((r) => r.projectId === project.id))
+        return false;
+      if (store.events.some((e) => e.projectId === project.id)) return false;
+      if (store.projectNotices.some((n) => n.projectId === project.id)) {
+        return false;
+      }
+      if (
+        store.projectDeadlineChanges.some((c) => c.projectId === project.id)
+      ) {
+        return false;
+      }
+      if (store.projectAdvisors.some((a) => a.projectId === project.id)) {
+        return false;
+      }
+      if (store.helpRequests.some((h) => h.projectId === project.id))
+        return false;
+      if (entryProjectIds.has(project.id)) return false;
+
+      return true;
+    })
+    .map((p) => ({ id: p.id, name: p.name, slug: p.slug }));
+}
+
+/**
+ * Delete a batch of those shells.
+ *
+ * ---------------------------------------------------------------------------
+ * Batched on purpose, and the batch size is not a style choice
+ * ---------------------------------------------------------------------------
+ *
+ * `deleteProject` is one `mutate()` per project, which is one Postgres round
+ * trip: four thousand of those would take far longer than a serverless function
+ * is allowed to live, and a timeout half way through leaves the caller with no
+ * idea how far it got. This does ONE mutation for the whole batch, and returns
+ * how many are left so the caller can press again and watch the number fall.
+ *
+ * The re-derivation inside `guarded` matters: the candidate list is computed
+ * against the snapshot being written, not against whatever the page rendered
+ * from, so a project that gained a deliverable in between is not deleted.
+ */
+export async function purgeEmptyProjectsCreatedBy(input: {
+  creatorId: string;
+  /** How many to remove this press. */
+  limit: number;
+}): Promise<Result<{ deleted: number; remaining: number; names: string[] }>> {
+  return guarded((store) => {
+    const all = emptyProjectsCreatedBy(store, input.creatorId);
+    const batch = all.slice(0, Math.max(1, Math.min(input.limit, 500)));
+    const ids = new Set(batch.map((p) => p.id));
+
+    if (ids.size === 0) {
+      return ok({ deleted: 0, remaining: 0, names: [] });
+    }
+
+    /*
+      Only the collections that can point at a project WITHOUT disqualifying it
+      from the candidate list — which is memberships and nothing else, since
+      every other one is a reason to keep the project. Written out anyway rather
+      than trusted: if the emptiness test above is ever loosened, this must not
+      silently start orphaning rows.
+    */
+    store.projectMemberships = store.projectMemberships.filter(
+      (m) => !ids.has(m.projectId)
+    );
+    store.projects = store.projects.filter((p) => !ids.has(p.id));
+
+    return ok({
+      deleted: batch.length,
+      remaining: all.length - batch.length,
+      names: batch.slice(0, 5).map((p) => p.name),
+    });
+  });
+}
+
 export async function deleteProject(
   projectId: string,
   /**

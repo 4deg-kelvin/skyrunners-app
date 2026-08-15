@@ -200,6 +200,20 @@ export interface Project {
    * `primaryReId` for that.
    */
   reIds: string[];
+  /**
+   * Who created it. Optional because rows made before this was mapped have none.
+   *
+   * The column has existed in `projects` since migration 0001 and was simply
+   * never selected or written, so every project in production has `NULL` — which
+   * only became visible when ~4,000 were bulk-created through the MCP server and
+   * there was no field that said by whom. Attribution had to be reconstructed
+   * from `project_members.added_by`, which happens to be recorded and happens to
+   * agree, and neither of those is something to rely on twice.
+   *
+   * Not used for permissions anywhere: authority comes from RE membership and the
+   * org graph, never from having created something.
+   */
+  createdBy?: string;
   phase: ProjectPhase;
   health: ProjectHealth;
   startDate?: string;

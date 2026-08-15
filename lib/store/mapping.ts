@@ -177,7 +177,7 @@ const projects: CollectionSpec<Project> = {
   key: "projects",
   table: "projects",
   columns:
-    "id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment",
+    "id, name, slug, description, parent_id, team_id, primary_re_id, phase, health, start_date, target_date, dates_overridden, is_open_to_join, open_roles, time_commitment, created_by",
   identify: (p) => p.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -190,6 +190,14 @@ const projects: CollectionSpec<Project> = {
     // Filled in by the loader from project_members — `reIds` is derived, not a
     // column, and the two must never disagree.
     reIds: [],
+    /*
+      Present in SQL since 0001, selected only from 2026-08-15.
+
+      It was written by nothing and read by nothing, so every existing row is
+      NULL. That gap is why attributing ~4,000 bulk-created projects to their
+      author meant going via `project_members.added_by`.
+    */
+    createdBy: opt(r.created_by as string),
     phase: r.phase as Project["phase"],
     health: r.health as Project["health"],
     startDate: opt(r.start_date as string),
@@ -215,6 +223,7 @@ const projects: CollectionSpec<Project> = {
     is_open_to_join: p.isOpenToJoin,
     open_roles: nul(p.openRoles),
     time_commitment: nul(p.timeCommitment),
+    created_by: nul(p.createdBy),
   }),
   dependsOn: ["members", "teams"],
 };

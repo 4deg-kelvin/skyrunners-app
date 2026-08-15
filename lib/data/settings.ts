@@ -12,6 +12,7 @@ import {
   termFor,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { emptyProjectsCreatedBy } from "@/lib/store/operations";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
@@ -102,4 +103,49 @@ export async function getClubIdentity(): Promise<{
 }> {
   await preloadLiveStore();
   return clubIdentity();
+}
+
+// ---------------------------------------------------------------------------
+// Cleaning up after a bulk write
+// ---------------------------------------------------------------------------
+
+export interface BulkCreationRow {
+  memberId: string;
+  fullName: string;
+  /** Projects of theirs that carry no work at all — the purge candidates. */
+  emptyCount: number;
+  /** A few names, so a Co-Lead can see what they're about to remove. */
+  sample: string[];
+}
+
+/**
+ * Who has empty projects to their name, worst first.
+ *
+ * The dry run for the purge in Settings. Deliberately a REPORT rather than a
+ * confirmation dialog: after ~4,000 projects were bulk-created through the MCP
+ * server, the first question is not "delete?" but "how many, and whose", and a
+ * count that appears before anything is pressed is the difference between a
+ * cleanup and a leap.
+ *
+ * Only members with something to clean up are listed, so this is empty and
+ * silent in the normal case. The threshold is deliberately low — three — because
+ * a handful of stray test projects is worth offering to tidy, and hiding the
+ * feature until a disaster happens means nobody knows it exists during one.
+ */
+export async function getBulkCreationReport(): Promise<BulkCreationRow[]> {
+  await preloadLiveStore();
+  const store = readStore();
+
+  return store.members
+    .map((member) => {
+      const empties = emptyProjectsCreatedBy(store, member.id);
+      return {
+        memberId: member.id,
+        fullName: member.fullName,
+        emptyCount: empties.length,
+        sample: empties.slice(0, 4).map((p) => p.name),
+      };
+    })
+    .filter((row) => row.emptyCount >= 3)
+    .sort((a, b) => b.emptyCount - a.emptyCount);
 }
