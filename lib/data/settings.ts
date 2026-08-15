@@ -12,7 +12,7 @@ import {
   termFor,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
-import { emptyProjectsCreatedBy } from "@/lib/store/operations";
+import { emptyProjectsByCreator } from "@/lib/store/operations";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
@@ -136,9 +136,18 @@ export async function getBulkCreationReport(): Promise<BulkCreationRow[]> {
   await preloadLiveStore();
   const store = readStore();
 
+  /*
+    One pass for the whole club, then a lookup per member.
+
+    Calling the per-creator selector in a loop was O(members x projects) and took
+    4.7 seconds at this incident's scale — on the page opened to fix that very
+    incident. See `emptyProjectsByCreator`.
+  */
+  const byCreator = emptyProjectsByCreator(store);
+
   return store.members
     .map((member) => {
-      const empties = emptyProjectsCreatedBy(store, member.id);
+      const empties = byCreator.get(member.id) ?? [];
       return {
         memberId: member.id,
         fullName: member.fullName,

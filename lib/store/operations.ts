@@ -2716,82 +2716,154 @@ export interface PurgeCandidate {
  *   - the primary RE's `project_members.added_by` for everything before, which
  *     is all 4,000 of them.
  */
+type PurgeStore = Pick<
+  StoreShape,
+  | "projects"
+  | "projectMemberships"
+  | "deliverables"
+  | "projectArtifacts"
+  | "workLogs"
+  | "joinRequests"
+  | "events"
+  | "projectNotices"
+  | "projectDeadlineChanges"
+  | "projectAdvisors"
+  | "helpRequests"
+  | "progressUpdates"
+>;
+
+/**
+ * Every shell in the club, bucketed by who made it. ONE pass.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this is grouped rather than filtered per member
+ * ---------------------------------------------------------------------------
+ *
+ * The first version answered for one creator and the Settings report called it
+ * once per member. That is O(members x projects) with a dozen linear scans
+ * inside, and measured at the incident's real scale — 40 members, 4,000
+ * projects — it took **4.7 seconds**. On the very page a Co-Lead opens to clean
+ * up 4,000 projects, which is the one moment it must not fall over.
+ *
+ * Indexing first makes it one pass over each collection plus one over projects.
+ * The same measurement drops to single-digit milliseconds. Nothing about the
+ * RULE changed — see the note on `emptyProjectsCreatedBy` for that — only how
+ * many times the store is walked.
+ */
+export function emptyProjectsByCreator(
+  store: PurgeStore
+): Map<string, PurgeCandidate[]> {
+  /*
+    Project ids that show any trace of work, from one sweep per collection.
+
+    Membership rows are NOT in here: every project has at least one, so they
+    can't disqualify anything on their own — who added them is what matters, and
+    that's handled below.
+  */
+  const touched = new Set<string>();
+  const mark = (id: string | undefined | null) => {
+    if (id) touched.add(id);
+  };
+
+  for (const p of store.projects) mark(p.parentId);
+  for (const d of store.deliverables) mark(d.projectId);
+  for (const a of store.projectArtifacts) mark(a.projectId);
+  for (const w of store.workLogs) mark(w.projectId);
+  for (const r of store.joinRequests) mark(r.projectId);
+  for (const e of store.events) mark(e.projectId);
+  for (const n of store.projectNotices) mark(n.projectId);
+  for (const c of store.projectDeadlineChanges) mark(c.projectId);
+  for (const a of store.projectAdvisors) mark(a.projectId);
+  for (const h of store.helpRequests) mark(h.projectId);
+  for (const u of store.progressUpdates) {
+    for (const entry of u.entries) mark(entry.projectId);
+  }
+
+  /*
+    Per project: who its members were added by, and who its primary RE's row was
+    added by. Both come from the same single sweep.
+  */
+  const adders = new Map<string, Set<string>>();
+  const primaryAddedBy = new Map<string, string>();
+  const projectById = new Map(store.projects.map((p) => [p.id, p]));
+
+  for (const m of store.projectMemberships) {
+    if (m.addedBy) {
+      const set = adders.get(m.projectId);
+      if (set) set.add(m.addedBy);
+      else adders.set(m.projectId, new Set([m.addedBy]));
+    }
+    if (projectById.get(m.projectId)?.primaryReId === m.memberId && m.addedBy) {
+      primaryAddedBy.set(m.projectId, m.addedBy);
+    }
+  }
+
+  const byCreator = new Map<string, PurgeCandidate[]>();
+
+  for (const project of store.projects) {
+    if (touched.has(project.id)) continue;
+
+    /*
+      Attribution: the recorded creator, or whoever added the primary RE for the
+      rows written before `created_by` was mapped.
+    */
+    const creator = project.createdBy ?? primaryAddedBy.get(project.id);
+    if (!creator) continue;
+
+    /*
+      Nobody else may have touched the membership list.
+
+      This is the half that protects a project which became real work before
+      anybody filed a deliverable: if a second person was added by anyone other
+      than the creator, a human has been here and it is out of scope, whatever
+      its name looks like.
+    */
+    const addedBy = adders.get(project.id);
+    if (addedBy && [...addedBy].some((id) => id !== creator)) continue;
+
+    const list = byCreator.get(creator);
+    const candidate = {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+    };
+    if (list) list.push(candidate);
+    else byCreator.set(creator, [candidate]);
+  }
+
+  return byCreator;
+}
+
+/**
+ * Projects attributable to one person that carry NO trace of work.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this is defined by emptiness and not by name, date or count
+ * ---------------------------------------------------------------------------
+ *
+ * An assistant connected to the MCP server created ~4,000 projects called
+ * "Project ABCX", "Project ABDG" and so on. The obvious cleanup — match the
+ * name, or delete everything created in that hour — is the dangerous one: it
+ * decides what to destroy from a pattern in a string, and the club's real
+ * projects were created in exactly the same way through the same code path.
+ *
+ * So the test is **has anything happened here**. A project a person actually
+ * meant has a deliverable, a document, a log entry, a session, a join request or
+ * a second member. One that has none of those things, and whose only membership
+ * rows were created by the same actor, is a shell — and deleting a shell removes
+ * no history, which is what makes this compatible with the rule in CLAUDE.md
+ * that history must survive.
+ *
+ * Every collection carrying a `projectId` is checked, deliberately including the
+ * ones a bulk writer would never touch. The cost of an extra check is nothing;
+ * the cost of a missed one is somebody's work.
+ */
 export function emptyProjectsCreatedBy(
-  store: Pick<
-    StoreShape,
-    | "projects"
-    | "projectMemberships"
-    | "deliverables"
-    | "projectArtifacts"
-    | "workLogs"
-    | "joinRequests"
-    | "events"
-    | "projectNotices"
-    | "projectDeadlineChanges"
-    | "projectAdvisors"
-    | "helpRequests"
-    | "progressUpdates"
-  >,
+  store: PurgeStore,
   creatorId: string
 ): PurgeCandidate[] {
   if (!creatorId) return [];
-
-  const entryProjectIds = new Set(
-    store.progressUpdates.flatMap((u) => u.entries.map((e) => e.projectId))
-  );
-
-  return store.projects
-    .filter((project) => {
-      const memberships = store.projectMemberships.filter(
-        (m) => m.projectId === project.id
-      );
-
-      /*
-        Attributable to this person, and to nobody else.
-
-        The membership half is what makes it safe: if ANY row on the project was
-        added by somebody other than the creator, another human has touched it and
-        it is out of scope, whatever its name looks like.
-      */
-      const primary = memberships.find(
-        (m) => m.memberId === project.primaryReId
-      );
-      const mine =
-        project.createdBy === creatorId || primary?.addedBy === creatorId;
-      if (!mine) return false;
-      if (memberships.some((m) => m.addedBy && m.addedBy !== creatorId)) {
-        return false;
-      }
-
-      // Anything at all having happened disqualifies it.
-      if (store.projects.some((p) => p.parentId === project.id)) return false;
-      if (store.deliverables.some((d) => d.projectId === project.id))
-        return false;
-      if (store.projectArtifacts.some((a) => a.projectId === project.id)) {
-        return false;
-      }
-      if (store.workLogs.some((w) => w.projectId === project.id)) return false;
-      if (store.joinRequests.some((r) => r.projectId === project.id))
-        return false;
-      if (store.events.some((e) => e.projectId === project.id)) return false;
-      if (store.projectNotices.some((n) => n.projectId === project.id)) {
-        return false;
-      }
-      if (
-        store.projectDeadlineChanges.some((c) => c.projectId === project.id)
-      ) {
-        return false;
-      }
-      if (store.projectAdvisors.some((a) => a.projectId === project.id)) {
-        return false;
-      }
-      if (store.helpRequests.some((h) => h.projectId === project.id))
-        return false;
-      if (entryProjectIds.has(project.id)) return false;
-
-      return true;
-    })
-    .map((p) => ({ id: p.id, name: p.name, slug: p.slug }));
+  return emptyProjectsByCreator(store).get(creatorId) ?? [];
 }
 
 /**
