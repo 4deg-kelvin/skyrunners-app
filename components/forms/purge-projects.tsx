@@ -84,8 +84,11 @@ export function PurgeProjects({ rows }: { rows: BulkCreationRow[] }) {
                 <p className="text-ink text-[15px] font-semibold">
                   {row.fullName}{" "}
                   <span className="text-ink-muted font-normal">
-                    · {row.emptyCount} empty project
-                    {row.emptyCount === 1 ? "" : "s"}
+                    · {row.emptyCount + row.withOthersCount} empty project
+                    {row.emptyCount + row.withOthersCount === 1 ? "" : "s"}
+                    {row.withOthersCount > 0
+                      ? ` (${row.withOthersCount} with other members on them)`
+                      : ""}
                   </span>
                 </p>
                 <p className="text-ink-muted mt-0.5 text-sm">
@@ -95,23 +98,50 @@ export function PurgeProjects({ rows }: { rows: BulkCreationRow[] }) {
               </div>
 
               {armed === row.memberId ? (
-                <div className="flex shrink-0 items-center gap-2">
-                  <ActionButton
-                    action={purgeEmptyProjectsAction}
-                    /*
-                      `expected` is the count this page rendered. The server
-                      compares it with the live count and refuses on a mismatch,
-                      so a stale tab can't delete a set nobody read.
-                    */
-                    fields={{
-                      creatorId: row.memberId,
-                      expected: String(row.emptyCount),
-                      limit: "250",
-                    }}
-                    label={`Delete ${Math.min(row.emptyCount, 250)} now`}
-                    pendingLabel="Deleting…"
-                    tone="danger"
-                  />
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  {row.emptyCount > 0 ? (
+                    <ActionButton
+                      action={purgeEmptyProjectsAction}
+                      /*
+                        `expected` is the count this page rendered. The server
+                        compares it with the live count for the SAME group and
+                        refuses on a mismatch, so a stale tab can't delete a set
+                        nobody read.
+                      */
+                      fields={{
+                        creatorId: row.memberId,
+                        expected: String(row.emptyCount),
+                        limit: "250",
+                      }}
+                      label={`Delete ${Math.min(row.emptyCount, 250)} with nobody else on them`}
+                      pendingLabel="Deleting…"
+                      tone="danger"
+                    />
+                  ) : null}
+
+                  {/*
+                    The wider group, on its own button with its own count.
+
+                    Never merged into the one above. These have other people on
+                    them — still no work of any kind, but a real project in its
+                    first week looks exactly like this, so the decision is made
+                    once, deliberately, by somebody reading the number.
+                  */}
+                  {row.withOthersCount > 0 ? (
+                    <ActionButton
+                      action={purgeEmptyProjectsAction}
+                      fields={{
+                        creatorId: row.memberId,
+                        expected: String(row.emptyCount + row.withOthersCount),
+                        limit: "250",
+                        withOthers: "yes",
+                      }}
+                      label={`Also delete ${row.withOthersCount} with other members`}
+                      pendingLabel="Deleting…"
+                      tone="danger"
+                    />
+                  ) : null}
+
                   <button
                     onClick={() => setArmed(null)}
                     className="text-ink-muted hover:text-ink text-sm font-semibold"

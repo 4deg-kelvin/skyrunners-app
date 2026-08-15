@@ -206,12 +206,17 @@ describe("what counts as an empty project", () => {
     assert.ok(!candidates().some((c) => c.id === parent.id));
   });
 
-  test("somebody else joining saves it", async () => {
+  test("somebody else joining moves it to the SEPARATE group, not out of scope", async () => {
     /*
-      The membership half of the test, and the one that protects a project that
-      turned into real work without anybody filing a deliverable yet. If another
-      person has been added by anyone other than the creator, a human has touched
-      it and it is no longer a shell.
+      This test used to assert that another member saved the project outright.
+      Anish's real data disproved the reasoning: the bulk run added other members
+      to some of its projects, so a hard veto left a pile of shells behind and he
+      had to ask twice.
+
+      Membership is not work — somebody standing in an empty room has not built
+      anything. But it is not nothing either, and a genuine project in its first
+      week looks identical from here. So it moves to `withOthers`, which the UI
+      counts and offers on its own button, and is NOT in the default group.
     */
     const project = await makeEmpty("Somebody joined");
     const added = await ops.addProjectMember({
@@ -222,7 +227,63 @@ describe("what counts as an empty project", () => {
       today: TODAY,
     });
     assert.ok(added.ok, added.ok ? "" : added.error);
+
+    // Not in the safe group...
     assert.ok(!candidates().some((c) => c.id === project.id));
+    // ...but reachable when the caller explicitly asks for the wider set.
+    const wide = ops.emptyProjectsCreatedBy(disk.readStore(), CULPRIT, {
+      withOthers: true,
+    });
+    assert.ok(wide.some((c) => c.id === project.id));
+
+    // And the groups are reported apart, so the UI can never merge them.
+    const groups = ops.emptyProjectsByCreator(disk.readStore());
+    assert.ok(
+      (groups.withOthers.get(CULPRIT) ?? []).some((c) => c.id === project.id)
+    );
+    assert.ok(
+      !(groups.alone.get(CULPRIT) ?? []).some((c) => c.id === project.id)
+    );
+  });
+
+  test("a member added by the CREATOR is still in the safe group", async () => {
+    /*
+      The distinction that makes the two groups useful. A bulk writer adding
+      people to its own projects is still one actor acting alone — which is
+      exactly what happened here — so it does not need the wider button.
+    */
+    const project = await makeEmpty("Bot added somebody");
+    await ops.addProjectMember({
+      projectId: project.id,
+      memberId: OTHER,
+      asRE: false,
+      addedBy: CULPRIT,
+      today: TODAY,
+    });
+    assert.ok(candidates().some((c) => c.id === project.id));
+  });
+
+  test("the wider set still refuses anything with real work on it", async () => {
+    // The safety that must survive widening: `withOthers` relaxes WHO is on the
+    // project, never WHETHER anything has happened on it.
+    const project = await makeEmpty("Has members and work");
+    await ops.addProjectMember({
+      projectId: project.id,
+      memberId: OTHER,
+      asRE: false,
+      addedBy: OTHER,
+      today: TODAY,
+    });
+    await ops.createDeliverable({
+      projectId: project.id,
+      title: "Real work",
+      ownerId: OTHER,
+    });
+
+    const wide = ops.emptyProjectsCreatedBy(disk.readStore(), CULPRIT, {
+      withOthers: true,
+    });
+    assert.ok(!wide.some((c) => c.id === project.id));
   });
 
   test("none of the club's real seeded projects are ever candidates", async () => {

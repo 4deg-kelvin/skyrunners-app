@@ -2750,9 +2750,19 @@ type PurgeStore = Pick<
  * RULE changed — see the note on `emptyProjectsCreatedBy` for that — only how
  * many times the store is walked.
  */
-export function emptyProjectsByCreator(
-  store: PurgeStore
-): Map<string, PurgeCandidate[]> {
+export interface EmptyProjectGroups {
+  /** Shells nobody but the creator was ever added to. The safe group. */
+  alone: Map<string, PurgeCandidate[]>;
+  /**
+   * Shells that other people were added to.
+   *
+   * Still no work on them — same emptiness test — but somebody else is on the
+   * list, so these are offered separately and never merged into the count above.
+   */
+  withOthers: Map<string, PurgeCandidate[]>;
+}
+
+export function emptyProjectsByCreator(store: PurgeStore): EmptyProjectGroups {
   /*
     Project ids that show any trace of work, from one sweep per collection.
 
@@ -2799,6 +2809,7 @@ export function emptyProjectsByCreator(
   }
 
   const byCreator = new Map<string, PurgeCandidate[]>();
+  const withOthers = new Map<string, PurgeCandidate[]>();
 
   for (const project of store.projects) {
     if (touched.has(project.id)) continue;
@@ -2810,16 +2821,36 @@ export function emptyProjectsByCreator(
     const creator = project.createdBy ?? primaryAddedBy.get(project.id);
     if (!creator) continue;
 
-    /*
-      Nobody else may have touched the membership list.
+    const othersAdded = [...(adders.get(project.id) ?? [])].some(
+      (id) => id !== creator
+    );
 
-      This is the half that protects a project which became real work before
-      anybody filed a deliverable: if a second person was added by anyone other
-      than the creator, a human has been here and it is out of scope, whatever
-      its name looks like.
+    /*
+      Somebody else on the membership list is a WEAKER signal than work, and it
+      is reported separately rather than treated as a veto.
+
+      It was a veto at first, on the reasoning that a second person means a human
+      has been here. Anish's data disproved that: the bulk run added other members
+      to some of its projects, so "has other members" caught a pile of shells and
+      the strict rule left them behind. Membership is not work — somebody standing
+      in an empty room has not built anything.
+
+      But it is not nothing either, and a real project with three people on it and
+      no deliverable filed yet looks identical from here. So the two groups are
+      kept apart and counted apart, and removing the second is a separate,
+      separately-labelled press. The UI never merges them.
     */
-    const addedBy = adders.get(project.id);
-    if (addedBy && [...addedBy].some((id) => id !== creator)) continue;
+    if (othersAdded) {
+      const list = withOthers.get(creator);
+      const candidate = {
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+      };
+      if (list) list.push(candidate);
+      else withOthers.set(creator, [candidate]);
+      continue;
+    }
 
     const list = byCreator.get(creator);
     const candidate = {
@@ -2831,7 +2862,7 @@ export function emptyProjectsByCreator(
     else byCreator.set(creator, [candidate]);
   }
 
-  return byCreator;
+  return { alone: byCreator, withOthers };
 }
 
 /**
@@ -2848,22 +2879,29 @@ export function emptyProjectsByCreator(
  * projects were created in exactly the same way through the same code path.
  *
  * So the test is **has anything happened here**. A project a person actually
- * meant has a deliverable, a document, a log entry, a session, a join request or
- * a second member. One that has none of those things, and whose only membership
- * rows were created by the same actor, is a shell — and deleting a shell removes
- * no history, which is what makes this compatible with the rule in CLAUDE.md
- * that history must survive.
+ * meant has a deliverable, a document, a log entry, a session, a join request, an
+ * update, a session or a sub-project. One with none of those is a shell — and
+ * deleting a shell removes no history, which is what makes this compatible with
+ * the rule in CLAUDE.md that history must survive.
  *
  * Every collection carrying a `projectId` is checked, deliberately including the
  * ones a bulk writer would never touch. The cost of an extra check is nothing;
  * the cost of a missed one is somebody's work.
+ *
+ * @param withOthers Include the shells other people were added to. Off by
+ *        default: those are a weaker case and the caller has to ask for them, so
+ *        no code path can quietly widen what a press removes.
  */
 export function emptyProjectsCreatedBy(
   store: PurgeStore,
-  creatorId: string
+  creatorId: string,
+  { withOthers = false }: { withOthers?: boolean } = {}
 ): PurgeCandidate[] {
   if (!creatorId) return [];
-  return emptyProjectsByCreator(store).get(creatorId) ?? [];
+  const groups = emptyProjectsByCreator(store);
+  const alone = groups.alone.get(creatorId) ?? [];
+  if (!withOthers) return alone;
+  return [...alone, ...(groups.withOthers.get(creatorId) ?? [])];
 }
 
 /**
@@ -2887,9 +2925,19 @@ export async function purgeEmptyProjectsCreatedBy(input: {
   creatorId: string;
   /** How many to remove this press. */
   limit: number;
+  /**
+   * Also remove the shells other people were added to.
+   *
+   * Defaults to false so the wider set is never reached by accident — the caller
+   * has to pass it, and the UI asks for it on a separate button with its own
+   * count. See the note in `emptyProjectsByCreator`.
+   */
+  withOthers?: boolean;
 }): Promise<Result<{ deleted: number; remaining: number; names: string[] }>> {
   return guarded((store) => {
-    const all = emptyProjectsCreatedBy(store, input.creatorId);
+    const all = emptyProjectsCreatedBy(store, input.creatorId, {
+      withOthers: input.withOthers === true,
+    });
     const batch = all.slice(0, Math.max(1, Math.min(input.limit, 500)));
     const ids = new Set(batch.map((p) => p.id));
 

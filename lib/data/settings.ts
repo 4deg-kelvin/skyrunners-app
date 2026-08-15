@@ -112,8 +112,17 @@ export async function getClubIdentity(): Promise<{
 export interface BulkCreationRow {
   memberId: string;
   fullName: string;
-  /** Projects of theirs that carry no work at all — the purge candidates. */
+  /** Shells nobody else was ever added to. The safe group. */
   emptyCount: number;
+  /**
+   * Shells other people WERE added to — same emptiness test, weaker case.
+   *
+   * Counted apart and never folded into `emptyCount`, because a real project with
+   * three people on it and no deliverable filed yet is indistinguishable from a
+   * bulk-created one that happened to collect members. A Co-Lead decides on that
+   * group separately.
+   */
+  withOthersCount: number;
   /** A few names, so a Co-Lead can see what they're about to remove. */
   sample: string[];
 }
@@ -143,18 +152,24 @@ export async function getBulkCreationReport(): Promise<BulkCreationRow[]> {
     4.7 seconds at this incident's scale — on the page opened to fix that very
     incident. See `emptyProjectsByCreator`.
   */
-  const byCreator = emptyProjectsByCreator(store);
+  const groups = emptyProjectsByCreator(store);
 
   return store.members
     .map((member) => {
-      const empties = byCreator.get(member.id) ?? [];
+      const alone = groups.alone.get(member.id) ?? [];
+      const withOthers = groups.withOthers.get(member.id) ?? [];
       return {
         memberId: member.id,
         fullName: member.fullName,
-        emptyCount: empties.length,
-        sample: empties.slice(0, 4).map((p) => p.name),
+        emptyCount: alone.length,
+        withOthersCount: withOthers.length,
+        // Sampled across both, so the names shown match what is actually there.
+        sample: [...alone, ...withOthers].slice(0, 4).map((p) => p.name),
       };
     })
-    .filter((row) => row.emptyCount >= 3)
-    .sort((a, b) => b.emptyCount - a.emptyCount);
+    .filter((row) => row.emptyCount + row.withOthersCount >= 3)
+    .sort(
+      (a, b) =>
+        b.emptyCount + b.withOthersCount - (a.emptyCount + a.withOthersCount)
+    );
 }

@@ -1581,8 +1581,11 @@ async function purgeEmptyProjectsAction$impl(
     while it was being looked at, so "the number moved" is the expected case, not
     the exotic one.
   */
+  const withOthers = String(formData.get("withOthers") ?? "") === "yes";
   const expected = Number(String(formData.get("expected") ?? ""));
-  const actual = ops.emptyProjectsCreatedBy(readStore(), creatorId).length;
+  const actual = ops.emptyProjectsCreatedBy(readStore(), creatorId, {
+    withOthers,
+  }).length;
   if (!Number.isFinite(expected) || expected !== actual) {
     return {
       ok: false,
@@ -1593,6 +1596,7 @@ async function purgeEmptyProjectsAction$impl(
   const result = await ops.purgeEmptyProjectsCreatedBy({
     creatorId,
     limit: Number(String(formData.get("limit") ?? "")) || 250,
+    withOthers,
   });
 
   if (!result.ok) return { ok: false, error: result.error };
