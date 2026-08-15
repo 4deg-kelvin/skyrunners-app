@@ -29,6 +29,7 @@ those three.
 | `lib/data/README.md` | Why the data layer exists and how to extend it |
 | `docs/TWO_TRACK_DEPLOY.md` | Shipping to the club while still building |
 | `docs/INTEGRATIONS.md` | Email invites and Discord — what to set up, and what's worth sending |
+| `docs/MCP_SECURITY_REVIEW.md` | **The AI-connection threat model.** Read before adding an MCP tool |
 | `supabase/README.md` | Migrations, views, RLS plan |
 
 ## Team
@@ -486,7 +487,17 @@ its project.
   extension. `requirements` and `test_report` are never guessed — both are
   claims about what a document *says*, and both are usually PDFs.
 - **Creating projects must feel effortless for leadership** — permissions are deliberately
-  permissive there.
+  permissive there. Still true, and not the whole story: an assistant on the MCP
+  server created **994 empty projects** through exactly those permissions,
+  correctly applied. So `createProject` also carries a ceiling on how many EMPTY
+  projects one person can leave behind in a day, and Settings has a Co-Lead
+  cleanup for shells already there.
+
+  The general lesson is in `docs/MCP_SECURITY_REVIEW.md` and it applies to every
+  write path in this repo: every check here asks **"is this allowed?"**, and the
+  answer was yes four thousand times over. An agent holding a legitimate token is
+  a load test pointed at your write paths, so ask the second question too —
+  **"how often, and what if this runs in a loop?"**
 
 ## Build phase status
 

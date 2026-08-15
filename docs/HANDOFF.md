@@ -77,6 +77,36 @@ wasn't running.
 
 ---
 
+## The incident worth reading first — 2026-08-15
+
+A member connected Claude to the MCP server with a write token and it created
+**994 empty projects**. Nothing was bypassed: he leads that division,
+`can.createProject` allowed it correctly, and every call was a legitimate action
+by an entitled member. The app had no concept of SCALE — every control asked "may
+this person do this once?" and none asked "should this happen a thousand times?"
+
+What exists now, and where:
+
+- `MAX_EMPTY_PROJECTS_PER_DAY` in `lib/store/operations.ts` — 25 per person per
+  day, counting only projects still carrying no deliverables. In the store layer
+  because that is the one write choke point.
+- `lib/mcp/rate-limit.ts` — 30 writes/minute, 200/hour per token, across all
+  sixteen write tools. In-memory and therefore per-instance: read the header for
+  what that is and is not worth.
+- Settings → Cleanup, from `emptyProjectsCreatedBy` — a Co-Lead can delete one
+  person's shells in batches. It will only ever offer projects with no
+  deliverables, documents, log entries, sessions, join requests, notices, deadline
+  history, advisors, help requests, update entries or sub-projects, and no
+  membership row added by anybody else.
+- `projects.created_by` is finally written. It existed from `0001` and was mapped
+  nowhere, so attribution had to be reconstructed from `project_members.added_by`.
+
+Full threat model, findings and what is still outstanding:
+**`docs/MCP_SECURITY_REVIEW.md`**. Read it before adding an MCP tool or any new
+write path.
+
+---
+
 ## The thirteen bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
