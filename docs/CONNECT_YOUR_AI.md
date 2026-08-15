@@ -51,8 +51,23 @@ claude mcp add --transport http skyrunners https://skyrunners-app.vercel.app/api
 
 Note the `-app`. `skyrunners.vercel.app` is somebody else's site.
 
-**Claude Desktop / claude.ai** — Settings → Connectors → Add custom connector,
-paste the URL, and put `Bearer skr_your_token_here` in the Authorization header.
+**Claude Desktop / claude.ai** — these cannot send a header at all: the "add a
+custom connector" dialog takes a URL and nothing else. So Settings gives you a
+second, personal URL with the token in it:
+
+```
+https://skyrunners-app.vercel.app/api/mcp/skr_your_token_here
+```
+
+Settings → Connectors → Add custom connector, and paste that.
+
+**That connection is read-only, on purpose.** It can answer anything about the club
+and change nothing. The reason is that Vercel logs the path of every request, so a
+token in a URL is a credential sitting in the platform's logs — fine for reading a
+calendar or a project list, not fine for something that can reassign work. If you
+want an assistant that makes changes, use Claude Code, where the token travels in a
+header. The proper fix for claude.ai is OAuth; it's scoped in
+`docs/MCP_SECURITY_REVIEW.md`.
 
 ### 3. Check it worked
 

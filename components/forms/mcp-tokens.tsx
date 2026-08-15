@@ -50,7 +50,9 @@ export function McpTokens({
     otherwise arrive at the same trap.
   */
   const [minted, setMinted] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"token" | "command" | null>(null);
+  const [copied, setCopied] = useState<
+    "token" | "command" | "connector" | null
+  >(null);
 
   if (!canUse) {
     return (
@@ -250,11 +252,51 @@ export function McpTokens({
             </button>
           </div>
 
-          <p className="text-ink-muted mt-3 text-xs">
-            In the Claude desktop or web app instead: Settings → Connectors →
-            Add custom connector, paste the server URL, and put{" "}
-            <code className="text-xs">Bearer </code>then your token in the
-            Authorization header.
+          {/*
+            The claude.ai path, and it needs a DIFFERENT URL rather than the same
+            one plus a header.
+
+            This paragraph used to say "paste the server URL and put Bearer <token>
+            in the Authorization header", which is not a thing that dialog can do —
+            it takes a URL and nothing else. So the instruction was impossible to
+            follow, and Anish's report that the MCP only worked in Claude Code was
+            exactly right.
+
+            The personal URL carries the token in the path, which is why it is
+            read-only: Vercel logs request paths, so a credential that could change
+            the club's data does not belong in one. See `lib/mcp/handler.ts`.
+          */}
+          <p className="text-ink mt-4 text-sm font-bold">
+            claude.ai or the Claude app — paste this URL
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+              {`${serverUrl}/${minted}`}
+            </code>
+            <button
+              onClick={() => {
+                void navigator.clipboard.writeText(`${serverUrl}/${minted}`);
+                setCopied("connector");
+              }}
+              className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+            >
+              {copied === "connector" ? (
+                <Check className="size-4" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+              {copied === "connector" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="text-ink-muted mt-1.5 text-xs">
+            Settings → Connectors → Add custom connector, and paste that. It can
+            answer anything about the club but{" "}
+            <span className="text-ink font-semibold">
+              cannot change anything
+            </span>{" "}
+            — the token is in the URL, and URLs end up in server logs, so this
+            one deliberately can&apos;t write. Use the Claude Code command above
+            for that.
           </p>
         </div>
       ) : null}

@@ -106,7 +106,21 @@ export async function viewerFromToken(
     .maybeSingle();
 
   if (error) {
-    return { ok: false, error: `Couldn't check that token: ${error.message}` };
+    /*
+      The database's own message is logged, not returned.
+
+      This branch is reachable by ANYONE who can POST to the endpoint, with no
+      valid credential, so whatever it returns is public. A Postgres error can
+      name tables, columns and constraints, and handing that to an unauthenticated
+      caller is free reconnaissance for nothing in return — the member reading the
+      relayed sentence can't act on it either way.
+    */
+    console.error("[mcp] token lookup failed", error);
+    return {
+      ok: false,
+      error:
+        "Couldn't check that token — the club's database didn't answer. Try again in a moment; if it keeps happening, tell whoever runs the site.",
+    };
   }
 
   const row = (data ?? null) as TokenRow | null;
