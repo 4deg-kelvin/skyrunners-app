@@ -47,7 +47,7 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
-import { ARTIFACT_KIND_ORDER } from "@/lib/labels";
+import { ARTIFACT_KIND_ORDER, eventKindOrDefault } from "@/lib/labels";
 import { checkUpload } from "@/lib/storage";
 import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
 import { revokeMyFeed, rotateMyFeed } from "@/lib/calendar/store";
@@ -63,6 +63,7 @@ import { GUIDE_PAGES } from "@/lib/types";
 import type {
   ArtifactKind,
   Deliverable,
+  EventKind,
   GuidePage,
   Project,
 } from "@/lib/types";
@@ -1688,23 +1689,15 @@ async function deleteTeamAction$impl(
 // Phase 8 — the calendar
 // ---------------------------------------------------------------------------
 
-const EVENT_KINDS = [
-  "design_review",
-  "company_tour",
-  "company_visit",
-  "build_session",
-  "general_meeting",
-  "training",
-  "social",
-  "competition",
-  "one_on_one",
-] as const;
+/*
+  The list lives in `lib/labels.ts`, derived from the labels map.
 
-function eventKindFrom(formData: FormData): (typeof EVENT_KINDS)[number] {
-  const raw = String(formData.get("kind") ?? "");
-  return (EVENT_KINDS as readonly string[]).includes(raw)
-    ? (raw as (typeof EVENT_KINDS)[number])
-    : "build_session";
+  It was written out by hand here, which made three copies of the same union — and
+  the MCP server later invented a fourth that was simply wrong. One derived list
+  cannot drift from the type.
+*/
+function eventKindFrom(formData: FormData): EventKind {
+  return eventKindOrDefault(String(formData.get("kind") ?? ""));
 }
 
 async function createEventAction$impl(

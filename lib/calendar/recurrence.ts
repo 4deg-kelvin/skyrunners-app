@@ -257,14 +257,42 @@ export function repeatProblem(
 /**
  * The RRULE line for the feed, or null when the event doesn't repeat.
  *
- * `UNTIL` is emitted as a UTC instant at the very end of the last day, so the
- * final occurrence is always included. The common bug here is emitting a DATE
- * value, which some clients read as exclusive and quietly drop the last week —
- * and nobody notices until the meeting that should have been there isn't.
+ * `UNTIL` is an instant at the end of the last day, so the final occurrence is
+ * always included. The obvious bug here is emitting a DATE value, which some
+ * clients read as exclusive and quietly drop the last week.
+ *
+ * ---------------------------------------------------------------------------
+ * The less obvious one, which shipped: `UNTIL` is UTC, the club is not
+ * ---------------------------------------------------------------------------
+ *
+ * This used to emit `UNTIL=<date>T235959Z` — 23:59:59 **UTC** on the last day.
+ * That looks like "the end of that day" and is not, because every occurrence is
+ * stored in club time. A 5pm Pacific meeting on the final day is 01:00 UTC on the
+ * day AFTER, which is past `T235959Z`, so clients dropped it.
+ *
+ * The result was the worst available: the website listed the last meeting, and
+ * nobody's phone had it. It bites any event at or after 5pm Pacific — which is
+ * when a student club meets, so in practice it bit nearly every series.
+ *
+ * Hence `toUtc`, injected exactly as `exdatesFor` takes it, so this module still
+ * knows nothing about ICS formatting or time zones and the two lines can't drift.
+ * It is a REQUIRED argument: a default would let a caller forget it and get the
+ * old bug back silently, which is the same reasoning as `buildOrgGraphFromRows`
+ * refusing to default `teamRows`.
+ *
+ * @param toUtc Renders a club-local `YYYY-MM-DDTHH:MM:SS` as a UTC ICS instant.
  */
-export function rruleFor(event: RepeatingEvent): string | null {
+export function rruleFor(
+  event: RepeatingEvent,
+  toUtc: (iso: string) => string
+): string | null {
   if (!event.repeatWeeklyUntil) return null;
-  const last = event.repeatWeeklyUntil.slice(0, 10).replace(/-/g, "");
+  /*
+    End of the last day IN CLUB TIME, converted. 23:59:59 Pacific is 07:59:59Z
+    the next morning, which safely covers an occurrence starting at any hour of
+    that day — including the late-evening ones that broke.
+  */
+  const last = toUtc(`${event.repeatWeeklyUntil.slice(0, 10)}T23:59:59`);
   const every = intervalWeeks(event);
   /*
     INTERVAL is omitted when it is 1, which is the RFC's default.
@@ -274,7 +302,8 @@ export function rruleFor(event: RepeatingEvent): string | null {
     by hand to work out why a client is unhappy.
   */
   const interval = every > 1 ? `;INTERVAL=${every}` : "";
-  return `RRULE:FREQ=WEEKLY${interval};UNTIL=${last}T235959Z`;
+  // `last` is already a full instant from `toUtc` — no suffix to add.
+  return `RRULE:FREQ=WEEKLY${interval};UNTIL=${last}`;
 }
 
 /**
@@ -289,21 +318,36 @@ export function rruleFor(event: RepeatingEvent): string | null {
  * occurrence it cancels exactly. A date-only EXDATE against a timed series is the
  * classic way this silently does nothing.
  *
- * `toUtc` is injected rather than imported so this module stays free of the ICS
+ * `toValue` is injected rather than imported so this module stays free of the ICS
  * formatting rules — the same separation that lets it be tested without them.
+ *
+ * ---------------------------------------------------------------------------
+ * `tzid` is not optional decoration
+ * ---------------------------------------------------------------------------
+ *
+ * An EXDATE only cancels an occurrence it matches EXACTLY, and a match compares
+ * the value type and zone as well as the moment. Since a repeating DTSTART is
+ * emitted as club wall time with a TZID — see `buildIcs` for why it must be — an
+ * EXDATE sent as a UTC instant matches nothing at all, and the cancelled week
+ * stays in everybody's calendar with no error anywhere.
+ *
+ * So the caller passes the same `tzid` and the same converter it used for
+ * DTSTART. Omitting `tzid` emits the plain UTC form, which is correct only when
+ * DTSTART is also absolute.
  */
 export function exdatesFor(
   event: RepeatingEvent,
-  toUtc: (iso: string) => string
+  toValue: (iso: string) => string,
+  tzid?: string
 ): string | null {
   if (!event.repeatWeeklyUntil) return null;
   const skipped = event.skippedDates ?? [];
   if (skipped.length === 0) return null;
 
   const stamps = skipped
-    .map((day) => toUtc(occurrenceStart(event, day)))
+    .map((day) => toValue(occurrenceStart(event, day)))
     .filter(Boolean);
   if (stamps.length === 0) return null;
 
-  return `EXDATE:${stamps.join(",")}`;
+  return `EXDATE${tzid ? `;TZID=${tzid}` : ""}:${stamps.join(",")}`;
 }

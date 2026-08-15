@@ -142,6 +142,54 @@ export function instantFrom(iso: string): Date {
 }
 
 /**
+ * The club's WALL-CLOCK reading of a stored datetime: `YYYY-MM-DDTHH:MM:SS`.
+ *
+ * The inverse of `instantFrom` — that turns "6pm on campus" into an instant, this
+ * turns an instant back into "6pm on campus". Empty string for a malformed input,
+ * matching `toIcsUtc`, because an `Invalid Date` inside a calendar property makes
+ * clients drop the event or the whole document.
+ *
+ * ---------------------------------------------------------------------------
+ * Why a repeating calendar event cannot use an absolute instant
+ * ---------------------------------------------------------------------------
+ *
+ * This exists for `RRULE`. A repeat is a rule, not a list, so the client expands
+ * it — and if `DTSTART` is an absolute UTC instant, the client repeats *that
+ * instant*, holding the UTC time fixed and letting the local time drift by an
+ * hour across a DST change.
+ *
+ * Which is exactly what shipped: a 5pm Pacific weekly meeting starting in
+ * August appeared as 4pm from November onward, while the website still said 5pm.
+ * A member reading their phone turns up an hour late to a meeting the site had
+ * right, and nothing anywhere reports an error.
+ *
+ * The fix is to say what was actually meant — "17:00, in America/Los_Angeles,
+ * every week" — which requires the wall time and a `TZID`. See `buildIcs`.
+ */
+export function clubWallTime(iso: string): string {
+  const at = instantFrom(iso);
+  if (Number.isNaN(at.getTime())) return "";
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLUB_TIME_ZONE,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(at);
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  // Midnight comes back as "24" under hour12: false in some ICU builds, which
+  // would be an invalid ICS hour — the same normalisation `zoneOffsetMs` needs.
+  const hour = String(Number(get("hour")) % 24).padStart(2, "0");
+
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}:${get("second")}`;
+}
+
+/**
  * Today's date on campus, as `YYYY-MM-DD`.
  *
  * `en-CA` because its short date format IS ISO order — the alternative is

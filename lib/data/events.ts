@@ -41,6 +41,7 @@ import {
   occurrenceEnd,
   occurrenceStart,
 } from "@/lib/calendar/recurrence";
+import { addDays, todayInClubTime } from "@/lib/dates";
 import {
   isCoLead,
   isREofOrAbove,
@@ -185,27 +186,7 @@ export async function getCalendar(input: {
     The `key` is what makes two occurrences of one series distinct to React
     without pretending they are different events.
   */
-  const inWindow = store.events.flatMap((e) => {
-    const days = occurrenceDates(
-      {
-        startsAt: e.startsAt,
-        endsAt: e.endsAt,
-        repeatWeeklyUntil: e.repeatUntil,
-        repeatEveryWeeks: e.repeatEveryWeeks,
-        skippedDates: e.skippedDates,
-      },
-      now,
-      until
-    );
-
-    return days.map((day) => ({
-      ...e,
-      startsAt: occurrenceStart({ startsAt: e.startsAt }, day),
-      endsAt: e.endsAt
-        ? occurrenceEnd({ startsAt: e.startsAt, endsAt: e.endsAt }, day)
-        : undefined,
-    }));
-  });
+  const inWindow = expandOccurrences(store.events, now, until);
 
   /*
     What this person may hang an event on. Committed, or RE-of-or-above, or a
@@ -322,10 +303,81 @@ export async function getCalendar(input: {
   };
 }
 
-/** Kept for `verify:live` and anything that only needs the raw list. */
-export async function getUpcomingEvents(): Promise<ClubEvent[]> {
+/**
+ * Every OCCURRENCE of every event between two dates, as synthetic events.
+ *
+ * A repeating meeting is ONE row (migration 0043) whose `startsAt` is the day the
+ * series began. So anything that filters or sorts on `startsAt` sees the club's
+ * weekly meeting once, in the past, and never again — which is not a rendering
+ * detail but the difference between a calendar that works and one that doesn't.
+ *
+ * Each occurrence keeps the series' `id`, deliberately: that id is what RSVPing
+ * needs, because one answer covers every week. Callers that must tell two
+ * occurrences apart use the date as well.
+ *
+ * Shared rather than inlined because it was inlined, and the copy that wasn't
+ * here — `getUpcomingEvents` — went on filtering `startsAt` and reported a
+ * two-day-old session under "Coming up".
+ */
+function expandOccurrences(
+  events: ClubEvent[],
+  from: string,
+  to: string
+): ClubEvent[] {
+  return events.flatMap((e) => {
+    const days = occurrenceDates(
+      {
+        startsAt: e.startsAt,
+        endsAt: e.endsAt,
+        repeatWeeklyUntil: e.repeatUntil,
+        repeatEveryWeeks: e.repeatEveryWeeks,
+        skippedDates: e.skippedDates,
+      },
+      from,
+      to
+    );
+
+    return days.map((day) => ({
+      ...e,
+      startsAt: occurrenceStart({ startsAt: e.startsAt }, day),
+      endsAt: e.endsAt
+        ? occurrenceEnd({ startsAt: e.startsAt, endsAt: e.endsAt }, day)
+        : undefined,
+    }));
+  });
+}
+
+/**
+ * What is actually coming up, soonest first.
+ *
+ * ---------------------------------------------------------------------------
+ * This used to return every event in the database, unfiltered
+ * ---------------------------------------------------------------------------
+ *
+ * It sorted ascending and did nothing else, so its only caller — `catch_up` in
+ * the MCP server — took `.slice(0, 5)` and printed the five OLDEST events in the
+ * club's history under the heading "Coming up". Anish caught it reporting a
+ * session from two days earlier.
+ *
+ * Worth being precise about the cause, because the plausible diagnosis was
+ * wrong: not an off-by-one and not a timezone boundary, despite `lib/dates.ts`
+ * existing for exactly that reason. There was no comparison to today at all. A
+ * function called `getUpcomingEvents` that never mentions the current date is the
+ * kind of thing a reader trusts by its name — including the person who wrote it.
+ *
+ * @param withinDays How far ahead to look. Two months matches the calendar page.
+ * @param limit      Caps the list; a repeating meeting alone could fill it.
+ */
+export async function getUpcomingEvents({
+  withinDays = 60,
+  limit = 20,
+}: { withinDays?: number; limit?: number } = {}): Promise<ClubEvent[]> {
   await preloadLiveStore();
-  return [...readStore().events].sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt)
-  );
+
+  const from = todayInClubTime();
+  const to = addDays(from, withinDays);
+
+  return expandOccurrences(readStore().events, from, to)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+    .slice(0, limit);
 }

@@ -57,7 +57,13 @@ import {
   getMember,
   getProject,
 } from "@/lib/mock-data";
-import { ATTENTION_LABELS, PHASE_LABELS } from "@/lib/labels";
+import {
+  ATTENTION_LABELS,
+  EVENT_KIND_LABELS,
+  EVENT_KINDS,
+  eventKindOrDefault,
+  PHASE_LABELS,
+} from "@/lib/labels";
 import { detectArtifactKind } from "@/lib/artifacts";
 import { formatDay } from "@/lib/dates";
 import { GUIDE_TOPICS, guideFor, isGuideTopic } from "./guide";
@@ -369,11 +375,21 @@ export const TOOLS: McpTool[] = [
         }
       }
 
-      const events = (await getUpcomingEvents()).slice(0, 5);
+      /*
+        Genuinely upcoming, which it was not.
+
+        `getUpcomingEvents` had no date filter at all, so this printed the five
+        OLDEST events in the club's history under "Coming up" — Anish saw a
+        session from two days earlier. The window and the cap are stated here
+        rather than left to the default, because the heading is a promise about
+        the contents and the call should read like it keeps it.
+      */
+      const events = await getUpcomingEvents({ withinDays: 30, limit: 5 });
       if (events.length) {
         out.push("", "### Coming up");
         for (const e of events) {
-          out.push(`- ${formatDay(e.startsAt)} — ${e.title}`);
+          const repeats = e.repeatUntil ? " (repeats)" : "";
+          out.push(`- ${formatDay(e.startsAt)} — ${e.title}${repeats}`);
         }
       }
 
@@ -404,6 +420,17 @@ export const TOOLS: McpTool[] = [
       const includeComplete = args.include_complete === true;
 
       const out: string[] = [];
+      /*
+        How many were hidden for being complete, so the omission is stated.
+
+        Anish hit the gap this closes: `whoami` said he was RE of a project and
+        this tool didn't list it, with nothing to explain the difference. The
+        filter was right — completed work would otherwise bury the live work — but
+        a silent filter reads as missing data, and an assistant reading the output
+        has no way to tell the two apart either.
+      */
+      let hiddenComplete = 0;
+
       for (const group of tree) {
         if (
           division &&
@@ -417,6 +444,7 @@ export const TOOLS: McpTool[] = [
         const walk = (nodes: typeof group.roots, depth: number) => {
           for (const node of nodes) {
             const p = node.project;
+            if (!includeComplete && p.phase === "complete") hiddenComplete++;
             const keep =
               (includeComplete || p.phase !== "complete") &&
               (!health || p.health === health) &&
@@ -440,9 +468,16 @@ export const TOOLS: McpTool[] = [
         }
       }
 
-      return out.length
-        ? out.join("\n")
-        : "No projects matched. Try without filters, or check the division name.";
+      const hidden = hiddenComplete
+        ? `_${hiddenComplete} completed project${hiddenComplete === 1 ? "" : "s"} not shown — pass include_complete to see them._`
+        : "";
+
+      if (!out.length) {
+        return hidden
+          ? `No ACTIVE projects matched. ${hidden}`
+          : "No projects matched. Try without filters, or check the division name.";
+      }
+      return [...out, hidden].filter(Boolean).join("\n");
     },
   },
 
@@ -1268,6 +1303,345 @@ export const TOOLS: McpTool[] = [
       );
 
       return `Attached "${str(args.title)}" to ${project.name} as ${detectArtifactKind(url)}.`;
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // The calendar
+  //
+  // Read, create, and say you're coming. Three things are deliberately absent:
+  //
+  //   - **Cancelling an event.** It deletes the attendee list, and there is no
+  //     undo. That belongs on the website where the person can see who they are
+  //     about to un-invite. Same reasoning as the footer of `McpTokens`.
+  //   - **Closed / invite-only events.** Co-Lead only, and the reason is that
+  //     every closed event subtracts from an open calendar — a decision to make
+  //     deliberately on a page, not by asking an assistant.
+  //   - **The subscription link.** `create_calendar_feed` would print a
+  //     credential into a chat transcript, which is the one place a URL-borne
+  //     secret must never go. The tool below points at Settings instead.
+  // -------------------------------------------------------------------------
+  {
+    name: "list_events",
+    description:
+      "What's on the club calendar — sessions, meetings and reviews, soonest first. Every OCCURRENCE of a repeating meeting is listed separately, so a weekly all-hands appears once per week rather than once per series. Says who is coming and whether you are.",
+    inputSchema: schema({
+      within_days: {
+        type: "number",
+        description: "How far ahead to look. Defaults to 30, max 365.",
+      },
+      mine_only: {
+        type: "boolean",
+        description: "Only events you are on the list for",
+      },
+    }),
+    async handler(args, viewer) {
+      const within = Math.min(Math.max(num(args.within_days) ?? 30, 1), 365);
+      const events = await getUpcomingEvents({ withinDays: within, limit: 40 });
+
+      const rows = events.filter(
+        (e) =>
+          args.mine_only !== true || e.attendeeIds.includes(viewer.member.id)
+      );
+
+      if (!rows.length) {
+        return args.mine_only === true
+          ? `Nothing you're on in the next ${within} days. Call list_events without mine_only to see what you could turn up to.`
+          : `Nothing on the calendar in the next ${within} days.`;
+      }
+
+      const out = [`**Next ${within} days — ${rows.length} events**`, ""];
+      for (const e of rows) {
+        const mine = e.attendeeIds.includes(viewer.member.id) ? " ✓ you" : "";
+        const repeats = e.repeatUntil
+          ? ` (repeats ${e.repeatEveryWeeks === 2 ? "fortnightly" : "weekly"} until ${e.repeatUntil.slice(0, 10)})`
+          : "";
+        const project = e.projectId ? getProject(e.projectId)?.name : undefined;
+        out.push(
+          `- **${formatDay(e.startsAt)}** ${e.title} — ${EVENT_KIND_LABELS[e.kind] ?? e.kind}` +
+            `${e.location ? `, ${e.location}` : ""}` +
+            `${project ? ` [${project}]` : ""}` +
+            `${e.attendeeIds.length ? `, ${e.attendeeIds.length} coming` : ", nobody signed up yet"}` +
+            `${mine}${repeats}`
+        );
+      }
+      out.push(
+        "",
+        "To get these in your own calendar app, connect it once at Settings → Your calendar on the website. It cannot be done from here — the link is a credential and would end up in this transcript."
+      );
+      return out.join("\n");
+    },
+  },
+
+  {
+    name: "create_event",
+    description:
+      "Put a session, meeting or review on the club calendar. Use `repeat_until` for a recurring meeting — one event covers every week, so anyone who says they're coming is on all of them. Times are CLUB time (Pacific). Attach it to a project when it's about that project's work, so it shows on the project page too.",
+    write: true,
+    inputSchema: schema(
+      {
+        title: { type: "string" },
+        starts_at: {
+          type: "string",
+          description:
+            "YYYY-MM-DDTHH:MM in club time, e.g. 2026-09-15T18:00. No timezone suffix.",
+        },
+        ends_at: { type: "string", description: "YYYY-MM-DDTHH:MM, optional" },
+        /*
+          The enum is DERIVED, not typed out.
+
+          The first version of this tool listed `meeting`, `review` and `other` —
+          none of which are event kinds. Nothing threw: the invalid string went
+          into the store and every label lookup for it rendered `undefined`. See
+          `EVENT_KINDS` in `lib/labels.ts`.
+        */
+        kind: {
+          type: "string",
+          enum: EVENT_KINDS,
+          default: "build_session",
+          description: "Defaults to a build session.",
+        },
+        location: { type: "string" },
+        notes: { type: "string" },
+        project: {
+          type: "string",
+          description:
+            "Slug or name. You must be COMMITTED to it — following isn't enough.",
+        },
+        invite: {
+          type: "array",
+          items: { type: "string" },
+          description: "Names or emails to put on the list up front",
+        },
+        repeat_until: {
+          type: "string",
+          description:
+            "YYYY-MM-DD. Last date the repeat may land on. Omit for a one-off.",
+        },
+        repeat_every_weeks: {
+          type: "number",
+          enum: [1, 2],
+          description: "1 weekly, 2 fortnightly. Ignored without repeat_until.",
+        },
+      },
+      ["title", "starts_at"]
+    ),
+    async handler(args, viewer) {
+      const startsAt = str(args.starts_at);
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(startsAt)) {
+        refuse(
+          "starts_at must look like 2026-09-15T18:00 — a date, a T, and a 24-hour club time. Don't add a Z or an offset; the club runs on Pacific and the server converts."
+        );
+      }
+
+      const projectId = str(args.project)
+        ? requireProject(str(args.project)).id
+        : undefined;
+
+      /*
+        The same rule the website enforces, checked the same way.
+
+        COMMITTED, not following: watching a project doesn't make you one of the
+        people running a build night, and an open session anybody could invent on
+        any project turns the calendar into a noticeboard.
+      */
+      const isOnProject = projectId
+        ? memberProjects(viewer.member.id).some(
+            (m) => m.projectId === projectId && m.commitment === "committed"
+          )
+        : false;
+
+      if (!can.createEvent(viewer.actor, isOnProject)) {
+        refuse(
+          projectId
+            ? "You're not committed to that project, so you can't run a session for it. Ask to join, or leave `project` out and make it a club-wide session."
+            : "Only leadership can create club-wide events. Attach it to a project you're committed to instead."
+        );
+      }
+
+      const invited = (Array.isArray(args.invite) ? args.invite : [])
+        .map((v) => str(v))
+        .filter(Boolean)
+        .map((who) => requireMember(who).id);
+
+      /*
+        Refused rather than silently defaulted.
+
+        The website falls back to `build_session` for a bad value because a form
+        can only submit what its own <select> offers. A model can send anything,
+        and quietly filing a design review as a build session is a wrong answer
+        delivered as a success — so it gets told, with the list.
+      */
+      const rawKind = str(args.kind);
+      if (rawKind && eventKindOrDefault(rawKind) !== rawKind) {
+        refuse(
+          `"${rawKind}" isn't an event kind. Use one of: ${EVENT_KINDS.join(", ")}.`
+        );
+      }
+
+      const event = ok(
+        await ops.createEvent({
+          title: str(args.title),
+          kind: eventKindOrDefault(rawKind),
+          startsAt,
+          endsAt: str(args.ends_at) || undefined,
+          location: str(args.location),
+          projectId,
+          createdBy: viewer.member.id,
+          attendeeIds: invited,
+          notes: str(args.notes),
+          repeatUntil: str(args.repeat_until) || undefined,
+          repeatEveryWeeks: num(args.repeat_every_weeks),
+        })
+      );
+
+      const when = event.repeatUntil
+        ? `${formatDay(event.startsAt)}, ${event.repeatEveryWeeks === 2 ? "fortnightly" : "weekly"} until ${event.repeatUntil.slice(0, 10)}`
+        : formatDay(event.startsAt);
+
+      return (
+        `Created **${event.title}** — ${when}.\n\n` +
+        `You're on the list. ${invited.length ? `${invited.length} other people were invited and will get a Discord DM. ` : ""}` +
+        "Anyone who says they're coming gets it in their own calendar within a few hours, if they've connected one."
+      );
+    },
+  },
+
+  {
+    name: "rsvp_event",
+    description:
+      "Say you're coming to something on the club calendar, or take yourself off the list. For a repeating meeting one answer covers every occurrence. Once you're on the list it lands in your personal calendar automatically, if you've connected one.",
+    write: true,
+    inputSchema: schema(
+      {
+        event: { type: "string", description: "The event's title or id" },
+        attending: { type: "boolean", default: true },
+      },
+      ["event"]
+    ),
+    async handler(args, viewer) {
+      const needle = str(args.event).toLowerCase();
+      const store = readStore();
+
+      /*
+        Matched against the STORED rows, not the expanded occurrences.
+
+        RSVPing joins the series — one row — so resolving to an occurrence would
+        invite an argument about which week the member meant when the answer
+        covers all of them.
+      */
+      const candidates = store.events.filter(
+        (e) =>
+          e.id === str(args.event) || e.title.toLowerCase().includes(needle)
+      );
+
+      if (!candidates.length) {
+        refuse(
+          `Nothing on the calendar matching "${str(args.event)}". Call list_events to see what's on.`
+        );
+      }
+      if (candidates.length > 1) {
+        refuse(
+          `"${str(args.event)}" matches ${candidates.length} events: ${candidates.map((e) => e.title).join(" / ")}. Use the full title.`
+        );
+      }
+
+      const event = candidates[0];
+      const attending = args.attending !== false;
+
+      ok(
+        await ops.setEventAttendance({
+          eventId: event.id,
+          memberId: viewer.member.id,
+          attending,
+        })
+      );
+
+      if (!attending) return `Taken off the list for ${event.title}.`;
+      return (
+        `You're coming to **${event.title}**` +
+        `${event.repeatUntil ? " — every occurrence, not just the next one" : ` on ${formatDay(event.startsAt)}`}.` +
+        " If you've connected a calendar it'll appear there within a few hours."
+      );
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Moving a date, on the record
+  // -------------------------------------------------------------------------
+  {
+    name: "push_deadline",
+    description:
+      "Move a project's target date, recording WHY. The old date stays on the record and shows as a ghost marker on the timeline, so the history of a slipping project is visible rather than quietly rewritten. Use this rather than update_project when the date is genuinely moving.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        target_date: { type: "string", description: "YYYY-MM-DD" },
+        reason: {
+          type: "string",
+          description:
+            "Required. Whoever is waiting on this will read it, so name the cause.",
+        },
+      },
+      ["project", "target_date", "reason"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      if (!can.manageProject(viewer.actor, viewer.graph, project.id)) {
+        refuse(
+          "Only this project's RE (or an RE above them, or a Co-Lead) can move its target date."
+        );
+      }
+
+      const updated = ok(
+        await ops.changeProjectDeadline({
+          projectId: project.id,
+          targetDate: str(args.target_date),
+          reason: str(args.reason),
+          actorId: viewer.member.id,
+          today: today(),
+        })
+      );
+
+      return `**${project.name}** target moved to ${updated.targetDate}. The old date stays on the record, with your reason.`;
+    },
+  },
+
+  {
+    name: "push_deliverable_deadline",
+    description:
+      "Move one deliverable's due date, recording WHY. Bounded by the project's own target — a deliverable can't be due after the work it belongs to. RE's call, deliberately: the owner can already edit their own date with update_deliverable, whereas this writes a permanent line saying the schedule slipped.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        deliverable: { type: "string", description: "Title, or its id" },
+        due_date: { type: "string", description: "YYYY-MM-DD" },
+        reason: { type: "string", description: "Required." },
+      },
+      ["project", "deliverable", "due_date", "reason"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      if (!can.manageDeliverables(viewer.actor, viewer.graph, project.id)) {
+        refuse(
+          "Only this project's RE (or above), or a Co-Lead, can push back a deadline on the record."
+        );
+      }
+
+      const deliverable = findDeliverable(project.id, str(args.deliverable));
+      const updated = ok(
+        await ops.changeDeliverableDeadline({
+          deliverableId: deliverable.id,
+          dueDate: str(args.due_date),
+          reason: str(args.reason),
+          actorId: viewer.member.id,
+          today: today(),
+        })
+      );
+
+      return `**${deliverable.title}** moved to ${updated.dueDate}. The old date stays on the project's record.`;
     },
   },
 ];

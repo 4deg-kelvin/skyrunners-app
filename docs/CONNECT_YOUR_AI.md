@@ -91,6 +91,40 @@ gives the assistant the whole picture.
 > Post on the help board — I need someone who knows Onshape
 > Add my skills: composites, CAD, structural analysis
 
+**The calendar** (reading is free; creating needs a write token)
+
+> What's on this week?
+> What am I signed up for in the next month?
+> Put a build session on for Thursday at 6, in Building 550
+> Set up a weekly all-hands, Tuesdays at 5, running until December 8th
+> Make it fortnightly instead — a townhall every other Tuesday
+> I'm coming to the Skydio tour
+
+One event covers a whole repeating series, so **saying you're coming once covers
+every occurrence.** Anything you're on lands in your own Apple, Google or Outlook
+calendar within a few hours, if you've connected one — see
+`docs/CONNECT_YOUR_CALENDAR.md`.
+
+Times are **club time** (Pacific), written like `2026-09-15T18:00`. Don't add a
+`Z` or an offset; the server converts, and it handles the daylight-saving change
+so a 5pm meeting stays 5pm all year.
+
+Three calendar things are deliberately not available from an assistant:
+**cancelling** an event (it deletes the attendee list, with no undo),
+**invite-only** events (Co-Lead only, on purpose — every closed event subtracts
+from an open calendar), and **your subscription link** (it's a credential, and
+asking for it would print it into your chat transcript).
+
+**Moving a date, on the record** (needs a write token)
+
+> Push the Wing Spar target to October 30th — the spar tooling slipped two weeks
+> Move Tyler's mass budget deliverable to the 12th, we're waiting on the laser cutter
+
+Both keep the old date on the project's record and show it as a ghost marker on
+the timeline, so a slipping schedule stays visible instead of being quietly
+rewritten. **A reason is required** — the tool refuses without one, because
+whoever is planning around that date is going to read it.
+
 **Logging what you did** (needs a write token)
 
 There are no hours — the club stopped counting time in August 2026. You describe

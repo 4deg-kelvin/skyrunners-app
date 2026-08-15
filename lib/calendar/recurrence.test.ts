@@ -21,12 +21,49 @@ import {
   rruleFor,
   type RepeatingEvent,
 } from "./recurrence.ts";
+/*
+  The REAL club-time converter, not a hand-rolled one.
 
-/** A Tuesday 6pm Pacific meeting, stored as an instant like live data. */
+  `rruleFor` and `exdatesFor` both take it injected so this module stays free of
+  ICS rules. The tests below used a local fake that treated its input as UTC,
+  and that is precisely why they could not catch the UNTIL bug: a fake with no
+  concept of Pacific time agrees with any timezone mistake the real one makes.
+*/
+import { toIcsUtc } from "./ics.ts";
+
+/**
+ * A Tuesday meeting stored as an INSTANT, like live `timestamptz` data.
+ *
+ * 18:00 **UTC**, which is 11am Pacific — not 6pm Pacific, as this said for a
+ * while. That mislabelling mattered: a late-morning meeting never crosses a UTC
+ * date boundary, so every assertion built on this fixture passed while evening
+ * meetings — i.e. all of them, in a student club — were broken. `evening()`
+ * below is the fixture that actually exercises the boundary.
+ */
 function weekly(over: Partial<RepeatingEvent> = {}): RepeatingEvent {
   return {
     startsAt: "2026-09-01T18:00:00.000Z",
     repeatWeeklyUntil: "2026-09-29",
+    ...over,
+  };
+}
+
+/**
+ * A 6pm PACIFIC meeting — what this club actually runs, and the case that broke.
+ *
+ * Zoneless, so `instantFrom` reads it in club time. That is the shape the demo
+ * seed writes and the shape a `<input type="datetime-local">` posts, and it is
+ * the one where the UTC date is a day ahead of the club date: 6pm Pacific in
+ * December is 02:00Z tomorrow. Any window or cutoff expressed as `T235959Z` on
+ * the club's date therefore lands BEFORE the meeting it was meant to include.
+ *
+ * December on purpose — PST is UTC-8, an hour further from UTC than PDT, so the
+ * boundary is crossed by two hours rather than one.
+ */
+function evening(over: Partial<RepeatingEvent> = {}): RepeatingEvent {
+  return {
+    startsAt: "2026-12-01T18:00",
+    repeatWeeklyUntil: "2026-12-08",
     ...over,
   };
 }
@@ -215,27 +252,65 @@ describe("what the form and the server both refuse", () => {
 
 describe("the RRULE the feed emits", () => {
   test("nothing for a one-off", () => {
-    assert.equal(rruleFor({ startsAt: "2026-09-01T18:00" }), null);
+    assert.equal(rruleFor({ startsAt: "2026-09-01T18:00" }, toIcsUtc), null);
   });
 
-  test("weekly, with UNTIL at the end of the last day", () => {
+  test("weekly, with UNTIL at the end of the last day IN CLUB TIME", () => {
     /*
-      `235959Z` rather than a DATE value. Some clients read a bare DATE UNTIL as
-      exclusive and silently drop the final occurrence.
+      An instant rather than a DATE value, because some clients read a bare DATE
+      UNTIL as exclusive and drop the final occurrence.
+
+      And 23:59:59 *Pacific*, which is 06:59:59Z the next morning in September.
+      It used to be `T235959Z` — the same wall-clock reading in the wrong zone.
     */
     assert.equal(
-      rruleFor(weekly()),
-      "RRULE:FREQ=WEEKLY;UNTIL=20260929T235959Z"
+      rruleFor(weekly(), toIcsUtc),
+      "RRULE:FREQ=WEEKLY;UNTIL=20260930T065959Z"
     );
   });
 
-  test("the UNTIL date matches the last expanded occurrence", () => {
-    // The two must agree, or the website and the member's phone disagree about
-    // when the meeting stops — which is unfalsifiable from either side.
-    const e = weekly({ repeatWeeklyUntil: "2026-09-29" });
+  test("UNTIL is at or after the last occurrence's own start instant", () => {
+    /*
+      THE invariant, and the one that was violated.
+
+      Stated as a comparison of instants rather than of dates. The test that
+      stood here asserted only that the last occurrence's DATE appeared
+      somewhere in the rule — which `UNTIL=20260929T235959Z` satisfied while
+      excluding the 6pm meeting on 2026-09-29. A date-level check cannot see a
+      time-level bug.
+
+      Both sides are `YYYYMMDDTHHMMSSZ`, which sorts correctly as a string.
+    */
+    for (const e of [weekly(), evening(), evening({ repeatEveryWeeks: 2 })]) {
+      const dates = occurrenceDates(e, ...WIDE);
+      const lastStart = toIcsUtc(occurrenceStart(e, dates[dates.length - 1]));
+      const until = rruleFor(e, toIcsUtc)!.match(/UNTIL=(\d{8}T\d{6}Z)/)![1];
+      assert.ok(
+        until >= lastStart,
+        `UNTIL ${until} would drop the last occurrence at ${lastStart}`
+      );
+    }
+  });
+
+  test("an evening series keeps its final meeting", () => {
+    /*
+      The exact shape of the shipped bug, pinned as its own case.
+
+      A 6pm Pacific meeting on the final day is 02:00Z the NEXT day in December.
+      `UNTIL=20261208T235959Z` is earlier than that, so clients expanded the
+      series without its last week — while the website listed it. The member's
+      symptom is a meeting nobody's phone knows about, and there is no error
+      anywhere to find.
+    */
+    const e = evening();
+    assert.equal(
+      rruleFor(e, toIcsUtc),
+      "RRULE:FREQ=WEEKLY;UNTIL=20261209T075959Z"
+    );
+    // 20261209T020000Z — the thing the old rule cut off by five hours.
     const dates = occurrenceDates(e, ...WIDE);
-    const rule = rruleFor(e)!;
-    assert.ok(rule.includes(dates[dates.length - 1].replace(/-/g, "")));
+    assert.equal(dates[dates.length - 1], "2026-12-08");
+    assert.ok(toIcsUtc(occurrenceStart(e, "2026-12-08")) < "20261209T075959Z");
   });
 });
 
@@ -274,10 +349,12 @@ describe("every other week, for the townhall", () => {
 
   test("the RRULE carries INTERVAL only when it is not 1", () => {
     assert.equal(
-      rruleFor(weekly({ repeatEveryWeeks: 2 })),
-      "RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20260929T235959Z"
+      rruleFor(weekly({ repeatEveryWeeks: 2 }), toIcsUtc),
+      "RRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20260930T065959Z"
     );
-    assert.ok(!rruleFor(weekly({ repeatEveryWeeks: 1 }))!.includes("INTERVAL"));
+    assert.ok(
+      !rruleFor(weekly({ repeatEveryWeeks: 1 }), toIcsUtc)!.includes("INTERVAL")
+    );
   });
 
   test("the RRULE and the expansion agree on the cadence", () => {
@@ -293,7 +370,7 @@ describe("every other week, for the townhall", () => {
           86_400_000
       );
     assert.deepEqual(new Set(gaps), new Set([14]));
-    assert.match(rruleFor(e)!, /INTERVAL=2/);
+    assert.match(rruleFor(e, toIcsUtc)!, /INTERVAL=2/);
   });
 });
 

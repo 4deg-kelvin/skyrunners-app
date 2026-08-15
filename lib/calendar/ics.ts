@@ -59,8 +59,58 @@
  *     ignored as a duplicate.
  */
 
-import { instantFrom } from "../dates";
+import { CLUB_TIME_ZONE, clubWallTime, instantFrom } from "../dates";
 import { exdatesFor, rruleFor, type RepeatingEvent } from "./recurrence";
+
+/**
+ * The club's timezone, spelled out for clients that expand an RRULE.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this block has to exist
+ * ---------------------------------------------------------------------------
+ *
+ * A repeating event is published as a rule the CLIENT expands, so the rule has to
+ * say what was meant: "17:00 in America/Los_Angeles, weekly". With an absolute
+ * UTC `DTSTART` the client holds the UTC time fixed and the local time slides an
+ * hour at the DST change — a 5pm meeting became 4pm from November, while the
+ * website still said 5pm. Referencing a `TZID` requires either that the client
+ * already knows the zone or that the calendar defines it, and the RFC says define
+ * it, so here it is.
+ *
+ * The transitions are the current US rule — second Sunday in March, first Sunday
+ * in November — written as yearly RRULEs, which is exactly what Google Calendar
+ * and Apple emit. If Congress abolishes the change, this goes stale in the same
+ * way every calendar file on earth does; most clients prefer their own tzdata for
+ * a zone they recognise, and this is the fallback for the ones that don't.
+ *
+ * `DTSTART` values inside a VTIMEZONE are deliberately zoneless and in the past:
+ * they mark when a rule began, not an event.
+ */
+const VTIMEZONE = [
+  "BEGIN:VTIMEZONE",
+  `TZID:${CLUB_TIME_ZONE}`,
+  "BEGIN:DAYLIGHT",
+  "TZOFFSETFROM:-0800",
+  "TZOFFSETTO:-0700",
+  "TZNAME:PDT",
+  "DTSTART:19700308T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+  "END:DAYLIGHT",
+  "BEGIN:STANDARD",
+  "TZOFFSETFROM:-0700",
+  "TZOFFSETTO:-0800",
+  "TZNAME:PST",
+  "DTSTART:19701101T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+];
+
+/** `2026-08-18T17:00:00` → `20260818T170000`, the ICS form of a wall time. */
+function icsWallTime(iso: string): string {
+  const wall = clubWallTime(iso);
+  return wall ? wall.replace(/[-:]/g, "") : "";
+}
 
 /** Anything this module needs from a `ClubEvent`. Structural, so tests pass literals. */
 export interface IcsEvent {
@@ -215,11 +265,26 @@ export function sequenceFor(event: IcsEvent): number {
 }
 
 function eventLines(event: IcsEvent, stamp: string): string[] {
+  /*
+    A REPEATING event is dated in club wall time with a TZID; a one-off keeps the
+    absolute UTC instant.
+
+    Splitting on `repeat` rather than converting everything is deliberate. Only a
+    rule the client expands can drift — a one-off is a single instant and an
+    absolute UTC value is the least ambiguous thing to send, which is also the form
+    every existing test pins. So the change is confined to the events that were
+    actually wrong.
+  */
+  const zoned = Boolean(event.repeat);
+  const startValue = zoned
+    ? `;TZID=${CLUB_TIME_ZONE}:${icsWallTime(event.startsAt)}`
+    : `:${toIcsUtc(event.startsAt)}`;
+
   const lines = [
     "BEGIN:VEVENT",
     `UID:${uidFor(event.id)}`,
     `DTSTAMP:${stamp}`,
-    `DTSTART:${toIcsUtc(event.startsAt)}`,
+    `DTSTART${startValue}`,
   ];
 
   /*
@@ -231,14 +296,16 @@ function eventLines(event: IcsEvent, stamp: string): string[] {
     day. An hour is the honest default for a club session and is what the
     website already implies by showing a start time.
   */
-  const end = event.endsAt
-    ? toIcsUtc(event.endsAt)
-    : toIcsUtc(
-        new Date(
-          instantFrom(event.startsAt).getTime() + 3_600_000
-        ).toISOString()
-      );
-  lines.push(`DTEND:${end}`);
+  const endIso =
+    event.endsAt ??
+    new Date(instantFrom(event.startsAt).getTime() + 3_600_000).toISOString();
+  // DTEND must use the same value type and zone as DTSTART, or clients reject the
+  // event outright — a UTC end on a TZID start is not a mixture the RFC allows.
+  lines.push(
+    zoned
+      ? `DTEND;TZID=${CLUB_TIME_ZONE}:${icsWallTime(endIso)}`
+      : `DTEND:${toIcsUtc(endIso)}`
+  );
 
   lines.push(`SUMMARY:${escapeText(event.title)}`);
   if (event.location) lines.push(`LOCATION:${escapeText(event.location)}`);
@@ -256,9 +323,15 @@ function eventLines(event: IcsEvent, stamp: string): string[] {
     expect them.
   */
   if (event.repeat) {
-    const rule = rruleFor(event.repeat);
+    /*
+      UNTIL stays an absolute UTC instant — the RFC requires that when DTSTART
+      carries a TZID — while EXDATE takes the wall time and the TZID, because it
+      has to match DTSTART exactly to cancel anything. Both converters come from
+      here so the three lines can never disagree about the zone.
+    */
+    const rule = rruleFor(event.repeat, toIcsUtc);
     if (rule) lines.push(rule);
-    const exdates = exdatesFor(event.repeat, toIcsUtc);
+    const exdates = exdatesFor(event.repeat, icsWallTime, CLUB_TIME_ZONE);
     if (exdates) lines.push(exdates);
   }
 
@@ -409,6 +482,16 @@ export function buildIcs(
   if (options.description) {
     lines.push(`X-WR-CALDESC:${escapeText(options.description)}`);
   }
+
+  /*
+    The timezone definition, before any component that references it.
+
+    Only when something repeats: a TZID is referenced only by a repeating event,
+    and a VTIMEZONE nothing points at is 17 lines of noise in every feed. Position
+    matters — some parsers resolve a TZID as they read and cannot look ahead — so
+    it goes here, after the calendar properties and before the first VEVENT.
+  */
+  if (events.some((e) => e.repeat)) lines.push(...VTIMEZONE);
 
   for (const event of events) lines.push(...eventLines(event, stamp));
 

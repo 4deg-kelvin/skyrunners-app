@@ -140,6 +140,28 @@ export const EVENT_KIND_LABELS: Record<EventKind, string> = {
   one_on_one: "1:1",
 };
 
+/**
+ * Every valid event kind, DERIVED rather than listed.
+ *
+ * There were three copies of this list — the `EventKind` union in `lib/types.ts`,
+ * the keys above, and a hand-written array in `lib/actions/index.ts` — and the MCP
+ * server then invented a fourth with `meeting`, `review` and `other` in it. None
+ * of those three exist, so `create_event` wrote an unrenderable kind into the
+ * store and the label lookup came back `undefined`. Exactly the failure named in
+ * CLAUDE.md: an enum mismatch doesn't throw, it just stops meaning anything.
+ *
+ * `EVENT_KIND_LABELS` is typed `Record<EventKind, string>`, so the compiler
+ * guarantees these keys ARE the union — no copy to keep in step.
+ */
+export const EVENT_KINDS = Object.keys(EVENT_KIND_LABELS) as EventKind[];
+
+/** Narrow an untrusted string, falling back to the harmless default. */
+export function eventKindOrDefault(raw: string): EventKind {
+  return (EVENT_KINDS as readonly string[]).includes(raw)
+    ? (raw as EventKind)
+    : "build_session";
+}
+
 /** Events at or above this weight are called out as significant. */
 export const KEY_EVENT_WEIGHT = 4;
 

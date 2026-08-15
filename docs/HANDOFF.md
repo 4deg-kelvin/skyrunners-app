@@ -77,7 +77,7 @@ wasn't running.
 
 ---
 
-## The ten bugs that cost the most time
+## The thirteen bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -294,6 +294,62 @@ reload, unchanged — indistinguishable from the write failing.
 `load()` now compares the file's `mtime` and re-reads when another instance has
 written. Live mode never hit this, because `readStore()` returns the
 per-request Postgres snapshot.
+
+### 11. A one-time secret rendered inside the form that closed on success
+
+`ActionForm` renders an action's success message **inside itself**, and
+`McpTokens` passed `onSuccess={() => setOpen(false)}`. The MCP token arrives as
+the first line of that message, so the form unmounted in the same tick the token
+appeared — it rendered and was destroyed before paint. Only the hash is stored,
+so **every token minted before the fix was dead on arrival**, and the report was
+"I can never see the token when it is made."
+
+`components/forms/calendar-feed.tsx` had it right (capture `result.message` via
+`onResult` into state that OUTLIVES the form) and `mcp-tokens.tsx` had it wrong,
+in the same codebase, the same week. Only two actions return irreplaceable data
+in `message` — `createMcpTokenAction` and `createCalendarFeedAction` — and both
+now use `onResult`. If a third ever appears, this is the trap it will fall into.
+
+### 12. Google refuses an ICS feed with zero events, and refuses `webcal://`
+
+Both report *"Validation failed, please edit the URL and try again"*, which names
+neither cause. Two separate bugs behind one message:
+
+- **An eventless calendar.** Legal per RFC 5545, refused by Google. It is exactly
+  the new-member case, since the feed carries only events you're on. `buildIcs`
+  now always emits at least one VEVENT — an all-day, `TRANSP:TRANSPARENT`
+  placeholder dated from the feed row's `created_at`, **not** from the stamp,
+  which would make the note walk forward a day every time a client polled.
+- **The copy button gave out `webcal://`** while the instructions beside it said
+  Google needs `https://`. Apple and Outlook take either. Both forms now have
+  their own labelled button.
+
+Apple accepts an eventless feed silently, so testing on a Mac proves nothing here.
+
+### 13. Two silent timezone bugs in repeating events
+
+Both found by parsing the real output with `node-ical` rather than by reading it,
+which is the lesson: for ICS, **measure the document.** Every failure mode is
+silent — a client that dislikes something shows an empty calendar, not an error.
+
+- **`UNTIL` was `<date>T235959Z`** — 23:59:59 *UTC* on the last day. Occurrences
+  are club time, so a 5pm Pacific meeting on the final day is 01:00 UTC the day
+  after, past the cutoff. Clients dropped the last meeting of every series while
+  the website listed it. It bites any event from 5pm onward, which is when a
+  student club meets. `rruleFor` now takes the converter injected, exactly as
+  `exdatesFor` already did.
+- **`DTSTART` was an absolute UTC instant**, so clients expanding the RRULE held
+  the UTC time fixed and the *local* time slid an hour at the DST change: a 5pm
+  meeting became 4pm from November. Repeating events now emit
+  `DTSTART;TZID=America/Los_Angeles` with a `VTIMEZONE`, plus `EXDATE` in the
+  same zone — an EXDATE whose value type differs from DTSTART matches nothing and
+  cancels nothing. One-offs deliberately keep the absolute form: only a rule can
+  drift.
+
+The test that should have caught the first one compared *dates* and passed on a
+*time* bug, using a fixture whose comment said "6pm Pacific" while its value was
+6pm UTC — late morning Pacific, which never crosses a date boundary. A fake
+`toUtc` in the tests agreed with any timezone mistake the real one made.
 
 ---
 

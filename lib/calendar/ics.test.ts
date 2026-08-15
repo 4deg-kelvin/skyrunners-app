@@ -299,7 +299,7 @@ describe("a repeating meeting in the feed", () => {
     */
     const ics = build([weekly()]);
     assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, 1);
-    assert.match(ics, /RRULE:FREQ=WEEKLY;UNTIL=20260929T235959Z/);
+    assert.match(ics, /RRULE:FREQ=WEEKLY;UNTIL=20260930T065959Z/);
   });
 
   test("fortnightly carries INTERVAL=2", () => {
@@ -311,11 +311,50 @@ describe("a repeating meeting in the feed", () => {
     assert.ok(!build([event()]).includes("RRULE"));
   });
 
-  test("a cancelled week emits EXDATE with the event's time", () => {
-    // A date-only EXDATE against a timed series matches nothing, so the cancelled
-    // week would stay in everybody's calendar.
+  test("a cancelled week emits EXDATE in the SAME zone as DTSTART", () => {
+    /*
+      Two ways this silently cancels nothing, both pinned here.
+
+      A date-only EXDATE never matches a timed series. And an EXDATE that names the
+      right MOMENT in the wrong form never matches either: a repeating DTSTART
+      carries a TZID, so a UTC EXDATE beside it is a different value type, matches
+      no occurrence, and the cancelled week stays in everybody's calendar.
+
+      18:00Z is 11:00 Pacific, which is what the wall-clock form must read.
+    */
     const ics = build([weekly({ skippedDates: ["2026-09-15"] })]);
-    assert.match(ics, /EXDATE:20260915T180000Z/);
+    assert.match(ics, /EXDATE;TZID=America\/Los_Angeles:20260915T110000/);
+    assert.ok(!ics.includes("EXDATE:"), "not the bare UTC form");
+  });
+
+  test("a repeating event is dated in club time, with a VTIMEZONE", () => {
+    /*
+      The DST drift, and the reason a repeat cannot use an absolute instant.
+
+      A rule is expanded by the CLIENT. With `DTSTART:20260901T180000Z` the client
+      holds the UTC time fixed, so the local time slides an hour in November — a
+      5pm meeting became 4pm on every phone while the website still said 5pm.
+      "11:00 in America/Los_Angeles, weekly" is what was actually meant.
+    */
+    const ics = build([weekly()]);
+    // DTSTART comes from the EVENT's own start — Aug 20 here, since the fixture's
+    // `repeat.startsAt` is a separate field. 18:00Z is 11:00 PDT.
+    assert.match(ics, /DTSTART;TZID=America\/Los_Angeles:20260820T110000/);
+    assert.match(ics, /DTEND;TZID=America\/Los_Angeles:20260820T120000/);
+    assert.ok(ics.includes("BEGIN:VTIMEZONE"), "the TZID must be defined");
+    assert.ok(
+      ics.indexOf("BEGIN:VTIMEZONE") < ics.indexOf("BEGIN:VEVENT"),
+      "parsers that resolve a TZID as they read cannot look ahead"
+    );
+  });
+
+  test("a one-off keeps the absolute UTC form, and needs no VTIMEZONE", () => {
+    // Only a rule can drift, so only a rule changes. A single instant is the least
+    // ambiguous thing to send, and a timezone nothing references is just noise.
+    const ics = build([event()]);
+    assert.match(ics, /DTSTART:20260820T180000Z/);
+    assert.ok(!ics.includes("VTIMEZONE"));
+    assert.ok(!ics.includes("TZID"));
   });
 
   test("changing the range changes SEQUENCE", () => {

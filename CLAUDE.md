@@ -434,7 +434,21 @@ its project.
   nobody; hiding the nav link is not access control.
 - **Engagement is a flashlight, not a scoreboard.** Outcomes are all that count; no
   leaderboard function exists, deliberately. See `lib/engagement.ts`.
-- **Calendar sync is opt-in**, Google and Apple.
+- **Calendar sync is opt-in**, and it's one subscription URL covering Apple,
+  Google and Outlook — there is no public Apple calendar API, so an ICS feed is
+  the only mechanism that reaches all three. `lib/calendar/` is pure and heavily
+  tested because **every failure mode is silent**: a client that dislikes the
+  document shows an empty calendar, never an error. Three rules that have each
+  already been broken, all in `docs/HANDOFF.md` §12–13:
+  - **Never emit a calendar with zero VEVENTs** — Google refuses to add it.
+  - **A repeating event carries `TZID` + `VTIMEZONE`, never an absolute UTC
+    `DTSTART`** — a client expanding the rule would hold UTC fixed and drift the
+    local time an hour at the DST change.
+  - **`EXDATE` must match `DTSTART`'s value type and zone**, or it cancels
+    nothing.
+
+  When changing anything here, parse the output with a real ICS library rather
+  than reading it. Reading it is how all three shipped.
 - **An event links to a project, both ways.** The calendar row links to the
   project; the project's sidebar lists its upcoming sessions with the attend
   button, and its timeline shows them as round dots beside the deliverable
