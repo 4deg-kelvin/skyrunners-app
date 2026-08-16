@@ -87,7 +87,7 @@ export default async function CalendarPage() {
       <PageHeader
         label="What's On"
         title="Calendar"
-        description="Every session, meeting and deadline. Anything open, you can turn up to — you don't have to be on the project."
+        description="Every session, meeting and deadline. If it's open, just turn up — you don't need to be on the project."
         action={
           <CreateEventForm
             myProjects={myProjects}
@@ -128,7 +128,7 @@ export default async function CalendarPage() {
         <Card>
           <CardBody>
             <EmptyState
-              message="Nothing scheduled in the next two months. If you're working on something, put it up — somebody may well join you."
+              message="Nothing in the next two months. Put a session up — somebody may well join you."
               actionLabel="See what needs doing"
               actionHref="/projects"
             />
@@ -199,8 +199,7 @@ export default async function CalendarPage() {
 
       <p className="text-ink-muted px-1 text-sm">
         Sessions keep running over breaks — the academic calendar pauses
-        check-ins, not the club. Helping on something you&apos;re not committed
-        to? Log it against <span className="font-semibold">misc</span>.
+        check-ins, not the club.
       </p>
     </div>
   );

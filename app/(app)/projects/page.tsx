@@ -100,7 +100,7 @@ export default async function ProjectsPage() {
         <PageHeader
           label="The Club's Work"
           title="Projects"
-          description="Everything the club is building. The top of this page is where you'd help most; the divisions below are the full tree. To join anything, ask its RE — they decide, and the ask is tracked."
+          description="Everything the club is building, ranked by where you'd help most. To join anything, ask its RE — the ask is tracked."
           action={
             <div className="flex flex-wrap items-center gap-2">
               {/*
@@ -207,7 +207,7 @@ export default async function ProjectsPage() {
                 </>
               ) : (
                 <EmptyState
-                  message="The club hasn't set up any divisions yet, so there are no projects to show. A Co-Lead does that, and everything appears here once they have."
+                  message="No divisions yet, so there are no projects. A Co-Lead adds them, and everything appears here."
                   actionLabel="See your work"
                   actionHref="/my-work"
                 />

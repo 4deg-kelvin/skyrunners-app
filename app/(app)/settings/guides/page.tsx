@@ -42,7 +42,7 @@ export default async function EditGuidesPage() {
       <PageHeader
         label="Co-Lead"
         title="Edit the guides"
-        description="Add the club's own material to the two guide pages — setup docs, shop rules, templates. Links to Google Docs work well; short notes are for anything the app itself doesn't explain."
+        description="Add the club's own material to the two guide pages — setup docs, shop rules, templates. Google Docs links work well."
       />
 
       {/*

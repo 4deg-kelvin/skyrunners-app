@@ -348,10 +348,10 @@ export function EditTeamForm({
               />
             </label>
             <p className="text-ink-muted mt-1 mb-2.5 text-xs">
-              Optional, and shown on the archive page. Somebody reading this in
-              two years is the person it&apos;s for. Its projects, sub-teams and
-              completed work all come with it — nothing is deleted. Refused if
-              any project here is still running.
+              Optional, and shown on the archive page — write it for somebody
+              reading in two years. Its projects, sub-teams and completed work
+              come with it; nothing is deleted. Refused while any project here
+              is still running.
             </p>
             <button
               type="button"

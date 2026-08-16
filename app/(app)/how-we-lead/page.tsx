@@ -35,7 +35,7 @@ export default function HowWeLeadPage() {
       <PageHeader
         label="How We Work"
         title="Expectations & leadership"
-        description="What the team asks of you, how contribution is tracked, and what we look for when choosing leads. Nothing here is hidden from anyone."
+        description="What we ask of you, how contribution is tracked, and how leads are chosen. Nothing here is hidden."
       />
 
       <Card>
@@ -45,11 +45,9 @@ export default function HowWeLeadPage() {
             Finish what you take on
           </h2>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            SkyRunners builds real aircraft, and that takes real time — but the
-            club does not count your hours, and there is no weekly quota to hit.
-            What we ask is that when you take on a deliverable you finish it,
-            and that you say where things stand twice a week so nobody is
-            guessing.
+            SkyRunners builds real aircraft, which takes real time — but the
+            club counts no hours and sets no quota. We ask two things: finish
+            the deliverables you take on, and say where they stand twice a week.
           </p>
 
           <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
@@ -100,8 +98,8 @@ export default function HowWeLeadPage() {
             Your Lead and the REs of your projects see exactly what you see on
             My Work: deliverables finished, updates on time, and the roles you
             hold. There is deliberately no combined score and no leaderboard — a
-            single number would just become something to game, and it would
-            flatten context that matters.
+            single number becomes something to game, and flattens the context
+            that matters.
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -172,10 +170,9 @@ export default function HowWeLeadPage() {
             See everything. Ask the RE.
           </h2>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Every project in the club is open for you to read: what phase
-            it&apos;s in, who&apos;s on it, what each person owns, what&apos;s
-            blocked, and who the Responsible Engineer is. Nothing about the work
-            is hidden, and you never have to ask a Co-Lead what&apos;s going on.
+            Every project is open for you to read: its phase, who&apos;s on it,
+            what each person owns, what&apos;s blocked, and who the Responsible
+            Engineer is. You never have to ask a Co-Lead what&apos;s going on.
           </p>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             To actually join, hit{" "}

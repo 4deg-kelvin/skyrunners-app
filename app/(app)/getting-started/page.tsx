@@ -48,9 +48,9 @@ export const metadata = {
  * The order is the argument
  * ---------------------------------------------------------------------------
  *
- * Hours and check-ins come first, ahead of even finding work, because they're
- * the two things the app asks a member to DO that nothing else in their life
- * has taught them. Everything after that is either self-evident (browse
+ * The work log and check-ins come first, ahead of even finding work, because
+ * they're the two things the app asks a member to DO that nothing else in their
+ * life has taught them. Everything after that is either self-evident (browse
  * projects) or only matters once they're on something.
  *
  * Written in second person and in the club's actual language — "RE", "Lead",
@@ -82,14 +82,14 @@ export default async function GettingStartedPage() {
       <PageHeader
         label="New Here?"
         title={`Welcome, ${firstName}`}
-        description="Five minutes, once. The first two sections are the only ones you have to remember — everything after that you can find when you need it."
+        description="Five minutes, once. Only the first two sections are worth remembering — look the rest up when you need it."
       />
 
       {/* ------------------------------------------------------------------
           0. Discord. A setup chore, not a concept — which is why it sits
-          ABOVE "first thing" without taking that label. Hours are still the
-          first thing to understand; this is the two minutes of admin that has
-          to happen before any of it can reach you.
+          ABOVE "first thing" without taking that label. The work log is still
+          the first thing to understand; this is the two minutes of admin that
+          has to happen before any of it can reach you.
       ------------------------------------------------------------------- */}
       {/* Anchor on a wrapper: `Card` takes no id, and adding one to a shared
           primitive for a single link target isn't worth widening its API. */}
@@ -115,8 +115,8 @@ export default async function GettingStartedPage() {
             <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
               All club communication runs through Discord. The app messages you
               there when you&apos;re added to a project, when an ask of yours is
-              answered, and — if you end up leading people — when one of them
-              checks in. Nothing else, and never a group ping.
+              answered, and — if you lead people — when one of them checks in.
+              Nothing else, and never a group ping.
             </p>
 
             {connected ? (
@@ -390,11 +390,11 @@ export default async function GettingStartedPage() {
               href={`/members/${viewer.member.id}`}
               linkLabel="your profile"
             >
-              Rooms and machines live on your own profile, under Trainings.
-              Request one there and a Lead verifies it once you&apos;ve done the
-              safety training — the robotics room, the laser cutter, the mill.
-              Everyone can see who&apos;s cleared on what, which is how you find
-              the person to ask about a machine.
+              Rooms and machines live on your profile, under Trainings — the
+              robotics room, the laser cutter, the mill. Request one there and a
+              Lead verifies it once you&apos;ve done the safety training.
+              Everyone can see who&apos;s cleared on what, so you know who to
+              ask.
             </Guide>
 
             {/*
@@ -456,11 +456,10 @@ export default async function GettingStartedPage() {
         <CardBody>
           <SectionLabel>The short version</SectionLabel>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Log a line about what you did. Check in twice a week — mostly by
+            Log a line about what you did. Check in twice a week — mostly just
             confirming what the log already says. Ask to join anything that
-            looks interesting. Say when you&apos;re stuck, early — that is
-            genuinely the whole thing, and it&apos;s about fifteen minutes a
-            week.
+            looks interesting. Say when you&apos;re stuck, early. That&apos;s
+            the whole thing: about fifteen minutes a week.
           </p>
           <p className="text-ink-muted mt-3 text-sm">
             Your profile shows deliverables finished, check-ins on time, and the

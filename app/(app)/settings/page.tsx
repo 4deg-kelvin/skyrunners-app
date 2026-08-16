@@ -130,7 +130,7 @@ export default async function SettingsPage() {
           schedule" hides all of that behind a name for one of its sections,
           so somebody looking for their phone number never opens it.
         */
-        description="Your profile, the days you check in, and pausing for academics. Co-Leads also set the club's expectations, academic calendar and trainings catalogue here."
+        description="Your profile, the days you check in, and pausing for academics. Co-Leads also manage the academic calendar and trainings catalogue."
       />
 
       {/* Profile first: it's the thing a new member needs on day one. */}
@@ -139,9 +139,8 @@ export default async function SettingsPage() {
           <SectionLabel>My Profile</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">Your details</h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            Everything here is optional except what you want people to see.
-            Skills matter most — Projects uses them to rank work by where
-            you&apos;d help.
+            All optional. Skills matter most — Projects uses them to rank work
+            by where you&apos;d help.
           </p>
           <div className="mt-5">
             <ProfileForm
@@ -170,10 +169,9 @@ export default async function SettingsPage() {
             Club events, in your own calendar
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            Subscribe once and every session you&apos;re on shows up in Apple
-            Calendar, Google Calendar or Outlook — and keeps itself up to date
-            when a time moves or something is cancelled. Nothing to install, and
-            it works on your phone.
+            Subscribe once and every session you&apos;re on appears in Apple
+            Calendar, Google Calendar or Outlook, updating itself when a time
+            moves. Nothing to install; works on your phone.
           </p>
           <div className="mt-5">
             <CalendarFeed
@@ -215,11 +213,9 @@ export default async function SettingsPage() {
               <SectionLabel>Check-in Days</SectionLabel>
               <h2 className="text-ink mt-2 text-2xl font-bold">Twice a week</h2>
               <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-                Two short check-ins beat one long one — they give you and your
-                Lead something concrete to talk about twice as often, which is
-                the whole point. Each one is pre-filled from your work log, so
-                the only box you have to write yourself is for a project you
-                logged nothing against.
+                Two short check-ins beat one long one. Each is pre-filled from
+                your work log, so the only box you write yourself is for a
+                project you logged nothing against.
               </p>
             </div>
             {isPaused ? <Badge tone="neutral">Paused</Badge> : null}
@@ -255,10 +251,8 @@ export default async function SettingsPage() {
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
             Pause your check-ins for a couple of weeks. Nothing counts against
-            you, no reminder emails go out, and there&apos;s no backlog waiting
-            when you come back. Give your Lead a heads-up too — pausing tells
-            them you&apos;re busy, but a quick word tells them what to cover
-            while you&apos;re out.
+            you and there&apos;s no backlog when you return. Tell your Lead what
+            to cover while you&apos;re out.
           </p>
 
           <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
@@ -384,9 +378,9 @@ export default async function SettingsPage() {
               Projects with nothing on them
             </h2>
             <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Usually this means somebody was testing, or an assistant connected
-              to the club&apos;s MCP server ran away with itself. Only projects
-              carrying no work at all appear here.
+              Usually a test, or an assistant on the club&apos;s MCP server
+              running away with itself. Only projects with no work on them
+              appear here.
             </p>
             <div className="mt-5">
               <PurgeProjects rows={bulkCreators} />
@@ -600,10 +594,10 @@ export default async function SettingsPage() {
             </div>
 
             <p className="text-ink-muted mt-4 text-sm">
-              Set an expiry only if the clearance really lapses. When one does,
-              it&apos;s cancelled and the member&apos;s Lead is told — there is
-              no grace period, because a lapsed clearance that still reads as
-              valid is the failure that hurts somebody.
+              Set an expiry only if the clearance really lapses. When it does,
+              it&apos;s cancelled and their Lead is told — no grace period,
+              because a lapsed clearance that still reads as valid is how
+              somebody gets hurt.
             </p>
           </CardBody>
         </Card>

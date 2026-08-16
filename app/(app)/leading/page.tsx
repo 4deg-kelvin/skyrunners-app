@@ -84,7 +84,7 @@ export default async function LeadingPage() {
                 ? "What a Lead does"
                 : "What an RE does"
         }
-        description="The short version of who can do what, and why the things you can't do are deliberate. Everything here is also published to members at /how-we-lead — none of it is private."
+        description="Who can do what, and why the limits are deliberate. Members see all of this at /how-we-lead."
       />
 
       {/* ------------------------------------------------------------------
@@ -204,19 +204,17 @@ export default async function LeadingPage() {
               need a reason — a bare rejection is what stops people submitting.
             </Rule>
             <Rule title="Sign off while a checklist item is still open">
-              Neither can the owner mark it done. The list says the work
-              isn&apos;t finished, so the app takes it at its word. You can
-              clear it yourself — tick the items, or delete the ones that turned
-              out not to be needed. Deleting is fine: a todo counts towards
-              nothing, so removing one falsifies no record.
+              Neither can the owner. The list says the work isn&apos;t finished,
+              so the app takes it at its word. Clear it yourself — tick the
+              items, or delete the ones that turned out not to be needed.
+              Deleting is fine: a todo counts towards nothing.
             </Rule>
             <Rule title="Give a checklist item an owner or a due date">
-              There&apos;s deliberately nowhere to put them. If something needs
-              a name and a date against it, it isn&apos;t a checklist item —
-              it&apos;s a deliverable, and it should be one. Errands entered as
-              deliverables are what makes &ldquo;projects completed&rdquo; stop
-              meaning anything: ten of them and somebody outranks the person who
-              shipped the airframe.
+              Deliberately nowhere to put them. If something needs a name and a
+              date against it, it isn&apos;t a checklist item — it&apos;s a
+              deliverable. Errands filed as deliverables are what makes
+              &ldquo;projects completed&rdquo; stop meaning anything: ten of
+              them and somebody outranks the person who shipped the airframe.
             </Rule>
             <Rule can title="Answer what people wrote about your project">
               Per-project check-in entries are public, and you can reply to them
@@ -253,10 +251,10 @@ export default async function LeadingPage() {
             They see everything and run nothing
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            A faculty or project advisor. They can read every project, every
-            check-in entry and every ask on the board, and comment on any of it.
-            They can turn up to any session on the calendar. They hold no
-            authority at all — and that is the point, not a gap.
+            A faculty or project advisor. They can read every project, check-in
+            entry and ask on the board, comment on any of it, and turn up to any
+            session. They hold no authority at all — that&apos;s the point, not
+            a gap.
           </p>
 
           <div className="mt-4 space-y-2.5">

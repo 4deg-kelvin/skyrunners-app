@@ -164,7 +164,7 @@ export default async function UpdatesPage() {
       <PageHeader
         label="Progress"
         title="Check-ins"
-        description="Twice a week, on the days you pick. The point is to start a conversation with your Lead, not to file a report."
+        description="Twice a week, on days you pick. Meant to start a conversation with your Lead, not file a report."
       />
 
       {/* ---------------- What you owe as a Lead ---------------- */}
@@ -280,10 +280,9 @@ export default async function UpdatesPage() {
           <p className="text-ink-muted mt-4 flex items-start gap-1.5 text-sm">
             <Lock className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              Your total hours and reliability are visible only to you and your
-              Lead chain. The per-project notes above are public — they belong
-              to the project, and they&apos;re how someone spots a blocker they
-              can clear.
+              Your reliability is visible only to you and your Lead chain. The
+              per-project notes above are public — they belong to the project,
+              and they&apos;re how someone spots a blocker they can clear.
             </span>
           </p>
         </CardBody>

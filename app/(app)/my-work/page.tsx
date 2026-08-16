@@ -93,7 +93,7 @@ export default async function MyWorkPage() {
       <PageHeader
         label="My Work"
         title={`Hi, ${firstName}`}
-        description="What you own, what you owe, and how your effort is adding up."
+        description="What you own, what you owe, and what you've delivered."
         action={
           mayLogWork ? (
             <LogWorkForm
@@ -478,7 +478,7 @@ export default async function MyWorkPage() {
                 exists. The tree is sorted by org structure, so it puts a
                 newcomer in front of a hierarchy rather than an opportunity.
               */
-              message="You're not on a project yet. Projects lists everything the club is building, with the places that most need people first — pick one and ask to join."
+              message="You're not on a project yet. Projects ranks everything by where you'd help most — pick one and ask to join."
               actionLabel="Find something to work on"
               actionHref="/projects"
             />

@@ -308,8 +308,7 @@ export function AddCatalogueItemForm({
         Appears on everyone&apos;s list immediately, unearned. Site access is a
         door; a machine training is clearance on one machine inside it, and
         neither implies the other. Set an expiry only if the clearance really
-        lapses — when it does, it&apos;s cancelled and the member&apos;s Lead is
-        told.
+        lapses — when it does, it&apos;s cancelled and their Lead is told.
       </p>
 
       <button

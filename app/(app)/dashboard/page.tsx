@@ -65,7 +65,7 @@ export default async function DashboardPage({
       <PageHeader
         label="Lead Portal"
         title="Dashboard"
-        description="What you owe as a Lead: check-ins waiting on you, work waiting on a sign-off, and anyone who has gone quiet. Scoped to your people — about fifteen minutes a week."
+        description="What you owe as a Lead: check-ins to read, work to sign off, anyone gone quiet. Your people only — about fifteen minutes a week."
         action={
           mayLogWork ? (
             <LogWorkForm
@@ -98,10 +98,9 @@ export default async function DashboardPage({
                 </p>
                 <p className="text-ink-soft mt-1 max-w-2xl text-[15px]">
                   Check-ins only generate inside a term the club has entered.
-                  Until one covers today, nobody is prompted to write one,
-                  nothing shows in your review queue, and reliability
-                  doesn&apos;t start counting. Everything else — the work log,
-                  projects, deliverables — works normally.
+                  Until one covers today nobody is prompted, your review queue
+                  stays empty, and reliability doesn&apos;t count. Everything
+                  else works normally.
                 </p>
                 <Link
                   href="/settings"

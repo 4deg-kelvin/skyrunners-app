@@ -56,10 +56,9 @@ export function LogWorkBanner() {
             You haven&apos;t logged any work yet.
           </span>{" "}
           <span className="text-ink-soft">
-            Write a line every time you work on something for the club, however
-            small — it takes about ten seconds. It&apos;s how your work shows up
-            at all: your check-ins fill themselves in from it, and without it
-            your record reads as nothing no matter how much you&apos;ve done.
+            Write a line every time you work on something, however small — ten
+            seconds. Your check-ins fill themselves in from it, and without it
+            your record reads as nothing.
           </span>
         </p>
         <Link

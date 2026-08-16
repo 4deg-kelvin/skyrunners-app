@@ -38,7 +38,7 @@ export default async function ProjectArchivePage() {
       <PageHeader
         label="History"
         title="Archived divisions"
-        description="Retired parts of the org chart, and the work they left behind. Nothing here was deleted."
+        description="Retired divisions and the work they left behind. Nothing was deleted."
         action={
           <Link
             href="/projects"
