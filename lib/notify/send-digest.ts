@@ -26,7 +26,7 @@ export interface DigestRun {
 /**
  * Build and send today's digests.
  *
- * `today` is the CLUB's day, not UTC's. The cron fires at 05:00 UTC, which is
+ * `today` is the CLUB's day, not UTC's. The cron fires at 02:00 UTC, which is
  * already the next calendar day in UTC but is still the same working evening in
  * California — writing `now()::date` here would file a Tuesday evening's digest
  * under Wednesday and then refuse to send Wednesday's.

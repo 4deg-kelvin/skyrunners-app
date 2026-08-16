@@ -6,7 +6,7 @@ import { todayInClubTime } from "@/lib/dates";
 
 /**
  * ============================================================================
- * The evening digest — 10pm California, every day
+ * The evening digest — 7pm California, every day
  * ============================================================================
  *
  * ---------------------------------------------------------------------------
@@ -42,26 +42,48 @@ import { todayInClubTime } from "@/lib/dates";
  * debug the app.
  *
  * ---------------------------------------------------------------------------
- * 05:00 UTC, and what that means through the year
+ * 02:00 UTC, and why 7pm local is not exactly achievable
  * ---------------------------------------------------------------------------
  *
- * Vercel schedules in UTC and has no notion of daylight saving, so a fixed
- * cron drifts against California by an hour twice a year:
+ * Anish asked for 7pm Pacific (2026-08-16). Vercel schedules in UTC and has no
+ * notion of daylight saving, so "7pm California" is two different cron
+ * expressions depending on the month:
  *
- *   PDT (mid-Mar → early Nov):  05:00 UTC = 10pm the previous day
- *   PST (early Nov → mid-Mar):  05:00 UTC =  9pm the previous day
+ *   7pm PDT (mid-Mar → early Nov) = 02:00 UTC
+ *   7pm PST (early Nov → mid-Mar) = 03:00 UTC
  *
- * 10pm is late enough that an evening in the lab is over and the day's hours
- * are logged — which is the whole point, since a digest sent at 6pm reports a
- * day that hasn't finished. The winter hour of drift lands at 9pm, still after
- * the working day, so it is left alone rather than chasing DST with two
- * schedules.
+ * One entry cannot be both, and the Hobby frequency limit above rules out the
+ * obvious workaround — scheduling hourly and gating on `todayInClubTime()`
+ * inside the handler would be exact all year and would also fail every
+ * deployment. Two daily entries (02:00 and 03:00, each no-opping when it is not
+ * 19:00 locally) would work, but a third cron risks the same deploy failure for
+ * an hour of accuracy, and `sendDailyDigests` would then be relied on to
+ * de-duplicate rather than merely being safe to retry.
  *
- * What the drift must NOT do is change which day gets summarised, and it
- * doesn't: `todayInClubTime()` resolves the club's calendar day in Pacific, so
- * at 05:00 UTC it returns the day that has just ended in California under
- * either offset. Using `new Date()` here instead would file a Tuesday evening
- * under Wednesday and then refuse to send Wednesday's — see `lib/dates.ts`.
+ * So: 02:00 UTC, and what that actually means is
+ *
+ *   PDT: 7:00pm — exactly as asked
+ *   PST: 6:00pm — an hour early
+ *
+ * 02:00 rather than 03:00 because PDT covers the months the club is busiest,
+ * fall recruiting and the spring build season. If being an hour EARLY is ever
+ * the worse failure, `0 3 * * *` flips it to 7pm in winter and 8pm in summer;
+ * that is the whole change.
+ *
+ * **This is deliberately earlier than the day is over**, which reverses the
+ * previous reasoning and is worth recording rather than quietly correcting. It
+ * used to run at 05:00 UTC (10pm PDT) precisely so an evening in the lab had
+ * finished and been logged before the day was summarised. At 7pm it has not, so
+ * a member working after dinner sees their own evening in TOMORROW's digest.
+ * That was Anish's call with the tradeoff on the table — do not "fix" it back to
+ * 10pm without asking him.
+ *
+ * What the drift must NOT do is change which day gets summarised, and it still
+ * doesn't: `todayInClubTime()` resolves the club's calendar day in Pacific, so at
+ * both 02:00 and 03:00 UTC it returns the day currently ending in California,
+ * exactly as 05:00 did. Using `new Date()` here instead would file a Tuesday
+ * evening under Wednesday and then refuse to send Wednesday's — see
+ * `lib/dates.ts`.
  */
 
 /** Node, not Edge: the store and the Supabase admin client both need it. */
