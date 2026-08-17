@@ -93,16 +93,30 @@ describe("the seeded catalogue matches the club's real shop", () => {
     }
   });
 
-  test("Lab 64 and Lab 64 24-hour are separate accesses", () => {
-    // One is not a property of the other. They're different clearances, and
-    // modelling the second as a flag on the first would make it unrequestable.
+  test("Lab 64 general and 24-hour access are separate clearances", () => {
+    /*
+      One is not a property of the other. They're different clearances, and
+      modelling the second as a flag on the first would make it unrequestable.
+
+      Both names now SAY which they are — the general one used to be a bare
+      "Lab 64", which left a member to infer whether it meant general access or
+      the parent of the 24-hour one. Asserted on the exact names because that
+      ambiguity is the thing being fixed, and because two entries whose names
+      don't distinguish them are indistinguishable on the profile page.
+    */
     const access = disk
       .readStore()
       .catalogueItems.filter((i) => i.kind === "site_access")
       .map((i) => i.name);
 
-    assert.ok(access.includes("Lab 64"));
-    assert.ok(access.includes("Lab 64 — 24 hour"));
+    assert.ok(
+      access.includes("Lab 64 — general access"),
+      `no general Lab 64 access in: ${access.join(", ")}`
+    );
+    assert.ok(
+      access.includes("Lab 64 — 24 hour access"),
+      `no 24-hour Lab 64 access in: ${access.join(", ")}`
+    );
   });
 
   test("PRL has site access and CNCs, and nothing invented", () => {

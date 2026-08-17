@@ -1855,10 +1855,26 @@ const item = (
 export const seedCatalogueItems: CatalogueItem[] = [
   // --- site access: can you get in the door --------------------------------
   item("acc-robotics", "sec-robotics", "Robotics Room", "site_access", 0),
-  item("acc-lab64", "sec-lab64", "Lab 64", "site_access", 0),
-  // Separate from ordinary Lab 64 access, deliberately — it's a different
-  // clearance, not a property of the first one.
-  item("acc-lab64-24", "sec-lab64", "Lab 64 — 24 hour", "site_access", 1),
+  /*
+    Two SEPARATE clearances for Lab 64, and both names say which they are.
+
+    They were "Lab 64" and "Lab 64 — 24 hour", which left the first one to be
+    inferred: a member reading a bare "Lab 64" beside a "24 hour" one cannot tell
+    whether it is general access or the parent of the other. Naming it makes the
+    pair legible without knowing the shop.
+
+    Genuinely different clearances rather than one with a flag — 24-hour access is
+    granted separately and not implied by general access, which is the same reason
+    `kind` distinguishes `site_access` from `machine`.
+  */
+  item("acc-lab64", "sec-lab64", "Lab 64 — general access", "site_access", 0),
+  item(
+    "acc-lab64-24",
+    "sec-lab64",
+    "Lab 64 — 24 hour access",
+    "site_access",
+    1
+  ),
   item("acc-prl", "sec-prl", "PRL", "site_access", 0),
   item("acc-chip", "sec-chip", "CHIP", "site_access", 0),
 
