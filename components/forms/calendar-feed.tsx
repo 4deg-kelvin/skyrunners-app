@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, Check, Copy } from "lucide-react";
+import { CalendarPlus, Check, Copy, TriangleAlert } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import {
@@ -12,6 +12,7 @@ import { formatMoment } from "@/lib/dates";
 import { CALENDAR_CLIENT_LABELS } from "@/lib/labels";
 import type { FeedSummary } from "@/lib/calendar/store";
 import type { CalendarClient } from "@/lib/calendar/feed-token";
+import { feedHealth } from "@/lib/calendar/health";
 
 /**
  * Subscribe your own calendar to the club's.
@@ -107,6 +108,12 @@ export function CalendarFeed({
   */
   const [copied, setCopied] = useState<"webcal" | "https" | null>(null);
 
+  /*
+    Computed at render, not passed in: it is a function of the clock, and a
+    boolean baked on the server goes stale the moment the page is cached.
+  */
+  const health = feedHealth(syncedAt);
+
   if (!canUse) {
     /*
       Demo mode still shows the STEPS, just not the button.
@@ -193,6 +200,34 @@ export function CalendarFeed({
               </>
             )}
           </p>
+
+          {/*
+            Silence, said out loud.
+
+            The failure this catches has no error anywhere: the subscription
+            breaks and the calendar just stops changing, which looks exactly like
+            "the club has nothing on". Anish RSVP'd on a Friday for a Saturday
+            event and by Sunday his phone had nothing, while this box said he was
+            connected.
+
+            Only past 48 hours — see `STALE_AFTER_HOURS` for why the threshold is
+            set by the slowest client rather than the fastest.
+          */}
+          {health === "stale" ? (
+            <p className="text-warn-fg mt-2 flex items-start gap-2 text-sm">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <span className="font-semibold">
+                  Nothing has collected this in over two days.
+                </span>{" "}
+                New events will not be reaching you. The usual cause is that
+                this link was replaced — pressing{" "}
+                <em>Show me the link again</em> makes a new one and stops every
+                device using the old one. Get the link below and re-add it on
+                each device.
+              </span>
+            </p>
+          ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <ActionForm

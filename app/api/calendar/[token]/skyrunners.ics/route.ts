@@ -39,6 +39,7 @@
  */
 
 import { buildIcs, type IcsEvent } from "@/lib/calendar/ics";
+import { withinFeedWindow } from "@/lib/calendar/window";
 import { feedByToken, recordFeedFetch } from "@/lib/calendar/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { preloadLiveStore, withSuppliedClientStore } from "@/lib/store/request";
@@ -48,29 +49,6 @@ import { appUrl } from "@/lib/urls";
 /** Node, not Edge: the store loader and the admin client both need it. */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/**
- * How far ahead the feed reaches.
- *
- * A subscribed calendar is not a planning horizon — the member already has one of
- * those — so this only has to cover far enough that nothing surprises them. A
- * year is generous for a club that plans a quarter at a time, and it keeps the
- * document small enough that a phone on a slow connection refreshes it in one
- * round trip.
- */
-const HORIZON_DAYS = 365;
-
-/**
- * How far BACK it reaches.
- *
- * Not zero, and this is the subtle one. If a past event vanishes from the feed,
- * clients that have already stored it keep it — they cannot distinguish "removed"
- * from "the feed is briefly broken". Keeping a short tail means a session that
- * was cancelled yesterday is still present, still marked CANCELLED, and therefore
- * actually clears. A month is long enough for every client to have polled at
- * least once.
- */
-const TAIL_DAYS = 30;
 
 function plainText(body: string, status: number): Response {
   return new Response(body, {
@@ -151,9 +129,11 @@ export async function GET(
     const knownClients =
       store.members.find((m) => m.id === feed.memberId)?.calendarClients ?? [];
 
+    /*
+      One instant for the whole run, so every event is windowed against the same
+      "now" rather than drifting as the loop proceeds.
+    */
     const now = Date.now();
-    const from = now - TAIL_DAYS * 86_400_000;
-    const until = now + HORIZON_DAYS * 86_400_000;
 
     /*
       Events this member is ON, and nothing else.
@@ -171,26 +151,15 @@ export async function GET(
     */
     const events = store.events
       .filter((event) => event.attendeeIds.includes(feed.memberId))
-      .filter((event) => {
-        const at = Date.parse(event.startsAt);
-        // A malformed date would otherwise become an Invalid Date in DTSTART and
-        // make a client drop the whole calendar.
-        if (Number.isNaN(at)) return false;
-        /*
-          A REPEATING event is judged on where its SERIES ends, not where it began.
+      /*
+        The window — how far back and forward the feed reaches — lives in
+        `lib/calendar/window.ts`, with its reasoning and its tests.
 
-          A weekly meeting that started in September is still running in November,
-          and every one of its occurrences lives on that single row. Windowing on
-          `startsAt` alone would drop the whole series from the feed the moment its
-          first occurrence fell out of the 30-day tail — silently removing a
-          recurring meeting from everybody's calendar a month after it started,
-          which is the worst possible time for it to vanish.
-        */
-        const seriesEnd = event.repeatUntil
-          ? Date.parse(`${event.repeatUntil.slice(0, 10)}T23:59:59Z`)
-          : at;
-        return seriesEnd >= from && at <= until;
-      })
+        It was inline here, which meant the one predicate deciding whether an
+        RSVP'd event reaches somebody's phone was the only part of
+        `lib/calendar/` with no test at all.
+      */
+      .filter((event) => withinFeedWindow(event, now))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map((event): IcsEvent => ({
         id: event.id,

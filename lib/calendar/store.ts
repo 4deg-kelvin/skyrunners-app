@@ -112,6 +112,7 @@ export async function rotateMyFeed(input: {
     };
   }
 
+  await forgetObservedClients();
   return { ok: true, url: feedUrl(input.origin, token) };
 }
 
@@ -126,7 +127,51 @@ export async function revokeMyFeed(): Promise<{ ok: boolean; error?: string }> {
     .is("revoked_at", null);
 
   if (error) return { ok: false, error: error.message };
+
+  await forgetObservedClients();
   return { ok: true };
+}
+
+/**
+ * Forget which calendar apps have fetched, because the URL they fetched is dead.
+ *
+ * ---------------------------------------------------------------------------
+ * The bug this fixes: a badge that says "connected" about a broken subscription
+ * ---------------------------------------------------------------------------
+ *
+ * `calendar_clients` and `calendar_synced_at` live on `profiles` and record what
+ * has ACTUALLY collected the feed — which is what makes the badge honest instead
+ * of a claim the member typed. But they record it about whatever feed existed at
+ * the time, and rotating or revoking left them untouched.
+ *
+ * So after a rotation the old URL 404s on every device that had it, and the
+ * member's Settings page went on saying "Your calendar is connected · Apple, last
+ * picked up Friday". Every signal they had said the thing was fine. Anish hit
+ * exactly this: an event he RSVP'd to on Friday never reached his phone, and the
+ * page told him he was connected.
+ *
+ * Clearing them means the badge falls back to "waiting for your calendar app to
+ * check in" until the NEW url is collected — which is both true and the prompt to
+ * re-add it. It costs a member who rotates and re-adds promptly a few minutes of
+ * an accurate "waiting", which is the right side to err on: this feature's whole
+ * failure mode is silence, and the badge is the only thing standing against it.
+ *
+ * Best-effort and unawaited-for-correctness on purpose. A failure here must not
+ * fail the rotation the member asked for — the worst case is a stale badge, which
+ * is what we had before.
+ */
+async function forgetObservedClients(): Promise<void> {
+  const supabase = await createClient();
+  if (!supabase) return;
+
+  const { data } = await supabase.auth.getUser();
+  const id = data.user?.id;
+  if (!id) return;
+
+  await supabase
+    .from("profiles")
+    .update({ calendar_clients: [], calendar_synced_at: null })
+    .eq("id", id);
 }
 
 /** The subscription URL for a token. `webcal://` is handled at the render site. */
