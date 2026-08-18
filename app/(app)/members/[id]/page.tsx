@@ -30,6 +30,8 @@ import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isAdvisor, isCoLead, isLeadership } from "@/lib/permissions";
+import { advisorProfileFor } from "@/lib/advisors/store";
+import { describeDegree, describeRole } from "@/lib/advisors/profile";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MemberProfilePage({
@@ -114,6 +116,16 @@ export default async function MemberProfilePage({
     id: member.id,
     globalRole: member.globalRole,
   });
+
+  /*
+    Only fetched for an advisor, because only an advisor has one — and the read
+    fails soft, so this is also null until migration 0044 is applied rather than
+    breaking the page. See `advisorProfileFor`.
+  */
+  const advisorBackground = subjectIsAdvisor
+    ? await advisorProfileFor(member.id)
+    : null;
+  const role = advisorBackground ? describeRole(advisorBackground) : undefined;
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
   // that too, because this is a safety record and one check isn't enough.
@@ -212,6 +224,31 @@ export default async function MemberProfilePage({
                 </>
               ) : null}
             </div>
+
+            {/*
+              What they know and what they do now.
+
+              Above the bio because it is the scannable half: a student deciding
+              whether to ask this person reads "Professor of Aeronautics" before
+              they read a paragraph.
+            */}
+            {role || (advisorBackground?.degrees.length ?? 0) > 0 ? (
+              <div className="border-line mt-5 border-t pt-4">
+                <SectionLabel tone="muted">Background</SectionLabel>
+                {role ? (
+                  <p className="text-ink mt-2 text-[15px] font-semibold">
+                    {role}
+                  </p>
+                ) : null}
+                {advisorBackground && advisorBackground.degrees.length > 0 ? (
+                  <ul className="text-ink-soft mt-1.5 space-y-0.5 text-sm">
+                    {advisorBackground.degrees.map((d) => (
+                      <li key={describeDegree(d)}>{describeDegree(d)}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
 
             {/*
               Their own words.

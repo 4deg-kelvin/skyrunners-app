@@ -233,9 +233,25 @@ export function formatDay(
  */
 export function formatMoment(
   iso: string,
-  options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }
+  options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }
 ): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+  /*
+    `toLocaleString`, not `toLocaleDateString`, and the TIME is in the default.
+
+    This formatted an INSTANT and then threw the time away — the whole difference
+    between it and `formatDay`. It cost a real diagnosis: the calendar panel said
+    "Last picked up Aug 16" when the question was whether Apple's last fetch came
+    before or after an event created that same afternoon, and the answer was
+    sitting in the value that wasn't rendered.
+
+    Callers wanting a bare date pass their own options, and two already do.
+  */
+  return new Date(iso).toLocaleString("en-US", {
     ...options,
     timeZone: CLUB_TIME_ZONE,
   });

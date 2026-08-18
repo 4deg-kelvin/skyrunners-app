@@ -7,6 +7,8 @@ import { ProfileForm } from "@/components/forms/profile-form";
 import { McpTokens } from "@/components/forms/mcp-tokens";
 import { CalendarFeed } from "@/components/forms/calendar-feed";
 import { PurgeProjects } from "@/components/forms/purge-projects";
+import { AdvisorProfileForm } from "@/components/forms/advisor-profile";
+import { advisorProfileFor } from "@/lib/advisors/store";
 import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
@@ -35,7 +37,7 @@ import { getLeadershipRoles } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { getThemeChoice } from "@/lib/theme";
 import { CATALOGUE_KIND_LABELS, TERM_KIND_LABELS } from "@/lib/labels";
-import { can } from "@/lib/permissions";
+import { can, isAdvisor } from "@/lib/permissions";
 import type { CalendarClient } from "@/lib/calendar/feed-token";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
@@ -119,6 +121,18 @@ export default async function SettingsPage() {
   const mayEditCatalogue = can.manageTrainingCatalogue(viewer.actor);
   const mayEditTiers = can.manageEngagementWeights(viewer.actor);
   const mayPurge = can.purgeEmptyProjects(viewer.actor);
+
+  /*
+    An advisor's Settings page is a different page.
+
+    Check-in days, the academic pause and the work-log nudge all assume the person
+    does engineering work; an advisor has none of those obligations, so showing
+    them is showing somebody controls for a job they don't have. Anish's report.
+  */
+  const viewerIsAdvisor = isAdvisor(viewer.actor);
+  const advisorProfile = viewerIsAdvisor
+    ? await advisorProfileFor(viewer.member.id)
+    : null;
   const isPaused = !!schedule.pausedUntil;
   const todayIso = todayInClubTime();
 
@@ -160,6 +174,35 @@ export default async function SettingsPage() {
           </div>
         </CardBody>
       </Card>
+
+      {/*
+        An advisor's background, in place of the check-in machinery below.
+
+        Directly under the profile because for an advisor it IS the profile — the
+        rest of this page is about obligations they do not have.
+      */}
+      {viewerIsAdvisor ? (
+        <Card>
+          <CardBody>
+            <SectionLabel>Advisor</SectionLabel>
+            <h2 className="text-ink mt-2 text-2xl font-bold">
+              Your background
+            </h2>
+            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+              Shown on your profile so members know what to ask you about. You
+              own no deliverables and file no check-ins, so this is what your
+              page says instead.
+            </p>
+            <div className="mt-5">
+              <AdvisorProfileForm
+                bio={viewer.member.bio}
+                profile={advisorProfile}
+                canUse={!viewer.isDemo}
+              />
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {/*
         Above "Connect your AI", and that ordering is deliberate.
@@ -214,68 +257,80 @@ export default async function SettingsPage() {
         </CardBody>
       </Card>
 
-      <Card>
-        <CardBody>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <SectionLabel>Check-in Days</SectionLabel>
-              <h2 className="text-ink mt-2 text-2xl font-bold">Twice a week</h2>
+      {/*
+        Check-ins and the academic pause, for people who file check-ins.
+
+        Hidden from advisors rather than disabled: an advisor has no check-in
+        obligation at all, so a greyed-out schedule would still be telling them
+        about a duty they don't have. `isAdvisor` keeps them out of the
+        obligation machinery everywhere else for the same reason.
+      */}
+      {viewerIsAdvisor ? null : (
+        <>
+          <Card>
+            <CardBody>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <SectionLabel>Check-in Days</SectionLabel>
+                  <h2 className="text-ink mt-2 text-2xl font-bold">
+                    Twice a week
+                  </h2>
+                  <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                    Two short check-ins beat one long one. Each is pre-filled
+                    from your work log, so the only box you write yourself is
+                    for a project you logged nothing against.
+                  </p>
+                </div>
+                {isPaused ? <Badge tone="neutral">Paused</Badge> : null}
+              </div>
+
+              <div className="mt-6">
+                <UpdateScheduleForm
+                  updatesPerWeek={schedule.updatesPerWeek}
+                  initialWeekdays={schedule.weekdays}
+                  disabled={!mayEdit || isPaused}
+                />
+              </div>
+
+              {isPaused ? (
+                <p className="text-ink-muted mt-4 text-sm">
+                  Your schedule is paused until{" "}
+                  {formatDay(schedule.pausedUntil!, {
+                    month: "long",
+                    day: "numeric",
+                  })}
+                  . Resume it below to change your days.
+                </p>
+              ) : null}
+            </CardBody>
+          </Card>
+
+          {/* Academic pause — the retention feature */}
+          <Card>
+            <CardBody>
+              <SectionLabel>Academic Pause</SectionLabel>
+              <h2 className="text-ink mt-2 text-2xl font-bold">
+                Heads-down on classes?
+              </h2>
               <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-                Two short check-ins beat one long one. Each is pre-filled from
-                your work log, so the only box you write yourself is for a
-                project you logged nothing against.
+                Pause your check-ins for a couple of weeks. Nothing counts
+                against you and there&apos;s no backlog when you return. Tell
+                your Lead what to cover while you&apos;re out.
               </p>
-            </div>
-            {isPaused ? <Badge tone="neutral">Paused</Badge> : null}
-          </div>
 
-          <div className="mt-6">
-            <UpdateScheduleForm
-              updatesPerWeek={schedule.updatesPerWeek}
-              initialWeekdays={schedule.weekdays}
-              disabled={!mayEdit || isPaused}
-            />
-          </div>
+              <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
+                <p className="text-ink-soft flex items-start gap-2 text-sm">
+                  <Info className="text-ink-muted mt-0.5 size-4 shrink-0" />
+                  <span>
+                    Please use this instead of going quiet. Midterms happen to
+                    everyone, and we would much rather you pause for two weeks
+                    than feel behind and drift away. Your Lead sees that
+                    you&apos;re paused, not that you&apos;re missing.
+                  </span>
+                </p>
+              </div>
 
-          {isPaused ? (
-            <p className="text-ink-muted mt-4 text-sm">
-              Your schedule is paused until{" "}
-              {formatDay(schedule.pausedUntil!, {
-                month: "long",
-                day: "numeric",
-              })}
-              . Resume it below to change your days.
-            </p>
-          ) : null}
-        </CardBody>
-      </Card>
-
-      {/* Academic pause — the retention feature */}
-      <Card>
-        <CardBody>
-          <SectionLabel>Academic Pause</SectionLabel>
-          <h2 className="text-ink mt-2 text-2xl font-bold">
-            Heads-down on classes?
-          </h2>
-          <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            Pause your check-ins for a couple of weeks. Nothing counts against
-            you and there&apos;s no backlog when you return. Tell your Lead what
-            to cover while you&apos;re out.
-          </p>
-
-          <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
-            <p className="text-ink-soft flex items-start gap-2 text-sm">
-              <Info className="text-ink-muted mt-0.5 size-4 shrink-0" />
-              <span>
-                Please use this instead of going quiet. Midterms happen to
-                everyone, and we would much rather you pause for two weeks than
-                feel behind and drift away. Your Lead sees that you&apos;re
-                paused, not that you&apos;re missing.
-              </span>
-            </p>
-          </div>
-
-          {/*
+              {/*
             These were disabled placeholders for a long time, which was the
             right call while they did nothing: the copy above tells members to
             pause rather than go quiet, so a button that silently failed would
@@ -284,13 +339,13 @@ export default async function SettingsPage() {
             They now write for real. Pausing also clears any open obligations,
             so nobody returns from midterms to a wall of missed check-ins.
           */}
-          <div className="mt-5">
-            <PauseControls pausedUntil={schedule.pausedUntil} />
-          </div>
-        </CardBody>
-      </Card>
+              <div className="mt-5">
+                <PauseControls pausedUntil={schedule.pausedUntil} />
+              </div>
+            </CardBody>
+          </Card>
 
-      {/*
+          {/*
         The way into the guide editor.
 
         A link rather than the editor itself: this page already carries the
@@ -298,54 +353,56 @@ export default async function SettingsPage() {
         academic calendar and the trainings catalogue. A two-page content
         editor inline would bury everything a plain member came here for.
       */}
-      {can.manageGuides(viewer.actor) ? (
-        <Card>
-          <CardBody>
-            <SectionLabel>Co-Lead</SectionLabel>
-            <h2 className="text-ink mt-2 text-2xl font-bold">
-              The guide pages
-            </h2>
-            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Add the club&apos;s own material to <em>New here?</em> and the
-              Lead guide — how to set up Fusion or KiCad, shop rules, templates,
-              anything you want a new member to have. Links to Google Docs work
-              well.
-            </p>
-            <Link
-              href="/settings/guides"
-              className="rounded-tile border-line hover:bg-surface text-ink mt-4 inline-flex items-center gap-2 border px-4 py-2.5 text-[15px] font-semibold transition-colors"
-            >
-              Edit the guides →
-            </Link>
-          </CardBody>
-        </Card>
-      ) : null}
+          {can.manageGuides(viewer.actor) ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Co-Lead</SectionLabel>
+                <h2 className="text-ink mt-2 text-2xl font-bold">
+                  The guide pages
+                </h2>
+                <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                  Add the club&apos;s own material to <em>New here?</em> and the
+                  Lead guide — how to set up Fusion or KiCad, shop rules,
+                  templates, anything you want a new member to have. Links to
+                  Google Docs work well.
+                </p>
+                <Link
+                  href="/settings/guides"
+                  className="rounded-tile border-line hover:bg-surface text-ink mt-4 inline-flex items-center gap-2 border px-4 py-2.5 text-[15px] font-semibold transition-colors"
+                >
+                  Edit the guides →
+                </Link>
+              </CardBody>
+            </Card>
+          ) : null}
 
-      {/*
+          {/*
         Only for people who'd actually receive one. A toggle for a message a
         plain member never gets is a setting that does nothing.
       */}
-      {digestReasons.length > 0 ? (
-        <Card>
-          <CardBody>
-            <SectionLabel>Daily Digest</SectionLabel>
-            <h2 className="text-ink mt-2 text-2xl font-bold">
-              One message each evening
-            </h2>
-            <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Because you hold responsibility for work or people, Discord sends
-              you a summary each evening — what moved, what&apos;s gone quiet
-              and for how long, and anything due inside a week.
-            </p>
-            <div className="mt-5">
-              <DigestToggle
-                optedOut={viewer.member.dailyDigestOptOut ?? false}
-                reasons={digestReasons}
-              />
-            </div>
-          </CardBody>
-        </Card>
-      ) : null}
+          {digestReasons.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Daily Digest</SectionLabel>
+                <h2 className="text-ink mt-2 text-2xl font-bold">
+                  One message each evening
+                </h2>
+                <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                  Because you hold responsibility for work or people, Discord
+                  sends you a summary each evening — what moved, what&apos;s
+                  gone quiet and for how long, and anything due inside a week.
+                </p>
+                <div className="mt-5">
+                  <DigestToggle
+                    optedOut={viewer.member.dailyDigestOptOut ?? false}
+                    reasons={digestReasons}
+                  />
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+        </>
+      )}
 
       {/* The club's own name. Co-Lead only, like everything else that
           reshapes the org. */}

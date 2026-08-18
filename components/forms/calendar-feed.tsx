@@ -247,9 +247,14 @@ export function CalendarFeed({
           <p className="text-ink-soft mt-1.5 text-sm">
             {syncedAt ? (
               <>
-                Last picked up {formatMoment(syncedAt)}. Your calendar app
-                decides how often to check — Apple every few minutes, Outlook
-                every few hours, Google slowest of all.
+                Last picked up {formatMoment(syncedAt)}. If that is before you
+                added the event you are looking for, your calendar app
+                hasn&apos;t collected it yet — on iPhone, Calendar → Calendars →
+                ⓘ next to SkyRunners →{" "}
+                <span className="font-semibold">Refresh</span>, which iOS
+                sometimes sets to Weekly or Manually. Apple normally checks
+                every few minutes, Outlook every few hours, Google slowest of
+                all.
               </>
             ) : (
               <>

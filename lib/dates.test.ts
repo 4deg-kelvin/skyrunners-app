@@ -87,9 +87,31 @@ describe("a calendar date renders as the day it says", () => {
 });
 
 describe("an instant renders in club time", () => {
-  test("late-evening Pacific keeps its own date", () => {
+  /*
+    These asserted "Aug 9" — the date alone — until 2026-08-16, when
+    `formatMoment` started including the TIME by default.
+
+    That was a fix, not a cosmetic change: the function formats an INSTANT, which
+    is its whole difference from `formatDay`, and it was throwing the time away.
+    The calendar panel said "Last picked up Aug 16" when the question was whether
+    Apple's last fetch came before or after an event created that afternoon, and
+    the answer was in the part not being rendered.
+
+    Asserting the full string is also a stronger test of the thing these were
+    always about: the HOUR proves the zone was applied, where a date only proves
+    it within twenty-four.
+  */
+  test("late-evening Pacific keeps its own date, and its own hour", () => {
     // 2026-08-09 20:00 PDT === 2026-08-10 03:00Z.
-    assert.equal(formatMoment("2026-08-10T03:00:00Z"), "Aug 9");
+    assert.equal(formatMoment("2026-08-10T03:00:00Z"), "Aug 9, 8:00 PM");
+  });
+
+  test("a caller can still ask for the bare date", () => {
+    // Two callers do, and the option is how they keep doing it.
+    assert.equal(
+      formatMoment("2026-08-10T03:00:00Z", { month: "short", day: "numeric" }),
+      "Aug 9"
+    );
   });
 
   test("the result does not depend on the machine's timezone", () => {
@@ -98,7 +120,7 @@ describe("an instant renders in club time", () => {
     const original = process.env.TZ;
     try {
       process.env.TZ = "Australia/Sydney";
-      assert.equal(formatMoment("2026-08-10T03:00:00Z"), "Aug 9");
+      assert.equal(formatMoment("2026-08-10T03:00:00Z"), "Aug 9, 8:00 PM");
     } finally {
       process.env.TZ = original;
     }

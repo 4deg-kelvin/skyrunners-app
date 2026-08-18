@@ -850,6 +850,13 @@ export interface ProfileEdits {
   classYear?: number;
   photoUrl?: string;
   skills?: string[];
+  /**
+   * A few lines in their own words. Blank clears it, like every other field here.
+   *
+   * Matters most for an advisor, whose profile has no deliverables to read
+   * instead — see `Member.bio`.
+   */
+  bio?: string;
 }
 
 /**
@@ -917,6 +924,12 @@ export async function updateProfile(input: {
 
     apply("preferredName", text(edits.preferredName));
     apply("phone", text(edits.phone));
+    /*
+      `apply` and not a bespoke branch: blank clears it, like every other text
+      field here. Without this line the field is accepted by the type, written
+      nowhere, and the advisor's bio silently never saves.
+    */
+    apply("bio", text(edits.bio));
 
     /*
       A changed ID is an unproven ID.

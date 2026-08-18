@@ -48,6 +48,8 @@ import {
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
 import { ARTIFACT_KIND_ORDER, eventKindOrDefault } from "@/lib/labels";
+import { saveMyAdvisorProfile } from "@/lib/advisors/store";
+import { normaliseAdvisorProfile } from "@/lib/advisors/profile";
 import { checkUpload } from "@/lib/storage";
 import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
 import { revokeMyFeed, rotateMyFeed } from "@/lib/calendar/store";
@@ -1564,6 +1566,52 @@ async function pushDeliverableDeadlineAction$impl(
  *     rather than deleting a set the Co-Lead never saw. That is the check that
  *     makes a stale tab harmless.
  */
+
+/**
+ * Save the signed-in advisor's own background, and their bio.
+ *
+ * No permission check beyond being signed in, deliberately: `saveMyAdvisorProfile`
+ * writes through RLS scoped to `auth.uid()`, so it can only ever reach the
+ * caller's own row — the same reasoning as `revokeMcpTokenAction`. Role is not
+ * checked either. A Lead who also advises a project is not worth a rule, and the
+ * fields simply go unused by anybody who leaves them blank.
+ */
+async function saveAdvisorProfileAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  /*
+    The bio lives on `profiles` and the rest on `advisor_profiles`, so this writes
+    two places. The bio goes first: it needs no migration, so if 0044 has not been
+    applied yet the advisor still gets the half that works rather than losing both.
+  */
+  const bioResult = await ops.updateProfile({
+    memberId: viewer.member.id,
+    edits: { bio: String(formData.get("bio") ?? "") },
+  });
+  if (!bioResult.ok) return { ok: false, error: bioResult.error };
+
+  const degrees = [0, 1, 2, 3, 4, 5].map((i) => ({
+    degree: String(formData.get(`degree_${i}`) ?? ""),
+    school: String(formData.get(`school_${i}`) ?? ""),
+    year: String(formData.get(`year_${i}`) ?? ""),
+  }));
+
+  const saved = await saveMyAdvisorProfile(
+    normaliseAdvisorProfile({
+      degrees,
+      jobTitle: String(formData.get("jobTitle") ?? ""),
+      employer: String(formData.get("employer") ?? ""),
+    })
+  );
+
+  if (!saved.ok) return { ok: false, error: saved.error };
+
+  refresh();
+  return { ok: true, message: "Saved." };
+}
+
 async function purgeEmptyProjectsAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -3058,6 +3106,12 @@ export async function purgeEmptyProjectsAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => purgeEmptyProjectsAction$impl(formData));
+}
+
+export async function saveAdvisorProfileAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => saveAdvisorProfileAction$impl(formData));
 }
 
 export async function deleteProjectAction(
