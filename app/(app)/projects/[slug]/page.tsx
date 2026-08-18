@@ -141,7 +141,7 @@ export default async function ProjectDetailPage({
   );
 
   const mayRequest =
-    !isOnProject && !view.myPendingRequest && can.requestToJoin();
+    !isOnProject && !view.myPendingRequest && can.requestToJoin(viewer.actor);
   const mayReviewRequests = can.reviewJoinRequest(
     viewer.actor,
     viewer.graph,

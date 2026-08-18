@@ -39,7 +39,7 @@
  */
 
 import { buildIcs, type IcsEvent } from "@/lib/calendar/ics";
-import { withinFeedWindow } from "@/lib/calendar/window";
+import { feedEventsFor } from "@/lib/calendar/window";
 import { feedByToken, recordFeedFetch } from "@/lib/calendar/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { preloadLiveStore, withSuppliedClientStore } from "@/lib/store/request";
@@ -149,19 +149,17 @@ export async function GET(
       the website, where the point is to browse them — and joining one puts it in
       the calendar, which is the incentive loop this should have.
     */
-    const events = store.events
-      .filter((event) => event.attendeeIds.includes(feed.memberId))
-      /*
-        The window — how far back and forward the feed reaches — lives in
-        `lib/calendar/window.ts`, with its reasoning and its tests.
+    /*
+      The selection — who the event is for, and whether it is in the window —
+      lives in `lib/calendar/window.ts` with its reasoning and its tests.
 
-        It was inline here, which meant the one predicate deciding whether an
-        RSVP'd event reaches somebody's phone was the only part of
-        `lib/calendar/` with no test at all.
-      */
-      .filter((event) => withinFeedWindow(event, now))
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-      .map((event): IcsEvent => ({
+      Shared with the "what your calendar app sees" preview in Settings, so the
+      preview cannot disagree with what this route actually serves. It was inline
+      here, which made the one predicate deciding whether an RSVP'd event reaches
+      a phone the only part of `lib/calendar/` with no test at all.
+    */
+    const events = feedEventsFor(store.events, feed.memberId, now).map(
+      (event): IcsEvent => ({
         id: event.id,
         title: event.title,
         startsAt: event.startsAt,
@@ -188,7 +186,8 @@ export async function GET(
               skippedDates: event.skippedDates,
             }
           : undefined,
-      }));
+      })
+    );
 
     return { events, knownClients };
   });

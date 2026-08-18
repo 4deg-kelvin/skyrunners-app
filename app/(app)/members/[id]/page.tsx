@@ -29,7 +29,7 @@ import { getMemberProfile, type MemberProjectRow } from "@/lib/data/members";
 import { getTrainings } from "@/lib/data/trainings";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
-import { can, isCoLead, isLeadership } from "@/lib/permissions";
+import { can, isAdvisor, isCoLead, isLeadership } from "@/lib/permissions";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
 export default async function MemberProfilePage({
@@ -43,6 +43,19 @@ export default async function MemberProfilePage({
   // Decide visibility BEFORE fetching, so restricted numbers are never loaded
   // into a page that isn't allowed to show them.
   const canViewEffort = can.viewMemberEffort(viewer.actor, viewer.graph, id);
+
+  /*
+    Reading the CONTENTS of somebody's check-ins is a narrower right than reading
+    their contribution record, and the two have to be asked separately.
+
+    They were one gate until advisors were given the record on 2026-08-16 for
+    writing references. That change alone would have handed a professor everybody's
+    weekly notes, which is surveillance rather than a reference — so the private
+    half stays with the Lead chain, which is also what makes the escalation in
+    `lib/review.ts` mean anything.
+  */
+  const canReadCheckIns =
+    viewer.member.id === id || can.reviewUpdate(viewer.actor, viewer.graph, id);
   const [view, trainings, resolvedAsks] = await Promise.all([
     getMemberProfile(id, canViewEffort, viewer.member.id),
     getTrainings(id),
@@ -54,8 +67,15 @@ export default async function MemberProfilePage({
 
   if (!view) notFound();
 
-  const { member, lead, directReports, projects, contribution, checkIns } =
-    view;
+  const {
+    member,
+    lead,
+    directReports,
+    projects,
+    advising,
+    contribution,
+    checkIns,
+  } = view;
   /*
     Live work first, finished work behind a toggle at the end.
 
@@ -80,6 +100,20 @@ export default async function MemberProfilePage({
   );
 
   const isOwnProfile = viewer.member.id === member.id;
+
+  /*
+    Whose profile this is, not who is looking.
+
+    An advisor owns no deliverables and files no check-ins by design, so both of
+    those cards render as a row of dashes and an empty list on their page — which
+    reads as "this person has done nothing" rather than "this person does a
+    different job". Anish reported exactly that. They get the bio and the projects
+    they advise instead.
+  */
+  const subjectIsAdvisor = isAdvisor({
+    id: member.id,
+    globalRole: member.globalRole,
+  });
   const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
   // that too, because this is a safety record and one check isn't enough.
@@ -180,6 +214,23 @@ export default async function MemberProfilePage({
             </div>
 
             {/*
+              Their own words.
+
+              Under the structured fields rather than above them: somebody landing
+              here usually wants the contact details, and a paragraph pushes those
+              below the fold. It matters most on an advisor's page, where there is
+              no deliverable list to read instead.
+            */}
+            {member.bio ? (
+              <div className="border-line mt-5 border-t pt-4">
+                <SectionLabel tone="muted">About</SectionLabel>
+                <p className="text-ink-soft mt-2 text-[15px] whitespace-pre-line">
+                  {member.bio}
+                </p>
+              </div>
+            ) : null}
+
+            {/*
               Ask this person for something.
 
               Only on a Lead's or Co-Lead's profile, and never your own. The
@@ -271,41 +322,77 @@ export default async function MemberProfilePage({
             </Card>
           ) : null}
 
-          {/* Contribution: four signals, no composite score, no ranking */}
-          <Card>
-            <CardBody>
-              {canViewEffort && contribution ? (
-                <>
-                  <ContributionPanel
-                    record={contribution}
-                    isOwnRecord={isOwnProfile}
-                  />
-                  <p className="text-ink-muted mt-5 text-sm">
-                    Four independent signals, deliberately not combined into a
-                    score and never ranked against other members.{" "}
-                    <Link
-                      href="/how-we-lead"
-                      className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-                    >
-                      What leadership looks for
-                    </Link>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <SectionLabel>Contribution</SectionLabel>
-                  <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
-                    <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
-                    <span>
-                      The work log and update contents are visible only to this
-                      member&apos;s Lead chain and the REs of projects they
-                      contribute to. Their project work is public — see above.
-                    </span>
-                  </p>
-                </>
-              )}
-            </CardBody>
-          </Card>
+          {/*
+            What they advise on.
+
+            Only rendered when there is something in it, so it never appears as an
+            empty card on a student's page. This is the closest thing an advisor
+            has to the "Projects & Responsibilities" card above, and it is the
+            answer to "should I ask this person about my project".
+          */}
+          {advising.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Advising</SectionLabel>
+                <p className="text-ink-soft mt-2 text-[15px]">
+                  Named as an advisor on {advising.length} project
+                  {advising.length === 1 ? "" : "s"}. Anyone on these can ask
+                  them for input.
+                </p>
+                <ul className="mt-4 space-y-2">
+                  {advising.map((p) => (
+                    <li key={p.id}>
+                      <Link
+                        href={`/projects/${p.slug}`}
+                        className="rounded-tile border-line hover:bg-surface text-ink block border px-3.5 py-2.5 text-[15px] font-semibold transition-colors"
+                      >
+                        {p.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/* Contribution: three signals, no composite score, no ranking */}
+          {subjectIsAdvisor ? null : (
+            <Card>
+              <CardBody>
+                {canViewEffort && contribution ? (
+                  <>
+                    <ContributionPanel
+                      record={contribution}
+                      isOwnRecord={isOwnProfile}
+                    />
+                    <p className="text-ink-muted mt-5 text-sm">
+                      Four independent signals, deliberately not combined into a
+                      score and never ranked against other members.{" "}
+                      <Link
+                        href="/how-we-lead"
+                        className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+                      >
+                        What leadership looks for
+                      </Link>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <SectionLabel>Contribution</SectionLabel>
+                    <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
+                      <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
+                      <span>
+                        The work log and update contents are visible only to
+                        this member&apos;s Lead chain and the REs of projects
+                        they contribute to. Their project work is public — see
+                        above.
+                      </span>
+                    </p>
+                  </>
+                )}
+              </CardBody>
+            </Card>
+          )}
 
           {/*
             Their check-in history.
@@ -315,7 +402,7 @@ export default async function MemberProfilePage({
             further up the chain, can catch up on someone without inheriting a
             queue item for them.
           */}
-          {canViewEffort ? (
+          {canReadCheckIns && !subjectIsAdvisor ? (
             <Card>
               <CardBody>
                 <SectionLabel>Check-ins</SectionLabel>

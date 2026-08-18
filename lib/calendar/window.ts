@@ -81,3 +81,42 @@ export function withinFeedWindow(
 
   return seriesEnd >= from && at <= until;
 }
+
+/** Only what the selection needs. Structural, so callers pass their own rows. */
+export interface FeedCandidate extends WindowedEvent {
+  attendeeIds: string[];
+}
+
+/**
+ * Exactly the events one member's feed contains, soonest first.
+ *
+ * ---------------------------------------------------------------------------
+ * Shared so that a preview cannot lie about the feed
+ * ---------------------------------------------------------------------------
+ *
+ * Settings shows the member what their calendar app is being served, because the
+ * failure mode of this whole feature is silence: when a subscription breaks or an
+ * event is missing there is no error anywhere, and "my calendar is empty" is
+ * indistinguishable from "the club has nothing on". Anish lost two events to that.
+ *
+ * A preview built from its own query would be worse than none — it would agree
+ * with the member's expectation while the real feed disagreed, which is the exact
+ * shape of the bug it exists to catch. So both callers use THIS function, and the
+ * only difference between them is that one renders titles and the other renders
+ * ICS.
+ *
+ * `attendeeIds` is both "invited" and "attending": an RE names people on a
+ * session, RSVPing adds yourself, and creating one adds you as the organiser. All
+ * three are the same condition here, which is why creating an event puts it in
+ * your own calendar without a second step.
+ */
+export function feedEventsFor<T extends FeedCandidate>(
+  events: T[],
+  memberId: string,
+  now: number = Date.now()
+): T[] {
+  return events
+    .filter((event) => event.attendeeIds.includes(memberId))
+    .filter((event) => withinFeedWindow(event, now))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}

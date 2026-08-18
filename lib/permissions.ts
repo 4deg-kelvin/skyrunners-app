@@ -565,7 +565,16 @@ export const can = {
     nobody wastes an ask, and somebody who really is the right person can still
     make the case. The RE decides either way — that hasn't changed.
   */
-  requestToJoin: () => true,
+  /*
+    Anyone may ask to join a project — except an advisor.
+
+    Not a restriction so much as a category error being closed. Joining is how
+    somebody becomes accountable for deliverables, and an advisor holds no
+    deliverables by design; the way they attach to a project is an RE naming them
+    as its advisor, which is a different act with a different meaning. The button
+    was offering them a request that, if approved, would have made them staff.
+  */
+  requestToJoin: (actor: Actor) => !isAdvisor(actor),
 
   /** Accepting or declining a request — the RE's call. */
   reviewJoinRequest: (actor: Actor, graph: OrgGraph, projectId: string) =>
@@ -602,6 +611,7 @@ export const can = {
   viewMemberEffort: (actor: Actor, graph: OrgGraph, memberId: string) =>
     isCoLead(actor) ||
     isSelf(actor, memberId) ||
+    isAdvisor(actor) ||
     isLeadOfOrAbove(actor, graph, memberId),
 
   /**
@@ -741,7 +751,7 @@ export const can = {
    * `viewLeadershipDashboard(actor, hasReports)`.
    */
   createEvent: (actor: Actor, isOnProject = false) =>
-    isLeadership(actor) || isOnProject,
+    isLeadership(actor) || isAdvisor(actor) || isOnProject,
 
   /** Your own, or leadership tidying the club calendar. */
   manageEvent: (actor: Actor, createdBy?: string) =>

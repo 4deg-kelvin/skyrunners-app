@@ -239,6 +239,15 @@ export interface MemberProfileView {
   lead?: Member;
   /** People who report directly to this member. */
   directReports: Member[];
+  /**
+   * Projects this person is a named ADVISOR on, nearest thing they have to a
+   * portfolio.
+   *
+   * Separate from `projects`, which is membership — an advisor is never a member
+   * of anything, so without this an advisor's profile lists nothing at all and
+   * reads as somebody who does nothing.
+   */
+  advising: { id: string; name: string; slug: string }[];
   projects: MemberProjectRow[];
   /**
    * Whether the viewer may see hours, update contents, and their contribution
@@ -316,6 +325,19 @@ export async function getMemberProfile(
     directReports: readStore().members.filter(
       (m) => m.leadId === member.id && m.status === "active"
     ),
+    /*
+      Read from `project_advisors` rather than from memberships, because being an
+      advisor is not a membership. Public, like everything else about who is on
+      what.
+    */
+    advising: readStore()
+      .projectAdvisors.filter((a) => a.memberId === member.id)
+      .flatMap((a) => {
+        const project = readStore().projects.find((p) => p.id === a.projectId);
+        return project
+          ? [{ id: project.id, name: project.name, slug: project.slug }]
+          : [];
+      }),
     projects: memberProjects(memberId).flatMap((pm) => {
       if (!pm.project) return [];
       return [

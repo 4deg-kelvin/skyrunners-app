@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { test, describe } from "node:test";
 
-import { TAIL_DAYS, withinFeedWindow } from "./window.ts";
+import { TAIL_DAYS, feedEventsFor, withinFeedWindow } from "./window.ts";
 
 /** Sunday. Aug 15 2026 was a Saturday. */
 const SUNDAY = Date.parse("2026-08-16T19:00:00.000Z");
@@ -102,5 +102,90 @@ describe("bad data", () => {
     // `Invalid Date` in a DTSTART makes some clients discard the WHOLE calendar,
     // so one bad row would take every other event with it.
     assert.equal(withinFeedWindow({ startsAt: "nonsense" }, SUNDAY), false);
+  });
+});
+
+describe("whose feed an event lands in", () => {
+  /* A title rides along so ordering assertions can name what they expect. */
+  interface Row {
+    title: string;
+    startsAt: string;
+    attendeeIds: string[];
+    repeatUntil?: string;
+  }
+
+  const ev = (over: Partial<Row> = {}): Row => ({
+    title: "Build session",
+    startsAt: daysFromSunday(2),
+    attendeeIds: [],
+    ...over,
+  });
+
+  test("an event you are on is in your feed", () => {
+    const rows = feedEventsFor([ev({ attendeeIds: ["me"] })], "me", SUNDAY);
+    assert.equal(rows.length, 1);
+  });
+
+  test("an event you are NOT on is not", () => {
+    /*
+      The privacy boundary of the whole feature, and the reason it is worth a
+      test: the feed is served past RLS with the service-role client, so what is
+      SELECTED is the only thing keeping one member's calendar out of another's.
+    */
+    const rows = feedEventsFor(
+      [ev({ attendeeIds: ["someone-else"] })],
+      "me",
+      SUNDAY
+    );
+    assert.equal(rows.length, 0);
+  });
+
+  test("CREATING an event puts it in your own feed, with no second step", () => {
+    /*
+      Anish's requirement, stated directly: "if you create an event, it should also
+      autopopulate your calendar".
+
+      It holds because `createEvent` seeds `attendeeIds` with the organiser — so
+      being the creator, being invited and having RSVP'd are one condition here
+      rather than three. If that ever changes, this fails rather than quietly
+      leaving organisers out of their own sessions.
+    */
+    const organiser = "me";
+    const created = ev({ attendeeIds: [organiser] });
+    assert.equal(feedEventsFor([created], organiser, SUNDAY).length, 1);
+  });
+
+  test("soonest first, so a client reads them in order", () => {
+    const rows = feedEventsFor(
+      [
+        ev({
+          title: "later",
+          startsAt: daysFromSunday(9),
+          attendeeIds: ["me"],
+        }),
+        ev({
+          title: "sooner",
+          startsAt: daysFromSunday(2),
+          attendeeIds: ["me"],
+        }),
+      ],
+      "me",
+      SUNDAY
+    );
+    assert.deepEqual(
+      rows.map((r) => r.title),
+      ["sooner", "later"]
+    );
+  });
+
+  test("your own event from yesterday is still there", () => {
+    // The two rules composed: attendance AND the tail. This is the exact case
+    // that went missing — RSVP'd Friday, event Saturday, read on Sunday.
+    const rows = feedEventsFor(
+      [ev({ startsAt: daysFromSunday(-1), attendeeIds: ["me"] })],
+      "me",
+      SUNDAY
+    );
+    assert.equal(rows.length, 1);
   });
 });

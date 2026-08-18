@@ -1259,10 +1259,11 @@ async function requestToJoinAction$impl(
 
   const project = getProject(projectId);
   if (!project) return { ok: false, error: "That project no longer exists." };
-  if (!can.requestToJoin()) {
+  if (!can.requestToJoin(viewer.actor)) {
     return {
       ok: false,
-      error: "This project isn't taking new people right now.",
+      error:
+        "Advisors are named on a project by its RE rather than joining it — joining is how somebody takes on deliverables, and an advisor deliberately holds none.",
     };
   }
 

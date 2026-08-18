@@ -13,6 +13,7 @@ import {
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { emptyProjectsByCreator } from "@/lib/store/operations";
+import { feedEventsFor } from "@/lib/calendar/window";
 import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
@@ -172,4 +173,42 @@ export async function getBulkCreationReport(): Promise<BulkCreationRow[]> {
       (a, b) =>
         b.emptyCount + b.withOthersCount - (a.emptyCount + a.withOthersCount)
     );
+}
+
+/**
+ * What this member's calendar app is being served, right now.
+ *
+ * ---------------------------------------------------------------------------
+ * Why the app shows this at all
+ * ---------------------------------------------------------------------------
+ *
+ * A calendar subscription has no error channel. When something is wrong the
+ * member sees an empty calendar, which is indistinguishable from a club with
+ * nothing scheduled — so "it isn't working" is unfalsifiable from either end, and
+ * Anish lost two events to exactly that before anybody could say whether the
+ * server or Apple was at fault.
+ *
+ * This turns that into a fact. If the event is listed here, the feed is serving
+ * it and the problem is the calendar app; if it isn't, the problem is here.
+ *
+ * Uses `feedEventsFor`, the same selection the feed route uses, so it cannot
+ * disagree with what is actually served — a preview with its own query would be
+ * worse than none.
+ */
+export interface FeedPreviewRow {
+  title: string;
+  /** `YYYY-MM-DD`, already resolved in club time by the caller's formatter. */
+  startsAt: string;
+  repeats: boolean;
+}
+
+export async function getFeedPreview(
+  memberId: string
+): Promise<FeedPreviewRow[]> {
+  await preloadLiveStore();
+  return feedEventsFor(readStore().events, memberId).map((e) => ({
+    title: e.title,
+    startsAt: e.startsAt,
+    repeats: Boolean(e.repeatUntil),
+  }));
 }

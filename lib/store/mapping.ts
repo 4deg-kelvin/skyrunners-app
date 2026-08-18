@@ -80,7 +80,7 @@ const members: CollectionSpec<Member> = {
   key: "members",
   table: "profiles",
   columns:
-    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, discord_verified_at, calendar_clients, calendar_synced_at, global_role, status, lead_id, primary_team_id, skills, joined_at, last_active_at, daily_digest_opt_out",
+    "id, email, full_name, preferred_name, photo_url, class_year, major, phone, discord_user_id, discord_verified_at, calendar_clients, calendar_synced_at, global_role, status, lead_id, primary_team_id, skills, bio, joined_at, last_active_at, daily_digest_opt_out",
   identify: (m) => m.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -102,6 +102,7 @@ const members: CollectionSpec<Member> = {
     leadId: (r.lead_id as string) ?? null,
     primaryTeamId: opt(r.primary_team_id as string),
     skills: opt(r.skills as string[]),
+    bio: opt(r.bio as string),
     joinedAt: r.joined_at as string,
     lastActiveAt: opt(r.last_active_at as string),
     dailyDigestOptOut: (r.daily_digest_opt_out as boolean) ?? false,
@@ -129,6 +130,7 @@ const members: CollectionSpec<Member> = {
     lead_id: m.leadId,
     primary_team_id: nul(m.primaryTeamId),
     skills: m.skills ?? [],
+    bio: nul(m.bio),
     joined_at: m.joinedAt,
     last_active_at: nul(m.lastActiveAt),
     daily_digest_opt_out: m.dailyDigestOptOut ?? false,

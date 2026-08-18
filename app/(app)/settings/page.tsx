@@ -27,6 +27,7 @@ import { UpdateScheduleForm } from "./update-schedule-form";
 import {
   getBulkCreationReport,
   getClubIdentity,
+  getFeedPreview,
   getSettings,
 } from "@/lib/data/settings";
 import { getCatalogue } from "@/lib/data/trainings";
@@ -57,13 +58,19 @@ function termRange(startsOn: string, endsOn: string): string {
 export default async function SettingsPage() {
   const viewer = await getViewer();
   const theme = await getThemeChoice();
-  const [view, catalogue, identity, mcpTokens, calendarFeed] =
+  const [view, catalogue, identity, mcpTokens, calendarFeed, feedPreview] =
     await Promise.all([
       getSettings(viewer.member.id),
       getCatalogue(),
       getClubIdentity(),
       listMyTokens(),
       myFeed(),
+      /*
+        What the calendar feed would serve this member right now. Fetched
+        unconditionally because it is the answer to "why is my calendar empty",
+        and that question is asked by people who have not yet connected one.
+      */
+      getFeedPreview(viewer.member.id),
     ]);
 
   /*
@@ -175,6 +182,7 @@ export default async function SettingsPage() {
           </p>
           <div className="mt-5">
             <CalendarFeed
+              preview={feedPreview}
               feed={calendarFeed}
               clients={calendarClients}
               syncedAt={viewer.member.calendarSyncedAt}

@@ -461,14 +461,16 @@ describe("membership is RE-controlled, with no cap", () => {
   });
 
   /*
-    `requestToJoin` takes no arguments on purpose, which is why the open/closed
-    project fixtures that used to sit here are gone. "Not looking for anyone
-    new" is a signal to read before asking, not a lock on the ask — a project
-    that has stopped recruiting still has to be askable, or the flag quietly
-    recreates the dead end `join_requests` exists to remove.
+    `requestToJoin` takes only the ACTOR, which is why the open/closed project
+    fixtures that used to sit here are gone. "Not looking for anyone new" is a
+    signal to read before asking, not a lock on the ask — a project that has
+    stopped recruiting still has to be askable, or the flag quietly recreates
+    the dead end `join_requests` exists to remove.
+
+    The actor matters for exactly one role: see the advisor block at the bottom.
   */
   test("a member can ask to join, but cannot add themselves", () => {
-    assert.equal(can.requestToJoin(), true);
+    assert.equal(can.requestToJoin(actor("worker")), true);
     assert.equal(can.addProjectMember(actor("worker"), graph, "leaf"), false);
   });
 
@@ -497,7 +499,7 @@ describe("membership is RE-controlled, with no cap", () => {
       can't ask has no route in except knowing somebody, which is the problem
       the app exists to remove. The RE still decides.
     */
-    assert.equal(can.requestToJoin(), true);
+    assert.equal(can.requestToJoin(actor("worker")), true);
     assert.equal(can.followProject(), true);
   });
 });
@@ -896,10 +898,39 @@ describe("an advisor holds no authority", () => {
     assert.equal(can.admitMember(advisor(), "worker"), false);
   });
 
-  test("cannot create club-wide events, invite to them, or take attendance", () => {
-    assert.equal(can.createEvent(advisor()), false);
+  test("CAN put a session on the calendar, but not a closed one", () => {
+    /*
+      Changed on 2026-08-16, on Anish's report that his advisor couldn't schedule
+      anything. Deliberate rather than a slip in either direction:
+
+      An advisor can already attend anything on the calendar and read every
+      project, so "book a design review" or "office hours Thursday" adds no
+      authority they didn't have — it saves them emailing a Co-Lead to type it in.
+      The calendar is open by design; one more open session on it costs nothing.
+
+      What stays shut is the invite-only event, which is Co-Lead-only because every
+      closed event subtracts from an open calendar, and attendance-taking, which is
+      a claim about other people rather than an offer of your own time.
+    */
+    assert.equal(can.createEvent(advisor()), true);
+    assert.equal(can.createClosedEvent(advisor()), false);
     assert.equal(can.inviteToEvent(advisor()), false);
     assert.equal(can.recordAttendance(advisor()), false);
+  });
+
+  test("cannot ask to join a project — that is not their route in", () => {
+    /*
+      Also changed on 2026-08-16. The button was there for everybody, and for an
+      advisor it offered a request that, if approved, would have made them staff:
+      joining is how somebody takes on deliverables, and an advisor holds none.
+
+      The way an advisor attaches to a project is an RE naming them as its
+      advisor — a different act, recorded in `project_advisors`.
+    */
+    assert.equal(can.requestToJoin(advisor()), false);
+    assert.equal(can.requestToJoin(actor("worker")), true);
+    // Following is untouched: watching the club is the whole point of the role.
+    assert.equal(can.followProject(), true);
   });
 
   test("cannot file a roll-up", () => {
@@ -914,10 +945,23 @@ describe("an advisor holds no authority", () => {
     assert.equal(can.createProject(advisor(), graph, { teamId: "div" }), false);
   });
 
-  test("cannot read somebody's personal effort record", () => {
-    // Same as any non-Lead. Seeing everything means seeing the club's WORK,
-    // not each member's private half — see the update privacy split.
-    assert.equal(can.viewMemberEffort(advisor(), graph, "worker"), false);
+  test("CAN read a member's contribution record, for references", () => {
+    /*
+      This asserted the opposite until 2026-08-16, and the reversal is the club's
+      call: advisors write letters of reference, and doing that from a page that
+      hides what somebody delivered is not possible.
+
+      Note what this does and does not open. `viewMemberEffort` is the
+      contribution record — delivered work, reliability, roles held. The
+      CONTENTS of a check-in remain with the member and their Lead chain, because
+      reviewing is one named person's obligation and that is what makes the
+      escalation in `lib/review.ts` mean anything. An advisor reading somebody's
+      weekly notes would be surveillance; reading what they finished is a
+      reference.
+    */
+    assert.equal(can.viewMemberEffort(advisor(), graph, "worker"), true);
+    // The private half is still the Lead chain's.
+    assert.equal(can.reviewUpdate(advisor(), graph, "worker"), false);
   });
 
   /* The positive half: what an advisor is FOR. */

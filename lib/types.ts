@@ -97,6 +97,20 @@ export interface Member {
   leadId: string | null;
   primaryTeamId?: string;
   skills?: string[];
+  /**
+   * A few lines about the person, in their own words.
+   *
+   * `profiles.bio` has existed since migration 0001 and was selected by nothing
+   * and written by nothing — the third column found in that state, after
+   * `projects.created_by` and `work_logs.hours`. No migration needed to use it.
+   *
+   * It earns its place with the ADVISOR role. A member's page is their
+   * deliverables and their record; an advisor has neither by design, so without
+   * this their profile is a name and an email. This is where a faculty advisor
+   * says what they work on and what they can help with — which is the thing a
+   * student needs in order to know whether to ask them.
+   */
+  bio?: string;
   joinedAt: string;
   /**
    * When they last signed in. Written by the trigger in migration 0005.

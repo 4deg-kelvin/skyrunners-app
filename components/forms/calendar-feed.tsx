@@ -8,10 +8,11 @@ import {
   createCalendarFeedAction,
   revokeCalendarFeedAction,
 } from "@/lib/actions";
-import { formatMoment } from "@/lib/dates";
+import { formatDay, formatMoment } from "@/lib/dates";
 import { CALENDAR_CLIENT_LABELS } from "@/lib/labels";
 import type { FeedSummary } from "@/lib/calendar/store";
 import type { CalendarClient } from "@/lib/calendar/feed-token";
+import type { FeedPreviewRow } from "@/lib/data/settings";
 import { feedHealth } from "@/lib/calendar/health";
 
 /**
@@ -78,7 +79,15 @@ export function CalendarFeed({
   clients,
   syncedAt,
   canUse,
+  preview,
 }: {
+  /**
+   * Exactly what the feed route would serve, from the same selection function.
+   *
+   * Shown so "my calendar is empty" stops being unfalsifiable — see
+   * `getFeedPreview`. A separate query here would defeat the whole point.
+   */
+  preview: FeedPreviewRow[];
   feed: FeedSummary | null;
   /**
    * Calendar apps observed fetching, from `profiles` rather than from the feed.
@@ -158,8 +167,58 @@ export function CalendarFeed({
     }
   };
 
+  /*
+    What the feed is serving, shown whether or not a subscription exists.
+
+    Deliberately ABOVE the connect button and outside the `feed ?` branch: the
+    question "why is my calendar empty" gets asked by people who have connected
+    one and by people who think they have, and the answer is the same list.
+  */
+  const previewPanel = (
+    <div className="rounded-tile border-line mb-3 border px-4 py-3">
+      <p className="text-ink-muted text-[11px] font-semibold tracking-[0.09em] uppercase">
+        What your calendar app is sent
+      </p>
+      {preview.length === 0 ? (
+        <p className="text-ink-soft mt-1.5 text-sm">
+          Nothing yet — you are not on any sessions in the next year. Say
+          you&apos;re coming to something on the calendar, or create a session,
+          and it appears here immediately. If this list is empty, an empty
+          calendar on your phone is correct rather than broken.
+        </p>
+      ) : (
+        <>
+          <ul className="mt-1.5 space-y-1">
+            {preview.slice(0, 6).map((row) => (
+              <li key={`${row.title}-${row.startsAt}`} className="text-sm">
+                <span className="text-ink font-semibold">
+                  {formatDay(row.startsAt)}
+                </span>{" "}
+                <span className="text-ink-soft">
+                  {row.title}
+                  {row.repeats ? " · repeats" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {preview.length > 6 ? (
+            <p className="text-ink-muted mt-1 text-xs">
+              and {preview.length - 6} more
+            </p>
+          ) : null}
+          <p className="text-ink-muted mt-2 text-xs">
+            {preview.length} event{preview.length === 1 ? "" : "s"} are in your
+            feed right now. If one of these is missing from your calendar app,
+            the app hasn&apos;t refreshed — the club&apos;s side is working.
+          </p>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div>
+      {previewPanel}
       {feed ? (
         <div className="rounded-tile border-line bg-surface border px-4 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
