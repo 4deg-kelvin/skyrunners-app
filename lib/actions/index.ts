@@ -49,6 +49,7 @@ import {
 import * as ops from "@/lib/store/operations";
 import { ARTIFACT_KIND_ORDER, eventKindOrDefault } from "@/lib/labels";
 import { saveMyAdvisorProfile } from "@/lib/advisors/store";
+import { saveWorkLogReply } from "@/lib/worklog/replies";
 import { normaliseAdvisorProfile } from "@/lib/advisors/profile";
 import { checkUpload } from "@/lib/storage";
 import { createMyToken, revokeMyToken } from "@/lib/mcp/store";
@@ -2167,6 +2168,49 @@ async function setCatalogueItemActiveAction$impl(
 // Phase 7 — the RE answers a check-in section
 // ---------------------------------------------------------------------------
 
+/**
+ * An RE's reply to one work-log line.
+ *
+ * The twin of `respondToUpdateEntryAction`, and gated on the SAME rule
+ * (`manageDeliverables` — RE of this project or above, or a Co-Lead) so the two
+ * rows in the merged feed cannot end up answerable by different people. A reader
+ * seeing a reply box on one row and not the next would reasonably conclude the
+ * app was broken.
+ *
+ * The write goes to its own table via `lib/worklog/replies.ts` rather than to
+ * columns on `work_logs`; migration 0045 explains why, and it is the reason this
+ * degrades to a clear message instead of a 500 before the SQL is applied.
+ */
+async function replyToWorkLogAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const workLogId = String(formData.get("workLogId") ?? "");
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!workLogId || !projectId) {
+    return { ok: false, error: "That entry no longer exists." };
+  }
+  if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
+    return denied("answer work logged on this project");
+  }
+
+  const response = String(formData.get("response") ?? "");
+  const saved = await saveWorkLogReply({
+    workLogId,
+    projectId,
+    response,
+    responderId: viewer.member.id,
+  });
+  if (!saved.ok) return { ok: false, error: saved.error };
+
+  refresh();
+  return {
+    ok: true,
+    message: response.trim() ? "Reply sent." : "Reply removed.",
+  };
+}
+
 async function respondToUpdateEntryAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -3393,6 +3437,12 @@ export async function respondToUpdateEntryAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => respondToUpdateEntryAction$impl(formData));
+}
+
+export async function replyToWorkLogAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => replyToWorkLogAction$impl(formData));
 }
 
 export async function postHelpRequestAction(

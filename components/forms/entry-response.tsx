@@ -4,7 +4,10 @@ import { useState } from "react";
 import { CornerDownRight } from "lucide-react";
 
 import { ActionForm } from "./action-form";
-import { respondToUpdateEntryAction } from "@/lib/actions";
+import {
+  replyToWorkLogAction,
+  respondToUpdateEntryAction,
+} from "@/lib/actions";
 
 /**
  * The RE's answer to one project section of a check-in.
@@ -19,13 +22,25 @@ import { respondToUpdateEntryAction } from "@/lib/actions";
  */
 export function EntryResponse({
   entryId,
+  workLogId,
   projectId,
   authorName,
   existing,
   responderName,
   canRespond,
 }: {
-  entryId: string;
+  /**
+   * The check-in entry being answered. Mutually exclusive with `workLogId`.
+   *
+   * One component for both because they are the same act on the same feed — the
+   * project page merged the work log and the check-in entries into one list, and
+   * Anish's note was that every row should be answerable. A second copy of this
+   * box for the other row type would be 120 lines that drift: the two would stop
+   * agreeing about who may reply, or what clearing the box does.
+   */
+  entryId?: string;
+  /** The logged line being answered. Mutually exclusive with `entryId`. */
+  workLogId?: string;
   projectId: string;
   authorName: string;
   existing?: string;
@@ -72,13 +87,22 @@ export function EntryResponse({
 
   return (
     <ActionForm
-      action={respondToUpdateEntryAction}
+      /*
+        Two actions rather than one taking a discriminator, because they write
+        different tables with different permission checks. The FORM is what is
+        shared; the write is not.
+      */
+      action={workLogId ? replyToWorkLogAction : respondToUpdateEntryAction}
       submitLabel={existing ? "Save reply" : "Send reply"}
       submittingLabel="Sending…"
       onSuccess={() => setEditing(false)}
       className="rounded-tile border-line bg-surface mt-2.5 border p-3"
     >
-      <input type="hidden" name="entryId" value={entryId} />
+      {workLogId ? (
+        <input type="hidden" name="workLogId" value={workLogId} />
+      ) : (
+        <input type="hidden" name="entryId" value={entryId} />
+      )}
       <input type="hidden" name="projectId" value={projectId} />
       <label className="block">
         <span className="text-ink mb-1 block text-sm font-semibold">

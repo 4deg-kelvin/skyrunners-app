@@ -9,6 +9,7 @@ import {
 
 import { PageHeader } from "@/components/layout/page-header";
 import { LogWorkForm } from "@/components/forms/log-work-form";
+import { workLogRepliesFor } from "@/lib/worklog/replies";
 import { ProjectTeamForm } from "@/components/forms/team-admin";
 import { ContactLink } from "@/components/ui/contact-link";
 import {
@@ -154,6 +155,15 @@ export default async function ProjectDetailPage({
     ].filter(Boolean);
     return parts.length ? `${parts.join(". ")}.` : undefined;
   })();
+
+  /*
+    Replies to logged lines, one query for the whole feed.
+
+    Read outside the snapshot and fails soft to {} — see `workLogRepliesFor`. A
+    query per row would be the round-trip-per-row mistake the data layer exists to
+    prevent, on a feed that renders three weeks of entries.
+  */
+  const logReplies = await workLogRepliesFor(project.id);
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
   const mayAssignRE = can.assignRE(viewer.actor, viewer.graph, project.id);
@@ -884,6 +894,38 @@ export default async function ProjectDetailPage({
                         <span className="text-ink-muted shrink-0 text-xs">
                           {formatDay(item.log.log.workDate)}
                         </span>
+                        {/*
+                          Answerable, exactly like a check-in entry.
+
+                          Anish's note on the merged feed: "you should be able to
+                          reply to all of these". A box on one row and not the next
+                          reads as the app being broken, and the whole point of the
+                          merge is that the two rows are the same kind of thing.
+
+                          `w-full` because the row is a flex line with the date
+                          pushed to the end — without it the reply sits in the
+                          middle of that line instead of under it.
+                        */}
+                        <div className="w-full">
+                          <EntryResponse
+                            workLogId={item.log.log.id}
+                            projectId={project.id}
+                            authorName={
+                              item.log.member?.preferredName ??
+                              item.log.member?.fullName ??
+                              "them"
+                            }
+                            existing={logReplies[item.log.log.id]?.response}
+                            responderName={
+                              members.find(
+                                (m) =>
+                                  m.member?.id ===
+                                  logReplies[item.log.log.id]?.respondedBy
+                              )?.member?.fullName
+                            }
+                            canRespond={mayManage}
+                          />
+                        </div>
                       </div>
                     ) : (
                       <UpdateRow

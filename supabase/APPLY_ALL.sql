@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql
 
 
 -- ==========================================================================
@@ -5222,4 +5222,197 @@ comment on column events.skipped_dates is
 
 -- ==========================================================================
 -- END 0043_recurring_events.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0044_advisor_profiles.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0044 — advisor profiles: degrees, current role, employer
+-- ===========================================================================
+--
+-- An advisor is a faculty or industry advisor. They own no deliverables and file
+-- no check-ins by design, so the things that make a student's profile worth
+-- reading are all absent from theirs — before this, an advisor's page was a name
+-- and an email address. A student deciding whether to ask them about a composite
+-- layup has nothing to go on.
+--
+-- ---------------------------------------------------------------------------
+-- Why a separate table rather than columns on `profiles`
+-- ---------------------------------------------------------------------------
+--
+-- Three reasons, in order of how much they matter.
+--
+--   1. **The app can ship before this migration is applied.** `profiles` is read
+--      by the per-request snapshot with an EXPLICIT column list, so adding a
+--      column there means the app selects it — and a select naming a column that
+--      does not exist yet fails EVERY page with a 500 until the SQL lands (see
+--      docs/HANDOFF.md on `loadSnapshot`). A separate table is read by its own
+--      fail-soft query in `lib/advisors/store.ts`, which returns null if the
+--      table is missing. Deploy order stops being load-bearing.
+--   2. It is sparse. One or two rows in a club of thirty-five, so three nullable
+--      columns on every profile would be mostly empty.
+--   3. `degrees` is a LIST OF RECORDS, not a scalar.
+--
+-- ---------------------------------------------------------------------------
+-- Why `degrees` is jsonb and not three parallel arrays
+-- ---------------------------------------------------------------------------
+--
+-- Each degree is a triple: what it was, where, and when. Parallel `text[]`
+-- columns would let the three drift out of alignment — a degree with somebody
+-- else's year is worse than no year — and there is no way to make Postgres
+-- enforce that they stay the same length. jsonb keeps a degree as one object.
+--
+-- Not a child table, because nothing ever queries across degrees: they are read
+-- and written as a whole list, always for one person, and a table would add a
+-- join and an ordering column to buy a query nobody makes.
+
+create table if not exists advisor_profiles (
+  member_id  uuid primary key references profiles (id) on delete cascade,
+
+  -- [{ "degree": "PhD Aeronautics", "school": "Stanford", "year": 2011 }, …]
+  -- Order is meaningful and preserved: advisors list the relevant one first.
+  degrees    jsonb not null default '[]'::jsonb,
+
+  -- What they do now. Two fields rather than one string, so "Staff Engineer" and
+  -- "Joby Aviation" can be rendered, sorted and searched separately later.
+  job_title  text,
+  employer   text,
+
+  updated_at timestamptz not null default now(),
+
+  -- A guard rather than a schema: jsonb would happily accept a string or a
+  -- number here, and the form has no reason to send either.
+  constraint advisor_profiles_degrees_is_array
+    check (jsonb_typeof(degrees) = 'array')
+);
+
+comment on table advisor_profiles is
+  'Faculty/industry advisor background. Separate from profiles so the app can '
+  'ship before this migration is applied — see the header of 0044.';
+
+alter table advisor_profiles enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Readable by the whole club, writable only by its owner
+-- ---------------------------------------------------------------------------
+--
+-- Public on purpose: this is the advisor equivalent of the roster, and the entire
+-- point is that a member can find out who to ask without asking a Co-Lead first.
+-- Nothing here is sensitive — it is what somebody would put on a faculty page.
+drop policy if exists advisor_profiles_read on advisor_profiles;
+create policy advisor_profiles_read on advisor_profiles
+  for select to authenticated
+  using (true);
+
+-- `for all` rather than separate insert/update policies, and that is deliberate:
+-- `persistDiff` splits inserts from updates, an upsert never reaches a
+-- `for update` policy, and a cascade delete needs a DELETE policy or it silently
+-- matches nothing. Same reasoning as `calendar_feeds_own` in 0041.
+drop policy if exists advisor_profiles_own on advisor_profiles;
+create policy advisor_profiles_own on advisor_profiles
+  for all to authenticated
+  using (member_id = auth.uid())
+  with check (member_id = auth.uid());
+
+
+-- ==========================================================================
+-- END 0044_advisor_profiles.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0045_work_log_replies.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0045 — replying to a work-log line
+-- ===========================================================================
+--
+-- The project page merged the work log and the check-in feed into one list on
+-- 2026-08-16, because with hours gone they are the same kind of thing: somebody
+-- saying what they did here. A check-in entry could be replied to and a log line
+-- could not, which made the merge visibly half-done — Anish's note was simply
+-- "you should be able to reply to all of these".
+--
+-- ---------------------------------------------------------------------------
+-- Why a separate table rather than three columns on `work_logs`
+-- ---------------------------------------------------------------------------
+--
+-- `update_entries` carries its reply inline (`response`, `responded_by`,
+-- `responded_at`, migration 0016), and doing the same here would be the obvious
+-- symmetry. It is the wrong call for one reason that outweighs it: `work_logs` is
+-- read by the per-request SNAPSHOT with an explicit column list, so the app would
+-- select three columns that do not exist until this file is applied — and a
+-- select naming a missing column fails EVERY page in the club, not just this
+-- feature. That trap has already cost one outage; see docs/HANDOFF.md and
+-- `migration-before-push`.
+--
+-- A separate table is read by its own fail-soft query in `lib/worklog/replies.ts`,
+-- which returns "no replies" if the table is missing. So the code ships first, the
+-- feature switches itself on when this lands, and the deploy order stops being
+-- load-bearing. Same reasoning as `advisor_profiles` in 0044.
+--
+-- ---------------------------------------------------------------------------
+-- Why `project_id` is stored here even though `work_logs` has one
+-- ---------------------------------------------------------------------------
+--
+-- So the RLS policy can call `auth_is_re_for(project_id)` directly, exactly as
+-- `update_entries_respond_re` does. Reaching through to `work_logs` for it would
+-- need a subquery in the policy, and RE authority INHERITS down the project tree —
+-- a policy that got that wrong would refuse an inherited RE's reply silently,
+-- which is precisely the failure 0016 was written to fix.
+--
+-- The duplication is safe because a reply cannot move between projects: it is
+-- created with its log line's project and never updated.
+
+create table if not exists work_log_replies (
+  -- One reply per log line, enforced by the primary key. An answer, not a
+  -- conversation — the same rule `UpdateEntry.response` states, and for the same
+  -- reason: threading here would turn a weekly obligation into an inbox.
+  work_log_id  uuid primary key references work_logs (id) on delete cascade,
+  project_id   uuid not null references projects (id) on delete cascade,
+  response     text not null,
+  -- Snapshotted, because REs change over a project's life and the answer should
+  -- keep saying who actually gave it.
+  responded_by uuid references profiles (id) on delete set null,
+  responded_at timestamptz not null default now()
+);
+
+create index if not exists work_log_replies_project_idx
+  on work_log_replies (project_id);
+
+comment on table work_log_replies is
+  'An RE''s answer to one work-log line. Separate from work_logs so the app can '
+  'ship before this migration is applied — see the header of 0045.';
+
+alter table work_log_replies enable row level security;
+
+-- Public to read, like the feed it appears in. The log line itself became public
+-- on 2026-08-16 (`can.viewMemberWorkOnProject`), and a reply that only its author
+-- could see would be a worse version of no reply at all.
+drop policy if exists work_log_replies_read on work_log_replies;
+create policy work_log_replies_read on work_log_replies
+  for select to authenticated
+  using (true);
+
+-- `for all`, not `for insert` + `for update`: an upsert never reaches a
+-- `for update` policy, and clearing a reply deletes the row, which needs DELETE
+-- reachability or it silently matches nothing. Same shape as
+-- `calendar_feeds_own` and for the same two reasons.
+drop policy if exists work_log_replies_re on work_log_replies;
+create policy work_log_replies_re on work_log_replies
+  for all to authenticated
+  using (auth_is_re_for(project_id) or auth_is_co_lead())
+  with check (auth_is_re_for(project_id) or auth_is_co_lead());
+
+insert into schema_migrations (version)
+values ('0045_work_log_replies')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0045_work_log_replies.sql
 -- ==========================================================================
