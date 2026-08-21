@@ -37,9 +37,29 @@ export function LogWorkForm({
   today,
   maxBackdateDays,
   recent,
+  startOpen = false,
+  defaultDescription,
 }: {
   projects: { id: string; name: string }[];
   defaultProjectId?: string;
+  /**
+   * Render expanded rather than as a button.
+   *
+   * For the copy of this form that sits ON a project page: there the whole point
+   * is that logging costs nothing, and a collapsed form is one more click between
+   * ticking a deliverable and writing the line about it. Everywhere else it stays
+   * collapsed so it never competes with the page it sits on.
+   */
+  startOpen?: boolean;
+  /**
+   * A draft to start from — what this member ticked off today.
+   *
+   * The form is uncontrolled, so this is a `defaultValue`: it seeds the box and
+   * then gets out of the way. Editing it is expected, and it is deliberately not
+   * re-synced afterwards, because a box that rewrites itself while somebody is
+   * typing in it is worse than an empty one.
+   */
+  defaultDescription?: string;
   today: string;
   maxBackdateDays: number;
   /**
@@ -66,7 +86,7 @@ export function LogWorkForm({
     stale: boolean;
   };
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
 
   const days = recent?.days ?? [];
   const stale = recent?.stale ?? false;
@@ -135,6 +155,7 @@ export function LogWorkForm({
             rows={2}
             required
             maxLength={500}
+            defaultValue={defaultDescription}
             placeholder="Mesh refinement on the spar model — first pass converged"
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />

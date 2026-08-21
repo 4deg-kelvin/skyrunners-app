@@ -358,7 +358,7 @@ describe("effort visibility is restricted to the reporting chain", () => {
     // Changed deliberately. An RE used to qualify via any shared project, which
     // meant being RE of one thing revealed a person's hours on everything else
     // plus their reliability record. The RE's narrower, legitimate question is
-    // covered by viewMemberWorkOnProject below.
+    // covered by viewMemberWorkOnProject below, which is now public.
     assert.equal(can.viewMemberEffort(actor("reRoot"), graph, "worker"), false);
   });
 
@@ -370,40 +370,37 @@ describe("effort visibility is restricted to the reporting chain", () => {
   });
 });
 
-describe("an RE sees time on their own project only", () => {
-  test("RE of the project can see hours logged on it", () => {
-    assert.equal(
-      can.viewMemberWorkOnProject(actor("reLeaf"), graph, "worker", "leaf"),
-      true
-    );
+describe("work on a project is public", () => {
+  /*
+    This block asserted the opposite until 2026-08-16: an RE of the project or
+    above, the person themselves, and the Lead chain — nobody else.
+
+    That rule was about HOURS. "3.5 hrs" invites comparison between volunteers
+    with different course loads, which the club refuses to do, so hiding it from
+    everyone but the two people who needed it was right. The hours went on
+    2026-08-14 and what is left is a sentence about a project, which is the
+    project's business. Anish's call: a log line and a check-in entry are the same
+    kind of thing, and both are public.
+
+    What is still private is asserted directly below — the PERSON-level view.
+  */
+  test("anybody signed in can see what was logged on a project", () => {
+    assert.equal(can.viewMemberWorkOnProject(), true);
   });
 
-  test("RE of a PARENT can too — authority inherits down the tree", () => {
+  test("the person-level record did NOT become public with it", () => {
+    /*
+      The line that matters. Publishing "what happened on this project" must not
+      publish "how this member is doing overall" — that is a judgment about
+      somebody rather than a fact about a project, and it stays with them and
+      their Lead chain.
+    */
     assert.equal(
-      can.viewMemberWorkOnProject(actor("reRoot"), graph, "worker", "leaf"),
-      true
-    );
-  });
-
-  test("...but not on a project outside their subtree", () => {
-    assert.equal(
-      can.viewMemberWorkOnProject(actor("reOther"), graph, "worker", "leaf"),
+      can.viewMemberEffort(actor("outsider"), graph, "worker"),
       false
     );
-  });
-
-  test("the person themselves always can", () => {
-    assert.equal(
-      can.viewMemberWorkOnProject(actor("worker"), graph, "worker", "leaf"),
-      true
-    );
-  });
-
-  test("the lead chain can, on any project", () => {
-    assert.equal(
-      can.viewMemberWorkOnProject(actor("lead2"), graph, "worker", "other"),
-      true
-    );
+    assert.equal(can.reviewUpdate(actor("outsider"), graph, "worker"), false);
+    assert.equal(can.reviewUpdate(actor("reRoot"), graph, "worker"), false);
   });
 });
 

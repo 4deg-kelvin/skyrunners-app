@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { LogWorkForm } from "@/components/forms/log-work-form";
 import { ProjectTeamForm } from "@/components/forms/team-admin";
 import { ContactLink } from "@/components/ui/contact-link";
 import {
@@ -45,7 +46,7 @@ import { ProjectBadges } from "@/components/ui/project-badges";
 import { SectionLabel } from "@/components/ui/section-label";
 import { StatTile } from "@/components/ui/stat-tile";
 import { PushDeadlineForm } from "@/components/forms/push-deadline";
-import { getProjectBySlug } from "@/lib/data/projects";
+import { getProjectBySlug, type ProjectDetailView } from "@/lib/data/projects";
 import { getViewer } from "@/lib/data/viewer";
 import {
   ATTENTION_LABELS,
@@ -85,6 +86,74 @@ export default async function ProjectDetailPage({
     division,
     teamOptions,
   } = view;
+
+  /*
+    ONE feed: check-in entries and work-log lines together, newest first.
+
+    These were two cards — "Recent Work" (REs only) and "Recent Updates On This
+    Project" (public) — and Anish's decision on 2026-08-16 is that they are the
+    same thing and both public. With hours gone, a log line and a check-in entry
+    are both just "what somebody did here"; the only difference is that one is
+    written as you go and the other twice a week. See
+    `can.viewMemberWorkOnProject` for why the privacy went with the hours.
+
+    Sorted by comparing an INSTANT (`submittedAt`) against a CALENDAR DATE
+    (`workDate`) as strings, which is sound because both are ISO-prefixed:
+    "2026-08-13T10:00Z" sorts above "2026-08-12" exactly as the dates do. On the
+    same day the check-in lands above the log line — arbitrary, but stable.
+    Never build two Dates to compare these; see `lib/dates.ts`.
+  */
+  const activity = [
+    ...updateFeed.map((row) => ({
+      kind: "update" as const,
+      at: row.submittedAt,
+      key: `u-${row.entry.id}`,
+      update: row,
+    })),
+    ...view.recentWorkLog.map((row) => ({
+      kind: "log" as const,
+      at: row.log.workDate,
+      key: `l-${row.log.id}`,
+      log: row,
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+
+  /*
+    A draft for the log box: what THIS member ticked off on THIS project today.
+
+    Anish's ask — "when people are checking off checklist items or deliverables it
+    should be super easy for them to effortlessly log what they did". Ticking
+    something is already a statement about what you did; asking somebody to retype
+    it as prose is the friction that stops people logging at all.
+
+    Scoped to today and to this member, so it never puts somebody else's work in
+    your box, and never resurfaces last week's. If nothing was ticked the box is
+    empty and behaves exactly as it does elsewhere.
+  */
+  const tickedToday = (() => {
+    const mine = deliverables.filter(
+      (row) => row.deliverable.ownerId === viewer.member.id
+    );
+    const finished = mine
+      .filter((row) => row.deliverable.submittedAt?.startsWith(view.today))
+      .map((row) => row.deliverable.title);
+    const items = mine.flatMap((row) =>
+      row.todos
+        .filter(
+          (todo) =>
+            todo.done &&
+            todo.doneBy === viewer.member.id &&
+            todo.doneAt?.startsWith(view.today)
+        )
+        .map((todo) => todo.title)
+    );
+
+    const parts = [
+      finished.length ? `Finished: ${finished.join(", ")}` : "",
+      items.length ? `Checked off: ${items.join(", ")}` : "",
+    ].filter(Boolean);
+    return parts.length ? `${parts.join(". ")}.` : undefined;
+  })();
 
   const mayManage = can.manageProject(viewer.actor, viewer.graph, project.id);
   const mayAssignRE = can.assignRE(viewer.actor, viewer.graph, project.id);
@@ -360,56 +429,46 @@ export default async function ProjectDetailPage({
           </Card>
 
           {/*
-            What people have actually been doing here.
+            Log what you did, right here.
 
-            REs only. This is the per-project half of the effort split — work on
-            THIS project, in the words of the person who did it — and never their
-            record or reliability, which belong to them and their Lead.
+            First thing under the status block, and expanded rather than
+            collapsed, because the moment somebody has just ticked a deliverable
+            is the moment they know what to write. Sending them to My Work to do
+            it loses most of them.
 
-            The descriptions ARE the content now, not an annotation on a number.
-            This used to read "3.5 hrs — ran the tensile coupons", and the hours
-            were the part carrying no information: three hours of what? Since
-            2026-08-14 there is no duration to show, which is the whole point.
+            The SAME component and the same action as the dashboard and My Work —
+            not a second write path. It is locked to this project by passing one
+            option, so there is no picker to get wrong.
+
+            Committed members only: `isOnProject` excludes followers, matching
+            `logWork`, which refuses a project you are not on. Showing the box to
+            a follower would be a control that always fails.
+
+            No `recent` list here on purpose — correcting or deleting an entry
+            stays on My Work, where that affordance already exists and is tested,
+            and where somebody looking for it will go.
           */}
-          {mayManage && view.recentWorkLog.length > 0 ? (
+          {isOnProject ? (
             <Card>
               <CardBody>
-                <SectionLabel>Work Log — REs only</SectionLabel>
-                <p className="text-ink-muted mt-2 text-sm">
-                  Day-to-day notes, written as people work. Last three weeks.
-                  Appears the moment somebody logs, and only this project&apos;s
-                  REs can see it.
+                <SectionLabel>Log your work</SectionLabel>
+                <h2 className="text-ink mt-2 text-2xl font-bold">
+                  What did you do on this?
+                </h2>
+                <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
+                  One line, ten seconds. It appears in the feed below straight
+                  away and fills in this project&apos;s box at your next
+                  check-in.
                 </p>
-                <div className="mt-4 space-y-2">
-                  {view.recentWorkLog.map(({ log, member }) => (
-                    <div
-                      key={log.id}
-                      className="rounded-tile border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border px-3.5 py-2.5"
-                    >
-                      <span className="min-w-0 text-sm">
-                        <span className="text-ink font-semibold">
-                          {member?.fullName ?? "Unknown member"}
-                        </span>
-                        {log.description ? (
-                          <span className="text-ink-soft">
-                            {" "}
-                            — {log.description}
-                          </span>
-                        ) : (
-                          <span className="text-ink-muted"> — no note</span>
-                        )}
-                      </span>
-                      <span className="text-ink-muted shrink-0 text-sm tabular-nums">
-                        {new Date(
-                          `${log.workDate}T00:00:00Z`
-                        ).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          timeZone: "UTC",
-                        })}
-                      </span>
-                    </div>
-                  ))}
+                <div className="mt-5">
+                  <LogWorkForm
+                    projects={[{ id: project.id, name: project.name }]}
+                    defaultProjectId={project.id}
+                    today={view.today}
+                    maxBackdateDays={view.maxBackdateDays}
+                    startOpen
+                    defaultDescription={tickedToday}
+                  />
                 </div>
               </CardBody>
             </Card>
@@ -737,11 +796,12 @@ export default async function ProjectDetailPage({
           {/* Per-project update feed — a payoff of update_entries */}
           <Card>
             <CardBody>
-              <SectionLabel>Check-in Updates — everyone</SectionLabel>
+              <SectionLabel>Work on this project</SectionLabel>
               <p className="text-ink-soft mt-2 text-sm">
-                What people reported about this project in their twice-weekly
-                check-ins: progress, blockers, what&apos;s next. Public to the
-                whole club, and this is the project&apos;s history.
+                Everything anyone has done here, newest first — lines logged as
+                people work, and the fuller entries they write at check-in.
+                Public to the whole club: it is the project&apos;s history, and
+                how anyone above you sees what is happening without asking.
               </p>
 
               {/*
@@ -792,63 +852,53 @@ export default async function ProjectDetailPage({
               ) : null}
 
               <div className="mt-4 space-y-3">
-                {updateFeed.length === 0 ? (
+                {activity.length === 0 ? (
                   view.notices.length > 0 ? null : (
                     <EmptyState
-                      message="No updates written about this project yet."
-                      actionLabel="See your own work"
+                      message="Nothing logged here yet."
+                      actionLabel="Log what you did"
                       actionHref="/my-work"
                     />
                   )
                 ) : (
-                  updateFeed.map(
-                    ({ entry, author, submittedAt, responder }) => (
-                      <div
-                        key={entry.id}
-                        className="rounded-tile border-line border px-4 py-3.5"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <p className="text-ink text-[15px] font-bold">
-                            {author?.fullName ?? "Unknown member"}
-                          </p>
-                          <span className="text-ink-muted text-xs">
-                            {formatDay(submittedAt)}
-                          </span>
-                        </div>
-                        <p className="text-ink-soft mt-1.5 text-sm">
-                          {entry.progress}
-                        </p>
-                        {entry.blockers ? (
-                          <p className="text-ink-soft mt-2 flex items-start gap-1.5 text-sm">
-                            <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
-                            <span className="font-medium">
-                              {entry.blockers}
-                            </span>
-                          </p>
-                        ) : null}
-                        {entry.nextSteps ? (
-                          <p className="text-ink-muted mt-1.5 text-sm">
-                            Next: {entry.nextSteps}
-                          </p>
-                        ) : null}
+                  activity.map((item) =>
+                    /*
+                      A logged line and a check-in entry, in one list.
 
-                        {/*
-                        The RE answers here, on the project, where the context
-                        is. A Lead marking the whole check-in read is a
-                        different obligation belonging to a different person —
-                        that one lives on /updates.
-                      */}
-                        <EntryResponse
-                          entryId={entry.id}
-                          projectId={project.id}
-                          authorName={
-                            author?.preferredName ?? author?.fullName ?? "them"
-                          }
-                          existing={entry.response}
-                          responderName={responder?.fullName}
-                          canRespond={mayManage}
-                        />
+                      The log line is deliberately plainer — one sentence, a name
+                      and a date — because that is all it is. Giving it the same
+                      chrome as a check-in would imply it carries blockers and
+                      next steps that nobody wrote.
+                    */
+                    item.kind === "log" ? (
+                      <div
+                        key={item.key}
+                        className="rounded-tile border-line flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border px-4 py-2.5"
+                      >
+                        <span className="min-w-0 text-sm">
+                          <span className="text-ink font-semibold">
+                            {item.log.member?.fullName ?? "Unknown member"}
+                          </span>
+                          {item.log.log.description ? (
+                            <span className="text-ink-soft">
+                              {" "}
+                              — {item.log.log.description}
+                            </span>
+                          ) : (
+                            <span className="text-ink-muted"> — no note</span>
+                          )}
+                        </span>
+                        <span className="text-ink-muted shrink-0 text-xs">
+                          {formatDay(item.log.log.workDate)}
+                        </span>
                       </div>
+                    ) : (
+                      <UpdateRow
+                        key={item.key}
+                        row={item.update}
+                        projectId={project.id}
+                        canRespond={mayManage}
+                      />
                     )
                   )
                 )}
@@ -1176,6 +1226,78 @@ export default async function ProjectDetailPage({
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One check-in entry in the project's activity feed.
+ *
+ * Extracted when the work log and the check-in feed merged into a single list
+ * (2026-08-16). The two entry kinds have genuinely different shapes — a log line
+ * is a sentence, an entry carries progress, blockers, next steps and a reply — so
+ * the branch inside `.map()` needed one of them out of the way to stay readable.
+ */
+function UpdateRow({
+  row,
+  projectId,
+  canRespond,
+}: {
+  row: ProjectDetailView["updateFeed"][number];
+  projectId: string;
+  /** RE of this project or above — who may answer an entry here. */
+  canRespond: boolean;
+}) {
+  const { entry, author, submittedAt, responder } = row;
+  return (
+    <div className="rounded-tile border-line border px-4 py-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-ink text-[15px] font-bold">
+          {author?.fullName ?? "Unknown member"}
+        </p>
+
+        <span className="text-ink-muted text-xs">{formatDay(submittedAt)}</span>
+      </div>
+
+      <p className="text-ink-soft mt-1.5 text-sm">{entry.progress}</p>
+
+      {entry.blockers ? (
+        <p className="text-ink-soft mt-2 flex items-start gap-1.5 text-sm">
+          <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
+
+          <span className="font-medium">{entry.blockers}</span>
+        </p>
+      ) : null}
+
+      {entry.nextSteps ? (
+        <p className="text-ink-muted mt-1.5 text-sm">Next: {entry.nextSteps}</p>
+      ) : null}
+
+      {/*
+
+                        The RE answers here, on the project, where the context
+
+                        is. A Lead marking the whole check-in read is a
+
+                        different obligation belonging to a different person —
+
+                        that one lives on /updates.
+
+                      */}
+
+      <EntryResponse
+        entryId={entry.id}
+
+        projectId={projectId}
+
+        authorName={author?.preferredName ?? author?.fullName ?? "them"}
+
+        existing={entry.response}
+
+        responderName={responder?.fullName}
+
+        canRespond={canRespond}
+      />
     </div>
   );
 }

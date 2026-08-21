@@ -420,8 +420,19 @@ its project.
   | Thing | Who sees it | Rule |
   |---|---|---|
   | Per-project entry (progress, blockers, next steps) | **Everyone** — it's the project's history | `can.viewProjectUpdates` |
-  | What they logged on one project | That project's REs, inheriting **down** the tree | `can.viewMemberWorkOnProject` |
+  | What they logged on one project | **Everyone**, since 2026-08-16 | `can.viewMemberWorkOnProject` |
   | The personal report and reliability | The member and their **Lead chain only** | `can.viewMemberEffort`, `can.reviewUpdate` |
+
+  The middle row changed on 2026-08-16 and the reasoning is worth keeping: it was
+  RE-and-Lead-chain only because the log used to carry HOURS, and a number
+  invites comparison between volunteers with different course loads. The hours
+  went on 2026-08-14; what is left is a sentence about a project, and the project
+  is public. A log line and a check-in entry are now the same kind of thing and
+  are shown in one feed on the project page.
+
+  What did NOT change is the bottom row. Publishing "what happened on this
+  project" must not publish "how this member is doing" — that is a judgment about
+  a person, and it stays with them and their Lead.
 
   **REs deliberately cannot read someone's personal report.** They get the per-project half
   publicly instead. Reviewing is one named person's obligation — that's what makes the

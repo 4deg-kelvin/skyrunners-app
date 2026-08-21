@@ -37,6 +37,7 @@ import {
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { addDays, daysBetweenDays } from "@/lib/dates";
 import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
@@ -421,6 +422,16 @@ export interface ProjectDetailView {
    * neither. Fixing that has to be possible from the project itself.
    */
   teamOptions: { id: string; name: string }[];
+  /**
+   * Today in club time, and how far back a log entry may be dated.
+   *
+   * Here because the project page now carries its own "log what you did" form —
+   * the same component the dashboard and My Work use, scoped to this project. The
+   * form needs both, and computing "today" in the component would read the
+   * browser's clock, which is the seven-hour bug in `lib/dates.ts`.
+   */
+  today: string;
+  maxBackdateDays: number;
 }
 
 export async function getProjectBySlug(
@@ -545,6 +556,8 @@ export async function getProjectBySlug(
       .teams.filter((t) => t.isActive)
       .map((t) => ({ id: t.id, name: t.name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
+    today: today(),
+    maxBackdateDays: MAX_BACKDATE_DAYS,
   };
 }
 

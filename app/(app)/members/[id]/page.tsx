@@ -419,10 +419,10 @@ export default async function MemberProfilePage({
                     <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
                       <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
                       <span>
-                        The work log and update contents are visible only to
-                        this member&apos;s Lead chain and the REs of projects
-                        they contribute to. Their project work is public — see
-                        above.
+                        This member&apos;s reliability and contribution record
+                        are visible only to them and their Lead chain. What they
+                        did on each project is public — it&apos;s on the project
+                        pages, in the feed.
                       </span>
                     </p>
                   </>

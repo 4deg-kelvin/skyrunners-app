@@ -615,27 +615,44 @@ export const can = {
     isLeadOfOrAbove(actor, graph, memberId),
 
   /**
-   * What ONE person logged on ONE project.
+   * What ONE person logged on ONE project. PUBLIC since 2026-08-16.
    *
-   * The RE's legitimate need: "who is actually working on the thing I'm
-   * accountable for?" Scoped to that project, and inheriting down the project
-   * tree — an RE of a parent sees work on its children, because they're
-   * accountable for that subtree.
+   * ---------------------------------------------------------------------------
+   * This used to be RE-and-Lead-chain only, and the club changed its mind
+   * ---------------------------------------------------------------------------
    *
-   * Renamed from `viewMemberHoursOnProject` on 2026-08-14. The rule is
-   * unchanged; there are simply no hours to see, so what it now permits is the
-   * count of days worked and the diary entries themselves.
+   * The old rule answered the RE's question — "who is actually working on the
+   * thing I'm accountable for?" — and kept everyone else out, on the reasoning
+   * that a member's effort was their own business.
+   *
+   * That reasoning was about HOURS. When the log was "3.5 hrs — ran the tensile
+   * coupons", the number invited comparison, and comparison between volunteers
+   * with different course loads is exactly what the club refused to do. Hiding it
+   * from everybody but the two people who needed it was the right call.
+   *
+   * The hours went on 2026-08-14, and what is left is a sentence about a
+   * project. Anish's decision on 2026-08-16: **the work you did on a project is
+   * the project's business, and the project is public.** A check-in entry and a
+   * log entry are now the same kind of thing — one is written as you go and one
+   * is written twice a week — so they are shown together, and a Division Lead
+   * two levels up can see what is happening in a sub-project without asking.
+   *
+   * What stays private is the PERSON-level view: `viewMemberEffort` for
+   * reliability and the contribution record, and `reviewUpdate` for the general
+   * note in a check-in that isn't about any project. Those are judgments about
+   * somebody rather than facts about a project, and they still belong to the
+   * member and their Lead chain.
+   *
+   * Takes no arguments now, like `viewProjectUpdates` and `followProject`. That
+   * is the file's convention for "public": the rule stays as the documented
+   * answer with a test on it, rather than becoming a function nothing can vary.
+   *
+   * Worth recording that it was never CALLED even when it did restrict — only
+   * its own tests referenced it, and the real gate was `can.manageProject` on
+   * the project page. So the privacy this rule described had one implementation
+   * somewhere else, which is exactly how a rule and its enforcement drift.
    */
-  viewMemberWorkOnProject: (
-    actor: Actor,
-    graph: OrgGraph,
-    memberId: string,
-    projectId: string
-  ) =>
-    isCoLead(actor) ||
-    isSelf(actor, memberId) ||
-    isLeadOfOrAbove(actor, graph, memberId) ||
-    isREofOrAbove(actor, graph, projectId),
+  viewMemberWorkOnProject: () => true,
 
   /**
    * Reading someone's private twice-weekly report, and marking it reviewed.
