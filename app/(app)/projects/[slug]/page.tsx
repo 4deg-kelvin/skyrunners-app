@@ -447,31 +447,24 @@ export default async function ProjectDetailPage({
             No `recent` list here on purpose — correcting or deleting an entry
             stays on My Work, where that affordance already exists and is tested,
             and where somebody looking for it will go.
+
+            Deliberately NOT wrapped in a `Card` with its own label and heading.
+            It had those, and that heading said the same thing as the form's own
+            "Log what I did" one line below it: two titles and a paragraph of
+            explanation around a box with one field in it. Anish asked for it to
+            feel convenient rather than big, so the form's own panel IS the block.
+            Everything else on this page is a Card, and this one being a bare
+            panel is what makes it read as a control rather than a section.
           */}
           {isOnProject ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Log your work</SectionLabel>
-                <h2 className="text-ink mt-2 text-2xl font-bold">
-                  What did you do on this?
-                </h2>
-                <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-                  One line, ten seconds. It appears in the feed below straight
-                  away and fills in this project&apos;s box at your next
-                  check-in.
-                </p>
-                <div className="mt-5">
-                  <LogWorkForm
-                    projects={[{ id: project.id, name: project.name }]}
-                    defaultProjectId={project.id}
-                    today={view.today}
-                    maxBackdateDays={view.maxBackdateDays}
-                    startOpen
-                    defaultDescription={tickedToday}
-                  />
-                </div>
-              </CardBody>
-            </Card>
+            <LogWorkForm
+              projects={[{ id: project.id, name: project.name }]}
+              defaultProjectId={project.id}
+              today={view.today}
+              maxBackdateDays={view.maxBackdateDays}
+              startOpen
+              defaultDescription={tickedToday}
+            />
           ) : null}
 
           {/* Deliverables — the whole task model, one flat list */}
