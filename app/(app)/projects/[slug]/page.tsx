@@ -374,11 +374,11 @@ export default async function ProjectDetailPage({
           {mayManage && view.recentWorkLog.length > 0 ? (
             <Card>
               <CardBody>
-                <SectionLabel>Recent Work</SectionLabel>
+                <SectionLabel>Work Log — REs only</SectionLabel>
                 <p className="text-ink-muted mt-2 text-sm">
-                  What people logged here in the last three weeks. Appears as
-                  soon as somebody logs — it doesn&apos;t wait for their
-                  check-in.
+                  Day-to-day notes, written as people work. Last three weeks.
+                  Appears the moment somebody logs, and only this project&apos;s
+                  REs can see it.
                 </p>
                 <div className="mt-4 space-y-2">
                   {view.recentWorkLog.map(({ log, member }) => (
@@ -737,9 +737,11 @@ export default async function ProjectDetailPage({
           {/* Per-project update feed — a payoff of update_entries */}
           <Card>
             <CardBody>
-              <SectionLabel>Recent Updates On This Project</SectionLabel>
+              <SectionLabel>Check-in Updates — everyone</SectionLabel>
               <p className="text-ink-soft mt-2 text-sm">
-                Everything anyone has reported about this project specifically.
+                What people reported about this project in their twice-weekly
+                check-ins: progress, blockers, what&apos;s next. Public to the
+                whole club, and this is the project&apos;s history.
               </p>
 
               {/*
