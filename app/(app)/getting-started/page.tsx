@@ -264,13 +264,11 @@ export default async function GettingStartedPage() {
           <div className="rounded-tile bg-surface mt-4 px-4 py-3.5">
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">Why it matters:</span>{" "}
-              your check-in writes itself from these lines. Each project&apos;s
-              box arrives already filled in from what you logged against it, and
-              the only box you have to write is for a project you logged nothing
-              against. So this isn&apos;t extra paperwork — it&apos;s the same
-              writing, done in ten-second pieces while you still remember. The
-              club does not count hours and nobody is ranked against anybody
-              else.
+              it&apos;s how anyone else knows what is happening on your project
+              — your RE, your Lead, and a Division Lead two levels up who
+              otherwise cannot see inside it. It is also your track record when
+              leadership is picking people they don&apos;t work beside every
+              week. Nobody is ranked against anybody else.
             </p>
           </div>
         </CardBody>
