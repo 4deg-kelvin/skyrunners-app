@@ -24,7 +24,7 @@ import { getViewer } from "@/lib/data/viewer";
 import { discordIsConfigured } from "@/lib/notify/discord";
 
 export const metadata = {
-  title: "New here?",
+  title: "New Member Resources",
 };
 
 /**
@@ -80,10 +80,27 @@ export default async function GettingStartedPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        label="New Here?"
+        label="New Member Resources"
         title={`Welcome, ${firstName}`}
         description="Five minutes, once. Only the first two sections are worth remembering — look the rest up when you need it."
       />
+
+      {/*
+        The club's own guides, FIRST.
+
+        This sat last for a while, on the reasoning that everything below explains
+        how the app works — the same for any club — while this is Stanford UAV's
+        own material, which makes more sense once you know what you're being asked
+        to do. Anish moved it to the top on 2026-08-16, and he is right about the
+        audience: somebody opening this page has usually been handed a link and
+        told to get set up, and the onboarding doc IS the thing they came for.
+        Making them scroll past five sections of model explanation to reach it
+        buries the one item with a deadline attached.
+
+        Co-Leads edit it at /settings/guides; see migration 0038 for why only this
+        half is data rather than code.
+      */}
+      <GuideBlocks sections={guideSections} canEdit={mayEditGuides} />
 
       {/* ------------------------------------------------------------------
           0. Discord. A setup chore, not a concept — which is why it sits
@@ -332,14 +349,12 @@ export default async function GettingStartedPage() {
               href="/find-work"
               linkLabel="Find Work"
             >
-              Everything the club is building, sorted by where you&apos;d help
-              most — unstaffed and stuck projects first. Nobody assigns you
-              anything. Find something and press{" "}
-              <span className="text-ink font-semibold">Ask to join</span>; the{" "}
+              Every project, sorted by where you&apos;d help most — unstaffed
+              and stuck first. Nobody assigns you work: find something and press{" "}
+              <span className="text-ink font-semibold">Ask to join</span>. The{" "}
               <span className="text-ink font-semibold">RE</span> (Responsible
-              Engineer — the person accountable for that project) gets a tracked
-              request, not another email. If they haven&apos;t answered in five
-              days it escalates on its own.
+              Engineer, accountable for that project) gets a tracked request,
+              and it escalates on its own after five days.
             </Guide>
 
             <Guide
@@ -348,12 +363,11 @@ export default async function GettingStartedPage() {
               href="/projects"
               linkLabel="Projects"
             >
-              You can <span className="text-ink font-semibold">follow</span> any
-              project instantly, as many as you like — that&apos;s just
-              watching. <span className="text-ink font-semibold">Joining</span>{" "}
-              needs the RE to say yes, because they&apos;re accountable for the
-              work. Same reason you can&apos;t add yourself: every name on a
-              project is there because somebody with context put it there.
+              <span className="text-ink font-semibold">Follow</span> anything,
+              instantly, as many as you like — that&apos;s just watching.{" "}
+              <span className="text-ink font-semibold">Joining</span> needs the
+              RE to say yes, because they&apos;re accountable for the work. Same
+              reason you can&apos;t add yourself.
             </Guide>
 
             <Guide
@@ -362,12 +376,11 @@ export default async function GettingStartedPage() {
               href="/my-work"
               linkLabel="My Work"
             >
-              A deliverable is one piece of work with one owner and one date.
-              When you finish, mark it done — that&apos;s a{" "}
-              <span className="text-ink font-semibold">claim</span>. An RE then
-              signs it off, and only then does it count. Two steps on purpose:
-              nobody marks their own homework, and the record is worth something
-              because of it.
+              One piece of work, one owner, one date. Mark it done when you
+              finish — that&apos;s a{" "}
+              <span className="text-ink font-semibold">claim</span>. An RE signs
+              it off, and only then does it count. Two steps so nobody marks
+              their own homework.
             </Guide>
 
             <Guide
@@ -376,12 +389,11 @@ export default async function GettingStartedPage() {
               href="/calendar"
               linkLabel="Calendar"
             >
-              Sessions, meetings and deadlines in one list. Anything marked open
-              you can turn up to, whether or not you&apos;re on the project —
-              press{" "}
+              Sessions, meetings and deadlines in one list. Anything open you
+              can turn up to, whether or not you&apos;re on the project — press{" "}
               <span className="text-ink font-semibold">I&apos;ll be there</span>
-              . You can put your own session up too: two people on the spar
-              Thursday night is exactly what it&apos;s for.
+              . Put your own session up too; two people on the spar on a
+              Thursday is what it&apos;s for.
             </Guide>
 
             <Guide
@@ -390,11 +402,10 @@ export default async function GettingStartedPage() {
               href={`/members/${viewer.member.id}`}
               linkLabel="your profile"
             >
-              Rooms and machines live on your profile, under Trainings — the
+              Rooms and machines live on your profile under Trainings — the
               robotics room, the laser cutter, the mill. Request one there and a
               Lead verifies it once you&apos;ve done the safety training.
-              Everyone can see who&apos;s cleared on what, so you know who to
-              ask.
+              Everyone can see who&apos;s cleared, so you know who to ask.
             </Guide>
 
             {/*
@@ -415,22 +426,20 @@ export default async function GettingStartedPage() {
               href="/members"
               linkLabel="the roster"
             >
-              Software and accounts don&apos;t need a safety check, so they
-              don&apos;t go through Trainings — the{" "}
+              Software and accounts need no safety check, so they skip Trainings
+              — the{" "}
               <span className="text-ink font-semibold">Fusion team drive</span>,
               an Onshape seat, the GitHub org, a key to the parts cabinet. Open
               the profile of the Lead who looks after it and press{" "}
               <span className="text-ink font-semibold">
                 Ask &lt;name&gt; for something
               </span>
-              . Say what it&apos;s for in one line — that&apos;s what makes it a
-              two-second yes rather than a reply asking why.
+              , saying what it&apos;s for in one line.
               <br />
               <br />
-              It lands on that person&apos;s dashboard next to everything else
-              they owe an answer on, and you get a Discord message when they
-              respond. If you don&apos;t know who to ask, ask any Co-Lead — they
-              can answer anything.
+              It lands on their dashboard with their other requests, and you get
+              a Discord message when they reply. Don&apos;t know who to ask? Any
+              Co-Lead can answer anything.
             </Guide>
 
             <Guide
@@ -441,12 +450,11 @@ export default async function GettingStartedPage() {
             >
               Your projects, what you own, and what you wrote about each project
               are <span className="text-ink font-semibold">public</span> —
-              that&apos;s the project&apos;s history and it&apos;s how somebody
-              spots a blocker they could clear. Your{" "}
+              that&apos;s the project&apos;s history, and how somebody spots a
+              blocker they could clear. Your{" "}
               <span className="text-ink font-semibold">reliability</span> and
-              personal record stay between you and your Lead. How you&apos;re
-              assessed is published in full — nothing about it is hidden from
-              you.
+              personal record stay between you and your Lead. The rubric itself
+              is published in full.
             </Guide>
           </div>
         </CardBody>
@@ -483,17 +491,6 @@ export default async function GettingStartedPage() {
           </div>
         </CardBody>
       </Card>
-
-      {/*
-        The club's own guides, after the expectations.
-
-        Deliberately last: everything above explains how the APP works and is
-        the same for every club, while this is the club's own material —
-        installing Fusion, getting into the shop — which makes most sense once
-        somebody knows what they're being asked to do. Co-Leads edit it at
-        /settings/guides; see migration 0038 for why only this half is data.
-      */}
-      <GuideBlocks sections={guideSections} canEdit={mayEditGuides} />
     </div>
   );
 }

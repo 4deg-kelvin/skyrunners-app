@@ -122,7 +122,7 @@ export function AccountMenu({
             className="text-ink hover:bg-surface flex items-center gap-2.5 px-4 py-3 text-[15px] font-semibold transition-colors"
           >
             <LifeBuoy className="text-cardinal-600 size-4" />
-            New here? Start here
+            New Member Resources
           </Link>
 
           {showLeadingGuide ? (
