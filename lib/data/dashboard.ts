@@ -45,7 +45,12 @@ import { pendingSignOffs, type PendingSignOff } from "@/lib/signoff";
 import { quietProjects, type QuietProject } from "@/lib/quiet";
 import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { workToShow, type MyWorkView } from "./my-work";
-import { can, isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
+import {
+  isCoLead,
+  isLeadership,
+  type Actor,
+  type OrgGraph,
+} from "@/lib/permissions";
 import { isREofOrAbove } from "@/lib/permissions";
 import type {
   MemberRequest,
@@ -296,12 +301,27 @@ export async function getDashboard(
     Resolved through the permission module rather than by matching `reIds`
     directly: authority inherits DOWN the project tree, and a Division Lead is a
     top RE over their whole division. Matching ids would miss both and silently
-    under-report what somebody owes. A Co-Lead qualifies everywhere, which is
-    why the old Co-Lead special case disappeared rather than moving.
+    under-report what somebody owes.
+
+    **The Co-Lead branch is load-bearing, and removing it broke this page once.**
+    `isREofOrAbove` has no Co-Lead shortcut, deliberately: it answers "does the
+    project tree grant this person authority here", not "is this allowed". The
+    Co-Lead answer lives in the `can.*` rules, each of which is
+    `isCoLead(actor) || ...`. So a Co-Lead who happens to be RE of nothing and
+    leads no division scores zero here — which is the live club exactly, where
+    the only Co-Lead is RE of 0 of 12 projects. The whole dashboard rendered
+    empty for them: no queue, no quiet projects, zero people, and
+    `isREofNothing` true.
+
+    Caught by exercising `getDashboard` rather than by reading it, which is the
+    lesson worth keeping: every check in this file is a permission-shaped
+    question, and the graph helpers answer a narrower one.
   */
-  const myProjectIds = store.projects
-    .filter((p) => isREofOrAbove(actor, graph, p.id))
-    .map((p) => p.id);
+  const myProjectIds = isCoLead(actor)
+    ? store.projects.map((p) => p.id)
+    : store.projects
+        .filter((p) => isREofOrAbove(actor, graph, p.id))
+        .map((p) => p.id);
   const myProjectIdSet = new Set(myProjectIds);
 
   /*
@@ -345,8 +365,14 @@ export async function getDashboard(
     interim while the named-verifier columns land, so the queue matches it: every
     pending request, for anybody who can act on one. See `can.verifyTraining` for
     why the interim is a widening and what narrows it again.
+
+    Gated on `isLeadership` rather than on `can.verifyTraining` with a dummy
+    member id. The rule takes a SUBJECT, and there isn't one here — the question
+    is "could this person verify anything at all". Passing `""` happened to give
+    the right answer and would have started lying the moment the rule looked at
+    its third argument for any other reason.
   */
-  const trainings = can.verifyTraining(actor, graph, "")
+  const trainings = isLeadership(actor)
     ? await getTrainingQueue(store.members.map((m) => m.id))
     : { pending: [], expired: [] };
 

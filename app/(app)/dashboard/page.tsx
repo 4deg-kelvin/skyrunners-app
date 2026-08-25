@@ -171,7 +171,7 @@ export default async function DashboardPage() {
                   anything?" — a liveness reading. Deliberately not divided by
                   headcount and never broken down per person: that would be the
                   hours signal again in a new unit, which is the trap named in
-                  `lib/contribution.ts`.
+                  `lib/delivered.ts`.
                 */}
                 <StatTile
                   label="Log entries this week"

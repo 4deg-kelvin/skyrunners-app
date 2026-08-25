@@ -139,9 +139,13 @@ describe("raiserLeadAudience", () => {
 
   test("one step, not the whole chain", () => {
     /*
-      A Lead's Lead hearing about every blocker in their sub-tree is the noise
-      that gets a bot muted. Age-based escalation in `lib/review.ts` is what
-      handles something that actually sits.
+      An RE two levels up hearing about every blocker in their sub-tree is the
+      noise that gets a bot muted. Something that actually SITS is handled by
+      age instead: unconfirmed sign-offs and per-project silence both surface on
+      the RE's dashboard by how long they have been waiting. (This used to name
+      `lib/review.ts`, which escalated unread check-ins; it went with the
+      reporting chain on 2026-08-24, and the age-not-count principle outlived
+      it.)
     */
     const store = disk.readStore();
     const deep = store.members.find((m) => {

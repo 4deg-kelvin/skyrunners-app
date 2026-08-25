@@ -28,10 +28,12 @@ export const config = {
    *
    * A Vercel Cron request carries `Authorization: Bearer $CRON_SECRET` and no
    * session cookie, so `updateSession` sees no user and 307s it to `/login`.
-   * The route never runs, nothing errors, and the only symptom is that the
-   * reminders quietly never arrive — which reads as a Discord problem and is
-   * not one. Verified against production: `/api/cron/checkin-reminders`
-   * answered `307 → /login?next=…` before this exclusion existed.
+   * The route never runs, nothing errors, and the only symptom is that the DMs
+   * quietly never arrive — which reads as a Discord problem and is not one.
+   * Verified against production on the check-in reminder cron, which answered
+   * `307 → /login?next=…` before this exclusion existed. That route has since
+   * been deleted; the exclusion covers `/api/cron/*` and still protects the
+   * digest.
    *
    * This does NOT make the endpoint public. It authenticates itself, harder
    * than a session would: no `CRON_SECRET` configured is a 503, and a wrong or

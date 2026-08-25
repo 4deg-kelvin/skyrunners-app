@@ -236,8 +236,10 @@ export const DELIVERABLE_STATUS_TONES: Record<DeliverableStatus, BadgeTone> = {
   measure; deliverables are), so the tones went with them.
 
   Nothing replaced it. If you find yourself adding a per-member badge tone map
-  back into this file, read `lib/contribution.ts` first: the record is three
-  signals and none of them is a rung a person sits on.
+  back into this file, read `lib/delivered.ts` first: what a member's record
+  holds is two counts of finished work, and neither is a rung a person sits on.
+  (That file was `lib/contribution.ts` and three signals until 2026-08-24 — the
+  shrinking is the point.)
 */
 
 // ---------------------------------------------------------------------------

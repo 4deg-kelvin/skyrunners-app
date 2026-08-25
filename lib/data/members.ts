@@ -62,9 +62,10 @@ export interface RosterRow {
 
     Nothing replaced them, deliberately. The roster is a "who do I ask about
     this?" page, and thirty rows each ending in a number is a leaderboard
-    whatever the header says — which is the one thing `lib/contribution.ts` has
-    always refused to build. Delivered counts stay because they're facts about
-    finished work; a rate per person does not.
+    whatever the header says — which is the one thing this app has always refused
+    to build. Delivered counts stay because they're facts about finished work; a
+    rate per person does not. See `lib/delivered.ts`, which is what
+    `lib/contribution.ts` became on 2026-08-24.
   */
 }
 

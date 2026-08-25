@@ -2103,7 +2103,8 @@ export const progressUpdates: ProgressUpdate[] = [
   // ---------------------------------------------------------------------------
   // Reports written and NOT yet read.
   //
-  // today() is 2026-08-06 and the grace period is 3 days (lib/review.ts), so the
+  // today() is 2026-08-06 and the grace period is 3 days (SIGN_OFF_GRACE_DAYS
+  // in lib/signoff.ts), so the
   // ages below are chosen to sit either side of the escalation boundary:
   //
   //   submitted 08-05 → 1 day  → unread, not escalated
@@ -2768,7 +2769,7 @@ export function isOverdue(d: Deliverable): boolean {
   // an RE to sign off — marking their work "overdue" because someone else is
   // slow blames the wrong person, and it's the exact unfairness the RE-confirms
   // rule risks introducing. The delay still surfaces, but against the RE, via
-  // `pendingSignOffs()` in lib/review.ts.
+  // `pendingSignOffs()` in lib/signoff.ts.
   if (d.status === "done" || d.status === "submitted") return false;
   return !!d.dueDate && d.dueDate < today();
 }
@@ -3163,7 +3164,8 @@ export function projectEscalationAudience(
  *
  * One step deliberately. A Lead's Lead hearing about every blocker in their
  * sub-tree is the noise that gets a bot muted, and the club already escalates
- * on AGE through `lib/review.ts` when something actually sits.
+ * on AGE when something actually sits: `lib/signoff.ts` for an unconfirmed
+ * sign-off, `lib/quiet.ts` for a project nobody has touched.
  */
 export function raiserLeadAudience(raiserId: string): string[] {
   const store = live();
@@ -3315,7 +3317,8 @@ export function hasLoggedAnyWork(memberId: string): boolean {
  * three weeks long. A 14-day window would silently truncate their draft, and the
  * truncation would look like "I didn't do that work" rather than like a bug.
  *
- * `checkInPeriodStart` in `lib/checkin-draft.ts` does the bounding.
+ * `checkInPeriodStart` in `lib/checkin-draft.ts` used to do the bounding; both
+ * went with check-ins on 2026-08-24, and the caller now passes its own window.
  */
 export function allWorkLogsFor(memberId: string) {
   return live()
@@ -3475,7 +3478,8 @@ export function certificationsFor(memberId: string) {
  * JavaScript parses `"2026-09-30"` as UTC midnight but a bare
  * `"2026-09-30T18:00"` as *local* time, so mixing the two silently loses a day
  * in Pacific — which is the difference between "1 day left" and "due today".
- * Same reasoning as `daysBetween` in `lib/review.ts`.
+ * Same reasoning as `daysBetween` in `lib/signoff.ts` and `lib/quiet.ts`,
+ * which both compare `YYYY-MM-DD` dates as UTC instants for exactly this.
  */
 export function daysUntil(iso: string | undefined): number | undefined {
   if (!iso) return undefined;
@@ -3577,7 +3581,7 @@ function daysBetween(a: string, b: string): number {
  * Replaces `hoursThisWeek`, which summed a number that no longer exists. The
  * dashboard used it as a single club-wide pulse, and the honest replacement is a
  * COUNT OF ENTRIES rather than any attempt to reconstruct volume — see the
- * warning in `lib/contribution.ts` about rebuilding the old signal in a new
+ * warning in `lib/delivered.ts` about rebuilding the old signal in a new
  * unit. This one is a liveness reading ("is anybody logging?"), never attached
  * to an individual and never compared between people.
  */

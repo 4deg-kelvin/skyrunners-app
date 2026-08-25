@@ -203,11 +203,13 @@ describe("the log locks once a check-in has reported it", () => {
   });
 
   /*
-    The submission day itself stays OPEN, and this is the half that pairs with
-    `checkInPeriodStart` in lib/checkin-draft.ts. You submit in the afternoon and
-    get another two hours in that evening; if this locked, that evening's work
-    could never be recorded, and the auto-fill window — which starts inclusively
-    on this same day — would have nothing to draft from.
+    The submission day itself stays OPEN.
+
+    This used to pair with `checkInPeriodStart` in lib/checkin-draft.ts, which
+    started the auto-fill window inclusively on the same day; both went with
+    check-ins on 2026-08-24. The rule stands on its own reason: you log in the
+    afternoon and get another two hours in that evening, and if the day locked
+    on submission that evening's work could never be recorded at all.
   */
   test("the submission day itself is still open", () => {
     assert.equal(ops.workIsLocked(SOFIA, "2026-08-05"), false);

@@ -61,7 +61,7 @@ export interface MyProjectCard {
    * Replaces `hoursLogged`. A count of DAYS rather than of entries, because
    * three entries on one afternoon is one day of work and counting them
    * separately would rebuild the volume metric that was just removed — in a new
-   * unit, which is the specific trap named in `lib/contribution.ts`.
+   * unit, which is the specific trap named in `lib/delivered.ts`.
    *
    * It feeds nothing. Not a contribution signal, not sorted on, not compared
    * between people: it sits on the card as context for the person whose card it

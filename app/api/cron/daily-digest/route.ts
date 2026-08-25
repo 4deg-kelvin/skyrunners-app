@@ -10,22 +10,19 @@ import { todayInClubTime } from "@/lib/dates";
  * ============================================================================
  *
  * ---------------------------------------------------------------------------
- * Why this is a SECOND cron rather than a third pass on the first one
+ * This is now the only cron, and the history is worth keeping
  * ---------------------------------------------------------------------------
  *
- * It started as a pass inside `/api/cron/checkin-reminders`, to keep the club
- * on one scheduled job. That was right until the digest needed a specific time
- * of day.
+ * It started as a pass inside `/api/cron/checkin-reminders`, to keep the club on
+ * one scheduled job, and then split out because the two wanted different times
+ * of day. That reminder cron ran at 19:30 UTC for a specific reason — every
+ * check-in was due at 23:59 UTC, so 19:30 plus a five-hour window made "due in
+ * about 4 hours" land before the deadline rather than after it.
  *
- * The check-in cron runs at 19:30 UTC and the number is not arbitrary: every
- * check-in is due at 23:59 UTC, and 19:30 + a five-hour window is what makes
- * "due in about 4 hours" land before the deadline rather than after it. Moving
- * that job to 03:00 UTC would put the whole run PAST every deadline — the
- * "ahead" pass would find nothing and the nudge would silently become a
- * post-mortem.
- *
- * So the two jobs want genuinely different times, and one job cannot serve
- * both. Hence two entries in `vercel.json`.
+ * Check-ins went on 2026-08-24 and the reminder cron went with them, so this is
+ * the only entry in `vercel.json` again. The split was still right at the time:
+ * two jobs wanting genuinely different times cannot be one job, and merging them
+ * back would have made the digest fire five hours early.
  *
  * ---------------------------------------------------------------------------
  * The Hobby-plan trap, and what is and isn't the limit
@@ -36,10 +33,11 @@ import { todayInClubTime } from "@/lib/dates";
  * The limit that bit was FREQUENCY: on Hobby a cron may run at most once a
  * day. It is not a limit of one job.
  *
- * Both entries here run once daily, so both are inside it. If a deploy ever
- * starts failing right after a change to `vercel.json`, this is the first
- * place to look — and the fix is to reduce frequency or drop an entry, not to
- * debug the app.
+ * This one runs once daily, so it is inside it, and there is a slot spare now.
+ * `lib/notify/cron-schedule.test.ts` asserts that no cron's schedule can fire
+ * more than once a day, so the trap cannot be re-entered silently. If a deploy
+ * ever starts failing right after a change to `vercel.json`, this is still the
+ * first place to look.
  *
  * ---------------------------------------------------------------------------
  * 02:00 UTC, and why 7pm local is not exactly achievable

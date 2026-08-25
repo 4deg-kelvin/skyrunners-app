@@ -369,9 +369,13 @@ export interface ProjectDeadlineChange {
  *
  * Deliberately NOT a `progress_update`. The feed on a project page is built
  * from update entries, so the obvious way to say "this project finished" would
- * be to synthesise a check-in — and that check-in would then count towards
- * somebody's reliability signal in `lib/contribution.ts`. A record that says a
- * member reported in on a day they didn't is worse than no announcement.
+ * have been to synthesise a check-in — and that check-in would then have counted
+ * towards somebody's reliability signal. A record that says a member reported in
+ * on a day they didn't is worse than no announcement.
+ *
+ * Reliability went on 2026-08-24 and check-ins with it, so the specific harm is
+ * gone. The rule is not: never manufacture a record of somebody having said
+ * something they didn't say.
  *
  * So notices are their own row, rendered in the same feed and clearly marked as
  * automatic.
@@ -499,9 +503,14 @@ export interface JoinRequest {
  * output.
  *
  * The cost is real and has to be designed around: an RE who goes quiet freezes
- * their whole project's record. So unconfirmed work escalates the same way an
- * unread check-in does (`lib/review.ts`), which turns a silent bottleneck into a
- * visible one.
+ * their whole project's record. So unconfirmed work AGES visibly — see
+ * `pendingSignOffs` in `lib/signoff.ts`, which puts it on the RE's dashboard by
+ * how long it has been waiting, and `lib/quiet.ts`, which flags the project
+ * itself. That turns a silent bottleneck into a visible one.
+ *
+ * (This used to say "escalates the same way an unread check-in does". The
+ * check-in escalation was `lib/review.ts` and went on 2026-08-24; age-not-count
+ * outlived it.)
  *
  * **Only `done` counts as delivered.** Anything that treats `submitted` as
  * complete — progress bars, the contribution record, "projects completed" —
@@ -665,10 +674,15 @@ export interface ProgressUpdate {
   /**
    * When the "due in a few hours" nudge went out, if it did.
    *
-   * Half of the idempotency mechanism for the reminder cron: the job claims
-   * this column before sending, so a retry or an overlapping invocation
-   * updates zero rows and gives up rather than sending twice. See
-   * `app/api/cron/checkin-reminders/route.ts`.
+   * DEAD since 2026-08-24. Half of the idempotency mechanism for the check-in
+   * reminder cron: the job claimed this column before sending, so a retry or an
+   * overlapping invocation updated zero rows and gave up rather than sending
+   * twice. The cron was `app/api/cron/checkin-reminders/route.ts` and went with
+   * check-ins.
+   *
+   * The pattern is worth copying if another cron ever needs to be idempotent —
+   * `app/api/cron/daily-digest/route.ts` does not, because it sends a summary
+   * rather than a one-shot notification.
    */
   reminderSentAt?: string;
   /**
@@ -701,7 +715,13 @@ export interface ProgressUpdate {
    * disappear.
    */
   leadIdAtSubmission?: string;
-  /** When a Lead marked it read. Stops the escalation clock in lib/review.ts. */
+  /**
+   * When a Lead marked it read. Nothing sets this since 2026-08-24; the profile
+   * still reads it to show "Read by X" on check-ins somebody did read.
+   *
+   * It stopped an escalation clock in `lib/review.ts`, which was deleted with
+   * the reporting chain.
+   */
   reviewedAt?: string;
   /**
    * Which Lead read it. Snapshotted rather than derived, because Leads change
