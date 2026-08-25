@@ -1,5 +1,5 @@
 /**
- * The daily digest — one DM to each RE and each Lead.
+ * The daily digest — one DM to each RE.
  *
  * ===========================================================================
  * The thing this has to get right is SILENCE
@@ -9,28 +9,42 @@
  * muted bot takes every other notification with it — the blocker alerts, the
  * check-in nudges, all of it. So three rules shape everything below:
  *
- *   1. **Nothing to say means nothing sent.** A member with no projects, no
- *      reports and no deadlines gets no message at all, not an empty one. This
- *      is the rule most likely to be broken by a later "just add a header".
+ *   1. **Nothing to say means nothing sent.** A member with no projects and no
+ *      deadlines gets no message at all, not an empty one. This is the rule
+ *      most likely to be broken by a later "just add a header".
  *
  *   2. **Quiet is reported as a FACT, not a scolding.** "Nothing logged since
  *      Aug 8 (4 days)" is information an RE can act on. "Nobody has worked on
  *      your project!" is a reproach, and people stop reading those.
  *
- *   3. **One message, not three.** Somebody who is an RE, a Lead and has
- *      deadlines gets a single DM with three sections. Three DMs at 19:30
- *      every evening is how this feature dies.
+ *   3. **One message, not two.** Somebody who is an RE of several projects and
+ *      has deadlines coming gets a single DM with two sections. Two DMs at
+ *      19:30 every evening is how this feature dies.
  *
  * ---------------------------------------------------------------------------
- * Privacy
+ * There used to be a Lead section, and its removal is the point
  * ---------------------------------------------------------------------------
  *
- * The RE section reports work on THEIR OWN projects — which is exactly what
- * `can.viewMemberWorkOnProject` allows, inheriting down the project tree. The
- * Lead section reports their direct reports' effort, which is
- * `can.viewMemberEffort`. Neither section crosses into the other's data: an RE
- * who isn't somebody's Lead never sees that person's whole record, only what
- * they did on the RE's project.
+ * A second section listed the recipient's direct reports and what each had done
+ * today, or when they were last active. It went with the reporting chain on
+ * 2026-08-24 — nobody has reports.
+ *
+ * The signal it carried did NOT go: the RE section already says "quiet today;
+ * last activity Aug 8 (16 days ago)" for each project, which is the same fact
+ * scoped to work rather than to a person. What is deliberately not added here is
+ * a per-member version of that line. It would be four lines of code and it would
+ * rebuild a list of names ranked by how recently each showed up, which is what
+ * the club removed. The unit is the project.
+ *
+ * The standing three-week version lives on the dashboard via `lib/quiet.ts`. Two
+ * windows on purpose: this is a daily narrative ("what happened today"), that is
+ * a list of what has been silent long enough to chase.
+ *
+ * Privacy is no longer a consideration here and that is worth recording rather
+ * than leaving as an absence. The old note explained that the RE half was public
+ * (`can.viewMemberWorkOnProject`) while the Lead half needed
+ * `can.viewMemberEffort`. Everything a member does is public as of 2026-08-24,
+ * so there is no line left for a section to cross.
  *
  * ---------------------------------------------------------------------------
  * Pure, so it can be tested
@@ -252,21 +266,13 @@ export function buildDigests(input: {
       sections.push(reSection(mine, today));
     }
 
-    // --- who reports to you -----------------------------------------------
-    const reports = store.members.filter(
-      (m) => m.leadId === member.id && m.status === "active"
-    );
-    if (reports.length) {
-      sections.push(leadSection(reports, today));
-    }
-
     // --- what's about to be due -------------------------------------------
-    const deadlines = deadlineSection(member, mine, reports, today);
+    const deadlines = deadlineSection(member, mine, today);
     if (deadlines) sections.push(deadlines);
 
     /*
-      Rule 1. Somebody who is neither an RE nor a Lead has nothing here, and
-      gets no DM — not a cheerful empty one.
+      Rule 1. Somebody who is an RE of nothing with nothing of their own due has
+      nothing here, and gets no DM — not a cheerful empty one.
     */
     if (!sections.length) continue;
 
@@ -311,89 +317,30 @@ function reSection(projects: Project[], today: string): string {
   return out.join("\n");
 }
 
-function leadSection(reports: Member[], today: string): string {
-  const store = readStore();
-  const out = [`__Your reports (${reports.length})__`];
-
-  for (const person of reports) {
-    const logs = store.workLogs.filter((w) => w.memberId === person.id);
-    const todayLogs = logs.filter((w) => isCurrent(w.workDate, today));
-
-    const checkedInToday = store.progressUpdates.some(
-      (u) => u.memberId === person.id && isCurrent(u.submittedAt, today)
-    );
-
-    if (todayLogs.length > 0 || checkedInToday) {
-      /*
-        What they DID, not how long for.
-
-        The first entry's note is quoted rather than a count of entries, because
-        a Lead reading this wants the specific thing — "reran the FEA" tells them
-        whether to ask a question; "2 entries" tells them nothing. A second entry
-        is acknowledged as a tail rather than listed, to keep one line per
-        person: the digest is scanned, not read.
-      */
-      const bits: string[] = [];
-      const first = todayLogs.find((w) => w.description.trim());
-      if (first) {
-        bits.push(
-          todayLogs.length > 1
-            ? `${first.description} (+${todayLogs.length - 1} more)`
-            : first.description
-        );
-      } else if (todayLogs.length > 0) {
-        bits.push("logged work");
-      }
-      if (checkedInToday) bits.push("checked in");
-      out.push(`• ${person.fullName} — ${bits.join(", ")}`);
-      continue;
-    }
-
-    // Nothing today. Say when they were last seen, so a Lead can tell the
-    // difference between "busy yesterday" and "gone for three weeks".
-    const lastLog = logs
-      .map((w) => w.workDate.slice(0, 10))
-      .sort()
-      .at(-1);
-    const lastUpdate = store.progressUpdates
-      .filter((u) => u.memberId === person.id && u.submittedAt)
-      .map((u) => u.submittedAt!.slice(0, 10))
-      .sort()
-      .at(-1);
-
-    const last = [lastLog, lastUpdate].filter(Boolean).sort().at(-1);
-    out.push(
-      last
-        ? `• ${person.fullName} — nothing today; last active ${last} (${ago(daysBetween(last, today))})`
-        : `• ${person.fullName} — nothing logged yet`
-    );
-  }
-
-  return out.join("\n");
-}
-
 function deadlineSection(
   member: Member,
   myProjects: Project[],
-  reports: Member[],
   today: string
 ): string | null {
   const store = readStore();
   const horizon = addDays(today, DEADLINE_HORIZON_DAYS);
 
   const projectIds = new Set(myProjects.map((p) => p.id));
-  const reportIds = new Set(reports.map((r) => r.id));
 
   /*
-    Everything the member could act on: work on their projects, work owned by
-    their reports, and their own. Deduped by id, because an RE's own
-    deliverable on their own project would otherwise appear three times.
+    Everything the member could act on: work on their projects, and their own.
+
+    A third clause matched work owned by their direct reports, and it went with
+    the reporting chain. It was mostly redundant even then -- a report's
+    deliverable is nearly always ON one of the RE's projects -- and what it
+    uniquely added was somebody else's deadline on somebody else's project,
+    which the recipient could not act on.
+
+    Deduped by id, because an RE's own deliverable on their own project would
+    otherwise appear twice.
   */
   const relevant = store.deliverables.filter(
-    (d) =>
-      projectIds.has(d.projectId) ||
-      reportIds.has(d.ownerId) ||
-      d.ownerId === member.id
+    (d) => projectIds.has(d.projectId) || d.ownerId === member.id
   );
 
   const deliverables = dueSoon(relevant, today);

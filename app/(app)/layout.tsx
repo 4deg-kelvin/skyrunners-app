@@ -51,16 +51,12 @@ export default async function AppLayout({
     so a failure here is a bare 500 on every route. A menu item is never worth
     that.
   */
-  let leadershipRoles = {
-    isRE: false,
-    divisionsLed: [] as string[],
-    hasReports: false,
-  };
+  let leadershipRoles = { isRE: false, divisionsLed: [] as string[] };
   try {
     leadershipRoles = await getLeadershipRoles(viewer.member.id);
   } catch {
     // Fail closed: a link that isn't there is a smaller problem than a 500.
-    leadershipRoles = { isRE: false, divisionsLed: [], hasReports: false };
+    leadershipRoles = { isRE: false, divisionsLed: [] };
   }
 
   /*
@@ -160,13 +156,16 @@ export default async function AppLayout({
         userName={viewer.member.fullName}
         /*
           Drives the Dashboard link, and it has to be the same question
-          `/dashboard` redirects on — "do you oversee anybody", not "is your
-          role string leadership". A Lead with no reports would otherwise see a
-          link that bounces them back, and a member who has been given reports
-          would see none for a page they're entitled to.
+          `/dashboard` redirects on — "are you an RE of anything", not "is your
+          role string leadership". A Lead who is RE of nothing would otherwise
+          see a link that bounces them back, and a plain member named RE of one
+          project would see none for a page they're entitled to.
+
+          Was "do you oversee anybody" until 2026-08-24. Same shape of question,
+          asked of the tree that still exists.
         */
         isLeadership={
-          viewer.member.globalRole === "co_lead" || leadershipRoles.hasReports
+          viewer.member.globalRole === "co_lead" || leadershipRoles.isRE
         }
         isAdvisor={isAdvisor(viewer.actor)}
         showLeadingGuide={isLeadership(viewer.actor) || leadershipRoles.isRE}

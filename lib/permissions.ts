@@ -653,17 +653,21 @@ export const can = {
    * Opening the leadership dashboard at all.
    *
    * The nav already hides the link from plain members, but hiding a link is not
-   * access control — the route was reachable by typing the URL, and it renders
-   * other people's hours and a review queue. Anyone who oversees at least one
-   * person has a reason to be here; nobody else does.
+   * access control -- the route is reachable by typing the URL.
    *
-   * Takes `graph` and the viewer's own id rather than just the role, because
-   * "leads somebody" is a fact about the org tree, not about `globalRole`. A
-   * member who has been given reports should see it; a `lead` with none has
-   * nothing to look at.
+   * `hasScope` used to mean "oversees at least one person", counted off the
+   * reporting chain. It now means "is an RE of at least one project", which is
+   * the same question asked of the tree that still exists: this page is a list
+   * of what you owe, and somebody who owes nothing sees an empty page and
+   * concludes the app is broken.
+   *
+   * Still a boolean passed in rather than derived here, and for the original
+   * reason: it is a fact about a tree, not about `globalRole`. A plain member
+   * named RE of one project belongs here; a `lead` who is RE of nothing does
+   * not. What changed is which tree.
    */
-  viewLeadershipDashboard: (actor: Actor, hasReports: boolean) =>
-    isCoLead(actor) || hasReports,
+  viewLeadershipDashboard: (actor: Actor, hasScope: boolean) =>
+    isCoLead(actor) || hasScope,
 
   /**
    * Edit the club-written material on /getting-started and /leading.
@@ -741,7 +745,7 @@ export const can = {
    * `isOnProject` is computed by the caller rather than looked up here —
    * `OrgGraph` has no membership lookup, and adding one for a single rule
    * would put a fifth synchronous method on a hot interface. Same shape as
-   * `viewLeadershipDashboard(actor, hasReports)`.
+   * `viewLeadershipDashboard(actor, hasScope)`.
    */
   createEvent: (actor: Actor, isOnProject = false) =>
     isLeadership(actor) || isAdvisor(actor) || isOnProject,

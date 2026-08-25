@@ -14,6 +14,7 @@ import { DetailRow, StatTile } from "@/components/ui/stat-tile";
 import { getDashboard } from "@/lib/data/dashboard";
 import { getViewer } from "@/lib/data/viewer";
 import { can } from "@/lib/permissions";
+import { formatDay } from "@/lib/dates";
 import { RequestDecision } from "@/components/forms/request-decision";
 
 export default async function DashboardPage() {
@@ -26,19 +27,21 @@ export default async function DashboardPage() {
     completions,
     deadlinesMoved,
     reQueue,
+    goneQuiet,
     trainings,
     requests,
   } = view;
 
   /**
-   * The gate. Hiding the nav link is not access control — this route was
-   * reachable by URL and renders other people's hours and review queue.
+   * The gate. Hiding the nav link is not access control — this route is
+   * reachable by URL.
    *
-   * Sends them to /my-work rather than showing a 403: for a plain member this
-   * isn't a permissions error to understand, it's a page that was never meant
-   * for them, and their own work is where they were going anyway.
+   * Keyed on being an RE of something rather than on overseeing somebody, since
+   * 2026-08-24. Sends them to /my-work rather than showing a 403: for a plain
+   * member this isn't a permissions error to understand, it's a page that was
+   * never meant for them, and their own work is where they were going anyway.
    */
-  if (!can.viewLeadershipDashboard(viewer.actor, !view.isLeadOfNobody)) {
+  if (!can.viewLeadershipDashboard(viewer.actor, !view.isREofNothing)) {
     redirect("/my-work");
   }
 
@@ -49,7 +52,7 @@ export default async function DashboardPage() {
       <PageHeader
         label="Lead Portal"
         title="Dashboard"
-        description="What you owe as a Lead: check-ins to read, work to sign off, anyone gone quiet. Your people only — about fifteen minutes a week."
+        description="What you owe as an RE: work to sign off, requests to answer, projects that have gone quiet. Your projects only — about fifteen minutes a week."
         action={
           mayLogWork ? (
             <LogWorkForm
@@ -115,8 +118,8 @@ export default async function DashboardPage() {
               <CardDivider />
               <DetailRow label="Description">{club.description}</DetailRow>
               <CardDivider />
-              <DetailRow label="People you oversee">
-                {counts.peopleOverseen}
+              <DetailRow label="People on your projects">
+                {counts.peopleOnMyProjects}
               </DetailRow>
               <CardDivider />
               <DetailRow label="Divisions">{counts.divisions}</DetailRow>
@@ -442,6 +445,76 @@ export default async function DashboardPage() {
                     </div>
                   ))}
                 </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/*
+            Projects that have gone quiet.
+
+            The one section here that is NEW rather than surviving. It replaces a
+            per-person flag that lived on the dashboard of whoever a member
+            reported to, and it is the mitigation for the reporting removal's
+            real cost: the chain's actual function was that somebody was NAMED as
+            responsible for noticing silence.
+
+            Addressed to the RE, which is why it belongs on this page and not on
+            the project. An RE who opens their project sees the feed and can tell
+            it is quiet; the whole problem is that they have no reason to open a
+            project nothing is happening on.
+
+            Non-empty only, like every other card in this column. Three weeks is
+            the threshold — see QUIET_AFTER_DAYS for why one week fires on half
+            the club every finals week.
+          */}
+          {goneQuiet.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Gone Quiet</SectionLabel>
+                <p className="text-ink-soft mt-2 text-[15px]">
+                  Nothing logged on these in three weeks, and they still have
+                  open work. Usually it&apos;s midterms; sometimes somebody is
+                  stuck and hasn&apos;t said so.
+                </p>
+
+                <div className="mt-4 space-y-2.5">
+                  {goneQuiet.map((q) => (
+                    <div
+                      key={q.project.id}
+                      className="rounded-tile border-line flex flex-wrap items-center justify-between gap-3 border px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/projects/${q.project.slug}`}
+                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
+                        >
+                          {q.project.name}
+                        </Link>
+                        <p className="text-ink-muted mt-0.5 text-sm">
+                          {q.openDeliverables}{" "}
+                          {q.openDeliverables === 1
+                            ? "deliverable"
+                            : "deliverables"}{" "}
+                          open · {q.committedCount}{" "}
+                          {q.committedCount === 1 ? "person" : "people"} on it
+                        </p>
+                      </div>
+                      <span className="text-ink-muted shrink-0 text-sm font-semibold">
+                        {q.lastLoggedAt
+                          ? `last logged ${formatDay(q.lastLoggedAt, {
+                              month: "short",
+                              day: "numeric",
+                            })}`
+                          : "never logged"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-ink-muted mt-4 text-sm">
+                  A message usually fixes it. The project page has everyone on
+                  it and how to reach them.
+                </p>
               </CardBody>
             </Card>
           ) : null}

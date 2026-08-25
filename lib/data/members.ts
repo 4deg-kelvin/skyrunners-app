@@ -361,21 +361,23 @@ function teamsLedBy(
  * guide should say to them, and whether they should be offered it at all.
  */
 export async function getLeadershipRoles(memberId: string): Promise<{
+  /**
+   * An RE of at least one project.
+   *
+   * Also decides whether the Dashboard link appears in the nav, and it has to be
+   * the SAME fact `/dashboard` redirects on — `can.viewLeadershipDashboard`.
+   *
+   * There was a `hasReports` beside this doing that job until 2026-08-24, and
+   * the reason it existed is worth carrying over to its replacement. The nav
+   * used to key off `globalRole !== "member"`, which got it wrong in both
+   * directions: a `lead` with nothing to look at saw a link that bounced them
+   * straight back, and a plain member who was entitled to the page saw no link.
+   * The fix was to ask the tree rather than the role string. Same fix, different
+   * tree: it is now `project_res` rather than `profiles.lead_id`.
+   */
   isRE: boolean;
   /** Names of divisions they lead — top-level teams only. */
   divisionsLed: string[];
-  /**
-   * At least one person reports to them directly.
-   *
-   * Decides whether the Dashboard link appears in the nav, and it is the SAME
-   * fact `/dashboard` redirects on — `can.viewLeadershipDashboard`. The nav
-   * used to key off `globalRole !== "member"` instead, which got it wrong in
-   * both directions: a `lead` with no reports saw a link that bounced them
-   * straight back, and a plain member who had been given reports saw no link
-   * for a page they were entitled to. Reporting lines are a fact about the org
-   * tree, not about a role string.
-   */
-  hasReports: boolean;
 }> {
   await preloadLiveStore();
   const store = readStore();
@@ -385,8 +387,5 @@ export async function getLeadershipRoles(memberId: string): Promise<{
     divisionsLed: teamsLedBy(memberId)
       .filter((t) => t.isDivision)
       .map((t) => t.name),
-    hasReports: store.members.some(
-      (m) => m.leadId === memberId && m.status === "active"
-    ),
   };
 }

@@ -106,12 +106,17 @@ export default async function SettingsPage() {
   const bulkCreators = can.purgeEmptyProjects(viewer.actor)
     ? await getBulkCreationReport()
     : [];
+  /*
+    Why this person gets a digest. "a Lead with reports" was a third reason here
+    and went with the reporting chain -- the digest has no section about people
+    any more, so having reports would have been a reason for a message with
+    nothing in it.
+  */
   const digestReasons = [
     roles.isRE ? "an RE" : "",
     roles.divisionsLed.length
       ? `Division Lead for ${roles.divisionsLed.join(" and ")}`
       : "",
-    roles.hasReports ? "a Lead with reports" : "",
   ].filter(Boolean);
 
   const mayEditCalendar = can.manageTerms(viewer.actor);
@@ -296,9 +301,9 @@ export default async function SettingsPage() {
               One message each evening
             </h2>
             <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              Because you hold responsibility for work or people, Discord sends
-              you a summary each evening — what moved, what&apos;s gone quiet
-              and for how long, and anything due inside a week.
+              Because you&apos;re accountable for work, Discord sends you a
+              summary each evening — what moved on your projects, what&apos;s
+              gone quiet and for how long, and anything due inside a week.
             </p>
             <div className="mt-5">
               <DigestToggle

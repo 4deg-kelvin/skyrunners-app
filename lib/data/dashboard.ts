@@ -42,9 +42,10 @@ import {
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { pendingSignOffs, type PendingSignOff } from "@/lib/signoff";
+import { quietProjects, type QuietProject } from "@/lib/quiet";
 import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { workToShow, type MyWorkView } from "./my-work";
-import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
+import { can, isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
 import { isREofOrAbove } from "@/lib/permissions";
 import type {
   MemberRequest,
@@ -91,23 +92,39 @@ export interface DashboardView {
    * looks, and because it's the one setup step with no visible symptom.
    */
   hasAcademicCalendar: boolean;
-  /** True when the viewer oversees nobody — changes the whole page's message. */
-  isLeadOfNobody: boolean;
+  /**
+   * True when the viewer is an RE of nothing — changes the whole page's message,
+   * and gates the route.
+   *
+   * Was `isLeadOfNobody`, counted off the reporting chain. Same job, asked of
+   * the tree that still exists: this page is about work you are accountable
+   * for, and if there is none there is nothing here.
+   */
+  isREofNothing: boolean;
   counts: {
-    /** People in the viewer's chain, not the club, unless they're a Co-Lead. */
-    peopleOverseen: number;
+    /** Committed members across the viewer's projects, not the club. */
+    peopleOnMyProjects: number;
     divisions: number;
     projects: number;
   };
   /**
-   * Work-log entries written this week by people the viewer oversees.
+   * Work-log entries written this week on the viewer's projects.
    *
-   * Was `hoursThisWeek`, a sum. A COUNT of entries now — a liveness reading
-   * ("is my part of the club logging anything?"), never divided by headcount and
-   * never shown per person. See the warning in `lib/contribution.ts` about
-   * rebuilding the removed signal in a new unit.
+   * Was `hoursThisWeek`, a sum, then a count scoped to the people the viewer
+   * oversaw. A COUNT scoped to their PROJECTS now — a liveness reading ("is my
+   * part of the club moving?"), never divided by headcount and never shown per
+   * person. See the warning in `lib/delivered.ts` about rebuilding the removed
+   * signal in a new unit.
    */
   logsThisWeek: number;
+  /**
+   * Projects of theirs where nobody has logged anything in three weeks.
+   *
+   * The one thing the reporting removal ADDED rather than took away, and the
+   * mitigation for its biggest risk: the chain's real function was that
+   * somebody was NAMED as responsible for noticing silence. See `lib/quiet.ts`.
+   */
+  goneQuiet: QuietProject[];
   /** Club-wide, deliberately: anyone may help with a blocked project. */
   flaggedProjects: FlaggedProject[];
   /** The viewer's own committed projects, so they can log work from here. */
@@ -206,44 +223,31 @@ export interface DashboardView {
   maxBackdateDays: number;
 }
 
+/*
+  `reportsBelow` lived above this, walking `profiles.lead_id` down to collect
+  everyone at or below somebody in the reporting chain. It went with the chain on
+  2026-08-24, and its cycle guard went with it -- there is no chain left to loop.
+
+  The two guards worth remembering, because both trees that remain still need
+  them: `projects.parent_id` and `teams.parent_id` are plain columns, so a loop
+  is possible and would HANG the request rather than fail it. `projectChain` and
+  `teamChain` in lib/permissions.ts are both cycle-guarded for that reason.
+*/
+
 /**
- * Everyone at or below `memberId` in the reporting chain, excluding themselves.
+ * The Monday of `today`'s week, as `YYYY-MM-DD`.
  *
- * Iterative rather than recursive, with a `seen` set: `profiles.lead_id` has a
- * self-reference CHECK but nothing prevents a longer cycle (A leads B leads A),
- * and a cycle here would hang the request rather than render wrong.
+ * Every operation is UTC. This used `new Date(today)` with `getDay()` and
+ * `setDate()`, which mixes an instant parsed as UTC midnight with LOCAL
+ * accessors -- so on a Vercel box in UTC it was right, and in California it read
+ * the previous day and returned the wrong Monday for a third of the day. Same
+ * class of bug as the one `lib/dates.ts` exists to prevent.
  */
-function reportsBelow(memberId: string): Member[] {
-  const collected: Member[] = [];
-  const seen = new Set<string>([memberId]);
-  let frontier = [memberId];
-  // Read once, outside the loop: the chain walk is O(depth × members) and
-  // re-reading the store per level would multiply that for no reason.
-  const allMembers = readStore().members;
-
-  while (frontier.length > 0) {
-    const next: string[] = [];
-    for (const id of frontier) {
-      for (const m of allMembers) {
-        if (m.leadId === id && !seen.has(m.id)) {
-          seen.add(m.id);
-          collected.push(m);
-          next.push(m.id);
-        }
-      }
-    }
-    frontier = next;
-  }
-
-  return collected;
-}
-
 function startOfWeek(today: string): string {
-  const d = new Date(today);
-  // Monday-based. getDay() is 0 for Sunday, so shift it.
-  const offset = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - offset);
-  return d.toISOString().slice(0, 10);
+  const d = new Date(Date.parse(`${today.slice(0, 10)}T00:00:00Z`));
+  // Monday-based. getUTCDay() is 0 for Sunday, so shift it.
+  const offset = (d.getUTCDay() + 6) % 7;
+  return new Date(d.getTime() - offset * 86_400_000).toISOString().slice(0, 10);
 }
 
 /**
@@ -279,35 +283,72 @@ export async function getDashboard(
   await preloadLiveStore();
   // Live, not the seed — signing something off has to drop it out of the
   // queue on the next render.
-  const { workLogs } = readStore();
+  const store = readStore();
 
-  // A Co-Lead oversees the club; everyone else oversees their own subtree.
-  const overseen = isCoLead(actor)
-    ? readStore().members.filter(
-        (m) => m.id !== actor.id && m.status === "active"
+  /*
+    The viewer's scope, and it is now ONE set instead of two.
+
+    Everything on this page used to be scoped two ways: the Lead half by
+    `reportsBelow(actor.id)` walking the reporting chain, the RE half by
+    `isREofOrAbove`. The chain went on 2026-08-24, so there is one scope left and
+    it is the project tree.
+
+    Resolved through the permission module rather than by matching `reIds`
+    directly: authority inherits DOWN the project tree, and a Division Lead is a
+    top RE over their whole division. Matching ids would miss both and silently
+    under-report what somebody owes. A Co-Lead qualifies everywhere, which is
+    why the old Co-Lead special case disappeared rather than moving.
+  */
+  const myProjectIds = store.projects
+    .filter((p) => isREofOrAbove(actor, graph, p.id))
+    .map((p) => p.id);
+  const myProjectIdSet = new Set(myProjectIds);
+
+  /*
+    People committed to those projects. Following doesn't count: watching a
+    project is not working on it, and a headcount inflated by watchers is the
+    number an RE would use to decide they have enough people.
+  */
+  const peopleOnMyProjects = new Set(
+    store.projectMemberships
+      .filter(
+        (m) => myProjectIdSet.has(m.projectId) && m.commitment === "committed"
       )
-    : reportsBelow(actor.id).filter((m) => m.status === "active");
-
-  const overseenIds = new Set(overseen.map((m) => m.id));
-
-  /**
-   * The same people, plus you.
-   *
-   * `overseen` deliberately excludes the viewer — it answers "who do I look
-   * after". But `logsThisWeek` below is about the team's week, and leaving
-   * yourself out of it meant a Co-Lead who was the only person logging saw zero.
-   * It read as broken, and it was wrong: you're part of the team you run.
-   */
-  const countedIds = new Set([...overseenIds, actor.id]);
+      .map((m) => m.memberId)
+  );
 
   const weekStart = startOfWeek(today());
-  const logsThisWeek = workLogs.filter(
-    (w) => countedIds.has(w.memberId) && w.workDate >= weekStart
+  /*
+    Scoped by PROJECT, not by person, and that is the whole difference.
+
+    It used to count entries by people the viewer oversaw, plus the viewer --
+    the "plus the viewer" was there because a Co-Lead who was the only person
+    logging saw zero and it read as broken. Scoping by project fixes that
+    structurally: your own entries on your own project are in your own projects.
+
+    An entry with no `projectId` (misc work) is deliberately not counted. This
+    number answers "is the work I am accountable for moving", and misc work is by
+    definition not on any of it.
+  */
+  const logsThisWeek = store.workLogs.filter(
+    (w) =>
+      !!w.projectId &&
+      myProjectIdSet.has(w.projectId) &&
+      w.workDate >= weekStart
   ).length;
 
-  // Trainings this viewer is the verifier for. `overseen` is their reporting
-  // subtree, which is exactly who `can.verifyTraining` covers.
-  const trainings = await getTrainingQueue(overseen.map((m) => m.id));
+  /*
+    Trainings waiting on a verifier.
+
+    This was scoped to the viewer's reporting subtree, which is exactly who
+    `can.verifyTraining` covered. That rule is now "any Lead, not yourself" as an
+    interim while the named-verifier columns land, so the queue matches it: every
+    pending request, for anybody who can act on one. See `can.verifyTraining` for
+    why the interim is a widening and what narrows it again.
+  */
+  const trainings = can.verifyTraining(actor, graph, "")
+    ? await getTrainingQueue(store.members.map((m) => m.id))
+    : { pending: [], expired: [] };
 
   /*
     Requests addressed to this person, plus — for a Co-Lead — everything else
@@ -316,7 +357,7 @@ export async function getDashboard(
   */
   const mine = requestsAwaitingLead(actor.id);
   const alsoVisible = isCoLead(actor)
-    ? readStore().memberRequests.filter(
+    ? store.memberRequests.filter(
         (r) => r.status === "pending" && r.leadId !== actor.id
       )
     : [];
@@ -338,17 +379,6 @@ export async function getDashboard(
     })
   );
 
-  // --- the RE half of the exception feed -----------------------------------
-  //
-  // The viewer's RE subtree, resolved through the permission module rather
-  // than by matching `reIds` directly: authority inherits DOWN the project
-  // tree, and a Division Lead is a top RE. Matching ids would miss both and
-  // silently under-report what somebody actually owes.
-  const store = readStore();
-  const myProjectIds = store.projects
-    .filter((p) => isREofOrAbove(actor, graph, p.id))
-    .map((p) => p.id);
-
   const reQueue = {
     signOffs: pendingSignOffs(
       store.deliverables,
@@ -358,25 +388,37 @@ export async function getDashboard(
     ),
   };
 
-  // "Gone quiet" used to live here, per PERSON: nothing logged this week while
-  // still holding open work. It went with the reporting chain, because it was
-  // rendered on the dashboard of the Lead they reported to and there is no such
-  // Lead. The signal itself is still worth having — losing people quietly is
-  // what the club actually loses people to — so it comes back re-scoped to the
-  // PROJECT, which is the shape that has an owner now. See
-  // docs/REPORTING_REMOVAL_PLAN.md.
+  /*
+    Projects that have gone quiet.
+
+    Was per PERSON -- nothing logged this week while still holding open work,
+    rendered on the dashboard of the Lead they reported to. Re-scoped to the
+    project, which is the shape that has an owner now, and moved into
+    `lib/quiet.ts` because the daily digest needs the same answer and the two
+    must not drift. Three weeks rather than one week: see the note on
+    `QUIET_AFTER_DAYS` for why a shorter window trains an RE to skip the panel.
+  */
+  const goneQuiet = quietProjects(
+    store.projects,
+    myProjectIds,
+    store.projectMemberships,
+    store.workLogs,
+    store.deliverables,
+    today()
+  );
 
   return {
     // The editable name/description, falling back to the shipped default.
     club: { ...club, ...clubIdentity() },
     hasAcademicCalendar: store.terms.length > 0,
-    isLeadOfNobody: overseen.length === 0,
+    isREofNothing: myProjectIds.length === 0,
     counts: {
-      peopleOverseen: overseen.length,
+      peopleOnMyProjects: peopleOnMyProjects.size,
       divisions: divisions().length,
       projects: readStore().projects.length,
     },
     logsThisWeek,
+    goneQuiet,
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
@@ -440,4 +482,8 @@ export async function getDashboard(
 }
 
 // Exported for tests.
-export { reportsBelow };
+/*
+  `reportsBelow` was exported from here for the digest, which asked the same
+  question. Both went with the reporting chain on 2026-08-24. The digest now
+  scopes by project, same as this file.
+*/
