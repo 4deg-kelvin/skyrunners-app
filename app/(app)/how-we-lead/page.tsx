@@ -47,7 +47,8 @@ export default function HowWeLeadPage() {
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             SkyRunners builds real aircraft, which takes real time — but the
             club counts no hours and sets no quota. We ask two things: finish
-            the deliverables you take on, and say where they stand twice a week.
+            the deliverables you take on, and log what you did as you go so the
+            rest of us can see where they stand.
           </p>
 
           <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
@@ -68,9 +69,10 @@ export default function HowWeLeadPage() {
               <span className="text-ink font-semibold">
                 Log what you did, not how long.
               </span>{" "}
-              A line a day is enough, and it is not paperwork: your twice-weekly
-              check-in writes itself from those lines, and only asks you to
-              write about a project you logged nothing against.
+              A line a day is enough. It goes straight into the project&apos;s
+              feed where your RE and anyone else on it can read it and reply —
+              that is the whole reporting relationship, and there is nothing
+              else to file.
             </p>
           </div>
 
@@ -79,10 +81,11 @@ export default function HowWeLeadPage() {
               <span className="text-ink font-semibold">
                 Quarters get heavy.
               </span>{" "}
-              Midterms happen to everyone. If you need to step back, set an
-              academic pause — nothing counts against you while it&apos;s on,
-              and there&apos;s no backlog waiting when you return. We would much
-              rather you pause than disappear.
+              Midterms happen to everyone, and nothing here accrues against you
+              — there is no report to miss and no backlog to come back to. If
+              you need to step back, say so on the projects you&apos;re on so
+              somebody can pick your deliverables up. We would much rather you
+              hand something over than disappear.
             </p>
           </div>
         </CardBody>
@@ -92,14 +95,13 @@ export default function HowWeLeadPage() {
         <CardBody>
           <SectionLabel>What Gets Tracked</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
-            Three numbers, no score
+            Two counts, no score
           </h2>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Your Lead and the REs of your projects see exactly what you see on
-            My Work: deliverables finished, updates on time, and the roles you
-            hold. There is deliberately no combined score and no leaderboard — a
-            single number becomes something to game, and flattens the context
-            that matters.
+            Everyone sees the same two numbers on your profile that you see on
+            My Work: deliverables finished and projects finished. There is
+            deliberately no combined score and no leaderboard — a single number
+            becomes something to game, and flattens the context that matters.
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -109,16 +111,16 @@ export default function HowWeLeadPage() {
                 body: "The one that counts most. Finished work is the only thing that can't be faked.",
               },
               {
-                title: "Updates on time",
-                body: "Twice a week, on days you pick. Being predictable is what lets others rely on you.",
-              },
-              {
-                title: "Roles held",
-                body: "Reported separately, never blended in — otherwise the people already chosen would always look best.",
+                title: "Projects finished",
+                body: "Projects you were committed to that got carried over the line — including ones where the work was tracked as somebody else's deliverables.",
               },
               {
                 title: "Not your hours",
                 body: "No timesheet, no weekly quota, no tier. Your work log records what you did, not how long it took.",
+              },
+              {
+                title: "Not a reliability score either",
+                body: "We used to count check-ins filed on time. The club stopped asking for check-ins, and did not replace the number — nothing here measures how often you showed up.",
               },
             ].map((item) => (
               <div

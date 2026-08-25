@@ -1,32 +1,53 @@
 # Handoff — read this first
 
-**Written 2026-08-08, last revised 2026-08-10.** Everything a fresh session
+**Written 2026-08-08, last revised 2026-08-24.** Everything a fresh session
 needs. Written for someone with no memory of how any of this came to be.
 
-**Start with "Session log — 2026-08-10" near the bottom** if you're picking up
-where the last session stopped. It has the three outstanding items.
+**The largest change since it was written is the reporting removal (2026-08-24)**
+— nobody reports to anybody and check-ins are gone. Item 1 below is the summary;
+`docs/REPORTING_REMOVAL_PLAN.md` is the full reasoning. Anything in this document
+that mentions a Lead reading somebody's report is history, and says so where it
+matters.
+
+**"Outstanding, in order" near the bottom** is what is actually left to do.
 
 ---
 ## Picking up right now? Read this box first
 
-1. ~~**Remove the hour-tracking system.**~~ **Done 2026-08-14**, migration
-   `0039`. The work log is a diary now: `WorkLog` has no `hours`, its
-   `description` is required, the twice-weekly check-in drafts itself from those
-   entries, and the log renders day by day on My Work. The Core / Committed /
-   Contributing tiers are deleted and the contribution record is three signals.
-   `docs/HOURS_REMOVAL_PLAN.md` records what shipped and where it differs from
-   the plan; the CLAUDE.md section is rewritten to match.
+1. ~~**Remove the reporting chain.**~~ **Done 2026-08-24.** The biggest change
+   this app has had: about 6,000 lines. Nobody reports to anybody, check-ins are
+   gone, and members report to their REs through the work they log on a project.
+   Read the section in CLAUDE.md, then `docs/REPORTING_REMOVAL_PLAN.md` for why
+   each decision went the way it did.
 
-   **The one thing to know before touching any of it:** `lib/checkin-draft.ts` is
-   called by BOTH the composer and `submitCheckIn`, deliberately. If those two
-   ever compute the window differently, the form marks a box required that the
-   server accepts — or accepts one the server refuses with a reason the page
-   never showed.
+   **Three things to know before touching any of it:**
 
-2. **Rewrite the two guide pages in detail** — /getting-started and /leading.
+   - **`profiles.lead_id` still exists and nothing reads it.** So do
+     `progress_updates.lead_id_at_submission` and the whole `update_schedules`
+     table. Deliberate — the club could revisit this and a dropped column can't
+     be un-dropped. `teams.lead_id` is different: it is LIVE and load-bearing,
+     because leading a division makes you a top RE inside it.
+   - **`lib/quiet.ts` is the mitigation, not a nice-to-have.** The chain's real
+     function was that somebody was *named* as responsible for noticing silence.
+     Per-project "gone quiet" is what replaced that, and if it gets weakened the
+     removal loses the thing that made it safe.
+   - **Migration `0046` is written and NOT applied** (the database password is
+     rejected — see §14). The trainings-verifier feature ships without it and
+     switches itself on when it lands. Nothing 500s in the meantime, on purpose.
+
+2. ~~**Remove the hour-tracking system.**~~ **Done 2026-08-14**, migration
+   `0039`. The work log is a diary: `WorkLog` has no `hours` and its
+   `description` is required. The Core / Committed / Contributing tiers are
+   deleted. `docs/HOURS_REMOVAL_PLAN.md` records what shipped.
+
+   The check-in auto-draft that made this removal *add* something has itself been
+   removed with check-ins. What replaced it is smaller and better: the log line
+   IS the report now, so there is nothing to draft.
+
+3. **Rewrite the two guide pages in detail** — /getting-started and /leading.
    The editable container for club material shipped (migration 0038,
-   /settings/guides); the built-in content still needs expanding. Both pages had
-   their hours copy rewritten in the removal, so they're accurate but still thin.
+   /settings/guides); the built-in content still needs expanding. Both were
+   rewritten again for the reporting removal, so they're accurate but still thin.
 
 Everything below is the older, still-accurate orientation.
 
@@ -37,8 +58,9 @@ Everything below is the older, still-accurate orientation.
 The app is **live on Supabase** at `skyrunners-app.vercel.app` — note the
 `-app`; `skyrunners.vercel.app` is somebody else's site and probing it to check
 a deploy gives a confident wrong answer. Real Google sign-in, real Postgres,
-migrations `0001`–`0033` applied. **Phases 0–8 are built** — my work, find work, projects,
-members, deliverables and sign-off, check-ins and review, terms, trainings and
+migrations `0001`–`0043` applied; `0044`–`0046` are written and waiting on a
+working password. **Phases 0–8 are built** — my work, find work, projects,
+members, deliverables and sign-off, terms, trainings and
 facility access, and the calendar. There is no phase 9+ scoped yet beyond the
 one item under "What's next".
 
@@ -51,12 +73,11 @@ npm run db:check        # is the database really there?
 PW=<db-password> npm run verify:live   # does every page work on real data?
 ```
 
-**Before the club uses it, somebody has to add a term.** Check-ins only
-generate inside an academic period the club has entered, and with no terms
-`inSession` is false for every date — so nobody is prompted, no review queue
-fills, and reliability never starts. It's the one setup step with no visible
-symptom, which is why the dashboard now says so in a banner. Settings →
-Academic Calendar.
+**Somebody should still add a term, but it stopped being urgent.** With no
+terms, `inSession` is false for every date, so the app cannot say what period the
+club is in. Until 2026-08-24 this was much worse — it silently generated no
+check-ins for anybody, which was the one setup step with no visible symptom, and
+is why the dashboard says so in a banner. Settings → Academic Calendar.
 
 `verify:live` is the one that matters. It loads the whole database and calls the
 `lib/data/*` function behind every route, plus the two pages that call several
@@ -407,13 +428,17 @@ fix when it isn't is to push operations down into SQL — which is why
 
 ### `lib/permissions.ts` — the only place authority is decided
 
-Four questions: Co-Lead? RE of this project or above? Lead of this person or
-above? Your own data?
+Three questions: Co-Lead? RE of this project or above? Your own data?
 
-**Three inheritances, running in different directions** — RE authority flows
-*down* the project tree, Lead authority flows *up* the reporting chain, and
-team-lead authority flows *down* the org tree and then down the project tree.
-That asymmetry is where the bugs are, which is why there are 50+ tests on it.
+There was a fourth — "Lead of this person, or above?" — and it went with the
+reporting chain on **2026-08-24** along with `isLeadOfOrAbove` and `leadChain`.
+Do not rebuild it; `lib/permissions.test.ts` asserts the five deleted rule names
+stay absent.
+
+**Two inheritances, and both run down** — RE authority flows *down* the project
+tree, and team-lead authority flows *down* the org tree and then down the project
+tree. The one that flowed *up* — over people — is the one that went. That
+asymmetry is where the bugs used to be, which is why there are 50+ tests on it.
 
 **A Division Lead is a top RE.** `leadsTeamAbove` folds into `isREofOrAbove`, so
 leading a division gives RE powers on every project inside it at any depth,
@@ -452,17 +477,31 @@ Role changes are **Co-Lead only**: it's the one permission that can reshape the
 permission system. A Co-Lead cannot change their own role, and the last Co-Lead
 cannot be demoted or deactivated — both are lock-out guards.
 
-### The privacy model — the rule most likely to be got wrong
+### The privacy model — one line, as of 2026-08-24
+
+**Everything about a member is public**, except archived check-in envelopes,
+which are the member's and a Co-Lead's (`can.readArchivedCheckIns`).
 
 | Thing | Who sees it |
 |---|---|
-| Per-project check-in content | **Everyone** — it's the project's history |
-| Hours on one project | That project's REs, inheriting **down** |
-| Personal report, total hours, reliability | The member and their **Lead chain only** |
+| Every log line, project, deliverable, and both delivered counters | **Everyone** |
+| Archived check-in envelopes, including `generalNote` | The member and **Co-Leads** |
 
-REs deliberately **cannot** read someone's personal report. They get the
-per-project half publicly instead. That's what makes reviewing one named
-person's obligation, and what makes the escalation mean anything.
+This table had three rows and a long argument in it. Each row collapsed for a
+different reason, and the order matters if you are wondering whether to reopen
+any of it:
+
+1. **Hours on one project** went public on 2026-08-16, because the hours
+   themselves went on 2026-08-14. The reason for hiding it was that a NUMBER
+   invites comparison between volunteers with different course loads. A sentence
+   about a project does not, and the project is public.
+2. **The personal report and reliability** were deleted outright on 2026-08-24
+   rather than rehomed. Reliability measured check-ins filed on time and there
+   are no check-ins. Two public counters replaced it.
+3. **The one exception got NARROWER, not wider.** A `generalNote` was written
+   under a promise that only the member and their Lead chain would read it. Their
+   old Lead can no longer read it; a Co-Lead can. Publishing what people already
+   typed is the one privacy change that changing it back cannot undo.
 
 ---
 
@@ -470,11 +509,15 @@ person's obligation, and what makes the escalation mean anything.
 
 - **Deliverables are the whole task model.** One flat list, one owner, one date,
   one status. No dependencies, no sub-tasks, no Gantt.
-- **No engagement score, no leaderboard, no ranking.** Four independent signals.
-  A component with no data returns `null`, never `0`.
+- **No engagement score, no leaderboard, no ranking.** Two plain counts, in the
+  side column of a profile. It was three independent signals until 2026-08-24
+  and four before that; each shrink deleted something that measured presence
+  rather than finished work.
+- **Nobody reports to anybody.** Members report to their REs, through the work
+  they log on a project. `docs/REPORTING_REMOVAL_PLAN.md`.
 - **Two-step sign-off**: the owner marks `submitted`, an RE confirms `done`.
-  Only `done` counts as delivered. Unconfirmed work escalates like an unread
-  check-in, so a quiet RE is visible rather than silently freezing records.
+  Only `done` counts as delivered. Unconfirmed work ages visibly on the RE's
+  dashboard, so a quiet RE is visible rather than silently freezing records.
 - **Completing a project is a review step, done from above.** The assigned RE
   finishes it; the RE above them or the Division Lead agrees it's done. A
   signed-off deliverable can be rejected from above too, with a mandatory
@@ -484,11 +527,13 @@ person's obligation, and what makes the escalation mean anything.
 - **Work inside a project can't be due after the project.** Checked both
   directions and only when a date actually moves, so one legacy violation can't
   freeze every other edit. An undated parent constrains nothing.
-- **Hours backdate 7 days** and lock once a submitted check-in reports them.
+- **Work logs backdate 7 days**, and can be deleted within that window.
 - **Phone over email** everywhere a human is contacted. Email stays the auth
   identity and the fallback.
-- **Escalation is on age, not count.** "Kenji has been waiting 6 days" beats
-  "12 unread".
+- **Everything queue-shaped is on age, not count.** "Waiting 6 days" beats "12
+  items". Applies to sign-offs, join requests, help requests, and per-project
+  "gone quiet" — the one rule that outlived every specific queue it was written
+  for.
 - **Never hard-delete people or projects.** Deactivate.
 
 Full reasoning in `docs/DECISIONS.md` and `docs/PRODUCT_REVIEW.md`.
@@ -617,10 +662,12 @@ run at most once a day, and it rejects the whole deployment over it — not just
 the cron.** A schedule string in a file nobody was looking at silently stopped
 the site updating for four commits, and the symptom pointed nowhere near it.
 
-Now `30 19 * * *`, and daily is genuinely enough: every check-in is due at 23:59
-UTC, so one run with a five-hour window catches the whole club. If a future job
-needs to be more frequent, that's a Pro-plan conversation, not a schedule edit.
-Written up in `docs/INFRA.md`.
+Now `0 2 * * *` — 7pm Pacific in summer, 6pm in winter — for the one cron left.
+The check-in reminder cron went with check-ins on 2026-08-24, which freed the
+second Hobby slot. If a future job needs to run more than once a day, that's a
+Pro-plan conversation, not a schedule edit. Written up in `docs/INFRA.md`, and
+`lib/notify/cron-schedule.test.ts` asserts no cron's schedule can fire more than
+once a day.
 
 ### 3. An env-var edit dropped the site into demo mode
 
@@ -679,11 +726,17 @@ The bot works — Kelvin verified. What exists:
 |---|---|
 | Added to a project | the person added |
 | Join request approved / declined | whoever asked |
-| Check-in submitted | that member's Lead |
 | Deliverable or project marked **blocked** | see `blockerAudience` below |
-| Check-in due in ~4 hours | the member (daily cron) |
-| Check-in still open the next day | the member, **once** |
+| A request addressed to you is answered | whoever asked |
+| Daily digest, 7pm Pacific | every RE with something to say |
 | "Send a test message" from Settings | themselves |
+
+Three check-in triggers were here — submitted, due-in-4-hours, and still-open —
+and all three went on 2026-08-24. Worth noting what that did to the volume: the
+club's notification load is now driven entirely by things somebody DID, not by
+things somebody was supposed to do. That is the direction to keep it in; a bot
+that only ever nags is a bot people mute, and muting it takes the blocker alerts
+with it.
 
 `blockerAudience(projectId, raiserId)` is the interesting one: the project's REs
 minus the raiser, climbing **one level** if that empties the list. Deliberately
@@ -873,15 +926,43 @@ in list rows, so it wants a real pass rather than one rule.
 
 ## Outstanding, in order
 
-1. **Rotate the Supabase database password.** Still not done. It has been in
-   plaintext in two chat transcripts.
-2. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
+1. **The database password is rejected, so three migrations are unapplied.**
+   `0044_advisor_profiles`, `0045_work_log_replies` and
+   `0046_catalogue_verifiers`. All three are written so the app ships without
+   them and switches each feature on when it lands — nothing 500s in the
+   meantime, which is why the deploy order stopped being load-bearing. Applying
+   them is one paste each into the Supabase SQL editor.
+
+   The connection details are confirmed correct: host
+   `aws-0-ca-central-1.pooler.supabase.com`, user `postgres.<project-ref>`, ports
+   5432 and 6543. Other regions return "tenant not found" and `aws-1` in the same
+   region does too, so the region and username are right and it really is the
+   password. `db.<ref>.supabase.co` does not resolve.
+
+2. **Rotate the Supabase database password once it works.** Two passwords have
+   now been in plaintext in chat transcripts.
+
+3. **Fold `catalogue_verifiers` into `catalogue_items`.** Two columns on the item
+   is the right schema; the side table exists because that table's snapshot
+   column list makes a pre-migration deploy fatal. See the header of
+   `supabase/migrations/0046_catalogue_verifiers.sql`.
+
+4. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
    Michael, Jonathan. They receive nothing at all until they press Verify now.
-3. **Nobody has logged hours yet.** Every contribution signal correctly reads
-   empty, which looks identical to broken. Get one real week in before judging
+
+5. **Nobody has logged any work yet.** Both delivered counters correctly read
+   zero, which looks identical to broken, and `lib/quiet.ts` will flag every
+   project until somebody logs something. Get one real week in before judging
    any of it.
-4. Tap-target pass (above).
-5. Offered and not built: fold the behavioural design rules into
+
+6. **`npm test` opens a real Discord connection.** The suite prints
+   `[discord] couldn't open a DM with ... 403` and an `ECONNRESET`. It does not
+   fail anything, but a test suite that talks to the network is a test suite that
+   fails when the network does — and worse, one that could DM a real person.
+   Worth pinning the client behind an env check.
+
+7. Tap-target pass (above).
+
+8. Offered and not built: fold the behavioural design rules into
    `docs/DESIGN_SYSTEM.md`; warn when the academic calendar is about to run out
-   (`calendarRunsOut` is computed and surfaced nowhere); wire a "what I look
-   after" line on Lead profiles so members know who to ask.
+   (`calendarRunsOut` is computed and surfaced nowhere).

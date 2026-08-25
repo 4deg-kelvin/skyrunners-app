@@ -1,5 +1,12 @@
 # Integrations — email and Discord
 
+> **Partly superseded, 2026-08-24.** The club removed the reporting chain and
+> twice-weekly check-ins. Anything below about a member's Lead, reviewing
+> check-ins, roll-ups, reliability or the academic pause is a record of what was
+> planned, not of how the app works — kept because the reasoning behind each
+> decision is still worth reading. See `docs/REPORTING_REMOVAL_PLAN.md` and the
+> section in `CLAUDE.md` for what replaced it.
+
 **What Anish needs to set up.** Both close the same gap: the app only notifies
 in-app, so **an invited member never learns they've been invited unless
 somebody tells them out of band.**

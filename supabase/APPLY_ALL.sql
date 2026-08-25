@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql, 0046_catalogue_verifiers.sql, 0047_reporting_chain_comments.sql
 
 
 -- ==========================================================================
@@ -5415,4 +5415,255 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0045_work_log_replies.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0046_catalogue_verifiers.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0046 — who verifies each training, and which ones are self-verify
+-- ===========================================================================
+--
+-- Until 2026-08-24 a training was verified by the member's Lead chain. The club
+-- removed the reporting chain, so verification needs a per-ITEM answer instead.
+-- That answer is the RE pattern applied to a machine: accountability sits with a
+-- named person rather than with a rank.
+--
+--   * A named verifier signs off requests for that item. "Tyler verifies the
+--     mill" is a sentence a new member can act on; "ask your Lead" is not, and
+--     was the thing being removed.
+--   * Self-verify means the member ticks it and nobody is asked. Right for
+--     anything where the honest answer is "did you read this" — a shop induction
+--     video, a document — and it removes the queue entirely for those, which is
+--     most of what was clogging it.
+--
+-- Unconfigured items fall back to "any Lead" (see `can.verifyTraining`). That is
+-- deliberate rather than a gap: a catalogue of thirty machines cannot be
+-- assigned in one sitting, and "nobody can verify this yet" would lock people
+-- out of the shop.
+--
+-- ---------------------------------------------------------------------------
+-- Why a separate table rather than two columns on `catalogue_items`
+-- ---------------------------------------------------------------------------
+--
+-- Two columns on the item is the better schema, and this is a compromise. The
+-- reason is in docs/HANDOFF.md and it has bitten this repo before:
+-- `catalogue_items` is read by the per-request snapshot with an EXPLICIT column
+-- list, so the moment the app selects a column that does not exist yet, EVERY
+-- page 500s until this file is applied. The database password was rejected while
+-- this shipped, so two columns meant either shipping nothing or shipping an
+-- outage.
+--
+-- Read through its own fail-soft query in `lib/trainings/verifiers.ts`, which
+-- returns an empty map if the table is absent — so deploy order stops mattering
+-- and the feature switches itself on the moment this lands, with no second
+-- deploy. Same pattern as 0044 (`advisor_profiles`) and 0045
+-- (`work_log_replies`).
+--
+-- **Worth folding into `catalogue_items` once the database is reachable.** It is
+-- a mechanical change: two columns, a backfill from this table, one module.
+--
+-- ---------------------------------------------------------------------------
+-- The lock-out safeguard lives in the application, not here
+-- ---------------------------------------------------------------------------
+--
+-- Somebody who is still the named verifier for a training cannot be demoted out
+-- of leadership or deactivated, and the refusal NAMES the items so whoever is
+-- making the change knows what to reassign first. Enforced in `setGlobalRole`
+-- and `setMemberStatus`, not as a constraint, for the same reason the "last
+-- Co-Lead" guard lives there: a CHECK cannot produce a message that says "Tyler
+-- verifies the mill and the laser cutter; reassign those first", and a bare
+-- constraint violation on an org-chart edit is the kind of message people work
+-- around by deleting something else. What they would delete here is a safety
+-- record.
+--
+-- `on delete set null` on `verifier_id` is the backstop for the case the guard
+-- deliberately allows: a Co-Lead force-deleting a duplicate profile. The item
+-- falls back to "any Lead" rather than pointing at a row that is gone.
+
+create table if not exists catalogue_verifiers (
+  -- One config row per item, enforced by the primary key.
+  item_id     uuid primary key
+                references catalogue_items (id) on delete cascade,
+  -- The one person who signs this off. Null when self-verify, or when nobody has
+  -- been named yet — both fall back to `can.verifyTraining`.
+  verifier_id uuid references profiles (id) on delete set null,
+  self_verify boolean not null default false,
+  updated_at  timestamptz not null default now(),
+  -- Naming somebody AND marking it self-verify is contradictory: it would leave
+  -- a person recorded as accountable for a sign-off that never reaches them.
+  -- Refused here as well as in `saveCatalogueVerifier`, which clears the
+  -- verifier when self-verify is set.
+  constraint verifier_xor_self_verify
+    check (not (self_verify and verifier_id is not null))
+);
+
+comment on table catalogue_verifiers is
+  'Per-item training verification: a named verifier, or self-verify. Replaces '
+  'Lead-chain verification, removed 2026-08-24. Separate from catalogue_items so '
+  'the app could ship before this landed — worth folding in, see 0046 header.';
+
+-- One index, on the column the lock-out safeguard queries. `item_id` is already
+-- the primary key, so it needs nothing.
+create index if not exists catalogue_verifiers_verifier_idx
+  on catalogue_verifiers (verifier_id)
+  where verifier_id is not null;
+
+alter table catalogue_verifiers enable row level security;
+
+-- Readable by everyone signed in, like `catalogue_items` itself. Knowing who
+-- signs off the mill is exactly what a member needs before asking, and hiding it
+-- recreates the "go ask a Co-Lead" bottleneck this app exists to remove.
+drop policy if exists catalogue_verifiers_read on catalogue_verifiers;
+create policy catalogue_verifiers_read on catalogue_verifiers
+  for select to authenticated
+  using (true);
+
+-- `for all`, not `for insert` + `for update`. `saveCatalogueVerifier` upserts,
+-- and an upsert never reaches a `for update` policy — a policy that never
+-- matches does not raise, the statement affects zero rows and returns success.
+-- Same shape and same reason as `work_log_replies_re` in 0045.
+--
+-- Co-Lead only, same as `catalogue_items_write`: the catalogue is the shape
+-- everything else hangs off.
+drop policy if exists catalogue_verifiers_write on catalogue_verifiers;
+create policy catalogue_verifiers_write on catalogue_verifiers
+  for all to authenticated
+  using (auth_is_co_lead()) with check (auth_is_co_lead());
+
+insert into schema_migrations (version)
+values ('0046_catalogue_verifiers')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0046_catalogue_verifiers.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0047_reporting_chain_comments.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0047 — comment the columns the reporting removal left behind
+-- ===========================================================================
+--
+-- Drops nothing. On 2026-08-24 the club removed the reporting chain and
+-- twice-weekly check-ins, and the app stopped reading a set of columns and one
+-- whole table. This file records which ones and why, so the next person to open
+-- the schema does not spend an afternoon working out whether `profiles.lead_id`
+-- is load-bearing.
+--
+-- ---------------------------------------------------------------------------
+-- Why nothing is dropped
+-- ---------------------------------------------------------------------------
+--
+-- Same reasoning as migration `0039`, which stopped collecting hours and left
+-- every hours column in place:
+--
+--   1. **A dropped column cannot be un-dropped.** Stopping is a club decision.
+--      If they reinstate check-ins next quarter, the history of who reported to
+--      whom and what they wrote is either still here or gone forever.
+--   2. **The rows are the history.** `progress_updates` and `update_entries`
+--      hold what people actually wrote, and the per-project half of it is public
+--      and part of each project's feed. Those are still SELECTed.
+--   3. **Dropping a column is the one schema change that can break a running
+--      deploy in both directions.** Nothing is gained by rushing it.
+--
+-- What IS gone from the app's reach is the `update_schedules` table: it is no
+-- longer in `COLLECTIONS` in `lib/store/mapping.ts`, so the per-request snapshot
+-- does not load it. The rows stay.
+--
+-- ---------------------------------------------------------------------------
+-- The one that is still live, and must not be confused with the others
+-- ---------------------------------------------------------------------------
+--
+-- **`teams.lead_id` IS LIVE.** It feeds `leadsTeamAbove`, which is what makes a
+-- Division Lead a top RE over every project in their division. It is authority
+-- over WORK, not over people, and it is the reason the reporting removal did not
+-- also strip division leadership. Do not "clean it up" alongside
+-- `profiles.lead_id` — the names are similar and the meanings are not.
+
+-- --------------------------------------------------------------------------
+-- profiles
+-- --------------------------------------------------------------------------
+
+comment on column profiles.lead_id is
+  'DEAD since 2026-08-24 — nothing reads this. Was the member''s Lead: who read '
+  'their twice-weekly check-in and who escalation ran through. The club removed '
+  'the reporting chain; members report to their REs through the work they log. '
+  'Kept because the decision could be revisited and a dropped column cannot be '
+  'un-dropped. NOTE: teams.lead_id is different and is LIVE.';
+
+-- --------------------------------------------------------------------------
+-- progress_updates / update_entries — an archive, still read
+-- --------------------------------------------------------------------------
+
+comment on table progress_updates is
+  'ARCHIVE since 2026-08-24. Nothing writes here; the club stopped asking for '
+  'check-ins. Existing rows still render: the per-project half (update_entries) '
+  'is public and part of each project''s feed, and the envelope shows on a '
+  'member''s profile behind can.readArchivedCheckIns.';
+
+comment on column progress_updates.lead_id_at_submission is
+  'DEAD since 2026-08-24 — nothing reads this. Snapshotted the member''s Lead at '
+  'submission so a mid-quarter reassignment could not silently re-file historic '
+  'check-ins under the new Lead. There are no Leads and no new check-ins.';
+
+comment on column progress_updates.reviewed_at is
+  'DEAD for new rows since 2026-08-24 — nothing sets this. Still READ: a '
+  'member''s profile shows "Read by X" on the check-ins somebody did read, which '
+  'is a true fact about the past worth keeping.';
+
+comment on column progress_updates.reviewed_by is
+  'Same as reviewed_at: nothing sets it, the profile still reads it.';
+
+comment on column progress_updates.reminder_sent_at is
+  'DEAD since 2026-08-24. Half of the idempotency guard for the check-in '
+  'reminder cron, which was deleted with the reminders. It existed so a retry or '
+  'an overlapping invocation updated zero rows rather than DMing twice.';
+
+comment on column progress_updates.late_notice_sent_at is
+  'DEAD since 2026-08-24. The other half — one chase per late check-in rather '
+  'than one every morning.';
+
+-- --------------------------------------------------------------------------
+-- update_schedules — the app no longer loads this table at all
+-- --------------------------------------------------------------------------
+
+comment on table update_schedules is
+  'DEAD since 2026-08-24 and NOT LOADED by the app — removed from COLLECTIONS in '
+  'lib/store/mapping.ts, so it is not in the per-request snapshot. Held which '
+  'weekdays each member checked in on, and paused_until for the academic pause. '
+  'Rows kept as history.';
+
+comment on column update_schedules.paused_until is
+  'DEAD. The academic pause: suppressed obligations and nudges and generated no '
+  'missed rows, so a lapse was a pause rather than a debt. Deleted outright '
+  'rather than reframed — with no obligations there is nothing to pause. The '
+  'principle survived in the copy: nothing accrues against a member who steps '
+  'back for a quarter.';
+
+-- --------------------------------------------------------------------------
+-- terms — the column kept its name and changed its meaning
+-- --------------------------------------------------------------------------
+
+comment on column terms.generates_obligations is
+  'STILL LIVE, but renamed in meaning rather than in SQL. Now reads as "the club '
+  'is in session during this period" — it drives what the app says about the '
+  'current term. It used to decide whether check-in obligations generated at '
+  'all, which made a missing calendar the one setup step with no visible '
+  'symptom. Not renamed because a migration for a column whose meaning is '
+  'documented buys nothing.';
+
+insert into schema_migrations (version)
+values ('0047_reporting_chain_comments')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0047_reporting_chain_comments.sql
 -- ==========================================================================

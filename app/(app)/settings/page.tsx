@@ -127,9 +127,11 @@ export default async function SettingsPage() {
   /*
     An advisor's Settings page is a different page.
 
-    Check-in days, the academic pause and the work-log nudge all assume the person
-    does engineering work; an advisor has none of those obligations, so showing
-    them is showing somebody controls for a job they don't have. Anish's report.
+    It used to differ by much more -- check-in days, the academic pause and the
+    work-log nudge all assumed the person does engineering work, and an advisor
+    has none of those obligations. Two of those three are gone for everybody now.
+    What is left is showing an advisor their background instead of controls for a
+    job they don't have. Anish's report.
   */
   const viewerIsAdvisor = isAdvisor(viewer.actor);
   const advisorProfile = viewerIsAdvisor
@@ -152,7 +154,7 @@ export default async function SettingsPage() {
           schedule" hides all of that behind a name for one of its sections,
           so somebody looking for their phone number never opens it.
         */
-        description="Your profile, the days you check in, and pausing for academics. Co-Leads also manage the academic calendar and trainings catalogue."
+        description="Your profile, the AI connection and your calendar feed. Co-Leads also manage the academic calendar and the trainings catalogue."
       />
 
       {/* Profile first: it's the thing a new member needs on day one. */}
@@ -191,8 +193,8 @@ export default async function SettingsPage() {
             </h2>
             <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
               Shown on your profile so members know what to ask you about. You
-              own no deliverables and file no check-ins, so this is what your
-              page says instead.
+              own no deliverables and log no work, so this is what your page
+              says instead.
             </p>
             <div className="mt-5">
               <AdvisorProfileForm
@@ -419,29 +421,34 @@ export default async function SettingsPage() {
                   {currentTerm.name}
                 </h3>
                 <Badge tone={inSession ? "ok" : "neutral"}>
-                  {inSession ? "In session" : "No check-ins due"}
+                  {inSession ? "In session" : "Out of session"}
                 </Badge>
               </div>
               <p className="text-ink-soft mt-2 text-[15px]">
                 {inSession
-                  ? "Check-ins are running normally this term."
-                  : "Nothing is due right now — check-ins pause automatically over finals, breaks and summer. Nobody accrues missed updates while the club is out of session."}
+                  ? "The club is formally in session."
+                  : "Out of session — finals, a break or summer. Nothing is expected of anybody, and nothing accrues while it lasts."}
               </p>
             </>
           ) : (
             /*
-              Two different nothings, and they need different messages.
-              An empty calendar is a club that hasn't been set up. A calendar
-              that has RUN OUT is the quiet failure: somebody entered the year
-              in September, it expired in June, and from then on no check-in is
-              ever due again and the app just looks broken.
+              Two different nothings, and they need different messages. An empty
+              calendar is a club that hasn't been set up. A calendar that has RUN
+              OUT is the quieter failure: somebody entered the year in September
+              and it expired in June.
+
+              This used to be the one setup step with no other symptom, because
+              a missing calendar silently switched off every check-in in the club.
+              Check-ins went on 2026-08-24 so the stakes are lower now -- what it
+              costs is the club not knowing what period it is in, which shows up
+              here rather than nowhere.
             */
             <p className="text-warn-fg mt-3 flex items-start gap-2 text-[15px]">
               <TriangleAlert className="mt-1 size-4 shrink-0" />
               <span>
                 {calendarRunsOut
-                  ? "The calendar has run out — the last period ended before today, so no check-ins are being generated for anyone."
-                  : "No period covers today, so no check-ins are being generated."}{" "}
+                  ? "The calendar has run out — the last period ended before today, so the club has no idea what term it's in."
+                  : "No period covers today."}{" "}
                 {mayEditCalendar
                   ? "Add the quarters, finals weeks and breaks below."
                   : "A Co-Lead needs to add the academic calendar."}
@@ -474,9 +481,9 @@ export default async function SettingsPage() {
                           </Badge>
                           {isNow ? <Badge tone="cardinal">Now</Badge> : null}
                           {term.generatesObligations ? (
-                            <Badge tone="ok">Check-ins run</Badge>
+                            <Badge tone="ok">In session</Badge>
                           ) : (
-                            <Badge tone="neutral">Paused</Badge>
+                            <Badge tone="neutral">Out of session</Badge>
                           )}
                         </div>
                         <p className="text-ink-muted mt-1 text-sm">
@@ -493,8 +500,8 @@ export default async function SettingsPage() {
 
           {mayEditCalendar ? (
             <p className="text-ink-muted mt-4 text-sm">
-              This table is what stops finals week generating a wall of missed
-              check-ins for everyone. Keep it a year ahead.
+              This is the club&apos;s own year: which weeks are a quarter, which
+              are finals, and when everybody is away. Keep it a year ahead.
             </p>
           ) : null}
         </CardBody>
@@ -574,10 +581,10 @@ export default async function SettingsPage() {
             </div>
 
             <p className="text-ink-muted mt-4 text-sm">
-              Set an expiry only if the clearance really lapses. When it does,
-              it&apos;s cancelled and their Lead is told — no grace period,
-              because a lapsed clearance that still reads as valid is how
-              somebody gets hurt.
+              Set an expiry only if the clearance really lapses. When it does
+              it&apos;s cancelled outright and shows as expired to whoever
+              verifies it — no grace period, because a lapsed clearance that
+              still reads as valid is how somebody gets hurt.
             </p>
           </CardBody>
         </Card>

@@ -8,16 +8,21 @@
  * 1. **This is an adapter, not a second permission layer.** Every tool calls
  *    the same `lib/data/*` readers and the same `can.*` checks the website
  *    uses. There is no `globalRole ===` in this file and there never should
- *    be. `lib/permissions.ts` has 50+ tests on three inheritances that run in
- *    different directions; a second copy nobody tests — called by a model that
- *    will try every tool to see what sticks — is the worst place to duplicate
- *    that logic.
+ *    be. `lib/permissions.ts` has 50+ tests on the inheritances; a second copy
+ *    nobody tests — called by a model that will try every tool to see what
+ *    sticks — is the worst place to duplicate that logic.
  *
- * 2. **No tool returns another member's effort data.** No work log, no check-in
- *    contents, no reliability, no personal report. See the header of
- *    `lib/mcp/viewer.ts`: the MCP snapshot is loaded past RLS, so the privacy
- *    boundary is enforced by which tools EXIST rather than by a filter that
- *    could be wrong. Restricted questions answer "use the website".
+ * 2. **No tool returns another member's archived check-ins.** That is now the
+ *    ONLY private thing left about a member: everything else — work logs,
+ *    projects, both delivered counters — went public over 2026-08-16 and
+ *    2026-08-24. See the header of `lib/mcp/viewer.ts`: the MCP snapshot is
+ *    loaded past RLS, so the boundary is enforced by which tools EXIST rather
+ *    than by a filter that could be wrong.
+ *
+ *    Read that as a NARROWING of what this file has to defend, not a widening
+ *    of what it may return. The rule to keep is the shape: if something is
+ *    restricted on the website, there is no tool for it here, and the answer is
+ *    "use the website".
  *
  * 3. **Output is prose, not JSON.** A model reads `Wing Spar — blocked, due
  *    Fri, Tyler` far better than a nested object, and it costs a third of the
@@ -29,15 +34,22 @@
  * ---------------------------------------------------------------------------
  *
  * Anything destructive or identity-shaped: deleting projects or members,
- * archiving divisions, changing someone's role or Lead, editing club settings or
- * the academic calendar, removing people from projects, and withdrawing a
- * sign-off. Each is rare, hard to undo, and fine to do on a website twice a
- * term.
+ * archiving divisions, changing someone's role, editing club settings or the
+ * academic calendar, removing people from projects, assigning who verifies a
+ * training, and withdrawing a sign-off. Each is rare, hard to undo, and fine to
+ * do on a website twice a term.
  *
- * Submitting a check-in is absent for a different reason: the point of a
- * check-in is to prompt a conversation with your Lead, and one an assistant
- * wrote on your behalf is worse than none. Logging work IS here — that's
- * bookkeeping, and making it frictionless is the whole reason to have an MCP.
+ * Submitting a check-in used to be listed here for a different reason — the
+ * point of one was to prompt a conversation with your Lead, and one an assistant
+ * wrote for you was worse than none. Check-ins were removed entirely on
+ * 2026-08-24, so there is nothing to leave out.
+ *
+ * The reasoning did NOT expire, though, and it applies to `log_work`, which IS
+ * here. A log line is now the member's only report, so an assistant writing one
+ * carries the weight the check-in used to. It stays because logging is
+ * bookkeeping and making it frictionless is the whole reason to have an MCP —
+ * but the tool description tells the model to record what the member actually
+ * did rather than to compose something on their behalf.
  */
 
 import { getFindWork } from "@/lib/data/find-work";
@@ -195,7 +207,7 @@ function projectLine(p: {
  * nobody is ever going to ask "is my profile incomplete?" — it has to arrive
  * unbidden in something they already call. Discord first: it's how the club
  * actually reaches people, so an unconnected account misses every blocker
- * alert and check-in nudge the app sends.
+ * alert and digest the app sends.
  */
 function profileNudges(viewer: McpViewer): string[] {
   const m = viewer.member;
@@ -203,7 +215,7 @@ function profileNudges(viewer: McpViewer): string[] {
 
   if (!m.discordUserId) {
     todo.push(
-      "Connect Discord — it's how the club reaches you, and without it you miss blocker alerts and check-in reminders. `update_my_profile` can set it, or Settings on the website."
+      "Connect Discord — it's how the club reaches you, and without it you miss blocker alerts and the daily digest. `update_my_profile` can set it, or Settings on the website."
     );
   } else if (!m.discordVerifiedAt) {
     todo.push(
@@ -234,7 +246,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "guide",
     description:
-      "How SkyRunners works and how to drive it: the club's model (deliverables, REs, phase vs health, check-ins), who is allowed to do what, recipes for common jobs, and what needs the website. Read this before guessing — and use it to explain the app to the member too.",
+      "How SkyRunners works and how to drive it: the club's model (deliverables, REs, phase vs health, the work log), who is allowed to do what, recipes for common jobs, and what needs the website. Read this before guessing — and use it to explain the app to the member too.",
     inputSchema: schema({
       topic: {
         type: "string",
@@ -281,10 +293,15 @@ export const TOOLS: McpTool[] = [
       if (reOf.length) {
         lines.push(`RE of: ${reOf.map((p) => p.name).join(", ")}.`);
       }
+      /*
+        What they are accountable for, which since 2026-08-24 is only ever
+        projects. There was a "Lead to N people" line here, off
+        `profiles.lead_id`; nobody reports to anybody now.
+      */
       lines.push(
-        reports.length
-          ? `Lead to ${reports.length} ${reports.length === 1 ? "person" : "people"}: ${reports.map((r) => r.fullName).join(", ")}.`
-          : "You have no direct reports, so you have no check-ins to review and no leadership dashboard."
+        reOf.length || leads.length
+          ? "Your authority comes from those, not from your title — you can shape deliverables and sign work off on anything at or below them."
+          : "You are not an RE of anything, so you can log work and ask to join things, but you cannot sign anything off yet."
       );
 
       const todo = profileNudges(viewer);
@@ -593,7 +610,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "list_members",
     description:
-      "The club roster — names, emails, roles, divisions and skills. Public information only; this never returns anyone's work log, check-ins or reliability.",
+      "The club roster — names, emails, roles, divisions and skills. Use `get_member` for one person's record.",
     inputSchema: schema({ search: { type: "string" } }),
     async handler(args, _viewer) {
       const roster = await getRoster();
@@ -646,7 +663,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "get_member",
     description:
-      "One person's public record — the projects they're on, what they own on each, their skills and any RE roles. Never their work log, check-ins or reliability; those are website-only.",
+      "One person's record — the projects they're on, what they own on each, their skills and any RE roles. All public. Their archived check-ins are not available here; those are website-only.",
     inputSchema: schema({ member: { type: "string" } }, ["member"]),
     async handler(args) {
       const m = requireMember(str(args.member));
@@ -1144,7 +1161,7 @@ export const TOOLS: McpTool[] = [
     */
     name: "log_work",
     description:
-      "Record what you did on a project today. This is a diary entry, not a timesheet — there are no hours. The note is the whole point: 'ran the tensile coupons, two of five failed early' is what gets read. It also pre-fills that project's section of the member's next check-in, so a good note here means they write nothing later. Backdating is allowed up to 7 days.",
+      "Record what the member did on a project. A diary entry, not a timesheet — there are no hours. The note is the whole point: 'ran the tensile coupons, two of five failed early' is what gets read. Since 2026-08-24 this is the member's ONLY report — it lands in the project's public feed where its RE can reply — so record what they actually tell you they did rather than composing something plausible on their behalf. Backdating is allowed up to 7 days.",
     write: true,
     inputSchema: schema(
       {

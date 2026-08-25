@@ -1,5 +1,12 @@
 # Where the build actually is
 
+> **Partly superseded, 2026-08-24.** The club removed the reporting chain and
+> twice-weekly check-ins. Anything below about a member's Lead, reviewing
+> check-ins, roll-ups, reliability or the academic pause is a record of what was
+> planned, not of how the app works — kept because the reasoning behind each
+> decision is still worth reading. See `docs/REPORTING_REMOVAL_PLAN.md` and the
+> section in `CLAUDE.md` for what replaced it.
+
 **Updated 2026-08-07.** One page. If you read nothing else, read this.
 
 For the forward-looking roadmap see [`PHASE_PLAN.md`](PHASE_PLAN.md); for the *why* behind

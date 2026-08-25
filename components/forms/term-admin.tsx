@@ -105,9 +105,15 @@ function TermFields({ term, idPrefix }: { term?: Term; idPrefix: string }) {
 
       {/*
         The override is deliberately behind a checkbox rather than being a plain
-        third dropdown. "Does this generate check-ins" follows from the kind
-        99% of the time, and a field you have to set every time is a field that
-        eventually gets set wrong on a finals week.
+        third dropdown. "Is the club in session" follows from the kind 99% of the
+        time, and a field you have to set every time is a field that eventually
+        gets set wrong on a finals week.
+
+        The underlying column is still `generates_obligations`, named for the
+        check-ins it used to switch on. Kept rather than renamed: the obligations
+        are gone, the in-session/out-of-session distinction is real and still
+        drives what the app says about the current period, and a rename means a
+        migration for a column whose meaning is stated here.
       */}
       <label className="text-ink-soft mt-3 flex items-start gap-2 text-sm">
         <input
@@ -118,8 +124,8 @@ function TermFields({ term, idPrefix }: { term?: Term; idPrefix: string }) {
           id={`${idPrefix}-override`}
         />
         <span>
-          Override: check-ins {kind === "quarter" ? "do NOT" : "DO"} run during
-          this period.
+          Override: the club {kind === "quarter" ? "is NOT" : "IS"} in session
+          during this period.
         </span>
       </label>
 

@@ -149,16 +149,20 @@ the work, and the description is the whole point:
 > Log yesterday on the layup: vacuum-bagged the second coupon
 > Log misc: helped at the open build session, cable-managed the test stand
 
-**This is worth the ten seconds.** Each project's section of your next
-twice-weekly check-in arrives *pre-filled from these entries*, and the only box
-you have to write yourself is for a project you logged nothing against. So a
-member who logs as they go barely writes a check-in at all; a member who doesn't
-writes the whole thing from memory.
+**This is worth the ten seconds, and it got more important in August 2026.** The
+club dropped its twice-weekly check-in on the 24th. Your log line is now the only
+thing you report: it lands in the project's feed, its RE can read it and reply to
+it, and nothing else is collected from you.
 
 Which makes this a good standing instruction to give your assistant:
 
 > At the end of any session where we worked on club stuff, log it to SkyRunners
 > for me — one line per project, describing what actually changed.
+
+One caveat, and it's the reason there was never a tool for submitting a check-in:
+an assistant writing your report *for* you is worse than a short one you wrote.
+Have it record what you actually did, not a polished version of what it assumes
+you did.
 
 ---
 
@@ -199,19 +203,18 @@ and none of them is something you do more than a couple of times a term:
 - Withdrawing a sign-off
 - Uploading files (links work fine; uploads need the browser)
 
-Two more worth explaining:
+Also: assigning who verifies a training, or marking one self-verify.
 
-**Submitting a check-in.** The point of a check-in is to start a conversation
-with your Lead. One your assistant wrote for you is worse than not writing one,
-so it isn't offered.
+**One more worth explaining: reading anyone's archived check-ins but your own.**
+Almost everything about a member is public now — every log line, every project,
+what they finished — and there are tools for all of it. Old check-ins are the
+exception, because they carried a note written back when only one person was
+going to read it. The MCP doesn't expose them for anybody, at any role. Use the
+website, where you're properly signed in.
 
-Logging your *work* is fine, and is the single most useful thing to hand to an
-assistant — see the note below.
-
-**Reading anyone's work log or check-in contents but your own.** The club's
-privacy model says that record belongs to the member and their Lead chain. Rather
-than try to reproduce that rule out here, the MCP simply doesn't expose it — for
-anybody, at any role. Use the website, where you're properly signed in.
+*Submitting a check-in* was listed here for a long time, with the reasoning that
+one your assistant wrote for you was worse than not writing one. Check-ins are
+gone; the reasoning moved to logging work, above.
 
 Your assistant knows all of this and will tell you to open the site.
 

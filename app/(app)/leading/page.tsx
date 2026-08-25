@@ -93,34 +93,36 @@ export default async function LeadingPage() {
         <CardBody>
           <SectionLabel>Read this first</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
-            There are two hierarchies, and you are probably only in one of them
+            Authority comes from the project, not from your title
           </h2>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-tile border-line border px-4 py-3.5">
-              <Badge tone="cardinal">Lead</Badge>
-              <p className="text-ink mt-2 text-sm font-bold">
-                You look after PEOPLE
-              </p>
-              <p className="text-ink-soft mt-1 text-sm">
-                A set of named members report to you. You read their check-ins,
-                you know when they&apos;re stuck, and you&apos;re who they tell
-                when a quarter goes bad. Authority flows{" "}
-                <span className="text-ink font-semibold">up</span> the reporting
-                chain — your Lead oversees your people too.
-              </p>
-            </div>
-            <div className="rounded-tile border-line border px-4 py-3.5">
-              <Badge tone="neutral">RE</Badge>
+              <Badge tone="cardinal">RE</Badge>
               <p className="text-ink mt-2 text-sm font-bold">
                 You look after a PROJECT
               </p>
               <p className="text-ink-soft mt-1 text-sm">
                 You&apos;re accountable for one project&apos;s deliverables. You
-                decide who joins, you sign work off. Authority flows{" "}
+                decide who joins, you sign work off, you read its feed and
+                answer what people write in it. Authority flows{" "}
                 <span className="text-ink font-semibold">down</span> the project
                 tree — an RE of a parent covers everything beneath it, however
                 deep.
+              </p>
+            </div>
+            <div className="rounded-tile border-line border px-4 py-3.5">
+              <Badge tone="neutral">Team Lead</Badge>
+              <p className="text-ink mt-2 text-sm font-bold">
+                A title, plus whatever you&apos;re RE of
+              </p>
+              <p className="text-ink-soft mt-1 text-sm">
+                Being a Team Lead makes you findable — people know to ask you
+                about your area. It does not, by itself, give you authority over
+                anybody. If you lead a{" "}
+                <span className="text-ink font-semibold">division</span>,
+                that&apos;s different: it makes you a top RE over every project
+                inside it.
               </p>
             </div>
           </div>
@@ -128,24 +130,32 @@ export default async function LeadingPage() {
           <div className="rounded-tile bg-surface mt-4 px-4 py-3.5">
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">
-                They are not the same people, and neither implies the other.
+                Nobody reports to anybody, as of 2026-08-24.
               </span>{" "}
-              Somebody who reports to you may work entirely on projects you have
-              no say over. Somebody on your project may report to a Lead you
-              never speak to. That&apos;s deliberate — merging them rebuilds the
-              silos this app exists to remove, where the only person who knew
-              anything was whoever happened to run both.
+              There used to be a second hierarchy here: every member had a named
+              Lead who read their twice-weekly check-in. The club removed it.
+              Members report to their REs now, through the work they log on a
+              project — which is public, sits in that project&apos;s feed, and
+              can be replied to in place.
+            </p>
+            <p className="text-ink-soft mt-2 text-sm">
+              What that means for you in practice: if you want to know how
+              somebody is doing, open the project you share with them. If you
+              want somebody to be accountable for a piece of work, make them its
+              RE. There is no longer any other lever.
             </p>
           </div>
 
           <p className="text-ink-soft mt-4 text-[15px]">
             <span className="text-ink font-semibold">
-              A Division Lead is both.
+              A Division Lead is a top RE.
             </span>{" "}
-            Leading a division makes you a top RE over every project inside it,
-            at any depth — deliverables, sign-off, join requests, appointing
-            REs. Leading a sub-team gives you the same over that team&apos;s
-            work and nothing sideways.
+            Leading a division gives you RE powers over every project inside it,
+            at any depth — deliverables, sign-off, join requests, appointing REs
+            — without being named on each one. Leading a sub-team gives you the
+            same over that team&apos;s work and nothing sideways. This is the
+            one place a title still carries authority, and it is authority over
+            WORK.
           </p>
         </CardBody>
       </Card>
@@ -216,23 +226,20 @@ export default async function LeadingPage() {
               them and somebody outranks the person who shipped the airframe.
             </Rule>
             <Rule can title="Answer what people wrote about your project">
-              Per-project check-in entries are public, and you can reply to them
-              in place.
-            </Rule>
-            <Rule title="Read the personal report of somebody on your project">
-              You get the per-project half — what they said about <em>your</em>{" "}
-              project — and not their personal record or reliability. Those
-              belong to them and their Lead. Being on your project doesn&apos;t
-              make you responsible for the person.
+              Everything logged on your project is public and you can reply to
+              any line of it, in place. This is the whole reporting relationship
+              now, so it is worth actually doing: a reply is what tells somebody
+              their note was read.
             </Rule>
             <Rule title="Declare your own project finished">
               The RE above you, or the Division Lead, agrees it&apos;s done. Set
               the stage to flight test and tell them it&apos;s ready.
             </Rule>
             <Rule title="Leave a parent project as its last RE">
-              Everything underneath escalates through it. Name someone else
-              first — and if you take an academic pause while you&apos;re the
-              only one, your Lead is told so they can.
+              Everything underneath escalates through it, so name somebody else
+              first. The same applies if you&apos;re stepping back for a quarter
+              — hand it over rather than going quiet, because a project with an
+              absent sole RE blocks every sign-off beneath it.
             </Rule>
           </div>
         </CardBody>
@@ -250,7 +257,7 @@ export default async function LeadingPage() {
             They see everything and run nothing
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            A faculty or project advisor. They can read every project, check-in
+            A faculty or project advisor. They can read every project, work-log
             entry and ask on the board, comment on any of it, and turn up to any
             session. They hold no authority at all — that&apos;s the point, not
             a gap.
@@ -269,16 +276,9 @@ export default async function LeadingPage() {
               same problem will find it, rather than in a DM only you can read.
             </Rule>
             <Rule title="Give an advisor a deliverable">
-              There&apos;s nowhere to. They own no work, log nothing and file no
-              check-ins, so they appear in no staffing count and no contribution
-              record. A project with two engineers and a professor is a project
-              with two engineers.
-            </Rule>
-            <Rule title="Report to one, or have one report to you">
-              They sit outside the reporting chain entirely, in both directions.
-              Making somebody an advisor clears their reporting line — which is
-              why it&apos;s a Co-Lead&apos;s call on the roster, not something
-              done in passing.
+              There&apos;s nowhere to. They own no work and log nothing, so they
+              appear in no staffing count. A project with two engineers and a
+              professor is a project with two engineers.
             </Rule>
             <Rule title="Expect them to sign anything off">
               Approving work is an RE&apos;s job and stays one. An advisor
@@ -384,12 +384,13 @@ export default async function LeadingPage() {
           </h2>
 
           <div className="mt-4 space-y-2.5">
-            <Rule title="Read the personal report of somebody who doesn't report to you">
-              The personal record and reliability belong to the member and their
-              Lead chain. An RE gets the per-project half instead — what
-              somebody wrote about <em>their project</em>, which is public to
-              everyone. Reviewing is one named person&apos;s obligation, and
-              that&apos;s exactly what makes the escalation mean something.
+            <Rule title="Read somebody's old check-ins">
+              A member&apos;s archived check-ins are theirs and a
+              Co-Lead&apos;s. They carried a general note that was written when
+              only the member&apos;s Lead was going to read it, so publishing
+              them now would break a promise about words already typed.
+              Everything else about a member is public, including what they
+              logged on every project.
             </Rule>
             <Rule title="Mark a project complete when you're its RE">
               Finishing the work and agreeing it&apos;s finished are different
@@ -440,15 +441,20 @@ export default async function LeadingPage() {
                 because they&apos;re the history.
               </Rule>
               <Rule can title="The academic calendar">
-                Check-ins only generate inside a term you&apos;ve entered.{" "}
+                Terms drive what the app calls in-session, which is what dates
+                on the calendar are shown against.{" "}
                 <span className="text-ink font-semibold">
-                  If there isn&apos;t one, nobody is ever asked for a check-in
+                  It used to also decide whether check-ins generated at all
                 </span>{" "}
-                — it&apos;s the one setup step with no other symptom.
+                — that was the one setup step with no other symptom, and it
+                stops mattering now that nobody is asked for one.
               </Rule>
               <Rule can title="The trainings catalogue">
                 Sites and machines are data, not code — add one and it appears
-                for everyone with no deploy.
+                for everyone with no deploy. Each one is either assigned to a
+                named person who signs it off, or marked self-verify so members
+                tick it themselves. Somebody who still verifies a machine
+                can&apos;t be demoted or deactivated until it&apos;s reassigned.
               </Rule>
               <Rule can title="Roles, and deleting a broken profile">
                 You can&apos;t change your own role, and the last Co-Lead

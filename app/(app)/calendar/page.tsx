@@ -198,8 +198,9 @@ export default async function CalendarPage() {
       )}
 
       <p className="text-ink-muted px-1 text-sm">
-        Sessions keep running over breaks — the academic calendar pauses
-        check-ins, not the club.
+        Sessions keep running over breaks. The academic calendar says when the
+        club is formally in session; it never stops anybody putting work on
+        here.
       </p>
     </div>
   );

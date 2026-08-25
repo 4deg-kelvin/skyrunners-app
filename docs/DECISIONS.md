@@ -57,12 +57,13 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 | Activity visibility | **Public to all members** — projects, deliverables, who's on what, artifacts, calendar |
 | Engineering record | **Anyone committed to the project attaches; only an RE removes.** Links must be confirmed non-expiring, and provably temporary ones are refused outright |
 | Record on completion | **Frozen.** A complete project accepts new attachments but nothing can be edited or removed except by a Co-Lead |
-| Effort visibility | **Restricted** — hours and update contents visible to the member, their Lead chain, and REs of projects they contribute to |
-| Contribution tracking | **Four independent signals, no composite score:** deliverables done, hours/week tier, updates on time, roles held |
-| Score visibility | **Members see their own.** Weights and rubric published at `/how-we-lead`. No ranking exists |
-| Leadership rubric | Delivered work first, then sustained commitment, then reliability, then lifting others |
-| Update review | Ancestor REs up the project chain, plus the Lead chain |
-| Training verification | Member submits a request; direct Lead or Co-Lead verifies |
+| Effort visibility | ~~Restricted to the member, their Lead chain and REs~~ → **Public**, in two steps: work logs on 2026-08-16, everything else on 2026-08-24 |
+| Contribution tracking | ~~Four independent signals~~ → three (2026-08-14) → **two plain counts** (2026-08-24): deliverables finished, projects finished. Still no composite, still no ranking |
+| Score visibility | **Everyone sees everyone's.** Rubric published at `/how-we-lead`. No ranking exists |
+| Leadership rubric | Delivered work first, then sustained over a quarter, then visible (logged as you go), then lifting others |
+| Update review | ~~Ancestor REs plus the Lead chain~~ → **nobody reviews anything.** Check-ins removed 2026-08-24; an RE reads their project's feed |
+| Training verification | **Per item:** a named verifier signs it off, or it is marked self-verify. Unassigned falls back to any Lead. A named verifier cannot be demoted until reassigned |
+| Reporting chain | ~~Every member has a named Lead~~ → **removed 2026-08-24.** Members report to their REs through the work they log. `docs/REPORTING_REMOVAL_PLAN.md` |
 | RE liveness | Projects flagged when the primary RE goes quiet 14+ days, or a blocker sits 7+ days |
 | Calendar sync | **Opt-in only**, Google *and* Apple |
 | Local dev path | `C:\Users\anish\skyrunners\project_and_member_managment_website\skyrunners-app` |

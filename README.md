@@ -99,12 +99,13 @@ Reference, when you need it: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) ·
 
 Full list in [`CLAUDE.md`](CLAUDE.md); these are the ones that cost the most time.
 
-- **Two hierarchies run in opposite directions.** RE authority inherits *down* the project
-  tree; Lead authority inherits *up* the reporting chain. Never check `globalRole` inline —
-  go through `lib/permissions.ts`.
-- **A check-in has a public half and a private half.** Per-project content belongs to the
-  project and everyone sees it. The personal report, total hours and reliability are
-  visible only to the member and their Lead chain.
+- **All authority comes from being an RE, and it inherits *down* the project tree.**
+  Leading a division makes you a top RE inside it. Nobody reports to anybody — the
+  reporting chain was removed on 2026-08-24. Never check `globalRole` inline; go through
+  `lib/permissions.ts`.
+- **Everything about a member is public**, except archived check-ins from before that
+  date, which are theirs and a Co-Lead's. Every log line, project, deliverable and both
+  delivered counters are open to the club, on purpose.
 - **Pages never import `lib/mock-data`.** They go through `lib/data/*`. ESLint enforces it,
   and that boundary is the entire reason swapping in Postgres won't touch a single page.
 

@@ -70,7 +70,6 @@ export default async function MembersPage() {
             {roster.map(
               ({
                 member,
-                lead,
                 leads,
                 committedCount,
                 reCount,
@@ -195,11 +194,6 @@ export default async function MembersPage() {
                             </span>
                           ) : null}
                         </p>
-                        {lead ? (
-                          <p className="text-ink-muted">
-                            Reports to {lead.fullName}
-                          </p>
-                        ) : null}
                       </div>
 
                       <div className="mt-3">

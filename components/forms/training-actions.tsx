@@ -85,7 +85,8 @@ export function RequestTrainingForm({
       </div>
 
       <p className="text-ink-muted mt-2 mb-2.5 text-xs">
-        Your Lead confirms it — nobody verifies their own training.
+        Whoever verifies this one confirms it — and it&apos;s never you, unless
+        it&apos;s marked self-verify.
       </p>
 
       <button
@@ -309,7 +310,8 @@ export function AddCatalogueItemForm({
         Appears on everyone&apos;s list immediately, unearned. Site access is a
         door; a machine training is clearance on one machine inside it, and
         neither implies the other. Set an expiry only if the clearance really
-        lapses — when it does, it&apos;s cancelled and their Lead is told.
+        lapses — when it does, it&apos;s cancelled and shows up as expired for
+        whoever verifies it.
       </p>
 
       <button

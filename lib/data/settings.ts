@@ -1,30 +1,21 @@
 /**
- * A member's own settings: update schedule and academic pause.
+ * A member's own settings.
  *
- * PHASE 1b: these become one select and one update against `update_schedules`.
+ * Was "update schedule and academic pause", which was most of the page until
+ * 2026-08-24. Both went with check-ins. What is left is the profile, the AI
+ * connection, the calendar feed, and — for a Co-Lead — the academic calendar and
+ * the trainings catalogue.
  */
 
-import {
-  clubIdentity,
-  getMember,
-  scheduleFor,
-  today,
-  termFor,
-} from "@/lib/mock-data";
+import { clubIdentity, getMember, today, termFor } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
 import { emptyProjectsByCreator } from "@/lib/store/operations";
 import { feedEventsFor } from "@/lib/calendar/window";
-import { UPDATES_PER_WEEK_DEFAULT, type Member, type Term } from "@/lib/types";
+import type { Member, Term } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 
 export interface SettingsView {
   member: Member;
-  schedule: {
-    updatesPerWeek: number;
-    weekdays: number[];
-    dueTime: string;
-    pausedUntil?: string;
-  };
   /** Where we are in the academic year right now. */
   currentTerm?: Term;
   /**
@@ -64,7 +55,6 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
   const member = getMember(memberId);
   if (!member) throw new Error(`Member not found: ${memberId}`);
 
-  const schedule = scheduleFor(memberId);
   const currentTerm = termFor(today());
 
   const terms = [...readStore().terms].sort((a, b) =>
@@ -73,12 +63,6 @@ export async function getSettings(memberId: string): Promise<SettingsView> {
 
   return {
     member,
-    schedule: {
-      updatesPerWeek: schedule?.updatesPerWeek ?? UPDATES_PER_WEEK_DEFAULT,
-      weekdays: schedule?.weekdays ?? [1, 4],
-      dueTime: schedule?.dueTime ?? "23:59",
-      pausedUntil: schedule?.pausedUntil,
-    },
     currentTerm,
     inSession: currentTerm?.generatesObligations ?? false,
     terms,

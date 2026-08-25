@@ -38,7 +38,6 @@ import { preloadLiveStore } from "@/lib/store/request";
 
 export interface RosterRow {
   member: Member;
-  lead?: Member;
   /**
    * Units this person leads, nearest-to-the-top first.
    *
@@ -120,7 +119,6 @@ export async function getRoster(): Promise<RosterRow[]> {
 
       return {
         member,
-        lead: member.leadId ? getMember(member.leadId) : undefined,
         leads: teamsLedBy(member.id),
         committedCount: committedProjectCount(member.id),
         reCount: mine.filter((p) => p.role === "re").length,

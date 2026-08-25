@@ -20,7 +20,6 @@ import {
   deliverables as seedDeliverables,
   joinRequests as seedJoinRequests,
   progressUpdates as seedProgressUpdates,
-  updateSchedules as seedUpdateSchedules,
   projectMemberships as seedMemberships,
   workLogs as seedWorkLogs,
   seedTrainingSections,
@@ -49,7 +48,6 @@ import type {
   ProjectDeadlineChange,
   ProjectNotice,
   TrainingSection,
-  UpdateSchedule,
   WorkLog,
 } from "../types.ts";
 
@@ -105,8 +103,6 @@ export interface StoreShape {
   projectMemberships: ProjectMembership[];
   joinRequests: JoinRequest[];
   progressUpdates: ProgressUpdate[];
-  /** Which weekdays each member checks in on, and any academic pause. */
-  updateSchedules: UpdateSchedule[];
   /**
    * The remaining collections. Everything the app reads now lives here, so the
    * Postgres backend is a straight table-per-collection mapping rather than a
@@ -197,7 +193,6 @@ function seed(): StoreShape {
     projectMemberships: seedMemberships,
     joinRequests: seedJoinRequests,
     progressUpdates: seedProgressUpdates,
-    updateSchedules: seedUpdateSchedules,
     teams: seedTeams,
     terms: seedTerms,
     events: seedEvents,

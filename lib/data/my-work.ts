@@ -103,7 +103,6 @@ export interface MyWorkView {
    * Who reads this person's check-ins. Undefined for a Co-Lead, who has nobody
    * above them — the UI says so rather than promising a Lead who doesn't exist.
    */
-  lead?: Member;
   /**
    * Today, and how far back hours may be dated.
    *
@@ -230,7 +229,6 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
 
   return {
     me,
-    lead: me.leadId ? getMember(me.leadId) : undefined,
     today: today(),
     maxBackdateDays: MAX_BACKDATE_DAYS,
     committed,

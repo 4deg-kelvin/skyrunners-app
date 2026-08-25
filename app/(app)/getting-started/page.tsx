@@ -48,10 +48,14 @@ export const metadata = {
  * The order is the argument
  * ---------------------------------------------------------------------------
  *
- * The work log and check-ins come first, ahead of even finding work, because
- * they're the two things the app asks a member to DO that nothing else in their
- * life has taught them. Everything after that is either self-evident (browse
- * projects) or only matters once they're on something.
+ * The work log comes first, ahead of even finding work, because it is the one
+ * thing the app asks a member to DO that nothing else in their life has taught
+ * them. Everything after that is either self-evident (browse projects) or only
+ * matters once they're on something.
+ *
+ * It used to be two things — the log and the twice-weekly check-in. The club
+ * dropped check-ins on 2026-08-24, and the log inherited the whole job: it IS
+ * how a member reports now, which makes it more important rather than less.
  *
  * Written in second person and in the club's actual language — "RE", "Lead",
  * "deliverable" — with each term explained the first time. A glossary at the
@@ -216,10 +220,10 @@ export default async function GettingStartedPage() {
       </div>
 
       {/* ------------------------------------------------------------------
-          1. The work log. First because it's the smallest habit and the one the
-          rest of the app is built on: the twice-weekly check-in drafts itself
-          from these entries, so a member who logs as they go writes almost
-          nothing later, and one who doesn't writes the whole thing by hand.
+          1. The work log. First because it's the smallest habit and, since
+          2026-08-24, the ONLY thing the app asks a member to write. It used to
+          feed a twice-weekly check-in; now it goes straight into the project's
+          feed where the RE reads it and can reply in place.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
@@ -255,8 +259,8 @@ export default async function GettingStartedPage() {
             <div className="rounded-tile border-line border px-4 py-3.5">
               <p className="text-ink text-sm font-bold">Got it wrong?</p>
               <p className="text-ink-soft mt-1 text-sm">
-                Recent entries are listed under the form and you can delete
-                them, right up until a check-in has reported them.
+                Recent entries are listed under the form and you can delete them
+                for a week, in case you logged the wrong project.
               </p>
             </div>
           </div>
@@ -265,68 +269,71 @@ export default async function GettingStartedPage() {
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">Why it matters:</span>{" "}
               it&apos;s how anyone else knows what is happening on your project
-              — your RE, your Lead, and a Division Lead two levels up who
-              otherwise cannot see inside it. It is also your track record when
-              leadership is picking people they don&apos;t work beside every
-              week. Nobody is ranked against anybody else.
+              — your RE, and a Division Lead two levels up who otherwise cannot
+              see inside it. This is the whole reporting relationship: there is
+              no separate report to file, and no Lead collecting one. It is also
+              your track record when leadership is picking people they
+              don&apos;t work beside every week. Nobody is ranked against
+              anybody else.
             </p>
           </div>
         </CardBody>
       </Card>
 
       {/* ------------------------------------------------------------------
-          2. Check-ins. The obligation people are most likely to
-          misunderstand as a status report to management.
+          2. Who you tell. The thing people misunderstand most, and now the
+          thing most likely to surprise somebody who was here before
+          2026-08-24: there is no Lead collecting a report.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
           <SectionLabel>Second thing</SectionLabel>
           <h2 className="text-ink mt-2 flex items-center gap-2.5 text-2xl font-bold">
             <PenLine className="text-cardinal-600 size-6" strokeWidth={2.5} />
-            Write a check-in twice a week
+            You report to your REs, and only through the log
           </h2>
 
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Two short updates a week, on{" "}
-            <Link
-              href="/settings"
-              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-            >
-              days you choose
-            </Link>
-            . You get a box per project you&apos;re on, already written from
-            your work log — edit what needs it and send. The only box you have
-            to fill in yourself is for a project you logged nothing against, and
-            &ldquo;blocked&rdquo; or &ldquo;no time this week&rdquo; is a real
-            answer.
+            Nobody has a Lead who collects a weekly report. Each project has one
+            or more{" "}
+            <span className="text-ink font-semibold">
+              Responsible Engineers
+            </span>{" "}
+            who are accountable for it finishing, and what you log lands in that
+            project&apos;s feed where they — and everyone else — can read it and
+            reply. That is the whole thing. There is nothing else to file.
           </p>
 
           <div className="mt-4 space-y-2.5">
             <div className="rounded-tile border-line border px-4 py-3.5">
               <p className="text-ink text-sm font-bold">
-                It&apos;s a conversation starter, not a report
+                &ldquo;I&apos;m stuck&rdquo; is the most useful thing you can
+                log
               </p>
               <p className="text-ink-soft mt-1 text-sm">
-                One named person — your Lead — reads it, so they know where to
-                help before you have to ask. Nobody grades it.
+                You do not need to have made progress to write a line. Blocked,
+                waiting on a part, buried in midterms — that&apos;s the entry
+                worth reading, and it&apos;s the one that gets you unblocked.
+                Nobody grades any of it.
               </p>
             </div>
             <div className="rounded-tile border-line border px-4 py-3.5">
               <p className="text-ink text-sm font-bold">
-                The best check-in is often &ldquo;I&apos;m stuck&rdquo;
+                Something actually blocking you? Say it on the deliverable
               </p>
               <p className="text-ink-soft mt-1 text-sm">
-                You do not need to have made progress to write one. Blocked,
-                waiting on a part, buried in midterms — that&apos;s the update
-                worth reading, and it&apos;s the one that gets you unblocked.
+                Marking a deliverable blocked needs a note, and that note is
+                messaged to whoever has to clear it. Use it — a blocker sitting
+                quietly in a log line is a blocker nobody is chasing.
               </p>
             </div>
             <div className="rounded-tile border-line border px-4 py-3.5">
-              <p className="text-ink text-sm font-bold">Midterms? Pause it</p>
+              <p className="text-ink text-sm font-bold">Midterms happen</p>
               <p className="text-ink-soft mt-1 text-sm">
-                Set an academic pause in Settings. Nothing counts against you
-                while it&apos;s on and there&apos;s no backlog waiting. We would
-                much rather you pause than disappear.
+                Nothing accrues against you — there is no report to miss and no
+                backlog to come back to. If a quarter goes badly, tell the RE of
+                whatever you&apos;re holding so somebody can pick it up. We
+                would much rather you hand something over than disappear.
               </p>
             </div>
           </div>
@@ -446,13 +453,19 @@ export default async function GettingStartedPage() {
               href="/how-we-lead"
               linkLabel="How we work"
             >
-              Your projects, what you own, and what you wrote about each project
-              are <span className="text-ink font-semibold">public</span> —
-              that&apos;s the project&apos;s history, and how somebody spots a
-              blocker they could clear. Your{" "}
-              <span className="text-ink font-semibold">reliability</span> and
-              personal record stay between you and your Lead. The rubric itself
-              is published in full.
+              Everything: your projects, what you own, every line you log, and
+              how many deliverables and projects you&apos;ve finished. That is
+              the project&apos;s history, and it&apos;s how somebody spots a
+              blocker they could clear.
+              <br />
+              <br />
+              There is no private half any more —{" "}
+              <span className="text-ink font-semibold">
+                no reliability score, no ranking, no hidden record
+              </span>
+              . The one exception is old check-ins from before 2026-08-24, which
+              stay with you and the Co-Leads because they were written when only
+              one person was going to read them.
             </Guide>
           </div>
         </CardBody>
@@ -462,16 +475,15 @@ export default async function GettingStartedPage() {
         <CardBody>
           <SectionLabel>The short version</SectionLabel>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Log a line about what you did. Check in twice a week — mostly just
-            confirming what the log already says. Ask to join anything that
+            Log a line about what you did, as you go. Ask to join anything that
             looks interesting. Say when you&apos;re stuck, early. That&apos;s
-            the whole thing: about fifteen minutes a week.
+            the whole thing, and it&apos;s about five minutes a week.
           </p>
           <p className="text-ink-muted mt-3 text-sm">
-            Your profile shows deliverables finished, check-ins on time, and the
-            roles you hold. No hours, no tier, no score. Nobody is ranked
-            against anybody else, and there is no leaderboard anywhere in this
-            app.
+            Your profile shows deliverables finished and projects finished. No
+            hours, no tier, no score, no reliability percentage. Nobody is
+            ranked against anybody else, and there is no leaderboard anywhere in
+            this app.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link

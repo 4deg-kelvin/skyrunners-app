@@ -583,28 +583,22 @@ export interface WorkLog {
 }
 
 // ---------------------------------------------------------------------------
-// Updates — twice a week by default, on member-chosen weekdays
+// Updates — an ARCHIVE since 2026-08-24
 // ---------------------------------------------------------------------------
+//
+// The club stopped asking for check-ins, so nothing new is ever written here.
+// The types stay because the ROWS stay: `progress_updates` and `update_entries`
+// hold what people already wrote, the per-project half is public and part of
+// each project's feed, and the envelope still renders on a member's profile.
+//
+// `UpdateSchedule` and `UPDATES_PER_WEEK_DEFAULT` were here and are gone. The
+// `update_schedules` table stays in Postgres with a comment -- the club's
+// decision could be revisited and a dropped table cannot be un-dropped -- but
+// nothing loads it, so it is out of the per-request snapshot. See
+// `lib/store/mapping.ts`.
 
 export type UpdateStatus =
   "pending" | "submitted" | "late" | "missed" | "reviewed";
-
-/** Club-wide default. Members pick which weekdays. */
-export const UPDATES_PER_WEEK_DEFAULT = 2;
-
-export interface UpdateSchedule {
-  memberId: string;
-  /** 0 = Sunday. Length should match `updatesPerWeek`. */
-  weekdays: number[];
-  updatesPerWeek: number;
-  dueTime: string;
-  /**
-   * Academic pause. Suppresses obligations AND nudges, and generates no
-   * `missed` rows — a lapse is a pause, never a debt. Someone who drifts during
-   * midterms has to be able to come back without facing a record of failure.
-   */
-  pausedUntil?: string;
-}
 
 // ---------------------------------------------------------------------------
 // Academic calendar

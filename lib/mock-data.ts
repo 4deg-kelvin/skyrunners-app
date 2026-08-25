@@ -9,7 +9,6 @@
 import {
   JOIN_REQUEST_STALE_DAYS,
   RE_SILENT_DAYS,
-  UPDATES_PER_WEEK_DEFAULT,
   type CatalogueItem,
   type CatalogueItemKind,
   type ClubEvent,
@@ -26,7 +25,6 @@ import {
   type ProgressUpdate,
   type Team,
   type Term,
-  type UpdateSchedule,
   type WorkLog,
 } from "./types.ts";
 import { type DeliveredInputs } from "./delivered.ts";
@@ -2957,72 +2955,6 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
 // Contribution inputs
 // ---------------------------------------------------------------------------
 
-/** Update schedules. Two per week, on days each member picks. */
-export const updateSchedules = members.map((m) => ({
-  memberId: m.id,
-  weekdays: [1, 4], // Monday and Thursday by default
-  updatesPerWeek: UPDATES_PER_WEEK_DEFAULT,
-  dueTime: "23:59",
-  pausedUntil: undefined as string | undefined,
-}));
-
-export function scheduleFor(memberId: string): UpdateSchedule {
-  // From the store, not the seed array — a member invited through the app has a
-  // schedule row there and none in the literals above.
-  const found = live().updateSchedules.find((s) => s.memberId === memberId);
-  if (found) return found;
-
-  // Anyone created outside the invite flow — the bootstrap Co-Lead in migration
-  // 0006, say — has no row yet. Return a sensible default rather than
-  // undefined, or Settings renders nothing and they can never pick their days.
-  return {
-    memberId,
-    weekdays: [2, 5],
-    updatesPerWeek: UPDATES_PER_WEEK_DEFAULT,
-    dueTime: "23:59",
-  };
-}
-
-/**
- * The check-in a member currently owes.
- *
- * Was a single hardcoded object keyed to `CURRENT_USER_ID`, which in live mode
- * would have shown one person's draft to everybody.
- */
-export function currentUpdateFor(memberId: string): ProgressUpdate {
-  const mine = live().progressUpdates.filter((u) => u.memberId === memberId);
-
-  const open = mine
-    .filter((u) => u.status === "pending" || u.status === "late")
-    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
-  if (open) return open;
-
-  const latest = [...mine].sort((a, b) => b.dueAt.localeCompare(a.dueAt))[0];
-  if (latest) return latest;
-
-  /*
-    Nothing on record — a brand-new member, or a clean database.
-
-    Synthesise a pending obligation so My Work renders and the composer has
-    somewhere to write. But ONLY in session: outside a quarter this is the line
-    that would invent a check-in obligation over winter break, for every member
-    with no history, on a day the club has explicitly paused. The terms table
-    exists to prevent exactly that, and it can't if the fallback ignores it.
-
-    Out of session the obligation is `reviewed` rather than `pending`: it's a
-    placeholder the UI can render, and nothing about it is owed.
-  */
-  const dueToday = inSession(today());
-
-  return {
-    id: `pending-${memberId}`,
-    memberId,
-    dueAt: `${today()}T23:59`,
-    status: dueToday ? "pending" : "reviewed",
-    entries: [],
-  };
-}
-
 /**
  * The two counts on a member's profile: deliverables and projects finished.
  *
@@ -3391,11 +3323,6 @@ export function allWorkLogsFor(memberId: string) {
     .sort(
       (a, b) => b.workDate.localeCompare(a.workDate) || b.id.localeCompare(a.id)
     );
-}
-
-/** Every check-in row on record for one member, for the period calculation. */
-export function updatesFor(memberId: string) {
-  return live().progressUpdates.filter((u) => u.memberId === memberId);
 }
 
 export function recentWorkLogs(memberId: string, days = 14) {

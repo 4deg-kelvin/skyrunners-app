@@ -23,6 +23,7 @@ those three.
 | `docs/INFRA.md` | **Everything server/database/deploy — the doc for Kelvin and his agent** |
 | `docs/PROJECT_PLAN.md` | Vision, stack rationale, roles, permissions, feature detail |
 | `docs/PRODUCT_REVIEW.md` | Independent critique of the org design, and what changed because of it |
+| `docs/REPORTING_REMOVAL_PLAN.md` | **Why nobody reports to anybody. Read before touching permissions** |
 | `docs/DATA_MODEL.md` | Postgres schema, invariants, views |
 | `docs/DESIGN_SYSTEM.md` | Visual language, tokens, component rules |
 | `docs/DECISIONS.md` | Locked decisions, infrastructure notes |
@@ -85,11 +86,10 @@ server alone.
 
 ## Current state
 
-**Phases 0–8 are built and live on Supabase**, migrations `0001`–`0019` applied. Members
-find work, ask to join, log what they did and mark work done; REs assign, sign off and manage
-their roster; Leads get a scoped review queue with escalation; there's a calendar, a
-trainings/facility-access catalogue, an academic-term editor, division archiving, and a
-help-wanted board on Find Work.
+**Phases 0–8 are built and live on Supabase.** Members find work, ask to join, log what
+they did and mark work done; REs assign, sign off, manage their roster and get a scoped
+queue of what they owe; there's a calendar, a trainings/facility-access catalogue, an
+academic-term editor, division archiving, and a help-wanted board on Find Work.
 
 `docs/HANDOFF.md` is the entry point for a fresh session — current state, the ten bugs
 that cost the most time, and what's next. **Read it before debugging anything.**
@@ -128,8 +128,10 @@ app/
     members/        roster and profiles — trainings live on the profile
     calendar/       sessions, meetings, 1:1s and deadlines
     settings/       your own, plus the Co-Lead academic calendar + catalogue
-    dashboard/      leadership only, scoped to who you oversee
+    dashboard/      REs only, scoped to the projects you're accountable for
 ```
+
+`/updates` was here and is gone (2026-08-24). It was the check-in page.
 
 **Six nav items, and that's a ceiling worth keeping.** It briefly hit eight —
 `/blockers`, `/deadlines` and `/trainings` were each a real feature given a
@@ -143,8 +145,8 @@ The `(app)` group exists because if the root layout resolved the viewer, `/login
 render inside a layout that redirects unauthenticated visitors to `/login` — an infinite
 loop. Parentheses affect layout nesting, not URLs.
 
-`/` redirects to `/my-work`. Members land on their own projects and the update they owe;
-the dashboard is the leadership view and is hidden from plain members in the nav.
+`/` redirects to `/my-work`. Members land on their own projects and deliverables; the
+dashboard is the RE view and is hidden in the nav from anyone who is RE of nothing.
 
 ## Architecture: the two boundaries that matter
 
@@ -161,18 +163,24 @@ a render loop: harmless against arrays, a round trip per row against Postgres.
 
 ### 2. `lib/permissions.ts` is the only place that decides who can do what
 
-Never check `globalRole` inline. The whole model is four questions:
+Never check `globalRole` inline. The whole model is three questions:
 
 1. Are you a Co-Lead? → anything
 2. Are you an RE of this project **or any above it**, or do you **lead a team that owns
    any of them**? → you own this subtree
-3. Are you this member's Lead, **directly or anywhere up their chain**? → you oversee them
-4. Is it your own data? → you can manage it
+3. Is it your own data? → you can manage it
 
-**Three inheritances, and they run in different directions:** RE authority flows **down**
-the project tree, Lead authority flows **up** the reporting chain, and team-lead authority
-flows **down** the org tree and then down the project tree. That asymmetry is where bugs
-hide, which is why there are 50+ tests on it.
+There was a fourth — "are you this member's Lead, directly or anywhere up their chain?" —
+and it went with the reporting chain on 2026-08-24 along with `isLeadOfOrAbove` and
+`leadChain`. **Do not reintroduce a person-to-person authority check.** If a feature needs
+"somebody is accountable for this member", the answer is the RE of the project the work is
+on. `lib/permissions.test.ts` has a structural test asserting the five deleted rule names
+stay absent.
+
+**Two inheritances, and both run down:** RE authority flows **down** the project tree, and
+team-lead authority flows **down** the org tree and then down the project tree. The one
+that flowed **up** — Lead authority over people — is the one that went. That asymmetry
+used to be where bugs hid, which is why there are 50+ tests on it.
 
 **Approving is a narrower right than doing.** `isREaboveProject` is
 `isREofOrAbove` minus the project's own RE, and exactly two rules use it:
@@ -188,17 +196,18 @@ division gives RE powers — deliverables, sign-off, join requests, appointing R
 every project inside it, at any depth, including sub-projects that carry no `teamId` of
 their own. A sub-team lead gets the same over their own team's subtree and nothing
 sideways. It is deliberately **not** Co-Lead: a Division Lead still cannot read a
-member's personal report unless they're in that person's Lead chain.
+member's archived check-ins, and cannot configure the club.
 
 Depth is unbounded in both trees and always has been — an RE four projects up really does
-own everything beneath them. `projectChain`, `teamChain` and `leadChain` are all
-cycle-guarded, because `parent_id` / `lead_id` are plain columns and a loop would hang the
-request rather than fail it.
+own everything beneath them. `projectChain` and `teamChain` are both cycle-guarded, because
+`parent_id` / `lead_id` are plain columns and a loop would hang the request rather than
+fail it. (`leadChain` was a third, over `profiles.lead_id`, and went with the reporting
+chain.)
 
 Pages get `{ actor, graph, member }` from `getViewer()` and call `can.*`.
 
 **`OrgGraph`'s four lookups are synchronous, and that's load-bearing.** They're called in
-loops while walking all three trees, so they must never each become a query.
+loops while walking both trees, so they must never each become a query.
 `lib/data/graph.ts` loads every profile, project, RE membership and team in four parallel
 queries and closes over Maps. Backing them with per-call queries turns one permission
 check into fifty.
@@ -235,23 +244,17 @@ signal, `getClubTiers`, `TierAdminForm` and `WorkLog.hours` are all deleted.
 it used to be an optional field beside a required number. That inversion is the
 whole point, so don't soften it to make logging faster.
 
-Two behaviours depend on it, and they're the reason the removal added something
-rather than only taking things away:
+The log renders grouped by day on My Work, with the weekday in the heading. It
+also went public on 2026-08-16 and, since 2026-08-24, it **is** how a member
+reports — there is nothing else to file. See the next section.
 
-- **The check-in drafts itself.** Each project's section is pre-filled from that
-  project's log entries since the member's last *submitted* check-in. The only
-  box they must write is for a project they logged nothing against.
-  `lib/checkin-draft.ts` is a pure module and is called by BOTH the composer
-  (`lib/data/my-work.ts`) and `submitCheckIn` — if those two ever disagree, the
-  form demands a box the server accepts, or accepts one it refuses with a reason
-  the page never showed.
-- **Day by day.** The log renders grouped by day on My Work, with the weekday in
-  the heading.
+There was a second behaviour here: the twice-weekly check-in drafted itself from
+these entries, via `lib/checkin-draft.ts`. Both are gone.
 
-**Don't reintroduce a duration in any unit**, and don't add a fourth contribution
-signal built on volume of anything — days logged, entries written, sessions
-attended. Each is the same inflatable signal in new clothes.
-`lib/contribution.test.ts` has a test that fails on those field names.
+**Don't reintroduce a duration in any unit**, and don't add a counter built on
+volume of anything — days logged, entries written, sessions attended. Each is
+the same inflatable signal in new clothes. `lib/delivered.test.ts` has a test
+that fails on those field names, and it has now survived two removals.
 
 Historical hours are **still in Postgres** and simply unselected: `work_logs.hours`,
 `update_entries.hours`, `progress_updates.hours_this_period` and the four
@@ -264,43 +267,99 @@ weeks — a rolling average. Stopping collection while keeping the ladder would
 have decayed every member's tier toward the bottom rung over the following
 weeks, on their own profile, with no new data causing it.
 
-## There is no engagement score
+## Nobody reports to anybody. Check-ins are gone. (Done 2026-08-24)
 
-`lib/contribution.ts` reports **three independent signals** and deliberately computes no
-composite number.
+The club decided **members report to their REs, through the work they log on a
+project** — which is public, lands in that project's feed, and can be replied to
+in place. `docs/REPORTING_REMOVAL_PLAN.md` is the plan it followed and holds the
+reasoning for every decision below.
 
-| Signal | Notes |
-|---|---|
-| **Delivered** | Deliverables and projects completed. **Primary** — can't be inflated |
-| **Reliability** | Updates on time |
-| **Scope** | RE roles held. Reported, **never blended in** |
+What went, in one list: the check-in composer, `/updates`, the reminder cron, the
+auto-draft, the Settings check-in-days card, the academic pause, the
+review/escalation module, `isLeadOfOrAbove`, `leadChain`, `reassignLead`,
+`reviewUpdate`, `viewMemberEffort`, `viewMemberContribution`, `submitRollup`,
+`lib/contribution.ts`, the `ContributionPanel`, and five of the dashboard's
+thirteen sections. About 6,000 lines.
+
+**Co-Lead, Team Lead and Member are still real titles, but symbolic.** Authority
+comes from being an RE. The one exception is a **Division Lead**, who is a top RE
+over their whole division — that is `leadsTeamAbove`, it survives deliberately,
+and it is authority over WORK rather than over people.
+
+Three things replaced what was removed:
+
+- **`lib/quiet.ts`** — per-PROJECT "gone quiet": nothing logged in three weeks
+  while open work remains, on the RE's dashboard. This is the one thing the
+  removal ADDED, and it is the mitigation for its real cost: the chain's actual
+  function was that somebody was *named* as responsible for noticing silence.
+  Three weeks, not one — one week fires on half the club every finals week and
+  teaches an RE to skip the panel. **Never add a per-person breakdown**; the work
+  logs carry `memberId` so it is two lines, and it rebuilds the thing the club
+  removed.
+- **`lib/delivered.ts`** — two counts on a profile, replacing the three-signal
+  record. See the next section.
+- **Per-item training verifiers** — `lib/trainings/verifiers.ts`. See #9 below.
+
+**Nothing about a member is private any more, with one exception.** A check-in
+carried a `generalNote` written under a stated promise that only the member and
+their Lead chain would read it, so `can.readArchivedCheckIns` narrowed to the
+member plus Co-Leads rather than opening. Publishing what people already typed is
+the one privacy change that changing it back cannot undo. Everything else — every
+log line, every deliverable, both counters — is public.
+
+`profiles.lead_id`, `progress_updates.lead_id_at_submission` and the whole
+`update_schedules` table are **still in Postgres** with comments, unselected.
+Same reasoning as the hours: the decision to stop is a club decision that could
+be revisited, and a dropped column can't be un-dropped. **`teams.lead_id`
+STAYS LIVE** — it feeds `leadsTeamAbove`.
+
+## Two counters, not an engagement score
+
+`lib/delivered.ts` reports **two counts** — deliverables completed and projects
+completed — and computes no composite, no rate and no rank. They sit in the side
+column of a member's profile next to the other details, deliberately not in a
+panel: the club's decision was that this should be available, not central.
+
+It replaced `lib/contribution.ts`, which reported three independent signals and
+also refused to combine them. That rule held; what did not survive was
+**Reliability**, which measured check-ins filed on time. The club deleted it
+rather than redefining it. **Scope** — RE roles held — went too: it required
+having already been appointed, so it measured having already been chosen.
 
 Rules that must not regress:
 
-- **A component with no data returns `null`, never `0`.** The old score returned 0 for "no
-  tasks assigned" but 1 for "no updates due", which made a reliable contributor score 50
-  while a member on leave scored 45.
-- **Never blend Scope into an overall judgment.** It requires already having been appointed,
-  so it would make the metric measure having already been chosen.
-- **Members always see their own record.** The rubric is published at `/how-we-lead`.
+- **Never add a rate.** A percentage needs a denominator and every candidate here
+  is a judgment: deliverables assigned depends on how finely an RE splits work,
+  projects joined depends on who invited you.
+- **Never add a third count built on volume.** See the note above.
 - **Never add a ranking function.** The data supports one; it's absent on purpose.
+- The rubric is published at `/how-we-lead`, from `lib/rubric.ts`.
 
-## Updates are per-project, not one blob
+## Updates are an ARCHIVE, and were per-project not one blob
 
-`progress_updates` is an envelope (who, when, status). Content lives in **`update_entries`**
-— one row per project, each with its own progress, blockers and next steps.
+`progress_updates` is an envelope (who, when, status); content lives in
+**`update_entries`** — one row per project. **Nothing writes either any more.**
+The rows that exist still render: the per-project half is public and part of each
+project's feed, and the envelope shows on a member's profile behind
+`can.readArchivedCheckIns`.
 
-Members are on multiple projects by design, so a single text field would be ambiguous to
-a Lead overseeing several of their projects, and an RE couldn't tell whether a blocker was
-theirs to clear. Anything rendering an update must iterate `entries` and label each with
-its project.
+The reason for the per-project shape is worth keeping, because it applies to
+anything that reports on somebody's work across projects: members are on several
+by design, so a single text field is ambiguous to anyone overseeing more than one
+of them, and an RE couldn't tell whether a blocker was theirs to clear. Anything
+rendering an update must iterate `entries` and label each with its project.
 
 ## The twelve things most likely to trip you up
 
-1. **Two independent hierarchies.** Org tree (`teams.parent_id`, who reports to whom) and
-   project tree (`projects.parent_id`, what work exists) are separate. A member's Lead is
-   *not* necessarily an RE of their projects. Merging them rebuilds the silos this app
-   exists to remove.
+1. **Two trees, and only one of them is about people.** The project tree
+   (`projects.parent_id`, what work exists) carries all authority. The org tree
+   (`teams.parent_id`) says which division owns what and who leads it — and
+   `teams.lead_id` is live and load-bearing, because leading a division makes you
+   a top RE inside it.
+
+   There used to be a third: a reporting chain over `profiles.lead_id`, where
+   every member had a named Lead. It went on 2026-08-24. `profiles.lead_id` still
+   exists and nothing reads it. **Don't rebuild it** — see the section above.
 
 2. **Enum strings must match between `lib/types.ts` and the SQL.** `global_role` is
    `co_lead`, **not** `admin`. A mismatch wouldn't throw — `isCoLead()` would just return
@@ -340,12 +399,26 @@ its project.
    The *only* enum in that feature is `kind` — `site_access` vs `machine`, two genuinely
    different behaviours, and **neither implies the other**.
 
+   **Who verifies one is also data, per item.** `lib/trainings/verifiers.ts`: a
+   named person signs it off, or it is marked self-verify and the member ticks it.
+   Unconfigured falls back to "any Lead", which is an interim rule while
+   `catalogue_items.verifier_id` waits on migration `0046`. A named verifier
+   **cannot be demoted or deactivated** until it is reassigned, and the refusal
+   names the items — a bare "not allowed" on an org-chart edit is the kind of
+   message people work around by deleting something else.
+
+   That config lives in its own table rather than as two columns on
+   `catalogue_items`, and the migration explains why at length: that table is read
+   by the per-request snapshot with an explicit column list, so selecting a column
+   before the SQL lands 500s every page. **Worth folding in once the database is
+   reachable.**
+
 10. **A parent project can't be marked complete while any descendant isn't.** Enforced in
    `updateProject`, recursively and cycle-guarded. Refused rather than cascaded: completing
    the children on the parent's behalf would sign off work their own REs never agreed was
    done. Completing one also writes a `ProjectNotice` addressed up the project tree —
-   **not** a synthesised check-in, which would make a member's reliability record claim
-   they reported in on a day they didn't.
+   **not** a synthesised check-in. That reasoning outlived check-ins: never
+   manufacture a record of somebody having said something they didn't say.
 
 11. **A sub-project can't be due after its parent.** Same function, checked in both
    directions — moving a child later, or pulling a parent in over children already
@@ -387,17 +460,18 @@ its project.
 
 | Term | Meaning |
 |---|---|
-| **Co-Lead** | Team leads. `global_role = co_lead`. Configures divisions and engagement weights |
-| **Team Lead** ("Lead") | Middle leadership. Reviews updates, checks in multiple times a week, verifies trainings, rolls reports up |
+| **Co-Lead** | The club's leads. `global_role = co_lead`. Configures divisions, the calendar and the catalogue, and can do anything |
+| **Team Lead** ("Lead") | A title and a directory entry — "ask this person about composites". Carries **no authority over people**. Leading a **division** is different: it makes you a top RE inside it |
 | **Member** | Everyone else |
-| **RE** | Responsible Engineer — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project |
+| **RE** | Responsible Engineer — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project. **This is where all authority comes from** |
 | **Division** | Top-level org unit (`teams.parent_id IS NULL`). Co-Lead editable |
-| **Check-in / Update** | Member's progress report. **Twice a week**, on member-chosen weekdays. Pausable for academics without penalty. Purpose is prompting a conversation with their Lead, not filing a report |
+| **Work log** | One line about what you did, on a project or as misc. Public, in the project's feed, replyable. **This is how a member reports** |
+| **Check-in / Update** | *Retired 2026-08-24.* Was a twice-weekly report to a named Lead. Existing rows still render; nothing writes new ones |
 | **Deliverable** | One unit of work with one owner and a date. The whole task model |
 | **Committed / Following** | Committed = an RE added them; carries deliverables and obligations. Following = self-service watch-only, unlimited |
 | **Join request** | A member's tracked ask to join. RE approves. Escalates after 5 days |
-| **Term** | Academic period. Obligations only generate when `generatesObligations` is true |
-| **Roll-up** | Lead's aggregated report up the chain to Co-Leads |
+| **Term** | Academic period. `generatesObligations` now means "the club is in session" — the obligations it named are gone, and the column kept its name rather than costing a migration |
+| **Gone quiet** | A PROJECT with nothing logged in three weeks and open work left. `lib/quiet.ts` |
 
 ## Key product decisions
 
@@ -414,38 +488,36 @@ its project.
   A tracked request lands in a queue, shows as pending, and escalates at 5 days.
 - **Transparency by default for *activity*.** Everyone sees projects, who's on what,
   responsibilities, the calendar, Gantt charts.
-- **A check-in has a public half and a private half.** This is the rule most likely to be
-  got wrong, so it's spelled out:
+- **Everything about a member is public, with exactly one exception.** This table
+  used to have three rows and a long argument about which half of a check-in was
+  whose. It collapsed on 2026-08-24:
 
   | Thing | Who sees it | Rule |
   |---|---|---|
-  | Per-project entry (progress, blockers, next steps) | **Everyone** — it's the project's history | `can.viewProjectUpdates` |
-  | What they logged on one project | **Everyone**, since 2026-08-16 | `can.viewMemberWorkOnProject` |
-  | The personal report and reliability | The member and their **Lead chain only** | `can.viewMemberEffort`, `can.reviewUpdate` |
+  | Every log line, every project, both counters, per-project update entries | **Everyone** | `can.viewProjectUpdates`, `can.viewMemberWorkOnProject` — both `() => true` |
+  | Archived check-in envelopes (incl. `generalNote`) | The member and **Co-Leads** | `can.readArchivedCheckIns` |
 
-  The middle row changed on 2026-08-16 and the reasoning is worth keeping: it was
-  RE-and-Lead-chain only because the log used to carry HOURS, and a number
-  invites comparison between volunteers with different course loads. The hours
-  went on 2026-08-14; what is left is a sentence about a project, and the project
-  is public. A log line and a check-in entry are now the same kind of thing and
-  are shown in one feed on the project page.
+  The path to that is worth knowing, because each step had a different reason.
+  What somebody logged on a project was RE-and-Lead-chain only until 2026-08-16,
+  because the log carried HOURS and a number invites comparison between
+  volunteers with different course loads. The hours went on 2026-08-14, leaving a
+  sentence about a project — and the project is public. Then reliability and the
+  contribution record went on 2026-08-24, and they were the last person-level
+  judgment in the app.
 
-  What did NOT change is the bottom row. Publishing "what happened on this
-  project" must not publish "how this member is doing" — that is a judgment about
-  a person, and it stays with them and their Lead.
-
-  **REs deliberately cannot read someone's personal report.** They get the per-project half
-  publicly instead. Reviewing is one named person's obligation — that's what makes the
-  escalation in `lib/review.ts` meaningful.
-- **An unread check-in escalates after 3 days** to the Lead *above* the Lead who didn't read
-  it. On age, not on count: "12 unread" is ignorable and punishes Leads with more reports,
-  whereas "Kenji has been waiting 6 days" names one person and is actionable.
-- **The dashboard is scoped to who you oversee**, not the club. A Lead opening thirty
-  reports, twenty-six of which aren't theirs, cannot tell what they owe — and the design
-  target is a 15-minute weekly obligation. `/dashboard` also redirects anyone who oversees
-  nobody; hiding the nav link is not access control.
+  **The one exception is narrower than the rule it replaced, not wider.** A
+  `generalNote` was written under a stated promise that only the member and their
+  Lead chain would read it. Their old Lead can no longer read it; a Co-Lead can.
+  Publishing what people already typed is the one privacy change that changing it
+  back cannot undo.
+- **The dashboard is scoped to the projects you're accountable for**, not the club.
+  Opening thirty items, twenty-six of which aren't yours, tells you nothing about
+  what you owe — the design target is a 15-minute weekly obligation. `/dashboard`
+  also redirects anyone who is an RE of nothing; hiding the nav link is not access
+  control, and the nav has to ask the same question or it offers a link that
+  bounces people straight back.
 - **Engagement is a flashlight, not a scoreboard.** Outcomes are all that count; no
-  leaderboard function exists, deliberately. See `lib/engagement.ts`.
+  leaderboard function exists, deliberately.
 - **Calendar sync is opt-in**, and it's one subscription URL covering Apple,
   Google and Outlook — there is no public Apple calendar API, so an ICS feed is
   the only mechanism that reaches all three. `lib/calendar/` is pure and heavily
@@ -516,14 +588,18 @@ its project.
 next, with a step-by-step plan in `docs/PHASE_1_KICKOFF.md`.
 
 Explicitly **not** planned: critical-path Gantt, a composite engagement score, a
-leaderboard, self-enrollment, a project commitment cap, and the **quarterly
-re-enrollment sweep**. Each was considered and rejected — read the reasoning in
-`DECISIONS.md` and `PRODUCT_REVIEW.md` before re-opening any of them.
+leaderboard, self-enrollment, a project commitment cap, the **quarterly
+re-enrollment sweep**, and — since 2026-08-24 — **anything that reintroduces a
+person-to-person reporting relationship**. Each was considered and rejected; read
+the reasoning in `DECISIONS.md`, `PRODUCT_REVIEW.md` and
+`REPORTING_REMOVAL_PLAN.md` before re-opening any of them.
 
-The sweep is the newest of those (dropped 2026-08-08): a 35-person club where every
-member has a named Lead doesn't need memberships auto-closing at quarter start, and
-silently dropping somebody is worse than a Lead glancing at their roster. Keeping the
-roster honest is that Lead's job.
+The sweep was dropped on 2026-08-08 and its reasoning has partly expired, which is
+worth flagging: it rested on "every member has a named Lead who glances at their
+roster", and there are no Leads in that sense now. The conclusion stands on the
+other half — silently dropping somebody is worse than a stale membership — and the
+RE of a project is who keeps its roster honest. If it comes back up, it is the RE's
+roster now, not a Lead's.
 
 
 ## Phase 1 starting points

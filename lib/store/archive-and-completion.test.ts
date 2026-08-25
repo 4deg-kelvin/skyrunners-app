@@ -1032,16 +1032,17 @@ describe("deleting a member record", () => {
     assert.equal(memberById(julia.id), undefined);
   });
 
-  test("their check-in schedule goes with them", async () => {
-    // Invite creates one. Leaving it behind would be a row pointing at nobody.
-    const julia = await freshMember();
-    await ops.deleteMember({ memberId: julia.id, actorId: CO_LEAD });
+  /*
+    "their check-in schedule goes with them" was a test here, asserting that
+    `deleteMember` cleared the row `inviteMember` created in `update_schedules`.
+    Neither side of that exists: invites stopped seeding a schedule and the app
+    stopped loading the table when check-ins went on 2026-08-24.
 
-    assert.equal(
-      disk.readStore().updateSchedules.some((u) => u.memberId === julia.id),
-      false
-    );
-  });
+    The invariant it was protecting is still tested by the rows above and below
+    it -- deleting a member must not leave a row pointing at nobody -- and it
+    still holds for work logs, memberships, join requests, certifications, help
+    requests and deliverables.
+  */
 
   test("you can't delete yourself", async () => {
     const result = await ops.deleteMember({

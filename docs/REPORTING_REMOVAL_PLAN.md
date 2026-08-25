@@ -1,7 +1,51 @@
 # Removing the reporting chain: the plan
 
 Written 2026-08-24, after the team decided to drop bi-weekly check-ins and
-person-to-person reporting. **Nothing here is built yet.**
+person-to-person reporting. **Shipped the same day, in five commits.** This is
+the plan it followed, kept because every decision below is a rule somebody will
+want the reasoning for later.
+
+---
+
+## What shipped, and where it differs from the plan
+
+| Phase | Commit | Note |
+|---|---|---|
+| 1 — stop asking | `Stop asking the club for check-ins` | As planned, plus what the type checker forced |
+| 2 — the permission layer | `Dismantle the reporting chain in the permission layer` | Also folded in the contribution half of Phase 4 |
+| 3 — the pages | `Scope the dashboard and the digest by project, not by person` | Includes the new per-project "gone quiet" |
+| 4 — the new frameworks | `Trainings get a named verifier, or self-verify` | Schema differs — see below |
+| 5 — copy and docs | `Rewrite everything that still taught the chain` | |
+
+**Four differences worth recording:**
+
+1. **Phase 1 had to touch the dashboard.** The plan put the dashboard in Phase 3,
+   but five of its sections read fields Phase 1 deleted, so the type checker
+   forced them out together. The phases are a sequencing aid, not a contract —
+   and every commit had to be independently deployable, which was the real
+   constraint.
+
+2. **The contribution half of Phase 4 landed in Phase 2.** Deleting
+   `viewMemberEffort` and `viewMemberContribution` and leaving the panel they
+   guarded would have meant inventing an interim rule for a thing being deleted
+   two commits later. The rules and the thing they guarded went together.
+
+3. **The trainings config is a side table, not two columns on `catalogue_items`.**
+   The plan proposed `verifier_id` and `self_verify` on the item, which is still
+   the better schema. `catalogue_items` is read by the per-request snapshot with
+   an explicit column list, so selecting a column before the migration lands 500s
+   every page — and the database password is rejected. A side table read by its
+   own fail-soft query ships today and switches itself on when `0046` lands.
+   Folding it in is on the outstanding list in `docs/HANDOFF.md`.
+
+4. **The check-in schedule machinery went further than planned.** Phase 1 removed
+   the write path; nothing then read `update_schedules`, `scheduleFor`,
+   `currentUpdateFor`, `UpdateSchedule` or `checkInDue`, so all of them went in
+   Phase 5. The TABLE stays in Postgres, unloaded.
+
+**The one recommendation in this plan that was taken in full:** per-project "gone
+quiet" (`lib/quiet.ts`), built rather than deferred, because the risk section
+below is right that accountability genuinely thins out without it.
 
 Read `docs/HOURS_REMOVAL_PLAN.md` first if you weren't here for that one. This is
 the same shape of change, and it went well for one reason worth copying: the

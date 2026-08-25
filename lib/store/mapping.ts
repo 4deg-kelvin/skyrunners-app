@@ -34,7 +34,6 @@ import type {
   Team,
   Term,
   TrainingSection,
-  UpdateSchedule,
   WorkLog,
   GuideBlock,
 } from "../types.ts";
@@ -374,32 +373,6 @@ const joinRequests: CollectionSpec<JoinRequest> = {
     response_note: nul(j.responseNote),
   }),
   dependsOn: ["members", "projects"],
-};
-
-const updateSchedules: CollectionSpec<UpdateSchedule> = {
-  key: "updateSchedules",
-  table: "update_schedules",
-  columns: "member_id, weekdays, updates_per_week, due_time, paused_until",
-  identify: (s) => s.memberId,
-  // Surrogate `id` PK the app never sees; the real key is member_id. Without
-  // this, pausing check-ins failed with "duplicate key value violates
-  // update_schedules_member_id_key".
-  conflictTarget: "member_id",
-  fromRow: (r) => ({
-    memberId: r.member_id as string,
-    weekdays: (r.weekdays as number[]) ?? [],
-    updatesPerWeek: r.updates_per_week as number,
-    dueTime: r.due_time as string,
-    pausedUntil: opt(r.paused_until as string),
-  }),
-  toRow: (s) => ({
-    member_id: s.memberId,
-    weekdays: s.weekdays,
-    updates_per_week: s.updatesPerWeek,
-    due_time: s.dueTime,
-    paused_until: nul(s.pausedUntil),
-  }),
-  dependsOn: ["members"],
 };
 
 const terms: CollectionSpec<Term> = {
@@ -945,7 +918,12 @@ export const COLLECTIONS = [
   deliverables,
   workLogs,
   joinRequests,
-  updateSchedules,
+  /*
+    `updateSchedules` was here. The table stays in Postgres with a column
+    comment -- the club's decision to stop asking for check-ins could be
+    revisited, and a dropped table cannot be un-dropped -- but the app stops
+    LOADING it, which is what keeps it out of the per-request snapshot.
+  */
   terms,
   events,
   projectArtifacts,
