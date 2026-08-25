@@ -78,14 +78,14 @@ Counted, not estimated.
 | `reviewUpdate` | 15 |
 | `leadChain` | 10 |
 
-**Seven permission rules use the chain.** Four die with it; three need a new home:
+**Seven permission rules use the chain.** Five die with it; two need a new home:
 
 | Rule | Today | Proposed |
 |---|---|---|
 | `reassignLead` | chain | **deleted** |
 | `reviewUpdate` | chain | **deleted** |
-| `viewMemberEffort` | chain | self + Co-Lead + advisor |
-| `viewMemberContribution` | chain | self + Co-Lead + advisor |
+| `viewMemberEffort` | chain | **deleted** (see decision 3) |
+| `viewMemberContribution` | chain | **deleted** (see decision 3) |
 | `setMemberStatus` | chain | Co-Lead only |
 | `verifyTraining` | chain | see decision 2 |
 | `grantAccess` | chain | see decision 2 |
@@ -121,76 +121,68 @@ Two things the chain did that nothing else does yet:
 
 ---
 
-## Five decisions I need from you
+## Decided (2026-08-24)
 
-Each has a recommendation. Say "all as recommended" and I will build it.
+Anish answered all four open questions. Recorded here rather than in a chat log,
+because each one is a rule somebody will want the reasoning for later.
 
-### 1. Reliability — redefine it rather than delete it
+### 1. Division Leads keep project authority
 
-`lib/contribution.ts` reports three signals: Delivered, **Reliability** (updates on
-time), Scope. Reliability's only input is check-ins, so afterwards it can only ever
-be `null`.
+`leadsTeamAbove` stays. A Division Lead remains a top RE over every project in
+their division. Symbolic applies to the reporting relationship between people, not
+to accountability for work.
 
-**Recommended:** redefine Reliability as **deliverables finished by their due
-date**. Same meaning to a reader, real data that still exists, and it keeps the
-three-signal shape instead of leaving a hole where the third was. It also stays
-honest under the existing rule that a signal with no data returns `null`, never
-`0`.
+### 2. Trainings: assigned to a named Lead, or self-verified
 
-*Alternative:* delete the signal, leaving Delivered and Scope.
+Each catalogue item is configured one of two ways:
 
-### 2. Trainings and facility access — a named verifier per item
+- **Assigned to a named Lead** who signs off requests for it. This is the RE
+  pattern applied to a machine: accountability sits with a person, not a rank.
+- **Self-verify.** The member ticks it themselves and no sign-off is asked for.
+  Right for anything where the honest answer is "did you read this" — a shop
+  induction video, a document — and it removes the queue entirely for those.
 
-Today a Lead verifies, because a Lead oversees the person. That reasoning is gone,
-and machine clearances are not project-scoped, so RE authority does not reach them
-either.
+Co-Leads can always verify anything.
 
-**Recommended:** give each `catalogue_items` row a **verifier** — one named member,
-exactly like an RE but for a machine or a room. Co-Leads can always verify. It is
-the pattern the club already trusts: accountability sits with a named person rather
-than a hierarchy, and the person who actually runs the mill is the right person to
-sign off on the mill.
+**Plus a lock-out safeguard, and it is the interesting part.** You cannot remove
+somebody from a Lead position while a training is assigned to them. The refusal
+has to name what is blocking it — "Tyler verifies the mill and the laser cutter;
+reassign those first" — because a bare "not allowed" on an org-chart edit is the
+kind of message people work around by deleting something else.
 
-*Alternatives:* Co-Leads only (simple, but bottlenecks on the people least likely to
-be in the shop); or any RE of a project the member is on (wrong shape — being on a
-project says nothing about machine competence).
+This is the same family as the two guards already in `updateProject` and the
+member admin: the last Co-Lead cannot be demoted, and a parent project cannot be
+completed while a child is open. Both refuse rather than cascade, for the same
+reason — the app should not quietly decide who inherits a safety sign-off.
 
-Needs a migration: `catalogue_items.verifier_id`.
+Two migrations: `catalogue_items.verifier_id` and `catalogue_items.self_verify`.
 
-### 3. The academic pause — keep a lighter version
+### 3. Reliability is deleted outright, and contribution stops being central
 
-Pausing exists to suspend check-in obligations. With no obligations there is
-nothing to pause, so the feature dies as written. But the need behind it is real: an
-RE should know somebody is heads-down on midterms before chasing them.
+Not redefined. Deleted.
 
-**Recommended:** a **"heads-down until &lt;date&gt;"** flag on the member, shown on the
-roster and beside their name on project member lists. No obligations, no penalties,
-no reminders — just a visible fact, so an RE does not chase and a member does not
-feel they have gone silent.
+In its place: a plain **counter** — deliverables completed, projects completed --
+in the side column of a member's profile, next to the other details. Not a panel,
+not a scored record, not a signal.
 
-*Alternative:* delete it outright.
+**This has a consequence worth stating plainly, because it is larger than it
+looks: after this there is nothing private left about a member.** Reliability was
+the last piece of the "personal record" — the work log went public on 2026-08-16,
+and check-ins are going. So `viewMemberEffort` and `viewMemberContribution` are
+not rehomed to Co-Leads, they are **deleted**, along with `lib/contribution.ts`
+and the `ContributionPanel`. Two public counters need no permission rule.
 
-### 4. Academic terms — keep the table, drop the obligation flag
+That also finishes what Anish said two days ago — "I dont see what should be
+private anymore since we removed hour logging." It is now true of the whole app,
+and the privacy table in CLAUDE.md collapses to one line.
 
-`Term.generatesObligations` decides whether check-ins are asked for. It has one
-other reader, in `lib/data/events.ts`.
+`/how-we-lead` currently publishes the three-signal rubric as club policy. It
+needs rewriting rather than trimming: the honest version is that the club looks at
+what you delivered, and there is no score.
 
-**Recommended:** keep terms (the calendar and the archive use them) and delete
-`generatesObligations` from the model — *after* confirming that events reader does
-not depend on the semantics. That is one grep, and I would rather do it than assume.
+### 4. The academic pause is deleted
 
-### 5. Check-in history — keep every row, stop writing new ones
-
-**Recommended, and I would argue for this one:** do exactly what the hours removal
-did. Stop creating `progress_updates` / `update_entries`, stop asking for them,
-delete no rows and drop no tables.
-
-Two reasons. Historical entries are part of each project's permanent record and they
-*already render in the merged project feed*, so a project's history stays continuous
-instead of restarting the day this ships. And a dropped table cannot be un-dropped
-if the club decides in a year that it wants something like this back.
-
-The tables become read-only history, with a column comment saying so.
+No obligations to pause, so nothing to keep. No replacement flag.
 
 ---
 
@@ -214,8 +206,12 @@ deliberately, with the reasoning in the diff.
 the RE dashboard. Member profiles lose Lead and Direct Reports. `lib/review.ts` and
 the digest's check-in sections go. "Gone quiet" is re-scoped to the project.
 
-**Phase 4 — the new frameworks.** Reliability redefined; catalogue verifiers;
-heads-down flag. Two migrations.
+**Phase 4 — the new frameworks.** Delete `lib/contribution.ts`, the
+`ContributionPanel` and the two view rules; add the two profile counters. Catalogue
+verifiers plus self-verify, and the Lead-removal safeguard. Two migrations
+(`verifier_id`, `self_verify`) — so the trainings half cannot land until database
+access works again, while the contribution half needs no schema change and can
+ship in Phase 3.
 
 **Phase 5 — schema and docs.** `teams.lead_id` **stays** — it feeds
 `leadsTeamAbove`. Only `profiles.lead_id` and
@@ -240,6 +236,11 @@ in a diff with a reason rather than being swept up in a bulk edit.
 **Two migrations are already pending** (`0044`, `0045`) and I cannot apply them —
 the database password is rejected. Phases 1–3 need no migration and can ship
 regardless; Phase 4 cannot land until database access works again.
+
+**The Lead-removal safeguard can strand the club.** If the only person who can
+verify the mill graduates, somebody has to be able to reassign it — so the guard
+must refuse the demotion *and* point at the reassignment, and a Co-Lead must
+always be able to override. A guard with no exit is worse than no guard.
 
 **"Symbolic" is easy to over-apply.** A Team Lead will still appear in the member
 directory as the person to ask for the Fusion drive. That is a directory, not a
