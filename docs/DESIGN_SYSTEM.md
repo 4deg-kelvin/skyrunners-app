@@ -86,7 +86,6 @@ For an app whose top requirement is that new members orient fast, that's worth a
 | `DetailRow` | Stacked label/value pair, divider-separated |
 | `Badge` | Status pill. Tones: ok / warn / risk / neutral / cardinal |
 | `Button` / `ButtonLink` | primary (solid cardinal), secondary (bordered), ghost |
-| `Donut` | Ring progress figure. Hand-rolled SVG, no chart library |
 | `ComingSoon` | Placeholder naming the phase a page arrives in |
 
 ---

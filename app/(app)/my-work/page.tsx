@@ -1,18 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, Eye, PenLine, TriangleAlert } from "lucide-react";
+import { Clock, Eye, TriangleAlert } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
 import { LogWorkForm } from "@/components/forms/log-work-form";
-import { CheckInForm } from "@/components/forms/check-in-form";
 import {
   JoinRequestDecision,
   WithdrawRequestButton,
 } from "@/components/forms/project-actions";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
 import { ContributionPanel } from "@/components/ui/contribution-panel";
@@ -27,11 +25,7 @@ import {
   type MyProjectCard as MyProjectCardData,
 } from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
-import {
-  checkInDue,
-  UPDATE_STATUS_LABELS,
-  UPDATE_STATUS_TONES,
-} from "@/lib/labels";
+import {} from "@/lib/labels";
 import { can, isAdvisor } from "@/lib/permissions";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
@@ -53,10 +47,8 @@ export default async function MyWorkPage() {
   const view = await getMyWork(viewer.member.id);
   const {
     me,
-    lead: myLead,
     committed,
     following,
-    currentUpdate,
     myDeliverables,
     contribution,
     myRequests,
@@ -81,11 +73,6 @@ export default async function MyWorkPage() {
   );
 
   const mayLogWork = can.logOwnWork(viewer.actor, me.id);
-  const maySubmitUpdate = can.submitOwnUpdate(viewer.actor, me.id);
-
-  // "Sunday check-in" said nothing about whether Sunday had already been and
-  // gone. `checkInDue` answers when, and says so out loud once it's late.
-  const due = checkInDue(currentUpdate.update.dueAt, today);
   const firstName = me.preferredName ?? me.fullName.split(" ")[0];
 
   return (
@@ -304,153 +291,6 @@ export default async function MyWorkPage() {
               ))
             )}
           </div>
-        </CardBody>
-      </Card>
-
-      {/* ---------------- The update, split per project ---------------- */}
-      <Card>
-        <CardBody>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <SectionLabel>
-                {currentUpdate.inSession ? "Update Due" : "Out Of Session"}
-              </SectionLabel>
-              <h2 className="text-ink mt-2 text-2xl font-bold">
-                {currentUpdate.inSession
-                  ? due.heading
-                  : "Nothing due right now"}
-              </h2>
-              {/*
-                Saying WHY matters. A page that just shows no obligation reads
-                as broken; "no check-ins during Winter break" reads as the club
-                working as intended. Same reasoning as the academic pause.
-              */}
-              <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-                {currentUpdate.inSession ? (
-                  <>
-                    {currentUpdate.updatesPerWeek} a week, on the days you
-                    picked. Each project&apos;s section is already written from
-                    your work log — the only boxes left are for projects you
-                    logged nothing against.
-                  </>
-                ) : (
-                  <>
-                    No check-ins are generated during{" "}
-                    {currentUpdate.termName ?? "this period"} — nothing counts
-                    against you and there&apos;s no backlog waiting. You can
-                    still log work and write one if you want to.
-                  </>
-                )}
-              </p>
-            </div>
-            {currentUpdate.inSession ? (
-              <Badge tone={UPDATE_STATUS_TONES[currentUpdate.update.status]}>
-                {UPDATE_STATUS_LABELS[currentUpdate.update.status]}
-              </Badge>
-            ) : (
-              <Badge tone="neutral">Paused</Badge>
-            )}
-          </div>
-
-          <div className="mt-6 space-y-3">
-            {currentUpdate.sections.length === 0 ? (
-              <EmptyState
-                message="You're not on any projects yet, so there's nothing project-specific to report."
-                actionLabel="Find something to join"
-                actionHref="/projects"
-              />
-            ) : (
-              currentUpdate.sections.map(
-                ({
-                  entry,
-                  project,
-                  breadcrumb,
-                  draftProgress,
-                  loggedWork,
-                  needsWriting,
-                }) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-tile border-line border px-4 py-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <Breadcrumb trail={breadcrumb} className="mb-1" />
-                        <Link
-                          href={`/projects/${project.slug}`}
-                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                        >
-                          {project.name}
-                        </Link>
-                      </div>
-                      {/*
-                      Says where this section's text came from, or that it needs
-                      writing. The preview is the only place a member sees the
-                      draft before opening the composer, so "already done for
-                      you" has to be legible from here or they won't open it.
-                    */}
-                      {needsWriting ? (
-                        <span className="text-ink-muted flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                          <PenLine className="size-3.5" />
-                          Needs a line
-                        </span>
-                      ) : (
-                        <span className="text-ink-soft flex shrink-0 items-center gap-1.5 text-sm font-semibold">
-                          <Clock className="size-3.5" />
-                          {loggedWork.length === 1
-                            ? "1 log entry"
-                            : loggedWork.length + " log entries"}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="rounded-tile border-line mt-3 border border-dashed px-3.5 py-3">
-                      {/*
-                      `whitespace-pre-line`, because the draft is newline-joined
-                      — one line per log entry. Without it a week of work renders
-                      as one run-on paragraph and the diary reads as a blob.
-                    */}
-                      <p className="text-ink-muted text-sm whitespace-pre-line">
-                        {draftProgress ||
-                          "Nothing logged against this project — write a line in the composer below."}
-                      </p>
-                    </div>
-                  </div>
-                )
-              )
-            )}
-          </div>
-
-          {maySubmitUpdate ? (
-            <div className="mt-5 flex flex-wrap items-start gap-3">
-              <CheckInForm
-                sections={currentUpdate.sections.map((s) => ({
-                  projectId: s.project.id,
-                  projectName: s.project.name,
-                  draftProgress: s.draftProgress,
-                  loggedCount: s.loggedWork.length,
-                  needsWriting: s.needsWriting,
-                }))}
-                dueLabel={due.phrase}
-                readerName={myLead?.preferredName ?? myLead?.fullName}
-              />
-              <ButtonLink href="/updates" variant="secondary">
-                Past check-ins
-              </ButtonLink>
-            </div>
-          ) : null}
-
-          <p className="text-ink-muted mt-4 text-sm">
-            Heads-down on academics?{" "}
-            <Link
-              href="/settings"
-              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-            >
-              Pause your check-ins
-            </Link>{" "}
-            — it doesn&apos;t count against you, and there&apos;s no backlog
-            when you come back.
-          </p>
         </CardBody>
       </Card>
 

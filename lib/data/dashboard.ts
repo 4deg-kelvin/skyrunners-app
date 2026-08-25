@@ -8,22 +8,25 @@
  * It used to take no arguments and return the whole club: every unread report,
  * club-wide compliance, everyone's hours. Two problems with that.
  *
- * The obvious one is privacy — a Lead could read reports written to a different
+ * The obvious one was privacy — a Lead could read reports written to a different
  * Lead, and (since the page had no gate at all) so could any member who typed
  * the URL.
  *
- * The subtler one is that it made the page useless. A Lead opening a list of
- * thirty reports, twenty-six of which aren't theirs, cannot tell what they owe.
- * The whole design target is "a Lead's weekly obligation fits in 15 minutes",
- * and a list you have to filter by eye fails that before you read a word.
+ * The subtler one is that it made the page useless. Opening a list of thirty
+ * items, twenty-six of which aren't yours, tells you nothing about what you owe.
+ * The design target is "a leader's weekly obligation fits in 15 minutes", and a
+ * list you have to filter by eye fails that before you read a word.
  *
- * So: `reviewQueue` is only reports written to YOU. Effort aggregates cover only
- * people in your chain. `flaggedProjects` stays club-wide on purpose — a blocked
- * project is exactly the thing a passing person should be able to unblock.
+ * On 2026-08-24 the club dropped check-ins and the reporting chain, and the
+ * privacy half of that reasoning went with them: there are no reports written to
+ * a person any more. **What remains is an RE dashboard** — what you owe is work
+ * on YOUR projects, and `flaggedProjects` stays club-wide on purpose, because a
+ * blocked project is exactly the thing a passing person should be able to
+ * unblock.
  *
- * PHASE 1 NOTE: `compliance` and `logsThisWeek` map onto `v_update_compliance`
- * and `v_member_hours_weekly` in docs/DATA_MODEL.md, but both now need a member
- * filter. Views should take the scoped id set rather than aggregating globally.
+ * `logsThisWeek` is the one aggregate left. It maps onto `v_member_hours_weekly`
+ * in docs/DATA_MODEL.md as a COUNT of entries, and it still needs a member
+ * filter rather than a global aggregate.
  */
 
 import {
@@ -38,26 +41,16 @@ import {
   today,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
+import { pendingSignOffs, type PendingSignOff } from "@/lib/signoff";
 import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { workToShow, type MyWorkView } from "./my-work";
 import { isCoLead, type Actor, type OrgGraph } from "@/lib/permissions";
-import {
-  escalationsFor,
-  pendingSignOffs,
-  unansweredSectionsFor,
-  unreadReportsFor,
-  type LeadEscalation,
-  type PendingSignOff,
-  type UnansweredSection,
-} from "@/lib/review";
 import { isREofOrAbove } from "@/lib/permissions";
 import type {
   MemberRequest,
   Member,
   Project,
-  ProgressUpdate,
   ProjectNotice,
-  UpdateEntry,
 } from "@/lib/types";
 import { preloadLiveStore } from "@/lib/store/request";
 import { getTrainingQueue, type TrainingQueueItem } from "@/lib/data/trainings";
@@ -75,17 +68,6 @@ function daysSince(iso: string): number {
   const from = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
   const to = Date.parse(`${today()}T00:00:00Z`);
   return Math.max(0, Math.round((to - from) / 86_400_000));
-}
-
-export interface ReviewQueueItem {
-  update: ProgressUpdate;
-  author?: Member;
-  /** Each entry paired with its project, so the UI never has to look it up. */
-  sections: { entry: UpdateEntry; project?: Project }[];
-  /** Whole days since submission. Drives the ordering and the warning tone. */
-  ageDays: number;
-  /** Past the grace period — your own Lead can now see this. */
-  escalated: boolean;
 }
 
 export interface FlaggedProject {
@@ -117,14 +99,6 @@ export interface DashboardView {
     divisions: number;
     projects: number;
   };
-  compliance: {
-    onTime: number;
-    late: number;
-    missed: number;
-    /** Due but not yet written. Not a failure — the window may still be open. */
-    pending: number;
-    fraction: number;
-  };
   /**
    * Work-log entries written this week by people the viewer oversees.
    *
@@ -134,10 +108,6 @@ export interface DashboardView {
    * rebuilding the removed signal in a new unit.
    */
   logsThisWeek: number;
-  /** Reports written TO the viewer and not yet read. Oldest first. */
-  reviewQueue: ReviewQueueItem[];
-  /** Leads under the viewer who are leaving their people unheard. */
-  escalations: LeadEscalation[];
   /** Club-wide, deliberately: anyone may help with a blocked project. */
   flaggedProjects: FlaggedProject[];
   /** The viewer's own committed projects, so they can log work from here. */
@@ -189,39 +159,17 @@ export interface DashboardView {
    * is also an RE that they owe "seven things" without saying which hat.
    */
   reQueue: {
-    /** Finished work no RE has signed off. `pendingSignOffs`. */
+    /**
+     * Finished work no RE has signed off. `pendingSignOffs`.
+     *
+     * This used to sit beside an `unanswered` list of check-in sections needing
+     * an RE's reply. Check-ins were removed on 2026-08-24, so that queue could
+     * only ever shrink — a backlog of historical rows is a to-do list nobody
+     * chose. Replying to the project feed is still possible; it just isn't an
+     * obligation with a counter.
+     */
     signOffs: PendingSignOff[];
-    /** Check-in sections with a blocker or a next step and no reply. */
-    unanswered: UnansweredSection[];
   };
-  /**
-   * People in scope who logged nothing this week while holding open work.
-   *
-   * The quiet failure the club actually loses people to: not a missed
-   * check-in, which is visible, but somebody who simply stops and whose
-   * absence nothing reports. Deliberately not a score or a flag on their
-   * record — it's a prompt to have a conversation.
-   */
-  goneQuiet: {
-    member: Member;
-    openDeliverables: number;
-    lastLoggedAt?: string;
-  }[];
-  /**
-   * Per-Lead roll-up. Populated for Co-Leads only, empty for everyone else.
-   *
-   * Derived rather than written. A roll-up somebody has to compose by hand is
-   * a chore that gets skipped in week three, and the numbers already exist —
-   * the scarce resource is leadership *reading*, not leadership typing.
-   */
-  rollUp: {
-    lead: Member;
-    reports: number;
-    unread: number;
-    worstUnreadDays: number;
-    logsThisWeek: number;
-    quietCount: number;
-  }[];
   /**
    * Trainings waiting on the viewer to verify, and clearances that lapsed.
    *
@@ -308,18 +256,19 @@ function startOfWeek(today: string): string {
  */
 export async function getDashboard(
   actor: Actor,
-  graph: OrgGraph,
-  /**
-   * Co-Leads only: widen the numbers from "people I look after" to the club.
-   *
-   * The default stays scoped, deliberately. The dashboard is built around a
-   * 15-minute weekly obligation, and a Lead opening thirty reports of which
-   * twenty-six aren't theirs can't tell what they owe. But a Co-Lead does
-   * legitimately need the club-wide view sometimes — so it's a toggle they
-   * choose, not the thing they land on.
-   */
-  scope: "mine" | "club" = "mine"
+  graph: OrgGraph
 ): Promise<DashboardView> {
+  /*
+    There was a `scope: "mine" | "club"` parameter here, and a Co-Lead-only
+    toggle on the page driving it. Both are gone: the only thing it widened was
+    the set of people whose check-ins you were accountable for reading, and
+    nobody reads check-ins now. What is left is scoped by the project tree, where
+    a Co-Lead already sees everything because a Co-Lead is a top RE everywhere.
+
+    Removed rather than left inert. A control that changes nothing is worse than
+    a missing one, because somebody clicks it, sees the same numbers, and stops
+    trusting the page.
+  */
   // Ensure the live snapshot exists before any synchronous read.
   //
   // Idempotent and free once loaded. It's here rather than left to the caller
@@ -328,11 +277,9 @@ export async function getDashboard(
   // then died on "Live store not loaded". Guarding at the boundary means call
   // order stops mattering.
   await preloadLiveStore();
-  // Live, not the seed — a Lead marking a report reviewed must disappear
-  // from their own queue on the next render.
-  const { progressUpdates, workLogs } = readStore();
-
-  const clubWide = scope === "club" && isCoLead(actor);
+  // Live, not the seed — signing something off has to drop it out of the
+  // queue on the next render.
+  const { workLogs } = readStore();
 
   // A Co-Lead oversees the club; everyone else oversees their own subtree.
   const overseen = isCoLead(actor)
@@ -347,90 +294,11 @@ export async function getDashboard(
    * The same people, plus you.
    *
    * `overseen` deliberately excludes the viewer — it answers "who do I look
-   * after". But the operational numbers below are about the team's week, and
-   * leaving yourself out of them meant a Co-Lead who was the only person
-   * logging hours saw 0.0 hours and an empty check-in panel. It read as broken,
-   * and it was wrong: you're part of the team you run.
+   * after". But `logsThisWeek` below is about the team's week, and leaving
+   * yourself out of it meant a Co-Lead who was the only person logging saw zero.
+   * It read as broken, and it was wrong: you're part of the team you run.
    */
   const countedIds = new Set([...overseenIds, actor.id]);
-
-  // Reports written to the viewer personally — their direct reports only. A
-  // Lead two levels up sees the escalation instead, not the raw report, so the
-  // obligation stays with exactly one person.
-  /**
-   * Is this person on an academic pause right now?
-   *
-   * Matters in two directions. A paused MEMBER owes nothing. A paused LEAD
-   * still has reports whose check-ins need reading — pausing your own
-   * obligations can't quietly pause other people's.
-   */
-  const pausedNow = (memberId: string): boolean => {
-    const schedule = readStore().updateSchedules.find(
-      (u) => u.memberId === memberId
-    );
-    return !!schedule?.pausedUntil && schedule.pausedUntil >= today();
-  };
-
-  const everyone = readStore().members;
-
-  const directReports = everyone.filter((m) => {
-    if (m.status !== "active" || m.id === actor.id) return false;
-
-    // Club-wide: every active member counts, whoever they report to.
-    if (clubWide) return true;
-
-    // Normally: people who report to you.
-    if (m.leadId === actor.id) return true;
-
-    // Cover for a paused Lead. If someone who reports to you is a Lead and
-    // they're on pause, THEIR reports come to you for the duration — otherwise
-    // one person taking two weeks for midterms silently strands everybody
-    // underneath them, which is the opposite of what the pause is for.
-    if (m.leadId && pausedNow(m.leadId)) {
-      const theirLead = everyone.find((x) => x.id === m.leadId);
-      if (theirLead?.leadId === actor.id) return true;
-      // Nobody above the paused Lead: it lands with the Co-Leads.
-      if (isCoLead(actor) && !theirLead?.leadId) return true;
-    }
-
-    // A Co-Lead also picks up anyone with nobody above them — including the
-    // other Co-Leads, whose own check-ins would otherwise go into a void.
-    if (isCoLead(actor) && m.leadId === null) return true;
-
-    return false;
-  });
-
-  const reviewQueue: ReviewQueueItem[] = unreadReportsFor(
-    actor.id,
-    progressUpdates,
-    directReports,
-    today()
-  ).map((unread) => ({
-    update: unread.update,
-    author: unread.author,
-    ageDays: unread.ageDays,
-    escalated: unread.escalated,
-    sections: unread.update.entries.map((entry) => ({
-      entry,
-      project: getProject(entry.projectId),
-    })),
-  }));
-
-  // Compliance across the people the viewer oversees. Counting the whole club
-  // would tell a Lead nothing about whether THEIR people are keeping up.
-  const scopedUpdates = progressUpdates.filter((u) =>
-    countedIds.has(u.memberId)
-  );
-  const onTime = scopedUpdates.filter(
-    (u) => u.status === "submitted" || u.status === "reviewed"
-  ).length;
-  const late = scopedUpdates.filter((u) => u.status === "late").length;
-  const missed = scopedUpdates.filter((u) => u.status === "missed").length;
-  // Pending is excluded from the ratio on purpose: the window may still be open,
-  // and counting an unwritten-but-not-yet-late report as a miss would show a
-  // Lead a falling compliance number every single morning.
-  const pending = scopedUpdates.filter((u) => u.status === "pending").length;
-  const totalDue = onTime + late + missed;
 
   const weekStart = startOfWeek(today());
   const logsThisWeek = workLogs.filter(
@@ -485,100 +353,18 @@ export async function getDashboard(
     signOffs: pendingSignOffs(
       store.deliverables,
       myProjectIds,
-      everyone,
+      store.members,
       today()
     ),
-    // Your own sections are dropped: an RE writes check-ins on their own
-    // projects too, and "Tyler Brooks is waiting on an answer" shown to Tyler
-    // is noise that makes the whole panel read as generated rather than owed.
-    // If a second RE should answer it, it's still in THEIR queue.
-    unanswered: unansweredSectionsFor(
-      progressUpdates,
-      myProjectIds,
-      everyone,
-      today()
-    ).filter((section) => section.author?.id !== actor.id),
   };
 
-  // --- who has gone quiet --------------------------------------------------
-  //
-  // Logged NOTHING this week while still holding open work. Not a missed
-  // check-in — that's already visible — but the person who simply stopped, which
-  // is what the club actually loses people to.
-  //
-  // The test used to be "zero hours". It is now "no entries at all", which is a
-  // slightly WIDER net in one useful direction: somebody who used to log 0.5
-  // hours as a placeholder no longer registers as active. One line in the diary
-  // is the bar, and one line is also all the check-in needs.
-  const goneQuiet = overseen
-    .map((member) => {
-      const logged = workLogs.some(
-        (w) => w.memberId === member.id && w.workDate >= weekStart
-      );
-      if (logged) return null;
-
-      const openDeliverables = store.deliverables.filter(
-        (d) => d.ownerId === member.id && d.status !== "done"
-      ).length;
-      // No open work means nothing to be quiet about — they may simply be
-      // between projects, which `/find-work` is the answer to, not this.
-      if (openDeliverables === 0) return null;
-
-      const lastLog = workLogs
-        .filter((w) => w.memberId === member.id)
-        .sort((a, b) => b.workDate.localeCompare(a.workDate))[0];
-
-      return {
-        member,
-        openDeliverables,
-        lastLoggedAt: lastLog?.workDate,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null)
-    .sort((a, b) => (a.lastLoggedAt ?? "").localeCompare(b.lastLoggedAt ?? ""));
-
-  // --- the roll-up, for Co-Leads -------------------------------------------
-  const rollUp = isCoLead(actor)
-    ? everyone
-        .filter(
-          (m) =>
-            m.globalRole !== "member" &&
-            m.globalRole !== "advisor" &&
-            m.status === "active" &&
-            // Not yourself. A roll-up is what you read to check on OTHER
-            // people's oversight — your own reports are already the review
-            // queue at the top of this same page, so appearing here is both
-            // duplicated and faintly absurd ("Anish Bayya: caught up").
-            m.id !== actor.id
-        )
-        .map((lead) => {
-          const theirReports = everyone.filter(
-            (m) => m.leadId === lead.id && m.status === "active"
-          );
-          const unread = unreadReportsFor(
-            lead.id,
-            progressUpdates,
-            theirReports,
-            today()
-          );
-          const reportIds = new Set(theirReports.map((m) => m.id));
-
-          return {
-            lead,
-            reports: theirReports.length,
-            unread: unread.length,
-            worstUnreadDays: unread[0]?.ageDays ?? 0,
-            logsThisWeek: workLogs.filter(
-              (w) => reportIds.has(w.memberId) && w.workDate >= weekStart
-            ).length,
-            quietCount: goneQuiet.filter((q) => reportIds.has(q.member.id))
-              .length,
-          };
-        })
-        // Leads with nobody under them are noise in a roll-up about oversight.
-        .filter((row) => row.reports > 0)
-        .sort((a, b) => b.worstUnreadDays - a.worstUnreadDays)
-    : [];
+  // "Gone quiet" used to live here, per PERSON: nothing logged this week while
+  // still holding open work. It went with the reporting chain, because it was
+  // rendered on the dashboard of the Lead they reported to and there is no such
+  // Lead. The signal itself is still worth having — losing people quietly is
+  // what the club actually loses people to — so it comes back re-scoped to the
+  // PROJECT, which is the shape that has an owner now. See
+  // docs/REPORTING_REMOVAL_PLAN.md.
 
   return {
     // The editable name/description, falling back to the shipped default.
@@ -590,23 +376,7 @@ export async function getDashboard(
       divisions: divisions().length,
       projects: readStore().projects.length,
     },
-    compliance: {
-      onTime,
-      late,
-      missed,
-      pending,
-      // No data is `0`, and the UI must show "—" rather than 0%. A Lead whose
-      // people have nothing due yet is not a Lead at 0% compliance.
-      fraction: totalDue === 0 ? 0 : onTime / totalDue,
-    },
     logsThisWeek,
-    reviewQueue,
-    escalations: escalationsFor(
-      actor.id,
-      readStore().members,
-      progressUpdates,
-      today()
-    ),
     myProjects: memberProjects(actor.id)
       .filter((m) => m.commitment === "committed")
       .map((m) => ({ id: m.projectId, name: m.project?.name ?? m.projectId })),
@@ -661,8 +431,6 @@ export async function getDashboard(
         ageDays: daysSince(notice.createdAt),
       })),
     reQueue,
-    goneQuiet,
-    rollUp,
     trainings,
     requests,
     today: today(),

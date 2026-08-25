@@ -9,13 +9,11 @@
 
 import { workIsLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
-  allWorkLogsFor,
   contributionInputsFor,
   daysUntil,
   daysWorkedOnProject,
   getMember,
   getProject,
-  inSession,
   isOverdue,
   joinRequestsAwaitingMe,
   deliverableTodos,
@@ -24,26 +22,17 @@ import {
   myDeliverablesOn,
   myJoinRequests,
   myProjects,
-  currentUpdateFor,
   projectBreadcrumb,
   projectProgress,
   projectREs,
   recentWorkLogs,
   lastWorkLogs,
-  scheduleFor,
-  termFor,
   today,
-  updatesFor,
 } from "@/lib/mock-data";
 import {
   buildContributionRecord,
   type ContributionRecord,
 } from "@/lib/contribution";
-import {
-  checkInPeriodStart,
-  draftProgressFrom,
-  workByProject,
-} from "@/lib/checkin-draft";
 import type {
   Deliverable,
   DeliverableTodo,
@@ -51,7 +40,6 @@ import type {
   Member,
   Project,
   ProjectMembership,
-  ProgressUpdate,
   UpdateEntry,
   WorkLog,
 } from "@/lib/types";
@@ -100,42 +88,6 @@ export interface MyProjectCard {
   daysToTarget?: number;
 }
 
-/**
- * A section of the current update, tied to a specific project.
- *
- * `draftProgress` and `needsWriting` are the check-in auto-fill — the reason
- * hours removal added something instead of only taking things away. See
- * `lib/checkin-draft.ts` for the window and the text.
- */
-export interface UpdateDraftSection {
-  entry: UpdateEntry;
-  project: Project;
-  breadcrumb: BreadcrumbNode[];
-  /**
-   * What this member logged against this project since their last check-in,
-   * oldest first. Rendered under the box so they can see what the draft is made
-   * of — a pre-filled field with no visible source reads as the app inventing
-   * words on their behalf.
-   */
-  loggedWork: WorkLog[];
-  /**
-   * The pre-filled text for the progress box. Empty when nothing was logged.
-   *
-   * Editable, deliberately: the log is raw notes, the check-in is what they want
-   * their Lead to read.
-   */
-  draftProgress: string;
-  /**
-   * True when nothing was logged against this project this period, so the member
-   * has to write the line themselves.
-   *
-   * This is the ONE thing the composer asks for, and it's the same condition
-   * `submitCheckIn` refuses on — both derive it from `workByProject`, so the
-   * form can't mark a box required that the server would accept, or vice versa.
-   */
-  needsWriting: boolean;
-}
-
 /** One day of the work log, with its entries. Newest day first. */
 export interface WorkLogDay {
   /** `YYYY-MM-DD`. Format with `formatDay` at the render site. */
@@ -169,22 +121,6 @@ export interface MyWorkView {
   committed: MyProjectCard[];
   /** Projects they're only watching. Unlimited. */
   following: MyProjectCard[];
-  currentUpdate: {
-    update: ProgressUpdate;
-    sections: UpdateDraftSection[];
-    updatesPerWeek: number;
-    /**
-     * Whether the club is in a period that generates check-ins at all.
-     *
-     * Separate from the personal pause: one is the academic calendar, the
-     * other is a member choosing to step back. Both mean nothing is owed, and
-     * a page that says nothing in either case reads as broken rather than as
-     * "you're fine".
-     */
-    inSession: boolean;
-    /** The period covering today, for saying WHY nothing is due. */
-    termName?: string;
-  };
   /**
    * Everything they own across all projects, soonest due first.
    *
@@ -287,143 +223,6 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
   const following = cards.filter(
     (c) => c.membership.commitment === "following"
   );
-  /*
-    Committed AND still running.
-
-    A finished project has nothing to report on. It stayed in the composer
-    because "being on the project creates a section" was written before
-    completion existed as a real state, so somebody with four delivered
-    projects got four empty boxes asking what moved forward on work that
-    isn't moving. That's the fastest way to teach people the form is
-    busywork.
-
-    Filtering on the CURRENT phase rather than remembering anything means a
-    reopened project comes straight back — which is the behaviour that has to
-    hold, since a project can go back to active when a sign-off is withdrawn.
-  */
-  const projects = committed.filter((c) => c.project.phase !== "complete");
-
-  const currentUpdate = currentUpdateFor(memberId);
-
-  /*
-    One section per COMMITTED PROJECT, not per pre-existing entry.
-
-    This used to map over `currentUpdate.entries`, which meant the composer
-    only offered a box for a project that already had a draft row — and those
-    rows are seeded from logged hours. So a member who was on three projects
-    and hadn't logged anything this period saw "no project sections to fill in"
-    and could write nothing at all.
-
-    That got it exactly backwards. The check-in most worth reading is the one
-    from somebody who did NOTHING and needs to say why — blocked, waiting on a
-    part, buried in midterms. Requiring hours before you can report is
-    requiring progress before you can report a lack of it.
-
-    Hours and open deliverables AUTO-FILL a section; they don't create it.
-    Being on the project creates it.
-  */
-  const existingByProject = new Map(
-    currentUpdate.entries.map((entry) => [entry.projectId, entry])
-  );
-
-  /*
-    The work log for the period this check-in covers.
-
-    Computed ONCE here, from the same two functions `submitCheckIn` uses, so the
-    form and the server agree about which projects have something to go on. If
-    they disagreed, the composer would mark a box required that the server would
-    accept — or, worse, accept a box the server then refuses, with the reason
-    never shown on the page.
-  */
-  const periodStart = checkInPeriodStart(updatesFor(memberId), today());
-  const loggedByProject = workByProject(
-    allWorkLogsFor(memberId),
-    periodStart,
-    today()
-  );
-
-  const sections: UpdateDraftSection[] = projects.map((card) => {
-    const existing = existingByProject.get(card.project.id);
-    const loggedWork = loggedByProject.get(card.project.id) ?? [];
-
-    return {
-      // A synthetic entry when there's no draft row yet. It carries the
-      // project's real id, so submitting writes against the right project —
-      // `submitCheckIn` keys on `projectId`, never on this id.
-      entry: existing ?? {
-        id: `draft-${currentUpdate.id}-${card.project.id}`,
-        updateId: currentUpdate.id,
-        projectId: card.project.id,
-        progress: "",
-      },
-      project: card.project,
-      breadcrumb: card.breadcrumb,
-      loggedWork,
-      /*
-        Anything already saved on the row wins over the draft.
-
-        Only relevant if a member half-writes a check-in and comes back, but
-        getting it the other way round would silently overwrite their own words
-        with a machine-generated summary — the single least forgivable thing this
-        feature could do.
-      */
-      draftProgress: existing?.progress.trim()
-        ? existing.progress
-        : draftProgressFrom(loggedWork),
-      needsWriting: loggedWork.length === 0 && !existing?.progress.trim(),
-    };
-  });
-
-  /*
-    Entries for projects they've since LEFT still render, at the end.
-
-    Dropping them would silently discard something already written — and it's
-    usually the handover note explaining why they left, which is the one part
-    of that check-in anybody needs.
-  */
-  for (const entry of currentUpdate.entries) {
-    if (projects.some((p) => p.project.id === entry.projectId)) continue;
-    const project = getProject(entry.projectId);
-    if (!project) continue;
-
-    /*
-      …but a project that FINISHED mid-period only comes back if they'd
-      already written something in it.
-
-      Two different rows used to end up here. One was a row seeded from logged
-      hours, empty, which is the thing the filter above exists to remove —
-      letting it back in through this loop would undo the fix. The other is a
-      sentence somebody typed before the project completed, and discarding that
-      is exactly what this loop was written to prevent.
-
-      Nothing seeds an empty row any more, so in practice only the second kind
-      arrives. The check stays because it costs nothing and the invariant it
-      protects — never show an empty box for finished work — is the one that got
-      this loop written in the first place.
-    */
-    const wroteSomething = Boolean(
-      entry.progress.trim() || entry.blockers?.trim() || entry.nextSteps?.trim()
-    );
-    if (project.phase === "complete" && !wroteSomething) continue;
-
-    sections.push({
-      entry,
-      project,
-      breadcrumb: projectBreadcrumb(project.id),
-      /*
-        No draft, and never required.
-
-        This is a project they've LEFT or one that finished. Asking somebody to
-        account for work on a project they're no longer on would be the composer
-        blocking a submission over something the member can't act on — and
-        `needsWriting: false` is what keeps `submitCheckIn` from refusing it,
-        since both sides read this same condition.
-      */
-      loggedWork: [],
-      draftProgress: entry.progress,
-      needsWriting: false,
-    });
-  }
 
   return {
     me,
@@ -432,13 +231,6 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
     maxBackdateDays: MAX_BACKDATE_DAYS,
     committed,
     following,
-    currentUpdate: {
-      update: currentUpdate,
-      sections,
-      updatesPerWeek: scheduleFor(memberId)?.updatesPerWeek ?? 2,
-      inSession: inSession(today()),
-      termName: termFor(today())?.name,
-    },
     myDeliverables: cards
       .flatMap((c) =>
         c.myDeliverables.map((d) => ({

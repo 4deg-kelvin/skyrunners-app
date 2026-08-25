@@ -5,43 +5,27 @@ import { TriangleAlert } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { LogWorkForm } from "@/components/forms/log-work-form";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
-import { ContactLink } from "@/components/ui/contact-link";
 import { VerifyControls } from "@/components/forms/training-actions";
-import { Donut } from "@/components/ui/donut";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
-import { FieldLabel, SectionLabel } from "@/components/ui/section-label";
+import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow, StatTile } from "@/components/ui/stat-tile";
 import { getDashboard } from "@/lib/data/dashboard";
 import { getViewer } from "@/lib/data/viewer";
-import { UPDATE_STATUS_LABELS, UPDATE_STATUS_TONES } from "@/lib/labels";
 import { can } from "@/lib/permissions";
 import { RequestDecision } from "@/components/forms/request-decision";
-import { MarkReviewedButton } from "@/components/forms/review-actions";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ scope?: string }>;
-}) {
-  const { scope: scopeParam } = await searchParams;
-  const scope = scopeParam === "club" ? "club" : "mine";
+export default async function DashboardPage() {
   const viewer = await getViewer();
-  const view = await getDashboard(viewer.actor, viewer.graph, scope);
+  const view = await getDashboard(viewer.actor, viewer.graph);
   const {
-    compliance,
     counts,
     club,
-    reviewQueue,
-    escalations,
     flaggedProjects,
     completions,
     deadlinesMoved,
     reQueue,
-    goneQuiet,
-    rollUp,
     trainings,
     requests,
   } = view;
@@ -159,56 +143,24 @@ export default async function DashboardPage({
             <CardBody>
               <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <SectionLabel>Operations</SectionLabel>
-                    {/*
-                      Co-Leads only. Scoped stays the default: the dashboard is
-                      built around a 15-minute weekly obligation, and landing on
-                      the whole club makes "what do I owe" unanswerable.
-                    */}
-                    {viewer.actor.globalRole === "co_lead" ? (
-                      <div className="flex items-center gap-1 text-sm">
-                        <Link
-                          href="/dashboard"
-                          className={
-                            scope === "mine"
-                              ? "text-cardinal-600 font-bold"
-                              : "text-ink-muted hover:text-ink font-semibold"
-                          }
-                        >
-                          My reports
-                        </Link>
-                        <span className="text-ink-muted">·</span>
-                        <Link
-                          href="/dashboard?scope=club"
-                          className={
-                            scope === "club"
-                              ? "text-cardinal-600 font-bold"
-                              : "text-ink-muted hover:text-ink font-semibold"
-                          }
-                        >
-                          Whole club
-                        </Link>
-                      </div>
-                    ) : null}
-                  </div>
+                  <SectionLabel>Operations</SectionLabel>
                   <h2 className="text-ink mt-2 text-2xl font-bold">
-                    Cycle summary
+                    What you owe
                   </h2>
+                  {/*
+                    There was a Co-Lead "My reports · Whole club" toggle here. It
+                    widened one thing — whose check-ins counted toward your
+                    reading obligation — and that obligation is gone. A Co-Lead
+                    is already a top RE everywhere, so both settings now render
+                    the same page.
+                  */}
                   <p className="text-ink-soft mt-2 text-[15px]">
-                    {scope === "club"
-                      ? "Who has checked in, how the effort is spread, and which projects need a hand — across the whole club."
-                      : `Who has checked in, how the effort is spread, and which projects need a hand — for you and the ${counts.peopleOverseen} ${counts.peopleOverseen === 1 ? "person" : "people"} you oversee, not the whole club.`}
+                    Work waiting on you, and which projects need a hand.
                   </p>
                 </div>
-                <Donut
-                  fraction={compliance.fraction}
-                  label="on time"
-                  size={132}
-                />
               </div>
 
-              <div className="mt-7 grid gap-4 sm:grid-cols-3">
+              <div className="mt-7 grid gap-4 sm:grid-cols-2">
                 {/*
                   A COUNT of log entries, not a sum of hours.
 
@@ -223,73 +175,22 @@ export default async function DashboardPage({
                   value={view.logsThisWeek}
                 />
                 <StatTile
-                  label="Updates awaiting review"
-                  value={reviewQueue.length}
+                  label="Waiting on your sign-off"
+                  value={reQueue.signOffs.length}
                 />
               </div>
             </CardBody>
           </Card>
 
           {/*
-            Escalations — Leads under you who are leaving people unheard.
-            Rendered only when non-empty: a permanent "0 escalations" panel is
-            noise that trains you to skip the whole column.
+            What you owe as an RE.
 
-            Reports on LEADS, not on updates. "Marcus has 2 people waiting,
-            oldest 5 days" is one conversation; a list of thirty unread reports
-            is a spreadsheet.
+            Since check-ins went there is only one queue here, and it is this
+            one: work somebody marked done that nobody has confirmed. It is
+            deliberately not a reading queue - an RE reads their project's feed,
+            which is a page they already have a reason to open.
           */}
-          {escalations.length > 0 ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Not Being Read</SectionLabel>
-                <p className="text-ink-soft mt-2 text-[15px]">
-                  These Leads have check-ins they haven&apos;t read. A report
-                  nobody reads is worse than no report — the member spent effort
-                  on it.
-                </p>
-
-                <div className="mt-4 space-y-3">
-                  {escalations.map(({ lead, overdue, worstAgeDays }) => (
-                    <div
-                      key={lead.id}
-                      className="rounded-tile border-warn-fg/30 bg-warn-bg/40 border px-4 py-3.5"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <Link
-                          href={`/members/${lead.id}`}
-                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                        >
-                          {lead.fullName}
-                        </Link>
-                        <span className="text-warn-fg text-sm font-semibold">
-                          oldest waiting {worstAgeDays}{" "}
-                          {worstAgeDays === 1 ? "day" : "days"}
-                        </span>
-                      </div>
-                      <p className="text-ink-soft mt-1.5 text-sm">
-                        {overdue.length}{" "}
-                        {overdue.length === 1 ? "person" : "people"} waiting:{" "}
-                        {overdue
-                          .map((r) => r.author?.fullName ?? "someone")
-                          .join(", ")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {/*
-            The RE half of what you owe, kept separate from the Lead half above.
-
-            Two obligations belonging to two different roles: a Lead reads a
-            person's check-in, an RE answers a project's section and signs off
-            its work. Merging them would tell somebody who is both that they
-            owe "seven things" without saying which hat they're wearing.
-          */}
-          {reQueue.signOffs.length + reQueue.unanswered.length > 0 ? (
+          {reQueue.signOffs.length > 0 ? (
             <Card>
               <CardBody>
                 <SectionLabel>Waiting On You As RE</SectionLabel>
@@ -320,32 +221,6 @@ export default async function DashboardPage({
                         <p className="text-ink-soft mt-1 text-sm">
                           {owner?.fullName ?? "Someone"} marked this done — it
                           doesn&apos;t count until you confirm it.
-                        </p>
-                      </div>
-                    )
-                  )}
-
-                  {reQueue.unanswered.map(
-                    ({ entry, author, ageDays, escalated }) => (
-                      <div
-                        key={entry.id}
-                        className={`rounded-tile border px-4 py-3 ${
-                          escalated
-                            ? "border-warn-fg/30 bg-warn-bg/40"
-                            : "border-line"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                          <span className="text-ink text-[15px] font-bold">
-                            {author?.fullName ?? "Someone"} is waiting on an
-                            answer
-                          </span>
-                          <span className="text-ink-muted text-sm">
-                            {ageDays === 0 ? "today" : `${ageDays}d waiting`}
-                          </span>
-                        </div>
-                        <p className="text-ink-soft mt-1 text-sm">
-                          {entry.blockers || entry.nextSteps}
                         </p>
                       </div>
                     )
@@ -517,119 +392,6 @@ export default async function DashboardPage({
           ) : null}
 
           {/*
-            Who has gone quiet.
-
-            Not a missed check-in — that's already visible and already
-            escalates. This is the person who simply stopped, which nothing
-            reported and which is what the club actually loses people to.
-            Deliberately framed as a prompt, not a flag on anybody's record.
-          */}
-          {goneQuiet.length > 0 ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Gone Quiet</SectionLabel>
-                <p className="text-ink-soft mt-2 text-[15px]">
-                  Nothing logged this week, but still holding open work. Worth a
-                  message — usually it&apos;s midterms, sometimes it&apos;s
-                  being stuck and not saying so.
-                </p>
-
-                <div className="mt-4 space-y-2.5">
-                  {goneQuiet.map(
-                    ({ member, openDeliverables, lastLoggedAt }) => (
-                      <div
-                        key={member.id}
-                        className="rounded-tile border-line flex flex-wrap items-center justify-between gap-3 border px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <Link
-                            href={`/members/${member.id}`}
-                            className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                          >
-                            {member.fullName}
-                          </Link>
-                          <p className="text-ink-muted mt-0.5 text-sm">
-                            {openDeliverables} open{" "}
-                            {openDeliverables === 1
-                              ? "deliverable"
-                              : "deliverables"}
-                            {lastLoggedAt
-                              ? ` · last logged ${new Date(
-                                  `${lastLoggedAt}T00:00:00Z`
-                                ).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  timeZone: "UTC",
-                                })}`
-                              : " · has never logged any work"}
-                          </p>
-                        </div>
-                        <ContactLink member={member} showLabel={false} />
-                      </div>
-                    )
-                  )}
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {/*
-            The roll-up, derived rather than composed.
-
-            "Roll-ups from Leads to Co-Leads" was on the phase list as a thing
-            a Lead writes. A report somebody types by hand is a chore that gets
-            skipped in week three, and every number in it already exists — the
-            scarce resource is leadership READING, not leadership typing.
-          */}
-          {rollUp.length > 0 ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Roll-Up</SectionLabel>
-                <p className="text-ink-soft mt-2 text-[15px]">
-                  Every Lead and how their people are doing this week. Sorted by
-                  who has somebody waiting longest.
-                </p>
-
-                <div className="mt-4 space-y-2.5">
-                  {rollUp.map((row) => (
-                    <div
-                      key={row.lead.id}
-                      className="rounded-tile border-line border px-4 py-3"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <Link
-                          href={`/members/${row.lead.id}`}
-                          className="text-ink hover:text-cardinal-600 text-[15px] font-bold"
-                        >
-                          {row.lead.fullName}
-                        </Link>
-                        {row.worstUnreadDays >= 3 ? (
-                          <Badge tone="risk">
-                            oldest unread {row.worstUnreadDays}d
-                          </Badge>
-                        ) : row.unread > 0 ? (
-                          <Badge tone="warn">{row.unread} to read</Badge>
-                        ) : (
-                          <Badge tone="ok">Caught up</Badge>
-                        )}
-                      </div>
-                      <p className="text-ink-muted mt-1 text-sm">
-                        {row.reports} {row.reports === 1 ? "report" : "reports"}{" "}
-                        · {row.logsThisWeek}{" "}
-                        {row.logsThisWeek === 1 ? "log entry" : "log entries"}{" "}
-                        this week
-                        {row.quietCount > 0
-                          ? ` · ${row.quietCount} gone quiet`
-                          : ""}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {/*
             Where "notify up the chain" arrives.
 
             A notice written only into the project's own feed reaches nobody —
@@ -742,181 +504,6 @@ export default async function DashboardPage({
             </Card>
           ) : null}
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Review queue */}
-            <Card>
-              <CardBody>
-                <div className="flex items-center justify-between gap-4">
-                  <SectionLabel>Needs Review</SectionLabel>
-                  <Link
-                    href="/updates"
-                    className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
-                  >
-                    All updates
-                  </Link>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {reviewQueue.length === 0 ? (
-                    <EmptyState
-                      message="Nothing waiting on you."
-                      actionLabel="View all updates"
-                      actionHref="/updates"
-                    />
-                  ) : (
-                    reviewQueue.map(
-                      ({ update, author, sections, ageDays, escalated }) => (
-                        <div
-                          key={update.id}
-                          className={
-                            escalated
-                              ? "rounded-tile border-cardinal-600 border px-4 py-3.5"
-                              : "rounded-tile border-line border px-4 py-3.5"
-                          }
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-ink text-[15px] font-bold">
-                              {author?.fullName ?? "Unknown member"}
-                              {/* Age, not a count. "12 unread" is ignorable;
-                                "waiting 5 days" names a specific person kept
-                                waiting, and is the same weight of problem
-                                whether you lead three people or fifteen. */}
-                              <span
-                                className={
-                                  escalated
-                                    ? "text-cardinal-600 ml-2 text-sm font-semibold"
-                                    : "text-ink-muted ml-2 text-sm font-normal"
-                                }
-                              >
-                                {ageDays === 0
-                                  ? "today"
-                                  : `waiting ${ageDays} ${ageDays === 1 ? "day" : "days"}`}
-                                {escalated ? " — your Lead can see this" : ""}
-                              </span>
-                            </p>
-                            <Badge tone={UPDATE_STATUS_TONES[update.status]}>
-                              {UPDATE_STATUS_LABELS[update.status]}
-                            </Badge>
-                          </div>
-
-                          {/* One block per project, so it's always clear which
-                            piece of work each note refers to. */}
-                          <div className="mt-2.5 space-y-2.5">
-                            {sections.map(({ entry, project }) => (
-                              <div
-                                key={entry.id}
-                                className="border-line-soft border-l-2 pl-3"
-                              >
-                                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                  {project ? (
-                                    <Link
-                                      href={`/projects/${project.slug}`}
-                                      className="text-cardinal-600 hover:text-cardinal-700 text-[13px] font-semibold"
-                                    >
-                                      {project.name}
-                                    </Link>
-                                  ) : (
-                                    <span className="text-ink-muted text-[13px] font-semibold">
-                                      Unknown project
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-ink-soft mt-1 line-clamp-2 text-sm">
-                                  {entry.progress}
-                                </p>
-                                {entry.blockers ? (
-                                  <p className="text-ink-soft mt-1.5 flex items-start gap-1.5 text-sm">
-                                    <TriangleAlert className="text-cardinal-600 mt-0.5 size-3.5 shrink-0" />
-                                    <span className="font-medium">
-                                      {entry.blockers}
-                                    </span>
-                                  </p>
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/*
-                            Clear it from here.
-
-                            The button used to live only on /updates, which is
-                            not in the nav — reachable solely through a link on
-                            this page. So the dashboard showed you a queue with
-                            an escalation clock on it and no way to act, and the
-                            honest reaction was "how do I get rid of this?".
-
-                            Reading the check-in is the obligation and the whole
-                            check-in is right here; making somebody navigate to
-                            press a button about what they just read is the kind
-                            of friction that turns a 15-minute weekly job into a
-                            skipped one.
-                          */}
-                          {author ? (
-                            <div className="border-line-soft mt-3 border-t pt-3">
-                              <MarkReviewedButton
-                                updateId={update.id}
-                                authorId={author.id}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    )
-                  )}
-                </div>
-              </CardBody>
-            </Card>
-
-            {/* Update window */}
-            <Card>
-              <CardBody>
-                <div className="flex items-center justify-between gap-4">
-                  <SectionLabel>Update Window</SectionLabel>
-                  <Badge tone="ok">Open now</Badge>
-                </div>
-
-                <h3 className="text-ink mt-4 text-[17px] font-bold">
-                  Today&apos;s check-in
-                </h3>
-                <p className="text-ink-soft mt-1.5 text-sm">
-                  Members submit twice a week on the days they choose. This
-                  window closes at 11:59 PM.
-                </p>
-
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  <MiniStat
-                    label="On time"
-                    value={compliance.onTime}
-                    tone="ok"
-                  />
-                  <MiniStat label="Late" value={compliance.late} tone="warn" />
-                  <MiniStat
-                    label="Missed"
-                    value={compliance.missed}
-                    tone="risk"
-                  />
-                </div>
-
-                {compliance.pending > 0 ? (
-                  <p className="text-ink-muted mt-3 text-sm">
-                    {compliance.pending} not yet due — excluded from the
-                    percentage.
-                  </p>
-                ) : null}
-
-                <div className="mt-5">
-                  <ButtonLink
-                    href="/updates"
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    Open review queue
-                  </ButtonLink>
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-
           {/* Projects needing attention */}
           <Card>
             <CardBody>
@@ -962,32 +549,6 @@ export default async function DashboardPage({
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "ok" | "warn" | "risk";
-}) {
-  const color =
-    tone === "ok"
-      ? "text-ok-fg"
-      : tone === "warn"
-        ? "text-warn-fg"
-        : "text-risk-fg";
-
-  return (
-    <div className="rounded-tile border-line border px-3 py-3 text-center">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <FieldLabel className="mt-1 text-[12px] font-medium tracking-normal normal-case">
-        {label}
-      </FieldLabel>
     </div>
   );
 }

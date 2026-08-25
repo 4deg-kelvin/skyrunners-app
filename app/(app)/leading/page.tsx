@@ -12,7 +12,6 @@ import { getViewer } from "@/lib/data/viewer";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { can, isCoLead, isLeadership } from "@/lib/permissions";
 import { HELP_REQUEST_STALE_DAYS } from "@/lib/types";
-import { REVIEW_GRACE_DAYS } from "@/lib/review";
 
 export const metadata = {
   title: "Leading here",
@@ -351,22 +350,11 @@ export default async function LeadingPage() {
           </h2>
 
           <div className="mt-4 space-y-2.5">
-            <Rule can title="Read your people's check-ins">
-              They arrive twice a week on{" "}
-              <Link
-                href="/dashboard"
-                className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-              >
-                your dashboard
-              </Link>
-              , scoped to the people you oversee and nobody else. Mark them
-              read. An unread one escalates to{" "}
-              <span className="text-ink font-semibold">
-                the Lead above you after {REVIEW_GRACE_DAYS} days
-              </span>{" "}
-              — on age, not on count, because &ldquo;12 unread&rdquo; is
-              ignorable and &ldquo;Kenji has been waiting 6 days&rdquo; names a
-              person.
+            <Rule can title="Read the feed on projects you're an RE of">
+              Work people log lands in the project&apos;s feed, and you can
+              reply to any line of it. That is the whole reporting relationship
+              now — there are no check-ins to collect and nobody files a report
+              to a person.
             </Rule>
             <Rule can title="Answer join requests on projects you're an RE of">
               Somebody asking to help is the whole point of Find Work.
@@ -416,10 +404,6 @@ export default async function LeadingPage() {
             </Rule>
             <Rule title="Add yourself to a project">
               Nobody can. Ask the RE — it&apos;s tracked, and it escalates.
-            </Rule>
-            <Rule title="Delete a check-in you were supposed to read">
-              That would erase the obligation and the escalation together, which
-              are the only things making review mean anything.
             </Rule>
             {!coLead ? (
               <Rule title="Start a project in a division you don't lead">
@@ -486,7 +470,7 @@ export default async function LeadingPage() {
         <CardBody>
           <SectionLabel>If you remember one thing</SectionLabel>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-            Read your people&apos;s check-ins and act on the ones that say
+            Read the feed on your projects and act on anything that says
             somebody is stuck. That single habit is most of the value here — the
             club loses members to being quietly blocked for three weeks, not to
             a lack of reporting.

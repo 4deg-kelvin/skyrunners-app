@@ -85,7 +85,6 @@ const dataModules = {
   members: await import("../lib/data/members.ts"),
   projects: await import("../lib/data/projects.ts"),
   dashboard: await import("../lib/data/dashboard.ts"),
-  updates: await import("../lib/data/updates.ts"),
   settings: await import("../lib/data/settings.ts"),
   events: await import("../lib/data/events.ts"),
   blockers: await import("../lib/data/blockers.ts"),
@@ -166,9 +165,6 @@ await check("/projects/[slug] getProjectBySlug", async () =>
 );
 await check("/dashboard      getDashboard", async () =>
   dataModules.dashboard.getDashboard(actor, graph)
-);
-await check("/updates        getUpdates", async () =>
-  dataModules.updates.getUpdates(actor)
 );
 await check("/settings       getSettings", async () =>
   dataModules.settings.getSettings(me.id)

@@ -95,23 +95,14 @@ export default async function AppLayout({
   */
   let nudgeToLogWork = false;
   /*
-    Skipped entirely for advisors, and not merely hidden.
-
-    Both of these come out of `getMyWork`, which synthesises a pending check-in
-    obligation for anybody with no history so the composer has somewhere to
-    write. An advisor owes no check-in ever, so that placeholder would put a
-    permanent red dot on a nav item they cannot even see — an alert that cannot
-    be cleared, for a page that does not exist for them. Not asking is cheaper
-    than asking and then discarding the answer.
+    Still skipped for advisors. An advisor answers no join requests and is not
+    asked to log work, so both readings would be zero for a nav item they cannot
+    see — not asking is cheaper than asking and discarding the answer.
   */
   if (!isAdvisor(viewer.actor)) {
     try {
       const myWork = await getMyWork(viewer.member.id);
-      const updateNeedsAttention =
-        myWork.currentUpdate.update.status === "pending" ||
-        myWork.currentUpdate.update.status === "late";
-      alertCount =
-        (updateNeedsAttention ? 1 : 0) + myWork.requestsAwaitingMe.length;
+      alertCount = myWork.requestsAwaitingMe.length;
       nudgeToLogWork =
         !myWork.hasEverLoggedWork &&
         daysBetweenDays(viewer.member.joinedAt, todayInClubTime()) >= 1;

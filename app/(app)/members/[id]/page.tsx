@@ -20,10 +20,8 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { DetailRow } from "@/components/ui/stat-tile";
 import { TrainingRecord } from "@/components/ui/training-record";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
-import { ActionButton } from "@/components/forms/action-form";
 import { ReopenButton } from "@/components/forms/help-request-actions";
 import { MemberRequestForm } from "@/components/forms/member-request";
-import { deleteCheckInAction } from "@/lib/actions";
 import { getResolvedAsksFor } from "@/lib/data/blockers";
 import { getMemberProfile, type MemberProjectRow } from "@/lib/data/members";
 import { getTrainings } from "@/lib/data/trainings";
@@ -126,7 +124,6 @@ export default async function MemberProfilePage({
     ? await advisorProfileFor(member.id)
     : null;
   const role = advisorBackground ? describeRole(advisorBackground) : undefined;
-  const canDeleteCheckIns = can.deleteCheckIn(viewer.actor, member.id);
   // Their Lead chain or a Co-Lead. Never themselves — the operation refuses
   // that too, because this is a safety record and one check isn't enough.
   const canVerifyTrainings = can.verifyTraining(
@@ -432,12 +429,13 @@ export default async function MemberProfilePage({
           )}
 
           {/*
-            Their check-in history.
-            Reading is separate from being accountable for reading: the review
-            QUEUE on the dashboard stays scoped to direct reports, because that's
-            the obligation that escalates. This is here so a Co-Lead, or any Lead
-            further up the chain, can catch up on someone without inheriting a
-            queue item for them.
+            Their check-in history — an archive now.
+
+            The club stopped asking for check-ins on 2026-08-24. These rows are
+            what people already wrote, and they stay readable: the per-project
+            half was always public and is part of each project's record. What is
+            gone is the review machinery around them, because "not yet read"
+            named an obligation that no longer exists.
           */}
           {canReadCheckIns && !subjectIsAdvisor ? (
             <Card>
@@ -465,30 +463,13 @@ export default async function MemberProfilePage({
                                 year: "numeric",
                               })}
                             </p>
-                            <div className="flex items-center gap-3">
+                            {reviewedBy ? (
                               <p className="text-ink-muted text-xs">
-                                {reviewedBy
-                                  ? `Read by ${reviewedBy.preferredName ?? reviewedBy.fullName}`
-                                  : "Not yet read"}
+                                Read by{" "}
+                                {reviewedBy.preferredName ??
+                                  reviewedBy.fullName}
                               </p>
-                              {/*
-                              Your own, or a Co-Lead clearing up. Anything a
-                              Lead has already read stays — the operation
-                              refuses it, because they acted on it.
-                            */}
-                              {canDeleteCheckIns && !reviewedBy ? (
-                                <ActionButton
-                                  action={deleteCheckInAction}
-                                  fields={{
-                                    updateId: update.id,
-                                    authorId: member.id,
-                                  }}
-                                  label="Delete"
-                                  pendingLabel="Deleting…"
-                                  tone="danger"
-                                />
-                              ) : null}
-                            </div>
+                            ) : null}
                           </div>
 
                           {sections.map(({ entry, project }) => (

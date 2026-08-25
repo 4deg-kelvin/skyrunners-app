@@ -117,22 +117,27 @@ describe("the daily digest lands in the California evening", () => {
   });
 });
 
-describe("the check-in nudge still lands before the deadline", () => {
-  const nudge = config.crons.find((c) => c.path.includes("checkin-reminders"));
+describe("the crons fit what the plan allows", () => {
+  /*
+    There was a "check-in nudge lands before the deadline" suite here. The nudge
+    cron went when the club stopped asking for check-ins on 2026-08-24.
 
-  test("it fires in the middle of the day, not the evening", () => {
-    /*
-      Every check-in is due at 23:59 UTC, and this job's "due in about 4 hours"
-      pass only makes sense while that is still ahead. Moving it late turns the
-      nudge into a post-mortem — the reason the digest is a second cron rather
-      than a third pass on this one.
-    */
-    assert.ok(nudge, "no checkin-reminders cron in vercel.json");
-    const [minute, hour] = nudge!.schedule.split(" ").map(Number);
-    const utcMinutes = hour * 60 + minute;
-    assert.ok(
-      utcMinutes < 23 * 60 + 59,
-      `fires at ${hour}:${minute} UTC, at or after the 23:59 UTC deadline`
-    );
+    This is what is worth keeping from it. Vercel's Hobby plan limits cron
+    FREQUENCY, not just count — once a day each — and getting that wrong is not
+    a warning, it is a rejected deployment. It cost four in a row once, and the
+    error names the plan rather than the schedule that broke it.
+  */
+  test("every cron runs at most once a day", () => {
+    for (const cron of config.crons) {
+      const [minute, hour] = cron.schedule.split(" ");
+      assert.ok(
+        !minute.includes("*") && !minute.includes("/"),
+        `${cron.path}: minute field "${minute}" fires more than once a day`
+      );
+      assert.ok(
+        !hour.includes("*") && !hour.includes("/"),
+        `${cron.path}: hour field "${hour}" fires more than once a day`
+      );
+    }
   });
 });

@@ -1105,149 +1105,9 @@ async function setProjectREAction$impl(
 // Writing a check-in
 // ---------------------------------------------------------------------------
 
-/**
- * Submit your own twice-weekly check-in.
- *
- * Fields arrive as `progress:<projectId>` etc. so one form can carry a variable
- * number of project sections without the client having to serialise anything.
- *
- * Hours are recomputed HERE from work logs rather than accepted from the form.
- * They're a factual record, not a claim — letting the client post them would
- * make the number editable in a way logging hours deliberately isn't.
- */
-async function submitCheckInAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-
-  if (!can.submitOwnUpdate(viewer.actor, viewer.member.id)) {
-    return denied("submit this check-in");
-  }
-
-  const projectIds = formData.getAll("projectId").map(String);
-  const entries = projectIds.map((projectId) => ({
-    projectId,
-    progress: String(formData.get(`progress:${projectId}`) ?? ""),
-    blockers: String(formData.get(`blockers:${projectId}`) ?? ""),
-    nextSteps: String(formData.get(`nextSteps:${projectId}`) ?? ""),
-  }));
-
-  const result = await ops.submitCheckIn({
-    memberId: viewer.member.id,
-    entries,
-    generalNote: String(formData.get("generalNote") ?? ""),
-    leadId: viewer.member.leadId,
-    today: today(),
-  });
-
-  if (result.ok) {
-    refresh();
-
-    /*
-      The Lead, not the member.
-
-      This is the one notification with a real deadline attached: an unread
-      check-in escalates after three days, and the whole review model rests on
-      one named person actually reading it. Everything else the app surfaces
-      can wait until somebody opens the site; this can't.
-    */
-    const lead = viewer.member.leadId
-      ? getMember(viewer.member.leadId)
-      : undefined;
-    if (lead) {
-      notify(
-        lead.discordUserId,
-        discordMessages.checkInSubmitted({
-          memberName: viewer.member.preferredName ?? viewer.member.fullName,
-          projectCount: entries.filter((e) => e.progress.trim()).length,
-          url: appUrl("/dashboard"),
-        })
-      );
-    }
-  }
-  return toResult(result, "Check-in sent to your Lead.");
-}
-
-async function setUpdateScheduleAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-
-  if (!can.setOwnSchedule(viewer.actor, viewer.member.id)) {
-    return denied("change this schedule");
-  }
-
-  const weekdays = String(formData.get("weekdays") ?? "")
-    .split(",")
-    .map((d) => Number(d.trim()))
-    .filter((d) => Number.isFinite(d));
-
-  const result = await ops.setUpdateSchedule({
-    memberId: viewer.member.id,
-    weekdays,
-  });
-
-  if (result.ok) refresh();
-  return toResult(result, "Check-in days saved.");
-}
-
-async function setPauseAction$impl(formData: FormData): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const weeks = Number(formData.get("weeks") ?? 0);
-
-  if (!can.setOwnSchedule(viewer.actor, viewer.member.id)) {
-    return denied("change this schedule");
-  }
-
-  let until: string | null = null;
-  if (weeks > 0) {
-    const d = new Date(`${today()}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + weeks * 7);
-    until = d.toISOString().slice(0, 10);
-  }
-
-  const result = await ops.setCheckInPause({
-    memberId: viewer.member.id,
-    until,
-    today: today(),
-  });
-
-  if (result.ok) refresh();
-  return toResult(
-    result,
-    until
-      ? `Paused until ${until}. No missed check-ins will build up.`
-      : "Resumed."
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Check-in review
 // ---------------------------------------------------------------------------
-
-async function markUpdateReviewedAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const updateId = String(formData.get("updateId") ?? "");
-  const authorId = String(formData.get("authorId") ?? "");
-
-  // Lead chain only. REs deliberately cannot mark a personal report read —
-  // that's what keeps the obligation on exactly one person and makes the
-  // escalation in lib/review.ts mean something.
-  if (!can.reviewUpdate(viewer.actor, viewer.graph, authorId)) {
-    return denied("review this check-in");
-  }
-
-  const result = await ops.markUpdateReviewed({
-    updateId,
-    reviewedBy: viewer.member.id,
-    today: today(),
-  });
-
-  if (result.ok) refresh();
-  return toResult(result, "Marked as read.");
-}
 
 // ---------------------------------------------------------------------------
 // Phase 2 — membership
@@ -1396,22 +1256,6 @@ async function deleteDeliverableAction$impl(
   const result = await ops.deleteDeliverable(deliverableId);
   if (result.ok) refresh();
   return toResult(result, "Deliverable deleted.");
-}
-
-async function deleteCheckInAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const updateId = String(formData.get("updateId") ?? "");
-  const authorId = String(formData.get("authorId") ?? "");
-
-  if (!can.deleteCheckIn(viewer.actor, authorId)) {
-    return denied("delete this check-in");
-  }
-
-  const result = await ops.deleteCheckIn(updateId);
-  if (result.ok) refresh();
-  return toResult(result, "Check-in deleted.");
 }
 
 async function setProjectTeamAction$impl(
@@ -3050,30 +2894,6 @@ export async function setProjectREAction(
   return withRequestStore(() => setProjectREAction$impl(formData));
 }
 
-export async function submitCheckInAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => submitCheckInAction$impl(formData));
-}
-
-export async function setPauseAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => setPauseAction$impl(formData));
-}
-
-export async function setUpdateScheduleAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => setUpdateScheduleAction$impl(formData));
-}
-
-export async function markUpdateReviewedAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => markUpdateReviewedAction$impl(formData));
-}
-
 export async function requestToJoinAction(
   formData: FormData
 ): Promise<ActionResult> {
@@ -3102,12 +2922,6 @@ export async function deleteDeliverableAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => deleteDeliverableAction$impl(formData));
-}
-
-export async function deleteCheckInAction(
-  formData: FormData
-): Promise<ActionResult> {
-  return withRequestStore(() => deleteCheckInAction$impl(formData));
 }
 
 export async function setProjectTeamAction(

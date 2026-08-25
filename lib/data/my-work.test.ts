@@ -1,5 +1,5 @@
 /**
- * What the check-in composer offers you a box for.
+ * The work log, day by day, on My Work.
  *
  * Run with:  npm test
  *
@@ -7,22 +7,27 @@
  * Why this file exists
  * ---------------------------------------------------------------------------
  *
- * Two bugs in two days, both in the same six lines, both invisible to every
- * other check in the repo — the page rendered, nothing threw, the form
- * submitted. Only a person looking at their own projects could tell.
+ * It was written for the check-in composer, which the club retired on
+ * 2026-08-24. Two bugs in two days lived in the six lines that decided which
+ * projects it offered a box for, and both were invisible to every other check
+ * in the repo -- the page rendered, nothing threw, the form submitted:
  *
- *   1. Sections were built from `currentUpdate.entries`, which are seeded from
+ *   1. Sections were built from `currentUpdate.entries`, which were seeded from
  *      logged hours. Somebody on three projects who hadn't logged anything saw
- *      "nothing to fill in" and could write nothing at all — so the member with
- *      most to report, the one who was blocked, was the one told to say nothing.
+ *      "nothing to fill in" -- so the member with most to report, the one who
+ *      was blocked, was the one told to say nothing.
  *
- *   2. Then sections were built from committed projects, and COMPLETED ones
- *      came with them. Four delivered projects meant four empty boxes asking
- *      what moved forward on work that isn't moving.
+ *   2. Then sections were built from committed projects, and COMPLETED ones came
+ *      with them. Four delivered projects meant four empty boxes asking what
+ *      moved forward on work that isn't moving.
  *
- * The rule that has to hold, in one line: **a box appears for work that is
- * yours and still running, and for nothing else — except words you already
- * wrote.**
+ * Those tests went with the composer. The lesson did not, and it applies to
+ * every list of a member's projects this app renders: **show work that is theirs
+ * and still running, and nothing else.**
+ *
+ * What is left here is the log itself, which the removal made more important
+ * rather than less -- it is now the only thing a member writes about their own
+ * progress.
  *
  * `SKYRUNNERS_STORE_DIR` is set BEFORE the store module loads, because
  * `disk.ts` resolves its path at module scope: a static top-level import would
@@ -65,114 +70,6 @@ process.on("exit", () => {
 });
 
 /** Set a project's phase, leaving everything else as it was. */
-async function setPhase(projectId: string, phase: "complete" | "testing") {
-  const p = disk.readStore().projects.find((x) => x.id === projectId)!;
-  const result = await ops.updateProject({
-    projectId,
-    name: p.name,
-    description: p.description,
-    phase,
-    health: p.health,
-    targetDate: p.targetDate,
-    openRoles: p.openRoles,
-    actorId: "m-anish",
-    today: TODAY,
-  });
-  if (!result.ok) throw new Error(`setPhase failed: ${result.error}`);
-}
-
-async function sectionProjectIds(memberId: string) {
-  const view = await getMyWork(memberId);
-  return view.currentUpdate.sections.map((s) => s.project.id).sort();
-}
-
-describe("the check-in composer offers a box per live committed project", () => {
-  test("every committed project gets one, with no hours logged", async () => {
-    // Bug 1. Being on the project creates the section; hours only fill it in.
-    const ids = await sectionProjectIds(NOAH);
-    assert.deepEqual(ids, ["p-layup", "p-load-test", "p-wing-spar"]);
-  });
-
-  test("a completed project drops out", async () => {
-    // p-load-test has no children, so it completes freely.
-    await setPhase("p-load-test", "complete");
-
-    const ids = await sectionProjectIds(NOAH);
-    assert.deepEqual(ids, ["p-layup", "p-wing-spar"]);
-  });
-
-  test("reopening it brings the box straight back", async () => {
-    // The behaviour that has to hold: withdrawing a sign-off puts a project
-    // back to active, and the member owes an update on it again.
-    await setPhase("p-load-test", "complete");
-    await setPhase("p-load-test", "testing");
-
-    const ids = await sectionProjectIds(NOAH);
-    assert.deepEqual(ids, ["p-layup", "p-load-test", "p-wing-spar"]);
-  });
-
-  test("logged work on a completed project doesn't resurrect the box", async () => {
-    /*
-      The specific way the fix could be undone. A row seeded from logged work
-      would fall through to the "projects they've since left" loop and render
-      anyway, putting the empty box straight back.
-    */
-    const logged = await ops.logWork({
-      memberId: NOAH,
-      projectId: "p-load-test",
-      workDate: TODAY,
-      description: "packed up the rig",
-      today: TODAY,
-    });
-    assert.equal(logged.ok, true);
-    await setPhase("p-load-test", "complete");
-
-    const ids = await sectionProjectIds(NOAH);
-    assert.ok(!ids.includes("p-load-test"));
-  });
-
-  test("but words already written are never discarded", async () => {
-    /*
-      The other half. If they wrote a sentence and the project completed
-      before they submitted, dropping the section throws away their writing —
-      usually the handover note, which is the part anybody needs.
-    */
-    const view = await getMyWork(NOAH);
-    const update = disk
-      .readStore()
-      .progressUpdates.find((u) => u.id === view.currentUpdate.update.id);
-    assert.ok(update, "the current update should be a real row by now");
-
-    update.entries.push({
-      id: "e-test-1",
-      updateId: update.id,
-      projectId: "p-load-test",
-      progress: "Rig is packed up, results are in the shared drive.",
-    });
-    await setPhase("p-load-test", "complete");
-
-    const after = await getMyWork(NOAH);
-    const kept = after.currentUpdate.sections.find(
-      (s) => s.project.id === "p-load-test"
-    );
-    assert.ok(kept, "a section with real content must survive completion");
-    assert.match(kept.entry.progress, /shared drive/);
-  });
-
-  test("following a project never creates a box", async () => {
-    // Following is watch-only and carries no obligation. Same rule as before
-    // the change; asserted here so the committed filter can't widen by accident.
-    const view = await getMyWork(NOAH);
-    const followedIds = view.following.map((f) => f.project.id);
-    for (const id of followedIds) {
-      assert.ok(
-        !view.currentUpdate.sections.some((s) => s.project.id === id),
-        `following ${id} should not produce a check-in section`
-      );
-    }
-  });
-});
-
 // ---------------------------------------------------------------------------
 // The work log, day by day, beside the form
 // ---------------------------------------------------------------------------
@@ -275,116 +172,3 @@ describe("the day-by-day work log", () => {
 });
 
 // ---------------------------------------------------------------------------
-// The check-in drafts itself from the log
-// ---------------------------------------------------------------------------
-
-describe("check-in sections pre-fill from the work log", () => {
-  /*
-    Log entries must be dated on or before mock `today()`, NOT this file's TODAY.
-
-    `getMyWork` reads `today()` from lib/mock-data, which is `DEMO_TODAY`
-    (2026-08-06) outside live mode — while `TODAY` here is 2026-08-10 and is only
-    what we hand to the write operations. An entry dated 2026-08-10 is therefore
-    in the FUTURE as far as the composer is concerned, `workInPeriod` filters it
-    out, and the draft comes back empty. That cost a debugging round: the write
-    succeeds, the read silently ignores it, and nothing anywhere says why.
-  */
-  const LOG_DAY = "2026-08-06";
-
-  test("a project with logged work arrives written, and isn't demanded", async () => {
-    const r = await ops.logWork({
-      memberId: NOAH,
-      projectId: "p-layup",
-      workDate: LOG_DAY,
-      description: "vacuum-bagged the second coupon",
-      today: TODAY,
-    });
-    assert.equal(r.ok, true);
-
-    const view = await getMyWork(NOAH);
-    const section = view.currentUpdate.sections.find(
-      (s) => s.project.id === "p-layup"
-    );
-    assert.ok(section, "p-layup should have a section");
-    assert.match(section.draftProgress, /vacuum-bagged the second coupon/);
-    assert.equal(section.needsWriting, false);
-    assert.ok(section.loggedWork.length > 0);
-  });
-
-  test("a project with nothing logged is empty and required", async () => {
-    // The one thing the member has to write, and the whole reason the rest is
-    // free. `submitCheckIn` refuses on this same condition.
-    await disk.mutate((s) => {
-      s.workLogs = s.workLogs.filter((w) => w.memberId !== NOAH);
-      return { ok: true as const, value: null };
-    });
-
-    const view = await getMyWork(NOAH);
-    assert.ok(view.currentUpdate.sections.length > 0);
-    for (const section of view.currentUpdate.sections) {
-      assert.equal(section.draftProgress, "");
-      assert.equal(section.needsWriting, true);
-      assert.equal(section.loggedWork.length, 0);
-    }
-  });
-
-  test("misc work drafts nothing — it belongs to no project", async () => {
-    await disk.mutate((s) => {
-      s.workLogs = s.workLogs.filter((w) => w.memberId !== NOAH);
-      return { ok: true as const, value: null };
-    });
-
-    const r = await ops.logWork({
-      memberId: NOAH,
-      workDate: LOG_DAY,
-      description: "helped at the open build session",
-      today: TODAY,
-    });
-    assert.equal(r.ok, true);
-
-    const view = await getMyWork(NOAH);
-    for (const section of view.currentUpdate.sections) {
-      assert.equal(
-        section.needsWriting,
-        true,
-        "misc work must not excuse a member from reporting on their projects"
-      );
-    }
-  });
-
-  test("words already written beat the generated draft", async () => {
-    /*
-      The least forgivable thing this feature could do is overwrite somebody's
-      own sentence with a machine-generated summary. If they half-wrote a
-      check-in and came back, what they typed wins.
-    */
-    await ops.logWork({
-      memberId: NOAH,
-      projectId: "p-layup",
-      workDate: LOG_DAY,
-      description: "raw note nobody should read",
-      today: TODAY,
-    });
-
-    const first = await getMyWork(NOAH);
-    const update = disk
-      .readStore()
-      .progressUpdates.find((u) => u.id === first.currentUpdate.update.id);
-    assert.ok(update);
-
-    update.entries.push({
-      id: "e-draft-guard",
-      updateId: update.id,
-      projectId: "p-layup",
-      progress: "What I actually want my Lead to read.",
-    });
-
-    const after = await getMyWork(NOAH);
-    const section = after.currentUpdate.sections.find(
-      (s) => s.project.id === "p-layup"
-    );
-    assert.ok(section);
-    assert.match(section.draftProgress, /actually want my Lead to read/);
-    assert.ok(!section.draftProgress.includes("raw note"));
-  });
-});
