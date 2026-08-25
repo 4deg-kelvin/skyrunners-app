@@ -233,3 +233,177 @@ describe("verification distinguishes whose problem it is", () => {
     }
   });
 });
+
+/*
+  =========================================================================
+  The seven DMs added on 2026-08-24.
+  =========================================================================
+
+  What is worth pinning is not the wording — it is the FACTS each message has
+  to carry. Every one of these replaced somebody having to go and ask, so a
+  message missing the who, the what or the link puts them back where they
+  started.
+
+  Discord's 2000-character limit applies to all of them, and a message over it
+  fails outright rather than truncating, so the length check is a real one.
+*/
+describe("what each DM has to say", () => {
+  const URL = "https://skyrunners.example/projects/wing-spar";
+
+  /** Every DM: has a link, is inside Discord's limit, no `undefined` leaked. */
+  function wellFormed(body: string) {
+    assert.ok(body.includes(URL), "carries a link back");
+    assert.ok(body.length < 2000, "inside Discord's limit");
+    assert.doesNotMatch(body, /undefined|null|NaN/);
+  }
+
+  test("signed off names the signer and the work", () => {
+    const body = discordMessages.deliverableSignedOff({
+      title: "Spar FEA converged",
+      projectName: "Wing Spar Redesign",
+      signedOffBy: "Priya",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /Spar FEA converged/);
+    assert.match(body, /Priya/);
+  });
+
+  /*
+    The reason is the whole message. "Your sign-off was withdrawn" without it
+    leaves somebody with nothing to do but go and ask, which is the dead end
+    this app exists to remove.
+  */
+  test("withdrawn carries the reason", () => {
+    const body = discordMessages.signOffWithdrawn({
+      title: "Spar FEA converged",
+      projectName: "Wing Spar Redesign",
+      withdrawnBy: "Priya",
+      reason: "the 3.5g case was run at the wrong mass",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /wrong mass/);
+  });
+
+  test("assigned says who assigned it and when it is due", () => {
+    const body = discordMessages.deliverableAssigned({
+      title: "Coupon tensile test report",
+      projectName: "Layup Process Qualification",
+      assignedBy: "Marcus",
+      dueDate: "Sep 3",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /Marcus/);
+    assert.match(body, /Sep 3/);
+  });
+
+  /*
+    A deliverable can be assigned with no date. The template must read as a
+    sentence either way rather than saying "due undefined" — which `wellFormed`
+    would catch, and which is the most common way an optional field ships
+    broken.
+  */
+  test("assigned still reads as a sentence with no due date", () => {
+    const body = discordMessages.deliverableAssigned({
+      title: "Coupon tensile test report",
+      projectName: "Layup Process Qualification",
+      assignedBy: "Marcus",
+      url: URL,
+    });
+    wellFormed(body);
+  });
+
+  test("awaiting sign-off names the person waiting on you", () => {
+    const body = discordMessages.awaitingSignOff({
+      title: "Load rig CAD complete",
+      projectName: "Spar Load Testing",
+      ownerName: "Noah",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /Noah/);
+  });
+
+  test("due soon offers the two honest outs", () => {
+    const body = discordMessages.deliverableDueSoon({
+      title: "Load rig CAD complete",
+      projectName: "Spar Load Testing",
+      dueDate: "in 2 days (2026-08-26)",
+      url: URL,
+    });
+    wellFormed(body);
+    // Move the date, or say it's blocked. A warning with no way out is just an
+    // accusation.
+    assert.match(body, /move the date/i);
+    assert.match(body, /blocked/i);
+  });
+
+  test("blocker cleared closes the loop the app used to leave open", () => {
+    const body = discordMessages.blockerCleared({
+      what: "ROS 2 migration of the Gazebo world",
+      projectName: "Simulation Environment",
+      clearedBy: "Lena",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /Lena/);
+  });
+
+  test("a log reply quotes the reply", () => {
+    const body = discordMessages.logReplied({
+      replierName: "Priya",
+      projectName: "Wing Spar Redesign",
+      response: "nice — can you post the plots?",
+      url: URL,
+    });
+    wellFormed(body);
+    assert.match(body, /post the plots/);
+    assert.match(body, /Priya/);
+  });
+
+  /*
+    A reply is free text from a form. Somebody pasting a wall of log output
+    must not produce a DM Discord rejects outright — which would lose the
+    notification silently, since `sendDiscordDM` only logs.
+  */
+  test("a very long reply is still a sendable message", () => {
+    const body = discordMessages.logReplied({
+      replierName: "Priya",
+      projectName: "Wing Spar Redesign",
+      response: "x".repeat(5000),
+      url: URL,
+    });
+    assert.ok(body.length < 2000, `was ${body.length} characters`);
+    assert.ok(body.includes(URL), "the link survives the trim");
+  });
+  test("a very long withdrawal reason is too", () => {
+    const body = discordMessages.signOffWithdrawn({
+      title: "Spar FEA converged",
+      projectName: "Wing Spar Redesign",
+      withdrawnBy: "Priya",
+      reason: "y".repeat(5000),
+      url: URL,
+    });
+    assert.ok(body.length < 2000, `was ${body.length} characters`);
+    assert.ok(body.includes(URL), "the link survives the trim");
+  });
+
+  /*
+    `> ` quotes only the FIRST line in Discord's markdown. A multi-line paste
+    renders as one quoted line followed by unattributed text that reads like
+    the bot talking.
+  */
+  test("a multi-line reply is flattened, not left half-quoted", () => {
+    const body = discordMessages.logReplied({
+      replierName: "Priya",
+      projectName: "Wing Spar Redesign",
+      response: "line one\nline two\nline three",
+      url: URL,
+    });
+    const quoted = body.split("\n").filter((l) => l.startsWith("> "));
+    assert.equal(quoted.length, 1);
+    assert.match(quoted[0], /line one line two line three/);
+  });
+});

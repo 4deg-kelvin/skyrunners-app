@@ -57,8 +57,49 @@
  */
 
 import { readStore } from "@/lib/store/disk";
-import { isREofOrAbove, type Actor, type OrgGraph } from "@/lib/permissions";
+import {
+  isCoLead,
+  isLeadership,
+  isREofOrAbove,
+  type Actor,
+  type OrgGraph,
+} from "@/lib/permissions";
+import { quietProjects, QUIET_AFTER_DAYS } from "@/lib/quiet";
+import { discordMessages } from "@/lib/notify/discord";
+import { appUrl } from "@/lib/urls";
+import { HEALTH_LABELS } from "@/lib/labels";
 import type { Deliverable, Member, Project } from "@/lib/types";
+
+/**
+ * Which weekday carries the weekly sections. 1 = Monday.
+ *
+ * ---------------------------------------------------------------------------
+ * Why a weekday check instead of a second cron
+ * ---------------------------------------------------------------------------
+ *
+ * The club wanted "gone quiet" weekly rather than daily, and the obvious way to
+ * do that is a second entry in `vercel.json`. Two reasons not to.
+ *
+ * Vercel's Hobby plan limits cron FREQUENCY — at most once a day each — and it
+ * rejects the whole DEPLOYMENT when a schedule breaks that, not just the cron.
+ * That has already cost this repo four failed deploys, and the error names the
+ * plan rather than the schedule. A weekly cron (`0 2 * * 1`) is legal, so this
+ * would have worked; the reason to avoid it anyway is the second one.
+ *
+ * A second cron is a second thing that can silently stop. One job that decides
+ * what to include has one failure mode and one place to look. `npm test` asserts
+ * the frequency rule in `lib/notify/cron-schedule.test.ts`, and the spare Hobby
+ * slot stays spare.
+ *
+ * Monday, because a list of things that went quiet is a list of things to do
+ * this week.
+ */
+const WEEKLY_ON = 1;
+
+/** UTC weekday of a `YYYY-MM-DD`. Never `new Date(today).getDay()` — see lib/dates.ts. */
+function weekdayOf(today: string): number {
+  return new Date(Date.parse(`${today.slice(0, 10)}T00:00:00Z`)).getUTCDay();
+}
 
 /**
  * How far ahead a deadline has to be to stay quiet.
@@ -76,10 +117,41 @@ export const DEADLINE_HORIZON_DAYS = 7;
  */
 export const MAX_DM_CHARS = 1900;
 
+/**
+ * How many days before a due date the owner gets their own DM.
+ *
+ * EXACTLY this many, not "within" — the difference is the whole design.
+ * `<= 2` would fire on the day before too, and again every day it ran late,
+ * which turns one useful nudge into a countdown clock nobody reads. Firing on
+ * one day only also means no new database column: it cannot repeat, so there
+ * is nothing to remember.
+ *
+ * Two days, because it is the last point at which the honest answers — move
+ * the date, or say it is blocked — are still available without letting anyone
+ * down. Warning on the day it is due is just an accusation.
+ */
+export const DUE_NUDGE_DAYS = 2;
+
 export interface Digest {
   memberId: string;
   discordUserId: string;
+  /** The digest itself. Empty when the only thing to send is `urgent`. */
   body: string;
+  /**
+   * A separate, shorter DM about THEIR OWN work due in two days, sent just
+   * before the digest.
+   *
+   * Two messages rather than a section, deliberately: the digest is a summary
+   * you skim, and this is a thing you have to do. Folding it in would make the
+   * one line that needs acting on look like the eight that do not.
+   *
+   * It rides the digest so it inherits the digest's `daily_digest_sent_on`
+   * claim — one send per member per day, already atomic — instead of needing a
+   * second cron, a second column and a second race. Vercel's Hobby plan allows
+   * two cron slots total and rejects the whole DEPLOYMENT when a schedule
+   * breaks the once-a-day rule, so a spare slot is worth keeping.
+   */
+  urgent?: string;
 }
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -260,27 +332,117 @@ export function buildDigests(input: {
     const actor: Actor = { id: member.id, globalRole: member.globalRole };
     const sections: string[] = [];
 
-    // --- what you're responsible for --------------------------------------
-    const mine = live.filter((p) => isREofOrAbove(actor, graph, p.id));
-    if (mine.length) {
-      sections.push(reSection(mine, today));
-    }
+    /*
+      A Co-Lead's scope is the club, and this branch is load-bearing.
+
+      `isREofOrAbove` has no Co-Lead shortcut — it answers "does the project tree
+      grant this person authority here", and the Co-Lead answer lives in the
+      `can.*` rules. Without this branch a Co-Lead who is PL of nothing gets
+      `mine = []`, no sections, and no digest at all. That is the live club
+      exactly: the only Co-Lead is PL of 0 of 12 projects. Same bug, same shape,
+      as the empty dashboard — see `lib/data/dashboard.test.ts`.
+    */
+    const mine = isCoLead(actor)
+      ? live
+      : live.filter((p) => isREofOrAbove(actor, graph, p.id));
+
+    /*
+      ORDER IS BY VALUE, NOT BY CHRONOLOGY, and it is load-bearing.
+
+      `clamp()` trims from the BOTTOM, so whatever is last is what a long digest
+      loses. That is not hypothetical: rendering the real fixture, the only
+      person whose digest overflowed was the Co-Lead with twelve projects, and
+      what it dropped was the WEEKLY quiet section — the one thing they see once
+      a week rather than daily. The roll call of project names was safe at the
+      top, repeating "quiet today" twelve times.
+
+      So: things that need attention first, the roll call last. If something has
+      to go, lose the list of names, not the list of problems.
+    */
+
+    /*
+      --- rough health of everything under you ---------------------------------
+
+      The club's ask: an important PL or Division Lead should be able to tell
+      from the digest whether something below them needs attention.
+    */
+    const health = healthSection(mine);
+    if (health) sections.push(health);
 
     // --- what's about to be due -------------------------------------------
     const deadlines = deadlineSection(member, mine, today);
     if (deadlines) sections.push(deadlines);
 
     /*
+      --- gone quiet, WEEKLY --------------------------------------------------
+
+      Monday only. Daily would make a three-week-old silence into a twenty-one
+      day nag, which is how a section teaches people to skip the whole message.
+    */
+    if (weekdayOf(today) === WEEKLY_ON) {
+      const quiet = quietSection(mine, today);
+      if (quiet) sections.push(quiet);
+    }
+
+    /*
+      --- trainings waiting on somebody ---------------------------------------
+
+      The club asked for this INSTEAD of a DM when a training is verified or
+      rejected: it belongs in the queue a Lead already works through, not as its
+      own interruption. Only for leadership, and only when the queue is non-empty.
+    */
+    if (isLeadership(actor)) {
+      const trainings = trainingSection();
+      if (trainings) sections.push(trainings);
+    }
+
+    /*
+      --- projects added since yesterday ---------------------------------------
+
+      Asked for as a digest line rather than a DM. Scoped to what the member
+      oversees, so a Division Lead hears about work appearing in their division —
+      which is also the tripwire that would have caught the 994-project incident
+      on day one instead of after the fact.
+    */
+    const added = newProjectSection(mine, today);
+    if (added) sections.push(added);
+
+    /*
+      --- what you're responsible for, last ----------------------------------
+
+      The longest section and the least urgent: it is a roll call, and on a
+      quiet week every line of it says the same thing.
+    */
+    if (mine.length) {
+      sections.push(reSection(mine, today));
+    }
+
+    /*
+      --- your own work, two days out -----------------------------------------
+
+      Its own DM, not a section. See `Digest.urgent`.
+    */
+    const urgent = dueSoonNudge(member, today);
+
+    /*
       Rule 1. Somebody who is a PL of nothing with nothing of their own due has
       nothing here, and gets no DM — not a cheerful empty one.
-    */
-    if (!sections.length) continue;
 
-    const body = [`**SkyRunners — ${today}**`, "", ...sections].join("\n");
+      `&& !urgent` is belt-and-braces. Anything the nudge matches is inside
+      `deadlineSection`'s seven-day window too, so sections is never empty today
+      when urgent is set — but that coupling is invisible, and if the horizon is
+      ever shortened the nudge would go silent rather than fail loudly.
+    */
+    if (!sections.length && !urgent) continue;
+
+    const body = sections.length
+      ? clamp([`**SkyRunners — ${today}**`, "", ...sections].join("\n"))
+      : "";
     digests.push({
       memberId: member.id,
       discordUserId: member.discordUserId,
-      body: clamp(body),
+      body,
+      ...(urgent ? { urgent } : {}),
     });
   }
 
@@ -313,6 +475,221 @@ function reSection(projects: Project[], today: string): string {
       out.push(`**${project.name}** — nothing logged on it yet`);
     }
   }
+
+  return out.join("\n");
+}
+
+/**
+ * Your own work due in exactly two days.
+ *
+ * Owned by the member, not merely on their projects: a PL already sees their
+ * projects' dates in the deadline section, and a DM saying "somebody else's
+ * task is due Thursday" is a fact they cannot act on.
+ *
+ * `submitted` is excluded along with `done`. Submitted work is waiting on a PL,
+ * so the member has finished their half — nudging them about the date would
+ * blame them for somebody else's queue. `blocked` is deliberately INCLUDED: a
+ * blocked deliverable with a date two days out is exactly the one worth a
+ * conversation, and the message's own wording still lands, because the date is
+ * the part that has not been dealt with.
+ */
+function dueSoonNudge(member: Member, today: string): string | null {
+  const on = addDays(today, DUE_NUDGE_DAYS);
+  const store = readStore();
+
+  const due = store.deliverables.filter(
+    (d) =>
+      d.ownerId === member.id &&
+      d.dueDate === on &&
+      d.status !== "done" &&
+      d.status !== "submitted"
+  );
+  if (!due.length) return null;
+
+  const names = new Map(store.projects.map((p) => [p.id, p.name]));
+
+  if (due.length === 1) {
+    const d = due[0];
+    return discordMessages.deliverableDueSoon({
+      title: d.title,
+      projectName: names.get(d.projectId) ?? "a project",
+      dueDate: `in ${DUE_NUDGE_DAYS} days (${d.dueDate})`,
+      url: appUrl("/my-work"),
+    });
+  }
+
+  /*
+    Several in one message, rather than one DM each.
+
+    The club's call on the assignment DMs was "3 DMs is fine, people know they
+    are being added to a lot" — and that reasoning does not carry over. Being
+    assigned three things is three decisions somebody else made, each worth
+    hearing about separately. Three things happening to share a due date is one
+    calendar fact, and three DMs about the same Thursday is the shape that gets
+    a bot muted.
+  */
+  return [
+    `**${due.length} things you own are due in ${DUE_NUDGE_DAYS} days (${on}):**`,
+    ...due.map(
+      (d) => `• ${d.title} — ${names.get(d.projectId) ?? "a project"}`
+    ),
+    "If any of those aren't going to happen, move the date or say it's blocked — both are better than the day arriving.",
+    appUrl("/my-work"),
+  ].join("\n");
+}
+
+/**
+ * Rough health of everything under you, in two lines at most.
+ *
+ * The club's ask: an important PL or Division Lead should be able to tell from
+ * the digest whether something below them needs attention.
+ *
+ * A COUNT first, then the names of only the ones that are wrong. Listing all
+ * twelve projects with a status each is a table, and a table in a DM is
+ * something people scroll past — the two facts that matter are "is anything
+ * wrong" and "which".
+ *
+ * SILENT when nothing is wrong, which is the part worth defending. A Lead with
+ * three healthy projects was getting "__Across your 3 projects__ / 3 on track"
+ * every single evening, and a line that cannot change is a line people learn to
+ * skip — taking the sections under it with them. Nothing wrong is also the
+ * default assumption, so saying it adds nothing; the roll call below already
+ * names the projects.
+ *
+ * `complete` is filtered out by the caller, so the three states here are the
+ * three live ones.
+ */
+function healthSection(projects: Project[]): string | null {
+  // With one project the roll call already says everything this would.
+  if (projects.length < 2) return null;
+
+  const blocked = projects.filter((p) => p.health === "blocked");
+  const atRisk = projects.filter((p) => p.health === "at_risk");
+  const needy = [...blocked, ...atRisk];
+  if (!needy.length) return null;
+
+  const onTrack = projects.length - needy.length;
+  const counts = [
+    blocked.length ? `${blocked.length} blocked` : "",
+    atRisk.length ? `${atRisk.length} at risk` : "",
+    onTrack ? `${onTrack} on track` : "",
+  ].filter(Boolean);
+
+  const out = [
+    `__Needs attention (${needy.length} of ${projects.length})__`,
+    counts.join(" · "),
+  ];
+
+  // Name them, cap at six.
+  for (const p of needy.slice(0, 6)) {
+    out.push(`• ${p.name} — ${HEALTH_LABELS[p.health].toLowerCase()}`);
+  }
+  if (needy.length > 6) out.push(`• …and ${needy.length - 6} more`);
+
+  return out.join("\n");
+}
+
+/**
+ * Trainings waiting on a verifier, club-wide.
+ *
+ * Asked for INSTEAD of a DM when a training is verified or rejected: it belongs
+ * in the queue a Lead already works through, not as its own interruption.
+ *
+ * Not scoped to a particular verifier, deliberately. Until
+ * `catalogue_items.verifier_id` is populated, `can.verifyTraining` is "any Lead"
+ * — so scoping this would invent a narrower rule than the one the app enforces,
+ * and the request would sit in nobody's digest. When named verifiers land, scope
+ * it to them and keep Co-Leads seeing all.
+ */
+function trainingSection(): string | null {
+  const store = readStore();
+  const waiting = store.certifications.filter((c) => c.status === "requested");
+  if (!waiting.length) return null;
+
+  const itemName = new Map(store.catalogueItems.map((i) => [i.id, i.name]));
+  const out = [`__Trainings to verify (${waiting.length})__`];
+
+  // Oldest first: age is what makes a queue actionable, the same rule every
+  // other queue in this app uses.
+  const ordered = [...waiting].sort((a, b) =>
+    a.requestedAt.localeCompare(b.requestedAt)
+  );
+  for (const c of ordered.slice(0, 6)) {
+    const who = store.members.find((m) => m.id === c.memberId);
+    out.push(
+      `• ${who?.fullName ?? "Somebody"} — ${itemName.get(c.itemId) ?? "a training"}`
+    );
+  }
+  if (ordered.length > 6) out.push(`• …and ${ordered.length - 6} more`);
+
+  return out.join("\n");
+}
+
+/**
+ * Projects that appeared since yesterday, within what this member oversees.
+ *
+ * Asked for as a digest line rather than a DM. It is also the tripwire that
+ * would have caught the 994-project incident on day one rather than after the
+ * fact — a Division Lead seeing "47 projects added" in their evening digest asks
+ * a question immediately.
+ *
+ * `startDate` is the proxy for "created", because `projects` has no `created_at`
+ * and `createProject` defaults `startDate` to today. It is imperfect in one
+ * direction only: a project entered in advance for next quarter carries a future
+ * start and will not appear here. That is the safe direction — a missed line
+ * beats a nightly line about a project nobody has touched.
+ */
+function newProjectSection(projects: Project[], today: string): string | null {
+  const since = addDays(today, -1);
+  const fresh = projects.filter(
+    (p) => p.startDate && p.startDate >= since && p.startDate <= today
+  );
+  if (!fresh.length) return null;
+
+  const out = [
+    fresh.length === 1
+      ? "__A project was added__"
+      : `__${fresh.length} projects were added__`,
+  ];
+  for (const p of fresh.slice(0, 8)) out.push(`• ${p.name}`);
+  if (fresh.length > 8) {
+    out.push(
+      `• …and ${fresh.length - 8} more — worth a look at who added them`
+    );
+  }
+  return out.join("\n");
+}
+
+/**
+ * Projects nobody has logged against in three weeks. WEEKLY — Mondays only.
+ *
+ * Reuses `lib/quiet.ts` rather than recomputing, so the digest and the dashboard
+ * can never disagree about what "quiet" means. That module is also where the
+ * three-week threshold is argued; a shorter one fires on half the club every
+ * finals week.
+ */
+function quietSection(projects: Project[], today: string): string | null {
+  const store = readStore();
+  const quiet = quietProjects(
+    projects,
+    projects.map((p) => p.id),
+    store.projectMemberships,
+    store.workLogs,
+    store.deliverables,
+    today
+  );
+  if (!quiet.length) return null;
+
+  const out = [`__Quiet for ${QUIET_AFTER_DAYS}+ days (${quiet.length})__`];
+  for (const q of quiet.slice(0, 6)) {
+    out.push(
+      `• ${q.project.name} — ${
+        q.lastLoggedAt ? `nothing since ${q.lastLoggedAt}` : "never logged"
+      }, ${q.openDeliverables} open`
+    );
+  }
+  if (quiet.length > 6) out.push(`• …and ${quiet.length - 6} more`);
+  out.push("A message usually fixes it. Worth ten minutes on a Monday.");
 
   return out.join("\n");
 }

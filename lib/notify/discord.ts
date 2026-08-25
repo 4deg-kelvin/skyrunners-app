@@ -133,6 +133,32 @@ export async function sendDiscordDM(
  * `appUrl` is passed in rather than read here so this file stays free of
  * request state and remains trivially testable.
  */
+/**
+ * A quoted line of somebody's free text, safe to put in a DM.
+ *
+ * Discord rejects a message over 2000 characters OUTRIGHT — it does not
+ * truncate it for you — and `sendDiscordDM` only logs the refusal, so the
+ * notification would vanish with nobody the wiser. Two of these messages quote
+ * text straight out of a form: a withdrawal reason and a reply to a work log.
+ * Somebody pasting a stack trace into either one is not exotic.
+ *
+ * Found by a test asserting the length, not by seeing it happen. The budget is
+ * per-quote and deliberately well under the limit, because the rest of the
+ * message and the URL have to fit too.
+ *
+ * Newlines are collapsed as well. `> ` only quotes the FIRST line in Discord's
+ * markdown, so a multi-line paste renders as one quoted line followed by
+ * unattributed text that reads like the bot talking.
+ */
+export const MAX_QUOTED_CHARS = 600;
+
+export function quoted(text: string): string {
+  const flat = text.replace(/\s*\n\s*/g, " ").trim();
+  return flat.length <= MAX_QUOTED_CHARS
+    ? flat
+    : `${flat.slice(0, MAX_QUOTED_CHARS).trimEnd()}… (trimmed)`;
+}
+
 export const discordMessages = {
   addedToProject: (opts: {
     projectName: string;
@@ -235,6 +261,144 @@ ${opts.answeredBy} said: ${opts.response}`
    * a dozen conditional sections and threading all of them through an options
    * object would put the formatting in two files.
    */
+  /*
+    =========================================================================
+    Things that happen to work you own — added 2026-08-25
+    =========================================================================
+
+    Every one of these closes a loop that used to end in silence, and they share
+    a shape worth naming: the app already knew, the member did not.
+
+    The club asked for them as six separate triggers rather than one batched
+    "something happened to your work" message, and that is the right call for
+    this club — being handed three deliverables at once is itself information,
+    and three DMs say it more honestly than one that says "3 things".
+
+    Deliberately NOT sent when the recipient is the actor. Somebody who signs off
+    their own work as a Co-Lead, or replies to their own log line, does not need
+    a DM confirming their own click — that is the fastest way to teach people the
+    bot is noise. Each call site checks.
+  */
+
+  /**
+   * The one that mattered most, and the reason this batch exists.
+   *
+   * Marking work done is a REQUEST; sign-off is what counts toward the delivered
+   * count on somebody's profile. So the moment that actually changes their record
+   * was the one moment the app never mentioned.
+   */
+  deliverableSignedOff: (opts: {
+    title: string;
+    projectName: string;
+    signedOffBy: string;
+    url: string;
+  }) =>
+    `**${opts.signedOffBy}** signed off **${opts.title}** in ${opts.projectName}.\n` +
+    `That's it counted — it's on your profile now.\n${opts.url}`,
+
+  /**
+   * Something came OFF your record. Reason is not optional.
+   *
+   * `withdrawSignOff` already requires one, and repeating it here is the whole
+   * value of the message: "your work was un-approved" with no reason is worse
+   * than silence, because the only available next move is to go and ask.
+   */
+  signOffWithdrawn: (opts: {
+    title: string;
+    projectName: string;
+    withdrawnBy: string;
+    reason: string;
+    url: string;
+  }) =>
+    `**${opts.withdrawnBy}** withdrew the sign-off on **${opts.title}** in ${opts.projectName}.\n` +
+    `> ${quoted(opts.reason)}\n` +
+    `It's back on your list — nothing about this is a mark against you.\n${opts.url}`,
+
+  /**
+   * You have been handed work with a date on it.
+   *
+   * `addedToProject` covered joining a project and said nothing about owning
+   * something in it, which is the half that carries an obligation.
+   */
+  deliverableAssigned: (opts: {
+    title: string;
+    projectName: string;
+    assignedBy: string;
+    dueDate?: string;
+    url: string;
+  }) =>
+    `**${opts.assignedBy}** put you on **${opts.title}** in ${opts.projectName}.` +
+    (opts.dueDate ? `\nDue ${opts.dueDate}.` : "\nNo date on it yet.") +
+    `\n${opts.url}`,
+
+  /**
+   * Somebody marked work done and it is waiting on YOU.
+   *
+   * The club's addition to this batch, and it completes the pair: the owner hears
+   * when it is signed off, the PL hears when it is waiting. Without this the
+   * queue only existed on a dashboard somebody had to remember to open — and an
+   * unsigned deliverable does not count for the person who did it, so the cost
+   * of a PL forgetting lands on somebody else.
+   */
+  awaitingSignOff: (opts: {
+    title: string;
+    projectName: string;
+    ownerName: string;
+    url: string;
+  }) =>
+    `**${opts.ownerName}** marked **${opts.title}** done in ${opts.projectName} — it needs your sign-off.\n` +
+    `It doesn't count for them until you confirm it.\n${opts.url}`,
+
+  /**
+   * A deadline you own, two days out.
+   *
+   * Sent from the daily digest cron rather than its own scheduled job — see the
+   * header of `lib/notify/digest.ts` on why there is exactly one cron.
+   *
+   * Two days rather than one, because the point is to leave room to do something
+   * about it or move it. A same-day warning is a post-mortem with better timing.
+   */
+  deliverableDueSoon: (opts: {
+    title: string;
+    projectName: string;
+    dueDate: string;
+    url: string;
+  }) =>
+    `**${opts.title}** in ${opts.projectName} is due ${opts.dueDate}.\n` +
+    `If that's not going to happen, move the date or say it's blocked — both are better than the day arriving.\n${opts.url}`,
+
+  /**
+   * The blocker you raised has been cleared.
+   *
+   * We DMed the people who could clear it and never told the person who was
+   * stuck. Which meant the app's one genuinely urgent notification had no
+   * closing half: you reported being stuck, and then found out by checking.
+   */
+  blockerCleared: (opts: {
+    what: string;
+    projectName: string;
+    clearedBy: string;
+    url: string;
+  }) =>
+    `**${opts.clearedBy}** cleared the blocker on **${opts.what}** in ${opts.projectName}.\n` +
+    `You're unblocked.\n${opts.url}`,
+
+  /**
+   * Somebody replied to a line in your work log.
+   *
+   * Replies are the whole reporting relationship since 2026-08-24 — a member
+   * logs, their PL answers in place. Nothing surfaced them, so the feature only
+   * worked for people who happened to re-open the project.
+   */
+  logReplied: (opts: {
+    replierName: string;
+    projectName: string;
+    response: string;
+    url: string;
+  }) =>
+    `**${opts.replierName}** replied to what you logged on ${opts.projectName}.\n` +
+    `> ${quoted(opts.response)}\n${opts.url}`,
+
   dailyDigest: (body: string) => body,
 };
 

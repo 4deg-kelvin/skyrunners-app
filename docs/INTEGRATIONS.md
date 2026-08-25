@@ -14,7 +14,7 @@ somebody tells them out of band.**
 | | State |
 |---|---|
 | **Email invites** | Not built. Needs a sending domain first — see below |
-| **Discord DMs** | **Built and inert.** Set `DISCORD_BOT_TOKEN` and it starts working |
+| **Discord DMs** | **Built and inert.** Set `DISCORD_BOT_TOKEN` and it starts working. Fifteen DM templates plus a daily digest — see [What is actually built](#what-is-actually-built-2026-08-24) |
 
 Written 2026-08-09.
 
@@ -201,7 +201,98 @@ ones where **nobody would otherwise find out in time**:
 | A session was added to the calendar | **Yes, channel** | The point is that people turn up |
 | Your check-in is due | No | It's on My Work, twice a week, forever. This is nagging |
 | Somebody logged hours | No | Nobody needs this |
-| A deliverable was signed off | Channel, maybe | Nice for morale, useless as a notification |
 
 The rule: **push what somebody couldn't have known, not what they could have
 looked up.**
+
+---
+
+## What is actually built (2026-08-24)
+
+Everything below is a **DM**. No channel posts: the club chose DMs because a
+channel post that matters to one person is noise to thirty-nine, and a channel
+that is mostly noise gets muted — which mutes the blocker alerts with it.
+
+Templates live in `lib/notify/discord.ts` and are wired in `lib/actions/`.
+
+### The fifteen DMs
+
+| Template | Goes to | Fires when |
+|---|---|---|
+| `addedToProject` | the member | a PL commits them to a project |
+| `addedToEvent` | the guest | a Co-Lead adds them to an invite-only event |
+| `joinRequestApproved` / `joinRequestDeclined` | the asker | a PL answers |
+| `requestReceived` / `requestAnswered` | PL / asker | an "I'm stuck" ask, both directions |
+| `blockerRaised` | the project's PLs | somebody marks a deliverable blocked |
+| `projectBlockedAbove` | PLs up the tree | the blocker is on a sub-project |
+| `deliverableSignedOff` | the owner | a PL signs their work off |
+| `signOffWithdrawn` | the owner | a PL takes it back, **with the reason** |
+| `deliverableAssigned` | the new owner | assigned on create, or reassigned on edit |
+| `awaitingSignOff` | the project's PLs | the owner marks it done |
+| `deliverableDueSoon` | the owner | **exactly** two days before the date |
+| `blockerCleared` | whoever was stuck | their blocker is lifted |
+| `logReplied` | whoever logged it | a PL answers their log line |
+
+Four rules these all obey, each of which was a bug at some point:
+
+- **Never DM the person who acted.** A Co-Lead signing off their own work does
+  not need a DM about their own click.
+- **Free text is `quoted()`, never interpolated raw.** Discord rejects a message
+  over 2000 characters *outright* — it does not truncate for you — and
+  `sendDiscordDM` only logs the refusal, so a pasted stack trace in a
+  withdrawal reason or a log reply would lose the notification silently. Caught
+  by a test asserting the length, not by seeing it happen.
+- **A DM can never fail a save.** They are sent after the write commits and
+  every failure path returns false.
+- **Assignments are one DM each, deliberately.** Being given three things is
+  three decisions somebody else made. Contrast `deliverableDueSoon`, which
+  batches: three things sharing a Thursday is one calendar fact, and three DMs
+  about it is what gets a bot muted.
+
+### The daily digest
+
+One DM a day per person, from **one** Vercel cron
+(`/api/cron/daily-digest`, `lib/notify/digest.ts`). Sections, in the order they
+appear:
+
+| Section | Who | When |
+|---|---|---|
+| Needs attention | anyone with 2+ projects | only when something is blocked or at risk |
+| Due within 7 days | everyone | when there is anything |
+| Quiet for 21+ days | PLs and Co-Leads | **Mondays only** |
+| Trainings to verify | leadership | when the queue is non-empty |
+| A project was added | PLs and Co-Leads | when one started yesterday or today |
+| Your projects | everyone | always, if they hold any |
+
+**Order is by value, and it is load-bearing.** The 1900-character clamp trims
+from the bottom, so the roll call goes last and the things that need attention
+go first. Rendering the real fixture is what found this: the only digest that
+overflowed was the Co-Lead's with twelve projects, and what it dropped was the
+Monday-only quiet section.
+
+Two more rules:
+
+- **Nothing to say → nothing sent.** No cheerful empty digest, and no section
+  that says the same thing every evening. "3 on track" daily for a year is a
+  line people learn to skip, and it takes the sections under it with it.
+- **A Co-Lead's scope is the club**, not their PL rows. `isREofOrAbove` has no
+  Co-Lead shortcut — that answer lives in the `can.*` rules — so scoping by it
+  alone gives a Co-Lead who is PL of nothing an empty digest. Same trap as the
+  empty dashboard, hit twice now. `lib/notify/digest.test.ts` guards it.
+
+### Why weekly sections are a weekday check, not a second cron
+
+Vercel's Hobby plan allows **two** cron slots and at most **one run per day**
+each, and it rejects the whole **deployment** when a schedule breaks that rule —
+not just the cron. A weekly schedule would have been legal, but a second cron is
+a second thing that can silently stop. One job that decides what to include has
+one failure mode and one place to look, and the spare slot stays spare.
+`lib/notify/cron-schedule.test.ts` asserts the frequency rule.
+
+### Reach, as of 2026-08-24
+
+**5 of 12 members have a Discord id.** Everything above reaches nobody else —
+`sendDiscordDM` returns false with no id and the digest skips them entirely.
+Three of the five are the Co-Leads. Getting the other seven connected is worth
+more than any further notification: the Settings page has the field, and
+`verifyDiscordDM` tells somebody exactly why their id did not work.

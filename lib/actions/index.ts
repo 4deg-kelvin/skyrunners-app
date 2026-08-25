@@ -111,6 +111,19 @@ function notify(discordUserId: string | undefined, message: string): void {
   }
 }
 
+/**
+ * Same thing, by member id instead of Discord id.
+ *
+ * Every call site in the 2026-08-25 batch has a member id and had been writing
+ * `notify(getMember(id)?.discordUserId, ...)` — six copies of one lookup, each of
+ * which silently does nothing if the member has no Discord connected. That is the
+ * correct behaviour, and having it in one place is what stops somebody
+ * "fixing" it later by asserting the id exists.
+ */
+function notifyMember(memberId: string, message: string): void {
+  notify(getMember(memberId)?.discordUserId, message);
+}
+
 export interface ActionResult {
   ok: boolean;
   /** Shown to the user verbatim, so it has to be a sentence they can act on. */
@@ -229,7 +242,53 @@ async function createDeliverableAction$impl(
   });
 
   if (result.ok) refresh();
+
+  /*
+    Being handed work with a date on it is the half `addedToProject` never
+    covered: that one says "you're on this project", which carries no obligation
+    on its own.
+
+    Sent per deliverable rather than batched, which the club asked for
+    explicitly — being given three at once is itself information, and three DMs
+    say it more honestly than one saying "3 things".
+  */
+  if (result.ok && result.value.ownerId !== viewer.member.id) {
+    notifyAssigned(result.value, viewer);
+  }
+
   return toResult(result, "Deliverable added.");
+}
+
+/**
+ * "You now own this." Shared by create and by an owner change on edit.
+ *
+ * One function because the member's experience is identical either way — they
+ * have work they did not have before — and because a second copy is how the two
+ * drift until only one of them mentions the due date.
+ */
+function notifyAssigned(
+  deliverable: {
+    id: string;
+    projectId: string;
+    title: string;
+    ownerId: string;
+    dueDate?: string;
+  },
+  viewer: { member: { id: string; preferredName?: string; fullName: string } }
+): void {
+  const project = getProject(deliverable.projectId);
+  notifyMember(
+    deliverable.ownerId,
+    discordMessages.deliverableAssigned({
+      title: deliverable.title,
+      projectName: project?.name ?? "a project",
+      assignedBy: viewer.member.preferredName ?? viewer.member.fullName,
+      dueDate: deliverable.dueDate
+        ? formatDay(deliverable.dueDate, { month: "short", day: "numeric" })
+        : undefined,
+      url: appUrl(project ? `/projects/${project.slug}` : "/my-work"),
+    })
+  );
 }
 
 /** The owner says it's finished. Does not complete it — a PL must confirm. */
@@ -241,6 +300,36 @@ async function submitDeliverableAction$impl(
 
   const result = await ops.submitDeliverable(id, viewer.member.id, today());
   if (result.ok) refresh();
+
+  /*
+    The PLs who can sign it off. The club's addition, and it completes the pair
+    with `deliverableSignedOff`: the owner hears when it lands, the PL hears when
+    it is waiting.
+
+    `blockerAudience` is reused deliberately rather than a new lookup — it
+    already answers "the project's PLs, minus the person acting, climbing one
+    level if that empties the list", which is exactly the audience here. Without
+    the climb, a PL submitting their own work would DM themselves and nobody
+    else.
+  */
+  if (result.ok) {
+    const project = getProject(result.value.projectId);
+    for (const plId of blockerAudience(
+      result.value.projectId,
+      viewer.member.id
+    )) {
+      notifyMember(
+        plId,
+        discordMessages.awaitingSignOff({
+          title: result.value.title,
+          projectName: project?.name ?? "a project",
+          ownerName: viewer.member.preferredName ?? viewer.member.fullName,
+          url: appUrl(project ? `/projects/${project.slug}` : "/dashboard"),
+        })
+      );
+    }
+  }
+
   return toResult(result, "Sent to your PL for sign-off.");
 }
 
@@ -260,6 +349,28 @@ async function confirmDeliverableAction$impl(
 
   const result = await ops.confirmDeliverable(id, viewer.member.id, today());
   if (result.ok) refresh();
+
+  /*
+    Tell the owner. This is the moment their delivered count changes, and it was
+    the one moment the app never mentioned — marking work done is a request, and
+    the approval that makes it count happened silently.
+
+    Not sent when the signer IS the owner: a Co-Lead signing off their own work
+    does not need a DM about their own click.
+  */
+  if (result.ok && result.value.ownerId !== viewer.member.id) {
+    const project = getProject(result.value.projectId);
+    notifyMember(
+      result.value.ownerId,
+      discordMessages.deliverableSignedOff({
+        title: result.value.title,
+        projectName: project?.name ?? "a project",
+        signedOffBy: viewer.member.preferredName ?? viewer.member.fullName,
+        url: appUrl(project ? `/projects/${project.slug}` : "/my-work"),
+      })
+    );
+  }
+
   return toResult(result, "Signed off.");
 }
 
@@ -309,6 +420,25 @@ async function withdrawSignOffAction$impl(
     today: today(),
   });
   if (result.ok) refresh();
+
+  /*
+    The owner, with the reason. Work came OFF their record, and "your sign-off
+    was withdrawn" without the reason leaves them nothing to do but go and ask —
+    which is the dead end this app exists to remove.
+  */
+  if (result.ok && result.value.ownerId !== viewer.member.id) {
+    const project = getProject(result.value.projectId);
+    notifyMember(
+      result.value.ownerId,
+      discordMessages.signOffWithdrawn({
+        title: result.value.title,
+        projectName: project?.name ?? "a project",
+        withdrawnBy: viewer.member.preferredName ?? viewer.member.fullName,
+        reason,
+        url: appUrl(project ? `/projects/${project.slug}` : "/my-work"),
+      })
+    );
+  }
   return toResult(
     result,
     "Sign-off withdrawn. The owner and everyone above the project were told."
@@ -359,6 +489,35 @@ async function setDeliverableStatusAction$impl(
       what: deliverable.title,
       note: blockerNote,
     });
+  }
+
+  /*
+    And the closing half, which was missing: tell the OWNER when their blocker
+    is cleared.
+
+    The app DMed the people who could clear it and never told the person who was
+    stuck, so its one genuinely urgent notification had no ending — you reported
+    being stuck and then found out by checking.
+
+    Keyed on the deliverable having BEEN blocked and no longer being so, read
+    from the pre-write snapshot above. Not sent to whoever cleared it.
+  */
+  if (
+    result.ok &&
+    deliverable?.status === "blocked" &&
+    status !== "blocked" &&
+    deliverable.ownerId !== viewer.member.id
+  ) {
+    const project = getProject(projectId);
+    notifyMember(
+      deliverable.ownerId,
+      discordMessages.blockerCleared({
+        what: deliverable.title,
+        projectName: project?.name ?? "a project",
+        clearedBy: viewer.member.preferredName ?? viewer.member.fullName,
+        url: appUrl(project ? `/projects/${project.slug}` : "/my-work"),
+      })
+    );
   }
 
   return toResult(result, "Updated.");
@@ -1266,8 +1425,20 @@ async function updateDeliverableAction$impl(
     return denied("edit deliverables on this project");
   }
 
+  /*
+    Read the owner BEFORE the write, so a reassignment is detectable afterwards.
+
+    `updateDeliverable` returns the new row, which cannot tell you whether the
+    owner changed — and DMing on every edit would mean a typo fix pings somebody
+    about work they already have.
+  */
+  const deliverableId = String(formData.get("deliverableId") ?? "");
+  const ownerBefore = projectDeliverables(projectId).find(
+    (d) => d.id === deliverableId
+  )?.ownerId;
+
   const result = await ops.updateDeliverable({
-    deliverableId: String(formData.get("deliverableId") ?? ""),
+    deliverableId,
     title: String(formData.get("title") ?? ""),
     ownerId: String(formData.get("ownerId") ?? "") || undefined,
     dueDate: String(formData.get("dueDate") ?? "") || undefined,
@@ -1275,6 +1446,16 @@ async function updateDeliverableAction$impl(
   });
 
   if (result.ok) refresh();
+
+  // Only when it actually moved, and never to the person doing the moving.
+  if (
+    result.ok &&
+    result.value.ownerId !== ownerBefore &&
+    result.value.ownerId !== viewer.member.id
+  ) {
+    notifyAssigned(result.value, viewer);
+  }
+
   return toResult(result, "Saved.");
 }
 
@@ -2106,6 +2287,31 @@ async function replyToWorkLogAction$impl(
   if (!saved.ok) return { ok: false, error: saved.error };
 
   refresh();
+
+  /*
+    Tell whoever wrote the line.
+
+    Replies ARE the reporting relationship since 2026-08-24 — a member logs, the
+    project's PL answers in place — and nothing surfaced them, so the feature
+    only worked for people who happened to re-open the project.
+
+    Only on a real reply: clearing one (empty response) is a correction, and
+    "your reply was deleted" is not news anybody needs.
+  */
+  const author = readStore().workLogs.find((w) => w.id === workLogId)?.memberId;
+  if (response.trim() && author && author !== viewer.member.id) {
+    const project = getProject(projectId);
+    notifyMember(
+      author,
+      discordMessages.logReplied({
+        replierName: viewer.member.preferredName ?? viewer.member.fullName,
+        projectName: project?.name ?? "a project",
+        response: response.trim(),
+        url: appUrl(project ? `/projects/${project.slug}` : "/my-work"),
+      })
+    );
+  }
+
   return {
     ok: true,
     message: response.trim() ? "Reply sent." : "Reply removed.",

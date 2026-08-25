@@ -41,7 +41,7 @@
  */
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
-import { daysBetweenDays, todayInClubTime } from "../dates.ts";
+import { todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
 import { repeatProblem } from "../calendar/recurrence.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";

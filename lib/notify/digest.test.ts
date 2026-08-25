@@ -468,6 +468,450 @@ describe("message length", () => {
   });
 });
 
+/*
+  =========================================================================
+  What the club asked for on 2026-08-24, and the traps each one has.
+  =========================================================================
+*/
+
+describe("your own work, two days out", () => {
+  /** Put `count` of `owner`'s open deliverables on `date`. */
+  async function dueOn(
+    owner: string,
+    date: string,
+    count = 1,
+    status = "in_progress"
+  ) {
+    await disk.mutate((s) => {
+      const mine = s.deliverables.filter(
+        (d) => d.ownerId === owner && d.status !== "done"
+      );
+      for (const d of mine.slice(0, count)) {
+        d.dueDate = date;
+        d.status = status as typeof d.status;
+      }
+      return { ok: true as const, value: null };
+    });
+  }
+
+  function urgentFor(id: string, today = TODAY) {
+    return digest
+      .buildDigests({ today, graph: graph() })
+      .find((d) => d.memberId === id)?.urgent;
+  }
+
+  function owner() {
+    return disk.readStore().deliverables.find((d) => d.status !== "done")!
+      .ownerId;
+  }
+
+  test("fires on exactly two days out", async () => {
+    await connectEveryone();
+    const who = owner();
+    await dueOn(who, addDays(TODAY, digest.DUE_NUDGE_DAYS));
+
+    assert.match(urgentFor(who) ?? "", /due in 2 days/);
+  });
+
+  /*
+    The whole reason the window is EXACT rather than "within". `<=` would fire
+    tomorrow as well, and again every day it ran late, which is a countdown
+    clock rather than a nudge — and it would need a database column to
+    remember. One day only means it cannot repeat.
+  */
+  test("does not fire the day before, or the day after", async () => {
+    await connectEveryone();
+    const who = owner();
+
+    await dueOn(who, addDays(TODAY, digest.DUE_NUDGE_DAYS));
+    assert.equal(urgentFor(who, addDays(TODAY, -1)), undefined);
+    assert.equal(urgentFor(who, addDays(TODAY, 1)), undefined);
+  });
+
+  /*
+    Submitted work is waiting on a PL. The member has finished their half, so
+    nudging them about the date blames them for somebody else's queue.
+  */
+  test("submitted work is not nudged", async () => {
+    await connectEveryone();
+    const who = owner();
+    await dueOn(who, addDays(TODAY, digest.DUE_NUDGE_DAYS), 99, "submitted");
+
+    assert.equal(urgentFor(who), undefined);
+  });
+
+  test("blocked work IS nudged — the date is still the unresolved part", async () => {
+    await connectEveryone();
+    const who = owner();
+    await dueOn(who, addDays(TODAY, digest.DUE_NUDGE_DAYS), 1, "blocked");
+
+    assert.ok(urgentFor(who));
+  });
+
+  /*
+    Three deliverables sharing a Thursday is ONE calendar fact. Three DMs about
+    it is the shape that gets a bot muted. (Contrast the assignment DMs, which
+    the club explicitly wanted one-per-thing: those are three decisions
+    somebody else made.)
+  */
+  test("several on the same day are one message, not one each", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const counts = new Map<string, number>();
+    for (const d of store.deliverables) {
+      if (d.status !== "done")
+        counts.set(d.ownerId, (counts.get(d.ownerId) ?? 0) + 1);
+    }
+    const busy = [...counts.entries()].find(([, n]) => n >= 3)?.[0];
+    if (!busy) return; // fixture has nobody with three; nothing to assert
+
+    await dueOn(busy, addDays(TODAY, digest.DUE_NUDGE_DAYS), 3);
+
+    const urgent = urgentFor(busy)!;
+    assert.match(urgent, /3 things you own/);
+    assert.equal(
+      urgent.split("\n").filter((l) => l.startsWith("\u2022")).length,
+      3
+    );
+  });
+
+  /*
+    Somebody else's deadline on their own project is a fact the recipient
+    cannot act on. The deadline SECTION covers that; this DM is for work the
+    member owns.
+  */
+  test("it is about work you own, not work on your projects", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const project = store.projects.find(
+      (p) => p.reIds.length > 0 && p.phase !== "complete"
+    )!;
+    const pl = project.reIds[0];
+    const notPl = store.deliverables.find(
+      (d) =>
+        d.projectId === project.id && d.ownerId !== pl && d.status !== "done"
+    );
+    if (!notPl) return;
+
+    await dueOn(notPl.ownerId, addDays(TODAY, digest.DUE_NUDGE_DAYS));
+
+    assert.ok(urgentFor(notPl.ownerId), "the owner is told");
+    assert.equal(urgentFor(pl), undefined, "the PL is not");
+  });
+
+  /*
+    The nudge rides the digest's `daily_digest_sent_on` claim, so `body` may be
+    empty. The sender must not treat that as a failure and release the day.
+  */
+  test("a record with only a nudge has an empty body, not a header-only one", async () => {
+    await connectEveryone();
+    const who = owner();
+    await dueOn(who, addDays(TODAY, digest.DUE_NUDGE_DAYS));
+
+    const record = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === who)!;
+
+    if (!record.body) return; // this fixture always has sections too
+    assert.match(record.body, /SkyRunners/);
+  });
+});
+
+describe("needs attention", () => {
+  function sectionFor(id: string) {
+    return (
+      digest
+        .buildDigests({ today: TODAY, graph: graph() })
+        .find((d) => d.memberId === id)?.body ?? ""
+    );
+  }
+
+  /** Somebody who is a PL of two or more live projects. */
+  function multiPl() {
+    const store = disk.readStore();
+    const counts = new Map<string, number>();
+    for (const p of store.projects) {
+      if (p.phase === "complete") continue;
+      for (const re of p.reIds) counts.set(re, (counts.get(re) ?? 0) + 1);
+    }
+    return [...counts.entries()].find(([, n]) => n >= 2)?.[0];
+  }
+
+  test("names the blocked and at-risk ones", async () => {
+    await connectEveryone();
+    const pl = multiPl();
+    if (!pl) return;
+
+    await disk.mutate((s) => {
+      const theirs = s.projects.filter(
+        (p) => p.reIds.includes(pl) && p.phase !== "complete"
+      );
+      theirs[0].health = "blocked";
+      for (const p of theirs.slice(1)) p.health = "on_track";
+      return { ok: true as const, value: null };
+    });
+
+    const body = sectionFor(pl);
+    assert.match(body, /Needs attention/);
+    assert.match(
+      body,
+      new RegExp(
+        escapeRegExp(
+          disk.readStore().projects.find((p) => p.health === "blocked")!.name
+        )
+      )
+    );
+  });
+
+  /*
+    A line that cannot change is a line people learn to skip, and it takes the
+    sections under it with it. "3 on track" every evening for a year is that
+    line. Nothing wrong is also the default assumption.
+  */
+  test("silent when nothing needs attention", async () => {
+    await connectEveryone();
+    const pl = multiPl();
+    if (!pl) return;
+
+    await disk.mutate((s) => {
+      for (const p of s.projects) p.health = "on_track";
+      return { ok: true as const, value: null };
+    });
+
+    assert.doesNotMatch(sectionFor(pl), /Needs attention/);
+  });
+
+  test("silent for somebody with one project — the roll call already said it", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const counts = new Map<string, number>();
+    for (const p of store.projects) {
+      if (p.phase === "complete") continue;
+      for (const re of p.reIds) counts.set(re, (counts.get(re) ?? 0) + 1);
+    }
+    const single = [...counts.entries()].find(([, n]) => n === 1)?.[0];
+    if (!single) return;
+
+    await disk.mutate((s) => {
+      for (const p of s.projects)
+        if (p.reIds.includes(single)) p.health = "blocked";
+      return { ok: true as const, value: null };
+    });
+
+    assert.doesNotMatch(sectionFor(single), /Needs attention/);
+  });
+});
+
+describe("weekly sections", () => {
+  /*
+    Monday, and only Monday. Daily would turn a three-week silence into a
+    twenty-one day nag.
+
+    Fixed dates rather than arithmetic on a weekday, because the whole point of
+    `lib/dates.ts` is that "what day is it" has exactly one implementation.
+    2026-08-24 is a Monday; 2026-08-25 is a Tuesday.
+  */
+  const MONDAY = "2026-08-24";
+  const TUESDAY = "2026-08-25";
+
+  function bodies(today: string) {
+    return digest
+      .buildDigests({ today, graph: graph() })
+      .map((d) => d.body)
+      .join("\n");
+  }
+
+  test("gone quiet appears on Monday", async () => {
+    await connectEveryone();
+    assert.match(bodies(MONDAY), /Quiet for/);
+  });
+
+  test("and on no other day", async () => {
+    await connectEveryone();
+    assert.doesNotMatch(bodies(TUESDAY), /Quiet for/);
+  });
+});
+
+describe("a project appearing", () => {
+  test("shows up the day it starts, and the day after", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const pl = store.projects.find((p) => p.reIds.length > 0)!.reIds[0];
+
+    await disk.mutate((s) => {
+      const p = s.projects.find((x) => x.reIds.includes(pl))!;
+      p.startDate = TODAY;
+      return { ok: true as const, value: null };
+    });
+
+    const body = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === pl)!.body;
+
+    assert.match(body, /project was added|projects were added/);
+  });
+
+  test("and not a week later", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const pl = store.projects.find((p) => p.reIds.length > 0)!.reIds[0];
+
+    await disk.mutate((s) => {
+      for (const p of s.projects) p.startDate = addDays(TODAY, -7);
+      return { ok: true as const, value: null };
+    });
+
+    const body = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === pl)!.body;
+
+    assert.doesNotMatch(body, /projects? (was|were) added/);
+  });
+});
+
+describe("order survives the trim", () => {
+  /*
+    `clamp()` cuts from the bottom, so section order decides what a long digest
+    loses. Found by rendering the real fixture: the only overflowing digest was
+    the Co-Lead's with twelve projects, and what it dropped was the WEEKLY quiet
+    section — the one thing they see once a week. The roll call of names was
+    safe at the top, repeating "quiet today" twelve times.
+  */
+  test("the roll call is last, so a trim eats names and not problems", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const co = store.members.find((m) => m.globalRole === "co_lead")!;
+
+    await disk.mutate((s) => {
+      s.projects[0].health = "blocked";
+      return { ok: true as const, value: null };
+    });
+
+    const body = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === co.id)!.body;
+
+    const attention = body.indexOf("Needs attention");
+    const rollCall = body.indexOf("Your projects");
+    assert.ok(attention >= 0, "the Co-Lead sees what needs attention");
+    assert.ok(
+      rollCall < 0 || attention < rollCall,
+      "and sees it before the roll call"
+    );
+  });
+
+  /*
+    The same trap as the empty dashboard, and it has now been hit twice.
+    `isREofOrAbove` has no Co-Lead shortcut: the Co-Lead answer lives in the
+    `can.*` rules. Scoping by it alone gives the club's only Co-Lead — who is PL
+    of 0 of 12 projects — nothing at all.
+  */
+  test("a Co-Lead who is PL of nothing still gets a digest", async () => {
+    await connectEveryone();
+
+    await disk.mutate((s) => {
+      const co = s.members.find((m) => m.globalRole === "co_lead")!;
+      for (const p of s.projects) {
+        p.reIds = p.reIds.filter((id) => id !== co.id);
+        if (p.primaryReId === co.id) p.primaryReId = p.reIds[0];
+      }
+      s.projectMemberships = s.projectMemberships.filter(
+        (m) => m.memberId !== co.id
+      );
+      for (const team of s.teams)
+        if (team.leadId === co.id) team.leadId = undefined;
+      return { ok: true as const, value: null };
+    });
+
+    const co = disk
+      .readStore()
+      .members.find((m) => m.globalRole === "co_lead")!;
+    const mine = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === co.id);
+
+    assert.ok(mine, "a Co-Lead's scope is the club, not their PL rows");
+    assert.match(mine.body, /Your projects/);
+  });
+});
+
+describe("trainings to verify", () => {
+  async function request() {
+    await disk.mutate((s) => {
+      const item = s.catalogueItems[0];
+      const who = s.members.find((m) => m.globalRole === "member")!;
+      s.certifications.push({
+        id: "cert-digest-test",
+        memberId: who.id,
+        itemId: item.id,
+        status: "requested",
+        completedAt: TODAY,
+        requestedAt: `${TODAY}T10:00:00.000Z`,
+      });
+      return { ok: true as const, value: null };
+    });
+  }
+
+  test("leadership sees the queue", async () => {
+    await connectEveryone();
+    await request();
+
+    const store = disk.readStore();
+    const lead = store.members.find(
+      (m) =>
+        m.globalRole !== "member" &&
+        store.projects.some((p) => p.reIds.includes(m.id))
+    );
+    if (!lead) return;
+
+    const body = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .find((d) => d.memberId === lead.id)?.body;
+
+    assert.match(body ?? "", /Trainings to verify/);
+  });
+
+  test("a plain member does not", async () => {
+    await connectEveryone();
+    await request();
+
+    const bodies = digest.buildDigests({ today: TODAY, graph: graph() });
+    for (const d of bodies) {
+      const m = mock.getMember(d.memberId);
+      if (m?.globalRole === "member") {
+        assert.doesNotMatch(d.body, /Trainings to verify/);
+      }
+    }
+  });
+
+  /*
+    Nothing to verify says nothing. The section exists because the club chose a
+    queue line over a DM per verification, and a queue line that is always
+    there stops being a queue.
+  */
+  test("an empty queue is silent", async () => {
+    await connectEveryone();
+
+    const bodies = digest
+      .buildDigests({ today: TODAY, graph: graph() })
+      .map((d) => d.body)
+      .join("\n");
+
+    assert.doesNotMatch(bodies, /Trainings to verify/);
+  });
+});
+
+function addDays(iso: string, days: number): string {
+  const base = Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
+  return new Date(base + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -46,7 +46,22 @@ matters.
    removed with check-ins. What replaced it is smaller and better: the log line
    IS the report now, so there is nothing to draft.
 
-3. **Rewrite the two guide pages in detail** — /getting-started and /leading.
+3. ~~**Build out the Discord notifications.**~~ **Done 2026-08-24.** Seven new
+   DMs and five new digest sections; `docs/INTEGRATIONS.md` has the full table
+   and the rules each one obeys. Three things worth knowing:
+
+   - **Only 5 of 12 members have a Discord id**, so none of it reaches the
+     other seven. That number is now the ceiling on every notification in the
+     app, and raising it is worth more than any further feature here.
+   - **The weekly sections are a weekday check inside the one cron**, not a
+     second cron. Vercel Hobby allows two slots at one run per day each and
+     rejects the whole *deployment* when a schedule breaks that.
+   - **Section order is load-bearing.** The clamp trims from the bottom, so the
+     roll call goes last. Found by rendering the real fixture, not by reading
+     the code: the only overflowing digest was the Co-Lead's, and what it lost
+     was the Monday-only quiet section.
+
+4. **Rewrite the two guide pages in detail** — /getting-started and /leading.
    The editable container for club material shipped (migration 0038,
    /settings/guides); the built-in content still needs expanding. Both were
    rewritten again for the reporting removal, so they're accurate but still thin.
@@ -129,7 +144,7 @@ write path.
 
 ---
 
-## The fourteen bugs that cost the most time
+## The fifteen bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -449,6 +464,35 @@ the view implemented a model the club had removed. That surfaced a third thing:
 `work_logs_read` was still the *pre-2026-08-16* restriction, so the database and
 the app had disagreed about work-log visibility for over a week. Nobody noticed
 because the redundant `work_logs_read_project_re` policy covered most reads.
+
+---
+
+### 15. Free text in a DM could silently lose the DM
+
+Two templates quote text straight out of a form — a withdrawal reason and a
+reply to a work log:
+
+```ts
+`> ${opts.response}\n${opts.url}`   // whatever they typed, verbatim
+```
+
+Discord rejects a message over **2000 characters outright**. It does not
+truncate for you, and `sendDiscordDM` deliberately only logs a refusal so a DM
+can never fail somebody's save. Put those two together and a pasted stack trace
+in a reply means the notification vanishes with nobody the wiser — the write
+succeeded, the page said "Reply sent", and the person it was for never heard.
+
+Fixed with `quoted()` in `lib/notify/discord.ts`: a 600-character budget per
+quote, and newlines collapsed as well, because `> ` quotes only the FIRST line
+in Discord's markdown — a multi-line paste renders as one quoted line followed
+by unattributed text that reads like the bot talking.
+
+**How it was found is the point.** Not by seeing it happen and not by reading
+the template, but by a test that asserted the length with a 5000-character
+input. Three tests fail if `quoted()` is removed. Any new template that
+interpolates member-supplied text needs the same treatment and the same test —
+the failure is invisible from the sending side, which is the whole reason it
+survived.
 
 ---
 

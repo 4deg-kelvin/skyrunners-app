@@ -82,6 +82,33 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
 
     if (!claimed || claimed.length === 0) continue;
 
+    /*
+      The urgent nudge first, then the digest.
+
+      Order matters: Discord shows the newest message last, so sending the
+      summary second leaves the reader on the thing they can skim rather than
+      the thing they have to do. It also rides the SAME claim as the digest —
+      one send per member per day, no second column, no second cron.
+
+      Its failure is not treated as the digest's. A refused nudge must not
+      release the day's claim, because doing so would re-send the digest
+      tomorrow-morning-style on the next run; and the digest below is the one
+      whose delivery the column is actually recording.
+    */
+    if (digest.urgent) {
+      await sendDiscordDM(digest.discordUserId, digest.urgent);
+    }
+
+    /*
+      An empty body means the nudge was the whole point of this record. Nothing
+      to send, and nothing failed — releasing the claim here would DM the same
+      nudge again on every retry.
+    */
+    if (!digest.body) {
+      sent++;
+      continue;
+    }
+
     if (await sendDiscordDM(digest.discordUserId, digest.body)) {
       sent++;
       continue;
