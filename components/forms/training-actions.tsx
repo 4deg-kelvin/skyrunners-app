@@ -92,7 +92,7 @@ export function RequestTrainingForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
+        className="text-ink-muted hover:text-ink mr-3 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -141,7 +141,7 @@ export function VerifyControls({
         <button
           type="button"
           onClick={() => setRejecting(false)}
-          className="text-ink-muted hover:text-ink ml-3 text-sm font-semibold"
+          className="text-ink-muted hover:text-ink mr-3 text-sm font-semibold"
         >
           Cancel
         </button>
@@ -317,7 +317,7 @@ export function AddCatalogueItemForm({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
+        className="text-ink-muted hover:text-ink mr-3 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -366,7 +366,7 @@ export function AddSectionForm() {
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
+        className="text-ink-muted hover:text-ink mr-3 text-sm font-semibold"
       >
         Cancel
       </button>
@@ -461,7 +461,7 @@ export function EditCatalogueItemForm({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-ink-muted hover:text-ink mt-3 ml-5 text-sm font-semibold"
+          className="text-ink-muted hover:text-ink mt-3 mr-3 text-sm font-semibold"
         >
           Cancel
         </button>
