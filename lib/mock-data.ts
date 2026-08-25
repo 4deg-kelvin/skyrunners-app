@@ -3478,49 +3478,6 @@ export function helpRequests() {
   );
 }
 
-export function openBlockers() {
-  return live()
-    .progressUpdates.filter((u) => u.submittedAt)
-    .flatMap((u) =>
-      u.entries
-        .filter((e) => e.blockers)
-        .map((e) => ({ entry: e, memberId: u.memberId, status: u.status }))
-    );
-}
-
-/**
- * Update compliance for the current window — powers the dashboard donut.
- *
- * `pending` means "due but not yet past its deadline", so it is deliberately
- * EXCLUDED from the denominator. Counting it would drag the figure down for
- * updates nobody is late on yet, making leadership see a problem that isn't
- * there.
- *
- * This definition becomes the `v_update_compliance` SQL view — get it right
- * here first.
- */
-export function updateCompliance() {
-  const all = live().progressUpdates;
-  const onTime = all.filter(
-    (u) => u.status === "submitted" || u.status === "reviewed"
-  ).length;
-  const late = all.filter((u) => u.status === "late").length;
-  const missed = all.filter((u) => u.status === "missed").length;
-  const pending = all.filter((u) => u.status === "pending").length;
-
-  const resolved = onTime + late + missed;
-
-  return {
-    total: all.length,
-    resolved,
-    onTime,
-    late,
-    missed,
-    pending,
-    fraction: resolved > 0 ? onTime / resolved : 1,
-  };
-}
-
 /** Reference "today" for the mock data. Replaced by `now()` in Phase 1. */
 /**
  * Today's date, as YYYY-MM-DD.
@@ -3549,21 +3506,6 @@ function daysBetween(a: string, b: string): number {
   return Math.abs(ms) / 86_400_000;
 }
 
-/**
- * Work-log entries written club-wide in the trailing 7 days.
- *
- * Replaces `hoursThisWeek`, which summed a number that no longer exists. The
- * dashboard used it as a single club-wide pulse, and the honest replacement is a
- * COUNT OF ENTRIES rather than any attempt to reconstruct volume — see the
- * warning in `lib/delivered.ts` about rebuilding the old signal in a new
- * unit. This one is a liveness reading ("is anybody logging?"), never attached
- * to an individual and never compared between people.
- */
-export function workLogsThisWeek(): number {
-  return live().workLogs.filter((w) => daysBetween(w.workDate, today()) <= 7)
-    .length;
-}
-
 /** Distinct days a member has a log entry against one project. */
 export function daysWorkedOnProject(memberId: string, projectId: string) {
   return new Set(
@@ -3573,12 +3515,6 @@ export function daysWorkedOnProject(memberId: string, projectId: string) {
       )
       .map((w) => w.workDate.slice(0, 10))
   ).size;
-}
-
-export function awaitingReview() {
-  return live().progressUpdates.filter(
-    (u) => u.status === "submitted" || u.status === "late"
-  );
 }
 
 /**

@@ -974,17 +974,48 @@ in list rows, so it wants a real pass rather than one rule.
 
 ## Outstanding, in order
 
-1. **Audit the RLS policies for the reporting chain.** The one real gap left by
-   the 2026-08-24 removal: the app-side rules went, the SQL mirrors did not.
-   `auth_can_view_effort` was deleted in `0049` — it was broken anyway — but
-   `auth_is_lead_of` survives and two `progress_updates` policies still call it.
-   Neither is broken; both implement a model that no longer exists.
+1. **The "public per-project half" of a check-in has never actually been public
+   in live mode.** Found 2026-08-25 while auditing the RLS layer for the
+   reporting chain. This is the highest-value thing left, and it needs a decision
+   rather than a patch.
 
-   Do it as its own considered change rather than in passing. `progress_updates`
-   feeds the public project feed, so narrowing it carelessly hides a project's own
-   history from the page that exists to show it. The target shape is
-   `can.readArchivedCheckIns` — the member and Co-Leads — for the ENVELOPE, with
-   `update_entries` staying public.
+   The chain of reasoning, because each step is checkable:
+
+   - `update_entries_read_all` is `using (true)` — the per-project half is public,
+     exactly as designed and as CLAUDE.md claims.
+   - **But the app never reads `update_entries` directly.**
+     `projectUpdateFeed()` reads `live().progressUpdates` and iterates
+     `u.entries`, and `lib/store/supabase.ts` attaches entries by looping over
+     the ENVELOPE rows that came back.
+   - So an entry whose envelope RLS filtered out is unreachable, whatever the
+     entries policy says.
+   - `progress_updates_read_chain` (migration `0008`) is
+     `member_id = auth.uid() or auth_is_lead_of(member_id)`, and with
+     `profiles.lead_id` now null everywhere `auth_is_lead_of` collapses to
+     `auth_is_co_lead()`.
+
+   **Net effect: a plain member's project feed shows only their OWN check-in
+   entries. A Co-Lead sees everyone's.** Pre-existing — `0008` predates all of
+   this — but the reporting removal is what made it total rather than partial.
+
+   Three ways out, and the choice is a real one:
+
+   - **(a) `progress_updates` → `using (true)`.** One line, and it publishes
+     `general_note` to the whole club — the one thing
+     `can.readArchivedCheckIns` deliberately protects, because those notes were
+     written under a promise. Don't.
+   - **(b) Stop selecting `general_note` in the snapshot** (`lib/store/mapping.ts`),
+     read it through a separate gated query the way `lib/advisors/store.ts` reads
+     `advisor_profiles`, then make the envelope `using (true)`. **This is the
+     recommendation.** It makes the database agree with the app rule instead of
+     contradicting it, and it uses a pattern already in the repo.
+   - **(c) Leave it.** Defensible only because nothing new is being written —
+     these are archives. But the project page currently claims to show "everything
+     anyone has done here" and does not.
+
+   Whatever is chosen, `auth_is_lead_of` and `progress_updates_review` should go
+   with it: the first is the SQL mirror of the deleted `isLeadOfOrAbove`, and the
+   second lets a "Lead" mark a report read when nothing marks anything read.
 
 2. **The database password does not work, and this is a Supabase-side problem.**
    Not needed any more — see `npm run db:push` — but worth recording so nobody
