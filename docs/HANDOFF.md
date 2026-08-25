@@ -1034,32 +1034,71 @@ in list rows, so it wants a real pass rather than one rule.
    - So an entry whose envelope RLS filtered out is unreachable, whatever the
      entries policy says.
    - `progress_updates_read_chain` (migration `0008`) is
-     `member_id = auth.uid() or auth_is_lead_of(member_id)`, and with
-     `profiles.lead_id` now null everywhere `auth_is_lead_of` collapses to
-     `auth_is_co_lead()`.
+     `member_id = auth.uid() or auth_is_lead_of(member_id)`.
 
-   **Net effect: a plain member's project feed shows only their OWN check-in
-   entries. A Co-Lead sees everyone's.** Pre-existing — `0008` predates all of
-   this — but the reporting removal is what made it total rather than partial.
+   **Net effect: a member's project feed shows their own check-in entries plus
+   whoever their `lead_id` chain reaches. A Co-Lead sees everyone's.**
+   Pre-existing — `0008` predates all of this.
 
-   Three ways out, and the choice is a real one:
+   ### Corrected 2026-08-24, by querying instead of reasoning
 
-   - **(a) `progress_updates` → `using (true)`.** One line, and it publishes
+   Two things this write-up got wrong, both found by asking the database:
+
+   - **`profiles.lead_id` is NOT null everywhere — 8 of 12 rows still have
+     one.** So `auth_is_lead_of` does not collapse to `auth_is_co_lead()`. It
+     still resolves, against a chain the application no longer reads and nobody
+     maintains. That is worse than collapsing, not better: visibility now
+     follows a reporting structure that officially does not exist.
+   - **The stakes are six rows.** Everything ever written:
+
+     | Day | Author | Entries | Private note |
+     |---|---|---|---|
+     | 2026-08-09 | Kevin Hao (Co-Lead) | 0 | **yes** |
+     | 2026-08-11 | Jonathan Ananta Lie (Co-Lead) | 2 | no |
+     | 2026-08-13 | Anish Bayya (Co-Lead) | 3 | no |
+     | 2026-08-13 | Julia Jiang (Lead) | 1 | no |
+
+     Four envelopes, six entries, all between 9 and 13 August, all before
+     check-ins were removed on 2026-08-24. **Nothing will ever be written
+     again** — the feature is gone. And the single envelope carrying a private
+     `general_note` has **zero** entries, so there is no row where a private
+     note and public content coexist.
+
+   That reframes the fix. The bug is real and the principle is unchanged, but
+   this is six archived rows, not a live leak, and the cost of each option
+   should be read against that.
+
+   ### The options, cheapest first
+
+   - **(a) `progress_updates` → `using (true)`.** One line. Publishes
      `general_note` to the whole club — the one thing
-     `can.readArchivedCheckIns` deliberately protects, because those notes were
-     written under a promise. Don't.
-   - **(b) Stop selecting `general_note` in the snapshot** (`lib/store/mapping.ts`),
-     read it through a separate gated query the way `lib/advisors/store.ts` reads
-     `advisor_profiles`, then make the envelope `using (true)`. **This is the
-     recommendation.** It makes the database agree with the app rule instead of
-     contradicting it, and it uses a pattern already in the repo.
-   - **(c) Leave it.** Defensible only because nothing new is being written —
-     these are archives. But the project page currently claims to show "everything
-     anyone has done here" and does not.
+     `can.readArchivedCheckIns` protects, written under a promise. Still no,
+     even for one row, and "it's only one" is exactly the argument that makes
+     privacy promises worthless.
+   - **(b) Revoke the column, then open the row.** Three steps and no
+     application refactor:
+     1. drop `general_note` from the snapshot's column list in
+        `lib/store/mapping.ts:497`
+     2. `revoke select (general_note) on progress_updates from authenticated` —
+        so it cannot be re-added by accident, which a comment cannot promise
+     3. `progress_updates_read_chain` → `using (true)`
+
+     `general_note` is rendered in exactly one place
+     (`app/(app)/members/[id]/page.tsx:412`, gated on
+     `can.readArchivedCheckIns`), so that page needs a small gated query of its
+     own — the `lib/advisors/store.ts` pattern. **This is the recommendation.**
+     Column-level privilege makes the database enforce the app's rule rather
+     than restate it.
+   - **(c) Leave it.** Defensible: six archived rows, no new writes, and the
+     people most affected are the three Co-Leads who wrote five of the six
+     entries and can already read everything. The cost is that the project page
+     claims to show "everything anyone has done here" and does not, and the
+     claim rots quietly.
 
    Whatever is chosen, `auth_is_lead_of` and `progress_updates_review` should go
-   with it: the first is the SQL mirror of the deleted `isLeadOfOrAbove`, and the
-   second lets a "Lead" mark a report read when nothing marks anything read.
+   with it: the first is the SQL mirror of the deleted `isLeadOfOrAbove` and now
+   resolves against a chain nothing maintains, and the second lets a "Lead" mark
+   a report read when nothing marks anything read.
 
 2. **The database password does not work, and this is a Supabase-side problem.**
    Not needed any more — see `npm run db:push` — but worth recording so nobody
@@ -1087,7 +1126,7 @@ in list rows, so it wants a real pass rather than one rule.
    at the time. There is now. See the header of
    `supabase/migrations/0046_catalogue_verifiers.sql`.
 
-4. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
+5. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
    Michael, Jonathan. They receive nothing at all until they press Verify now.
 
 5. **Nobody has logged any work yet.** Both delivered counters correctly read
