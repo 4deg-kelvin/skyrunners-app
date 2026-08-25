@@ -267,17 +267,26 @@ describe("a Division Lead is a top PL over their division", () => {
     assert.equal(can.assignRE(actor("otherDivLead"), graph, "leaf"), false);
   });
 
-  test("a division lead still cannot read a personal report", () => {
+  test("a division lead's authority is over work, not people", () => {
     /*
       "Top PL" means top PL, not Co-Lead, and this is the test that keeps the
       Division-Lead route above from quietly becoming one.
 
-      It used to assert `viewMemberEffort` and `reviewUpdate`, both deleted on
-      2026-08-24. The archived check-ins are what is left of a personal report,
-      and the answer has to stay the same: leading a division is authority over
-      that division's WORK, not over the people doing it.
+      It has now lost its subject twice. It asserted `viewMemberEffort` and
+      `reviewUpdate`, both deleted on 2026-08-24; then
+      `can.readArchivedCheckIns(divLead) === false`, until the private note went
+      and that rule became `() => true`. There is no longer any per-person read
+      to deny, which is the point rather than a gap -- so what it pins is the
+      shape that mattered: division authority reaches the division's PROJECTS
+      and stops.
     */
-    assert.equal(can.readArchivedCheckIns(actor("divLead"), "worker"), false);
+    assert.equal(can.manageProject(actor("divLead"), graph, "root"), true);
+    // Co-Lead-only, both of them: these are the two rules that act on a
+    // PERSON rather than on work. `inviteMember` is deliberately NOT here —
+    // it is `isLeadership`, so a Division Lead can invite, which is about
+    // growing the club rather than authority over anybody in it.
+    assert.equal(can.setMemberStatus(actor("divLead"), graph, "worker"), false);
+    assert.equal(can.setGlobalRole(actor("divLead"), "worker"), false);
   });
 
   test("a team with no lead grants nobody anything", () => {
@@ -372,53 +381,65 @@ describe("work on a project is public", () => {
     assert.equal(can.viewMemberWorkOnProject(), true);
   });
 
-  test("and the archive did not become public with it", () => {
+  test("and now the archive is public too", () => {
     /*
-      This asserted that "how this member is doing overall" stayed private when
-      the per-project half went public. That judgment no longer exists to
-      protect -- reliability and the contribution record went on 2026-08-24 --
-      so what it guards now is the narrower thing that remains: publishing what
-      happened on a project must not publish the general note somebody wrote
-      about their term.
+      This asserted the opposite three times, and each version was right when it
+      was written.
+
+      First it kept "how this member is doing overall" private when the
+      per-project half went public. Then reliability and the contribution
+      record went on 2026-08-24, leaving only the general note somebody wrote
+      about their term. Then the note itself went, so there is nothing behind
+      the gate.
     */
-    assert.equal(can.readArchivedCheckIns(actor("outsider"), "worker"), false);
-    assert.equal(can.readArchivedCheckIns(actor("reRoot"), "worker"), false);
+    assert.equal(can.readArchivedCheckIns(), true);
   });
 });
 
-describe("the archived check-ins are the last non-public thing", () => {
+describe("nothing about a member is private", () => {
   /*
-    This replaces "update review is the Lead's job, and only theirs", which
-    asserted `can.reviewUpdate` for the Lead chain. Nobody reviews anything now.
+    This block has been rewritten twice and the shape of the rewrite is the
+    interesting part.
 
-    What is left points the other way. Not who OWES a reading, but who may read
-    what people already wrote: a check-in carried a `generalNote`, anything not
-    tied to a project, written under a stated promise that only the member and
-    their Lead chain would see it. Publishing that retroactively is the one
-    privacy change that cannot be undone by changing it back -- so the gate
-    NARROWED rather than opening.
+    It began as "update review is the Lead's job, and only theirs", asserting
+    `can.reviewUpdate` for the Lead chain. Nobody reviews anything now. It
+    became "the archived check-ins are the last non-public thing", asserting
+    that a `generalNote` written under a stated promise stayed with the member
+    and the Co-Leads.
+
+    Then the note went, and the sentence has no qualifier left. **That is the
+    thing to defend.** The table in CLAUDE.md once had three rows and a long
+    argument about which half of a check-in was whose; it now has one row
+    reading "everyone". Every assertion here fails if somebody adds an
+    exception, which is the whole reason they are worth keeping now that they
+    all read `true`.
   */
-  test("the member themselves can read their own", () => {
-    assert.equal(can.readArchivedCheckIns(actor("worker"), "worker"), true);
+  test("every role can read anyone's archived check-ins", () => {
+    /*
+      One assertion, not a loop over roles, and that is the change worth
+      noticing: the rule takes no arguments now, so "for every role" is not
+      something a test can express any more. The arity IS the guarantee. The
+      third test below is what checks it stayed that way.
+    */
+    assert.equal(can.readArchivedCheckIns(), true);
   });
 
-  test("a Co-Lead can read anyone's", () => {
-    assert.equal(can.readArchivedCheckIns(actor("coLead"), "worker"), true);
+  test("and the two rules that were always public still are", () => {
+    assert.equal(can.viewProjectUpdates(), true);
+    assert.equal(can.viewMemberWorkOnProject(), true);
   });
 
-  test("their old Lead can NOT, and that is the narrowing", () => {
-    // lead2 was this member's direct Lead in the fixture and could read these
-    // until 2026-08-24. The right to read them came from an obligation to read
-    // them; the obligation is gone, so the right goes with it.
-    assert.equal(can.readArchivedCheckIns(actor("lead2"), "worker"), false);
-  });
-
-  test("a PL of their project cannot, same as before", () => {
-    assert.equal(can.readArchivedCheckIns(actor("reRoot"), "worker"), false);
-  });
-
-  test("an unrelated member cannot", () => {
-    assert.equal(can.readArchivedCheckIns(actor("outsider"), "worker"), false);
+  /*
+    The rule takes no arguments any more. Calling it with the old signature
+    still compiles -- extra arguments to a zero-arity function are legal in JS
+    -- so this pins that it does not accidentally depend on them, which is how
+    a `() => true` quietly becomes a gate again.
+  */
+  test("it does not read its arguments", () => {
+    const rule = can.readArchivedCheckIns as (...a: unknown[]) => boolean;
+    assert.equal(rule(), true);
+    assert.equal(rule(actor("outsider"), "worker"), true);
+    assert.equal(rule(undefined, undefined), true);
   });
 });
 
@@ -977,15 +998,21 @@ describe("an advisor holds no authority", () => {
       letters of reference: doing that from a page that hides what somebody
       delivered is not possible. The rule went on 2026-08-24 with the
       contribution record, and the need it served is now met by the profile
-      being public -- so there is nothing here to assert as a special case, which
-      is the outcome the club wanted.
+      being public.
 
-      What is still NOT theirs is the archived check-ins. The original reasoning
-      holds and is the reason this test kept a line: an advisor reading
-      somebody's weekly notes about being underwater in a class is surveillance;
-      reading what they finished is a reference.
+      The archived check-ins were the one thing still not theirs, on reasoning
+      worth keeping on the record: an advisor reading somebody's weekly notes
+      about being underwater in a class is surveillance, while reading what they
+      finished is a reference.
+
+      That distinction died with its subject. The notes are gone -- removed
+      content and all in migration `0050` -- and what is left of a check-in is a
+      date, a status and who the member's Lead was. There is nothing here an
+      advisor should not see, so the exception went rather than being narrowed
+      again. **If a private field ever comes back, this is the first test to
+      restore.**
     */
-    assert.equal(can.readArchivedCheckIns(advisor(), "worker"), false);
+    assert.equal(can.readArchivedCheckIns(), true);
   });
 
   /* The positive half: what an advisor is FOR. */

@@ -494,7 +494,7 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     from `update_entries` was dropped in migration 0039.
   */
   columns:
-    "id, member_id, due_at, reminder_sent_at, late_notice_sent_at, submitted_at, status, general_note, lead_id_at_submission, reviewed_at, reviewed_by",
+    "id, member_id, due_at, reminder_sent_at, late_notice_sent_at, submitted_at, status, lead_id_at_submission, reviewed_at, reviewed_by",
   identify: (u) => u.id,
   fromRow: (r) => ({
     id: r.id as string,
@@ -505,7 +505,6 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     submittedAt: opt(r.submitted_at as string),
     status: r.status as ProgressUpdate["status"],
     entries: [],
-    generalNote: opt(r.general_note as string),
     leadIdAtSubmission: opt(r.lead_id_at_submission as string),
     reviewedAt: opt(r.reviewed_at as string),
     reviewedBy: opt(r.reviewed_by as string),
@@ -518,7 +517,6 @@ const progressUpdates: CollectionSpec<ProgressUpdate> = {
     late_notice_sent_at: nul(u.lateNoticeSentAt),
     submitted_at: nul(u.submittedAt),
     status: u.status,
-    general_note: nul(u.generalNote),
     lead_id_at_submission: nul(u.leadIdAtSubmission),
     reviewed_at: nul(u.reviewedAt),
     reviewed_by: nul(u.reviewedBy),

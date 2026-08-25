@@ -1018,7 +1018,9 @@ in list rows, so it wants a real pass rather than one rule.
 
 ## Outstanding, in order
 
-1. **The "public per-project half" of a check-in has never actually been public
+1. ~~**The "public per-project half" of a check-in has never actually been public**~~ **Fixed 2026-08-25, migration `0050`.** The club chose option (a′): remove private notes entirely rather than build a read path to protect one seven-character test note. `progress_updates` is now `using (true)`, `general_note` is emptied and unselected, `progress_updates_review` and `auth_is_lead_of` are dropped, and `can.readArchivedCheckIns` is `() => true`. The write-up below is kept because the BUG SHAPE recurs: a permissive policy on a child table proves nothing when the read goes parent-first.
+
+   ~~The "public per-project half" of a check-in has never actually been public
    in live mode.** Found 2026-08-25 while auditing the RLS layer for the
    reporting chain. This is the highest-value thing left, and it needs a decision
    rather than a patch.

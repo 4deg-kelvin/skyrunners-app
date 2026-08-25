@@ -703,8 +703,25 @@ export interface ProgressUpdate {
    * check-in asks for.
    */
   entries: UpdateEntry[];
-  /** Anything not tied to a specific project. Optional. */
-  generalNote?: string;
+  /*
+    `generalNote` was here: anything not tied to a specific project.
+
+    It was the LAST thing about a member that was not public — readable by them
+    and their Lead chain, then by them and the Co-Leads. Removed on 2026-08-24,
+    content and all, in migration `0050`. The column survives in Postgres,
+    empty, for the same reason `work_logs.hours` does.
+
+    The argument for keeping it is worth knowing, because it was a good one and
+    it expired rather than being wrong: those notes were written under a stated
+    promise, and publishing what somebody already typed is the one privacy
+    change that changing your mind cannot undo. What made it moot was checking
+    — the only note in the database was seven characters a Co-Lead typed to see
+    if the form worked. There was no promise left to keep.
+
+    **Don't add a private field back here.** "Everything about a member is
+    public" is now unqualified, and one exception is what a table of three
+    exceptions grows from.
+  */
   /**
    * Who this person reported to AT SUBMISSION. Mirrors
    * `progress_updates.lead_id_at_submission`.

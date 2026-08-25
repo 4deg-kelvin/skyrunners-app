@@ -43,14 +43,17 @@ export default async function MemberProfilePage({
     The one gate left on this page.
 
     There used to be two: `viewMemberEffort` for the contribution record, and a
-    narrower one for the CONTENTS of somebody's check-ins. Reliability and the
-    contribution record were deleted on 2026-08-24 and everything that is left
-    about a member is public -- so the only question remaining is the archived
-    check-ins, which are gated for a reason `can.readArchivedCheckIns` states in
-    full. Decided before fetching, so the notes are never loaded into a page that
-    is not allowed to show them.
+    narrower one for the CONTENTS of somebody's check-ins. Both are gone --
+    reliability and the contribution record on 2026-08-24, then the private note
+    itself, content and all, in migration `0050`.
+
+    So this asks a question with one answer, and the call stays anyway. It is
+    what makes re-gating a one-line change if a private field is ever added
+    back: the decision is still made HERE, before the fetch, so the data is
+    never loaded into a page that is not allowed to show it. Inlining `true`
+    would save a line and lose that.
   */
-  const canReadCheckIns = can.readArchivedCheckIns(viewer.actor, id);
+  const canReadCheckIns = can.readArchivedCheckIns();
   const [view, trainings, resolvedAsks] = await Promise.all([
     getMemberProfile(id, canReadCheckIns, viewer.member.id),
     getTrainings(id),
@@ -408,12 +411,6 @@ export default async function MemberProfilePage({
                               ) : null}
                             </div>
                           ))}
-
-                          {update.generalNote ? (
-                            <p className="border-line text-ink-soft mt-3 border-t pt-3 text-[15px]">
-                              {update.generalNote}
-                            </p>
-                          ) : null}
                         </li>
                       ))}
                   </ul>

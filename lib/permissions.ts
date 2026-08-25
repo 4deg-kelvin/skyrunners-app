@@ -908,27 +908,35 @@ export const can = {
   viewOwnContribution: () => true,
 
   /**
-   * Reading somebody's ARCHIVED check-ins -- the member, or a Co-Lead.
+   * Reading somebody's ARCHIVED check-ins. Anyone -- there is nothing left to
+   * gate.
    *
-   * The one thing on a member's profile that is not public, on a page where
-   * everything else now is. Worth stating why, because the obvious reading is
-   * that it was missed.
+   * This was the LAST non-public thing about a member, and the rule is kept
+   * rather than deleted because its history is the argument against re-adding
+   * one.
    *
-   * A check-in carried a `generalNote`: anything not tied to a project. It was
+   * A check-in carried a `generalNote`: anything not tied to a project,
    * written under a stated promise that only the member and their Lead chain
-   * would read it, and a lot of it is "I am underwater in CS 161 and behind on
-   * everything". The club stopped asking for check-ins on 2026-08-24 and the
-   * chain went with them, so nothing new will ever land here -- but publishing
-   * what people already typed would break a promise retroactively, which is the
-   * one kind of privacy change that cannot be undone by changing it back.
+   * would read it. That promise is why the gate NARROWED on 2026-08-24 instead
+   * of opening when everything else went public -- publishing what people
+   * already typed is the one privacy change that cannot be undone by changing
+   * it back.
    *
-   * So the gate NARROWS rather than widens. It used to be the member, their
-   * whole Lead chain, and Co-Leads; it is now the member and Co-Leads. The
-   * per-project half of every one of these is public and always was, and it is
-   * in the project's feed where it belongs.
+   * The note was removed entirely later the same day, content and all, in
+   * migration `0050`. What made that safe was checking rather than reasoning:
+   * the only `generalNote` in the database was seven characters a Co-Lead had
+   * typed to see whether the form worked. There was no promise left to keep.
+   *
+   * So what this now guards is an envelope holding a due date, a submitted
+   * date, a status, and who the member's Lead was at the time. None of that is
+   * private, and a gate that protects nothing is worse than no gate: it reads
+   * as though something sensitive is behind it, and the next person to add a
+   * field here will assume it is covered.
+   *
+   * **If a private field is ever added back, this is the rule to restore** --
+   * to the member and Co-Leads, not to any person-to-person chain.
    */
-  readArchivedCheckIns: (actor: Actor, memberId: string) =>
-    isCoLead(actor) || isSelf(actor, memberId),
+  readArchivedCheckIns: () => true,
 
   /**
    * Removing a deliverable outright — the PL's list, so the PL's call.

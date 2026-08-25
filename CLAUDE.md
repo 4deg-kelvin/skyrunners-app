@@ -302,12 +302,25 @@ Three things replaced what was removed:
   record. See the next section.
 - **Per-item training verifiers** — `lib/trainings/verifiers.ts`. See #9 below.
 
-**Nothing about a member is private any more, with one exception.** A check-in
-carried a `generalNote` written under a stated promise that only the member and
-their Lead chain would read it, so `can.readArchivedCheckIns` narrowed to the
-member plus Co-Leads rather than opening. Publishing what people already typed is
-the one privacy change that changing it back cannot undo. Everything else — every
-log line, every deliverable, both counters — is public.
+**Nothing about a member is private. No exceptions, as of 2026-08-25.**
+
+There was one, and it lasted a day. A check-in carried a `generalNote` written
+under a stated promise that only the member and their Lead chain would read it,
+so `can.readArchivedCheckIns` narrowed to the member plus Co-Leads rather than
+opening — publishing what people already typed is the one privacy change that
+changing it back cannot undo.
+
+Migration `0050` removed the note, content and all. What made that safe was
+checking rather than reasoning: the only `generalNote` in the live database was
+the string `"amongus"`, seven characters a Co-Lead had typed to see whether the
+form worked. There was no promise left to keep, so the club chose to delete the
+concept rather than carry a privacy exception, a permission rule and a
+special-cased read path for a field nobody had used before it was retired.
+
+`can.readArchivedCheckIns` is now `() => true` and takes no arguments. It is
+kept rather than deleted because **its history is the argument against re-adding
+a private field** — if one ever comes back, that rule and the advisor test in
+`lib/permissions.test.ts` are the two things to restore.
 
 `profiles.lead_id`, `progress_updates.lead_id_at_submission` and the whole
 `update_schedules` table are **still in Postgres** with comments, unselected.
@@ -341,9 +354,17 @@ Rules that must not regress:
 
 `progress_updates` is an envelope (who, when, status); content lives in
 **`update_entries`** — one row per project. **Nothing writes either any more.**
-The rows that exist still render: the per-project half is public and part of each
-project's feed, and the envelope shows on a member's profile behind
-`can.readArchivedCheckIns`.
+The rows that exist still render, and all of it is public: the per-project half
+is part of each project's feed, and the envelope shows on a member's profile.
+
+**The per-project half was not actually public in live mode until `0050`,** and
+the shape of that bug is worth keeping. `update_entries_read_all` was
+`using (true)`, exactly as designed — but nothing reads `update_entries`
+directly. `projectUpdateFeed()` iterates `progressUpdates[].entries`, and the
+snapshot attaches entries by looping over the ENVELOPE rows that came back, so an
+entry whose envelope RLS filtered out was unreachable whatever the entries policy
+said. **A permissive policy on a child table proves nothing if the parent is
+gated and the read goes parent-first.**
 
 The reason for the per-project shape is worth keeping, because it applies to
 anything that reports on somebody's work across projects: members are on several
@@ -530,28 +551,35 @@ rendering an update must iterate `entries` and label each with its project.
   A tracked request lands in a queue, shows as pending, and escalates at 5 days.
 - **Transparency by default for *activity*.** Everyone sees projects, who's on what,
   responsibilities, the calendar, Gantt charts.
-- **Everything about a member is public, with exactly one exception.** This table
-  used to have three rows and a long argument about which half of a check-in was
-  whose. It collapsed on 2026-08-24:
+- **Everything about a member is public. No exceptions.** This table had three
+  rows and a long argument about which half of a check-in was whose. It has one:
 
   | Thing | Who sees it | Rule |
   |---|---|---|
-  | Every log line, every project, both counters, per-project update entries | **Everyone** | `can.viewProjectUpdates`, `can.viewMemberWorkOnProject` — both `() => true` |
-  | Archived check-in envelopes (incl. `generalNote`) | The member and **Co-Leads** | `can.readArchivedCheckIns` |
+  | Every log line, every project, both counters, every update entry, every archived check-in | **Everyone** | `can.viewProjectUpdates`, `can.viewMemberWorkOnProject`, `can.readArchivedCheckIns` — all three `() => true` |
 
-  The path to that is worth knowing, because each step had a different reason.
+  The path there is worth knowing, because every step had a different reason and
+  none of them was "privacy doesn't matter".
+
   What somebody logged on a project was PL-and-Lead-chain only until 2026-08-16,
   because the log carried HOURS and a number invites comparison between
   volunteers with different course loads. The hours went on 2026-08-14, leaving a
   sentence about a project — and the project is public. Then reliability and the
   contribution record went on 2026-08-24, and they were the last person-level
-  judgment in the app.
+  judgment in the app. That left one thing: a check-in's `generalNote`, written
+  under a stated promise, which is why the gate NARROWED that day instead of
+  opening.
 
-  **The one exception is narrower than the rule it replaced, not wider.** A
-  `generalNote` was written under a stated promise that only the member and their
-  Lead chain would read it. Their old Lead can no longer read it; a Co-Lead can.
-  Publishing what people already typed is the one privacy change that changing it
-  back cannot undo.
+  It opened on 2026-08-25, and only because the promise turned out to be
+  hypothetical. **The club is in testing and the only note anybody had written
+  was seven characters long.** Migration `0050` deleted it. That is the whole
+  justification, and it does not generalise: if members had been filing real
+  check-ins for a term, the right answer would still be the narrow gate, because
+  a promise about what you write is not renegotiable after the fact.
+
+  **So the rule to carry forward is not "everything is public".** It is: decide
+  before people type, and if you get it wrong, the direction you can still move
+  is towards MORE privacy, never less.
 - **The dashboard is scoped to the projects you're accountable for**, not the club.
   Opening thirty items, twenty-six of which aren't yours, tells you nothing about
   what you owe — the design target is a 15-minute weekly obligation. `/dashboard`
