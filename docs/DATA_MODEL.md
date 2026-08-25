@@ -459,13 +459,43 @@ Things the database or permission module must guarantee:
 
 ---
 
-## Views worth creating early
+## Views
 
-| View | Purpose |
-|---|---|
-| `v_project_tree` | Flattened tree with depth and materialized path |
-| `v_member_hours_weekly` | Hours per member per week, pre-aggregated |
-| `v_update_compliance` | Per member: due, on-time, late, missed |
-| `v_project_rollup_dates` | Recursive computed Gantt spans |
-| `v_org_chain` | Each member's full reporting chain to a Co-Lead |
-| `v_open_projects` | Joinable projects with open roles — the "find work" feed |
+> **Every view needs `security_invoker = on`, and this is not optional.**
+> A view created without it reads its base tables as the OWNER, so RLS does not
+> apply — and every view in `public` is exposed over PostgREST. On 2026-08-25 ten
+> views were returning real member data to an ANONYMOUS caller holding nothing
+> but the publishable key, including per-member hours and a contribution record.
+> Fixed in `0048`. Write `create view x with (security_invoker = on) as ...`, or
+> the next one leaks the same way.
+>
+> Second rule, from the same day: **before dropping a view, grep the migrations
+> for its name.** Postgres records dependencies for views-on-views and
+> policies-on-views, but a FUNCTION BODY is an opaque string — dropping
+> `v_lead_chain` silently broke `auth_can_view_effort()` and, through it, every
+> read of `work_logs`. `pg_depend` will not save you. See `0049`.
+
+| View | Purpose | State |
+|---|---|---|
+| `v_project_tree` | Flattened tree with depth and materialized path | live, invoker |
+| `v_project_division` | Resolves a project to its division | live, invoker |
+| `v_project_re_authority` | Who holds RE authority where | live, invoker |
+| `v_project_progress` | Deliverable counts and fraction per project | live, invoker |
+| `v_projects_needing_attention` | The exception feed | live, invoker |
+| `v_join_requests_for_re` | Requests awaiting an RE | live, invoker |
+| `v_stale_join_requests` | Requests past the escalation window | live, invoker |
+| `v_lead_chain` | Each member's reporting chain | **dropped `0048`** — no chain |
+| `v_member_hours_weekly` | Hours per member per week | **dropped `0048`** — no hours |
+| `v_member_contribution` | The contribution record | **dropped `0048`** — deleted 2026-08-24 |
+
+**None of the live ones is read by the app.** `lib/data/*` goes through the
+per-request snapshot over TABLES, and `lib/permissions.ts` walks the trees in
+memory through `OrgGraph` because its four lookups must stay synchronous. The
+views were written ahead of code that never arrived — worth knowing before
+assuming one is load-bearing.
+
+Still unbuilt, and named here because the old version of this table listed them
+as though they existed: `v_project_rollup_dates` (recursive Gantt spans) and
+`v_open_projects` (the Find Work feed). `v_update_compliance` and `v_org_chain`
+are no longer wanted at all — check-in compliance and the reporting chain both
+went in 2026-08.

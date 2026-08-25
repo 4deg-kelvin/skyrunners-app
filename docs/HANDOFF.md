@@ -31,9 +31,11 @@ matters.
      function was that somebody was *named* as responsible for noticing silence.
      Per-project "gone quiet" is what replaced that, and if it gets weakened the
      removal loses the thing that made it safe.
-   - **Migration `0046` is written and NOT applied** (the database password is
-     rejected — see §14). The trainings-verifier feature ships without it and
-     switches itself on when it lands. Nothing 500s in the meantime, on purpose.
+   - **Migrations `0044`–`0049` were applied on 2026-08-25.** The
+     trainings-verifier feature is live. They were written to ship WITHOUT the
+     migration and switch on when it landed, which is why the deploy order was
+     never load-bearing — keep that pattern for anything touching a table the
+     snapshot reads with an explicit column list.
 
 2. ~~**Remove the hour-tracking system.**~~ **Done 2026-08-14**, migration
    `0039`. The work log is a diary: `WorkLog` has no `hours` and its
@@ -58,8 +60,7 @@ Everything below is the older, still-accurate orientation.
 The app is **live on Supabase** at `skyrunners-app.vercel.app` — note the
 `-app`; `skyrunners.vercel.app` is somebody else's site and probing it to check
 a deploy gives a confident wrong answer. Real Google sign-in, real Postgres,
-migrations `0001`–`0043` applied; `0044`–`0046` are written and waiting on a
-working password. **Phases 0–8 are built** — my work, find work, projects,
+migrations `0001`–`0049` applied. **Phases 0–8 are built** — my work, find work, projects,
 members, deliverables and sign-off, terms, trainings and
 facility access, and the calendar. There is no phase 9+ scoped yet beyond the
 one item under "What's next".
@@ -128,7 +129,7 @@ write path.
 
 ---
 
-## The thirteen bugs that cost the most time
+## The fourteen bugs that cost the most time
 
 Read these before debugging anything. Each was invisible in the obvious place.
 
@@ -401,6 +402,53 @@ The test that should have caught the first one compared *dates* and passed on a
 *time* bug, using a fixture whose comment said "6pm Pacific" while its value was
 6pm UTC — late morning Pacific, which never crosses a date boundary. A fake
 `toUtc` in the tests agreed with any timezone mistake the real one made.
+
+### 14. Ten views bypassed RLS, and dropping one broke `work_logs`
+
+Two bugs on 2026-08-25, and the second was caused by fixing the first.
+
+**The leak.** Supabase's advisor flagged all ten `v_*` views as CRITICAL
+"Security Definer View", and it was right. A view created without
+`security_invoker` reads its base tables as the OWNER, so RLS does not apply —
+and every view in `public` is exposed over PostgREST. Verified against production
+with nothing but the publishable key, the one that ships in the browser bundle:
+
+    GET /rest/v1/projects?select=slug   ->  []       (RLS working)
+    GET /rest/v1/v_project_tree         ->  [{...}]  (RLS bypassed)
+
+Eight of ten returned rows to an anonymous caller: project structure, the
+reporting chain, RE authority, per-member weekly HOURS, and a contribution record
+including `hours_total`. Keyed by UUID, so no names or prose — but hours and the
+contribution record are the two things the club spent two removals deciding not
+to show even to members.
+
+Fixed in `0048`: `security_invoker = on` on the seven that stay, `revoke select
+from anon` on top, and the three the removals had killed (`v_lead_chain`,
+`v_member_hours_weekly`, `v_member_contribution`) dropped outright.
+
+**The break.** I checked that no application code read `v_lead_chain` before
+dropping it. Wrong thing to check: `auth_can_view_effort()`, a `security definer`
+function from `0004`, selects from it, and two RLS policies call that function.
+So `select` on `work_logs` and `update_schedules` started failing with
+`relation "v_lead_chain" does not exist` — and `work_logs` is in the per-request
+snapshot, so that is every page.
+
+**Postgres did not stop me, and that is the transferable part.** It records
+dependencies for views on views and for policies on views, so `drop view` normally
+errors with "other objects depend on it". A FUNCTION BODY is an opaque string:
+nothing is recorded, the drop succeeds, and the failure surfaces at query time.
+**Before dropping any view, grep the migrations for its name — `pg_depend` will
+not save you.**
+
+It was also intermittent, which is worse than broken. `work_logs` has two SELECT
+policies, Postgres OR's them, and SQL guarantees no evaluation order — so it
+worked for callers who satisfied the other policy and errored for everyone else.
+
+`0049` repaired it by replacing the policies rather than restoring the view, since
+the view implemented a model the club had removed. That surfaced a third thing:
+`work_logs_read` was still the *pre-2026-08-16* restriction, so the database and
+the app had disagreed about work-log visibility for over a week. Nobody noticed
+because the redundant `work_logs_read_project_re` policy covered most reads.
 
 ---
 
@@ -926,25 +974,42 @@ in list rows, so it wants a real pass rather than one rule.
 
 ## Outstanding, in order
 
-1. **The database password is rejected, so three migrations are unapplied.**
-   `0044_advisor_profiles`, `0045_work_log_replies` and
-   `0046_catalogue_verifiers`. All three are written so the app ships without
-   them and switches each feature on when it lands — nothing 500s in the
-   meantime, which is why the deploy order stopped being load-bearing. Applying
-   them is one paste each into the Supabase SQL editor.
+1. **Audit the RLS policies for the reporting chain.** The one real gap left by
+   the 2026-08-24 removal: the app-side rules went, the SQL mirrors did not.
+   `auth_can_view_effort` was deleted in `0049` — it was broken anyway — but
+   `auth_is_lead_of` survives and two `progress_updates` policies still call it.
+   Neither is broken; both implement a model that no longer exists.
 
-   The connection details are confirmed correct: host
-   `aws-0-ca-central-1.pooler.supabase.com`, user `postgres.<project-ref>`, ports
-   5432 and 6543. Other regions return "tenant not found" and `aws-1` in the same
-   region does too, so the region and username are right and it really is the
-   password. `db.<ref>.supabase.co` does not resolve.
+   Do it as its own considered change rather than in passing. `progress_updates`
+   feeds the public project feed, so narrowing it carelessly hides a project's own
+   history from the page that exists to show it. The target shape is
+   `can.readArchivedCheckIns` — the member and Co-Leads — for the ENVELOPE, with
+   `update_entries` staying public.
 
-2. **Rotate the Supabase database password once it works.** Two passwords have
-   now been in plaintext in chat transcripts.
+2. **The database password does not work, and this is a Supabase-side problem.**
+   Not needed any more — see `npm run db:push` — but worth recording so nobody
+   re-runs the diagnosis. Host, port, database and user all verified against the
+   dashboard's own connection string. The tenant resolves at `ca-central-1` and
+   nowhere else (all 32 shared endpoints swept). Four separately-reset passwords
+   all returned `28P01`. No network bans, no network restrictions.
+   `db.<ref>.supabase.co` exists but AAAA-only, and this machine has no IPv6
+   egress.
 
-3. **Fold `catalogue_verifiers` into `catalogue_items`.** Two columns on the item
+   **The route that works is `npm run db:push`** — the Management API, over plain
+   HTTPS, authenticated with a personal access token. No pooler, no IPv6, no
+   database password. `npm run db:pending` generates a paste-able bundle for when
+   there is no token to hand.
+
+3. **Never paste `APPLY_ALL.sql` into a live database.** It is the whole history
+   and not re-runnable: `0001` has `create type global_role as enum (...)`, which
+   takes no `if not exists`, so it aborts on the first statement with
+   `42710: type "global_role" already exists` and nothing after it runs. Use
+   `npm run db:pending`, which refuses to write a bundle that is not re-runnable.
+
+4. **Fold `catalogue_verifiers` into `catalogue_items`.** Two columns on the item
    is the right schema; the side table exists because that table's snapshot
-   column list makes a pre-migration deploy fatal. See the header of
+   column list made a pre-migration deploy fatal, and there was no database access
+   at the time. There is now. See the header of
    `supabase/migrations/0046_catalogue_verifiers.sql`.
 
 4. **Five of seven people have unverified Discord** — Julia, Kevin, Khush,
@@ -955,11 +1020,12 @@ in list rows, so it wants a real pass rather than one rule.
    project until somebody logs something. Get one real week in before judging
    any of it.
 
-6. **`npm test` opens a real Discord connection.** The suite prints
-   `[discord] couldn't open a DM with ... 403` and an `ECONNRESET`. It does not
-   fail anything, but a test suite that talks to the network is a test suite that
-   fails when the network does — and worse, one that could DM a real person.
-   Worth pinning the client behind an env check.
+6. **`npm test` opens a real Discord connection.** Four tests in
+   `lib/notify/discord.test.ts` set a FAKE token and let a real `fetch` through,
+   so the suite prints `403` and an `ECONNRESET`. It cannot DM anybody — the token
+   is fake and the real one is deleted in a `before` hook — so the only cost is
+   that the suite needs the internet. The success-case test already stubs `fetch`;
+   doing the same in the other four is about five lines.
 
 7. Tap-target pass (above).
 

@@ -61,7 +61,9 @@ npm run check          # everything CI runs except the build: typecheck, lint,
 npm run sweep          # just the sweep: exports nothing renders or calls
 npm run build:check    # verify it compiles WITHOUT killing a running dev server
 npm run db:check       # are the Supabase migrations actually applied?
-npm run db:bundle      # regenerate supabase/APPLY_ALL.sql (all migrations, one paste)
+npm run db:push        # apply pending migrations (needs SUPABASE_ACCESS_TOKEN)
+npm run db:pending     # write supabase/PENDING.sql — the re-runnable subset
+npm run db:bundle      # regenerate APPLY_ALL.sql — FRESH databases only, see below
 npm test               # permission + contribution tests
 npm run format         # Prettier
 ```
@@ -349,7 +351,7 @@ by design, so a single text field is ambiguous to anyone overseeing more than on
 of them, and an RE couldn't tell whether a blocker was theirs to clear. Anything
 rendering an update must iterate `entries` and label each with its project.
 
-## The twelve things most likely to trip you up
+## The fourteen things most likely to trip you up
 
 1. **Two trees, and only one of them is about people.** The project tree
    (`projects.parent_id`, what work exists) carries all authority. The org tree
@@ -425,7 +427,29 @@ rendering an update must iterate `entries` and label each with its project.
    dated — and **only when the date actually moves**, so one pre-existing violation
    can't freeze every other edit on the project. An undated parent constrains nothing.
 
-12. **An upsert can never reach a `for update` RLS policy.** `persistDiff` splits
+12. **A view without `security_invoker = on` bypasses RLS, and PostgREST
+   exposes it.** Write `create view x with (security_invoker = on) as ...` —
+   every time. Without it the view reads its base tables as the OWNER, so the
+   policies protecting them do nothing. On 2026-08-25 ten views were serving real
+   member data to an ANONYMOUS caller holding only the publishable key, including
+   per-member hours and the contribution record the club had just deleted. Fixed
+   in `0048`; `docs/HANDOFF.md` §14 has the whole thing.
+
+   **And before dropping a view, grep the migrations for its name.** Postgres
+   records dependencies for views-on-views and policies-on-views, so `drop view`
+   usually errors if something needs it. A FUNCTION BODY is an opaque string:
+   dropping `v_lead_chain` silently broke `auth_can_view_effort()`, and through it
+   every read of `work_logs` — which the snapshot reads on every page. `pg_depend`
+   will not save you.
+
+13. **`APPLY_ALL.sql` is for FRESH databases only.** It is the whole history and
+   is not re-runnable: `0001` has `create type global_role as enum (...)`, and
+   `create type` takes no `if not exists`. Pasted into a live database it aborts
+   on the first statement with `42710` and nothing after it runs. Use
+   `npm run db:pending`, which writes only the unapplied migrations and refuses
+   if that set is not re-runnable.
+
+14. **An upsert can never reach a `for update` RLS policy.** `persistDiff` splits
    inserts from updates for exactly this reason; see `docs/HANDOFF.md` §9 before
    touching `lib/store/supabase.ts`. And RLS does not raise on a *missing* policy —
    the statement matches nothing and returns success — so every write there calls
@@ -438,7 +462,9 @@ rendering an update must iterate `entries` and label each with its project.
   **Role and graph** questions live in `permissions.ts`; **ownership** questions
   ("is this your row") live in `operations.ts`, which is the only layer holding
   the row — four operations do this, and the header there names them
-- Nested queries use recursive CTEs — views already written in `0001_core_schema.sql`
+- Nested queries use recursive CTEs. Views exist in `0001_core_schema.sql` but
+  **nothing reads them** — `lib/data/*` uses the snapshot over tables and
+  `OrgGraph` walks the trees in memory. See #12 before touching one
 - Generated Supabase types are snake_case; `lib/types.ts` is camelCase. **Map between
   them inside `lib/data/*`** — don't let snake_case leak into components
 - Snapshot values that change over time (`lead_id_at_submission`, `weights_version`)

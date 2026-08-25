@@ -49,3 +49,9 @@ yarn-error.log*
 # Editor swap files — a committed .swp is just a binary blob nobody can read
 *.swp
 *.swo
+
+# Generated on demand by `npm run db:pending` — the set of unapplied
+# migrations, which is true only at the moment it is written. APPLY_ALL.sql IS
+# committed because it is the whole history and does not go stale; a committed
+# PENDING.sql would be a file that lies about what the database needs.
+supabase/PENDING.sql

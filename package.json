@@ -10,6 +10,8 @@
     "build": "next build",
     "build:check": "node scripts/build-check.mjs",
     "db:check": "node scripts/db-check.mjs",
+    "db:push": "node scripts/db-push.mjs",
+    "db:pending": "node scripts/build-pending-bundle.mjs",
     "db:bundle": "node scripts/build-migration-bundle.mjs",
     "verify:live": "node --import ./scripts/alias-loader.mjs --experimental-strip-types scripts/verify-live.ts",
     "start": "next start",
