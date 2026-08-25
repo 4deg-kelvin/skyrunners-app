@@ -9,7 +9,7 @@
 
 import { workIsLocked, MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import {
-  contributionInputsFor,
+  deliveredInputsFor,
   daysUntil,
   daysWorkedOnProject,
   getMember,
@@ -29,10 +29,7 @@ import {
   lastWorkLogs,
   today,
 } from "@/lib/mock-data";
-import {
-  buildContributionRecord,
-  type ContributionRecord,
-} from "@/lib/contribution";
+import { buildDelivered, type Delivered } from "@/lib/delivered";
 import type {
   Deliverable,
   DeliverableTodo,
@@ -133,8 +130,15 @@ export interface MyWorkView {
     project: Project;
     todos: DeliverableTodo[];
   }[];
-  /** Their own record — always visible to them. */
-  contribution: ContributionRecord;
+  /**
+   * What they have finished. Two counts, public like everything else.
+   *
+   * This was a three-signal `ContributionRecord` until 2026-08-24. Reliability
+   * measured check-ins filed on time and the club stopped filing them; Scope
+   * measured RE roles held, which measures having already been chosen. See
+   * `lib/delivered.ts`.
+   */
+  delivered: Delivered;
   /**
    * What they've done recently, grouped by day and newest day first.
    *
@@ -245,7 +249,7 @@ export async function getMyWork(memberId: string): Promise<MyWorkView> {
           b.deliverable.dueDate ?? "9999"
         )
       ),
-    contribution: buildContributionRecord(contributionInputsFor(memberId)),
+    delivered: buildDelivered(deliveredInputsFor(memberId)),
     myRequests: myJoinRequests(memberId),
     requestsAwaitingMe: joinRequestsAwaitingMe(memberId),
     hasEverLoggedWork: hasLoggedAnyWork(memberId),

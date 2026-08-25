@@ -760,15 +760,11 @@ async function inviteMemberAction$impl(
     };
   }
 
-  const leadIdRaw = String(formData.get("leadId") ?? "");
   const result = await ops.inviteMember({
     email: String(formData.get("email") ?? ""),
     phone: String(formData.get("phone") ?? "") || undefined,
     fullName: String(formData.get("fullName") ?? ""),
     globalRole,
-    // Default to the inviter: somebody with no Lead has nobody reading their
-    // check-ins, which is the quiet failure this whole model exists to avoid.
-    leadId: leadIdRaw || viewer.member.id,
     primaryTeamId: String(formData.get("primaryTeamId") ?? "") || undefined,
     today: today(),
   });
@@ -872,22 +868,6 @@ const ROLE_WORD: Record<string, string> = {
   co_lead: "Co-Lead",
 };
 
-async function setMemberLeadAction$impl(
-  formData: FormData
-): Promise<ActionResult> {
-  const viewer = await getViewer();
-  const memberId = String(formData.get("memberId") ?? "");
-  const leadId = String(formData.get("leadId") ?? "") || null;
-
-  if (!can.reassignLead(viewer.actor, viewer.graph, memberId)) {
-    return denied("change who they report to");
-  }
-
-  const result = await ops.setMemberLead({ memberId, leadId });
-  if (result.ok) refresh();
-  return toResult(result, "Reporting line updated.");
-}
-
 async function deleteMemberAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -913,6 +893,37 @@ async function deleteMemberAction$impl(
   return toResult(result, "Record deleted.");
 }
 
+/*
+  Letting somebody into the club for the first time. Its own action, and that
+  split is the point.
+
+  This used to be one action with `setMemberStatus`, which guessed which act it
+  was from the row: "no Lead yet and they have signed in" meant admission, and
+  admission was open to every Lead while a status change was not. The chain went
+  on 2026-08-24, so `leadId` is no longer written and the heuristic no longer
+  has anything to read.
+
+  Guessing intent from data shape was the fragile part, not the field it read.
+  The two acts arrive from two different controls — the roster's Access panel
+  and the member admin card — so each gets its own action and its own rule.
+  Admitting is open to any Lead (`can.admitMember`); deactivating is Co-Lead
+  only (`can.setMemberStatus`).
+*/
+async function admitMemberAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const memberId = String(formData.get("memberId") ?? "");
+
+  if (!can.admitMember(viewer.actor, memberId)) {
+    return denied("admit members");
+  }
+
+  const result = await ops.setMemberStatus({ memberId, status: "active" });
+  if (result.ok) refresh();
+  return toResult(result, "They're in.");
+}
+
 async function setMemberStatusAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -921,58 +932,12 @@ async function setMemberStatusAction$impl(
   const status = String(formData.get("status") ?? "") as
     "active" | "inactive" | "alumni";
 
-  /*
-    Admitting somebody is a different act from changing a member's status, and
-    it needs a different rule.
-
-    A person who signed in without an invite has no Lead, so
-    `isLeadOfOrAbove` is false for everybody and `setMemberStatus` would admit
-    only Co-Leads — while the roster's Access panel shows Activate to every
-    Lead. That made it a dead control for five of the club's seven leaders. See
-    `can.admitMember`.
-  */
-  const target = viewer.graph.getMember(memberId);
-  const isFirstAdmission =
-    status === "active" && !!target && !target.leadId && !!target.lastActiveAt;
-
-  const allowed = isFirstAdmission
-    ? can.admitMember(viewer.actor, memberId)
-    : can.setMemberStatus(viewer.actor, viewer.graph, memberId);
-
-  if (!allowed) return denied("change their status");
+  if (!can.setMemberStatus(viewer.actor, viewer.graph, memberId)) {
+    return denied("change their status");
+  }
 
   const result = await ops.setMemberStatus({ memberId, status });
-  if (!result.ok) return toResult(result, "");
-
-  /*
-    Give them a Lead in the same click.
-
-    A member with no Lead is invisible to the half of the app that runs on the
-    reporting chain: nobody reviews their check-ins, nothing escalates when they
-    go quiet, and they appear on no dashboard. Landing in the club that way is
-    worse than not being admitted, because everybody assumes somebody has them.
-
-    Defaults to whoever pressed the button — they're the person who sent the
-    link and knows who this is. A Co-Lead admitting on somebody else's behalf
-    can pass `leadId` to hand them straight over.
-  */
-  if (isFirstAdmission) {
-    const leadId = String(formData.get("leadId") ?? "") || viewer.member.id;
-    if (leadId !== memberId) {
-      await ops.setMemberLead({ memberId, leadId });
-    }
-  }
-
-  refresh();
-  if (isFirstAdmission) {
-    const lead = viewer.graph.getMember(
-      String(formData.get("leadId") ?? "") || viewer.member.id
-    );
-    return {
-      ok: true,
-      message: `They're in, reporting to ${lead?.fullName ?? "you"}.`,
-    };
-  }
+  if (result.ok) refresh();
   return toResult(
     result,
     status === "active" ? "Reactivated." : "Deactivated."
@@ -2858,10 +2823,10 @@ export async function setGlobalRoleAction(
   return withRequestStore(() => setGlobalRoleAction$impl(formData));
 }
 
-export async function setMemberLeadAction(
+export async function admitMemberAction(
   formData: FormData
 ): Promise<ActionResult> {
-  return withRequestStore(() => setMemberLeadAction$impl(formData));
+  return withRequestStore(() => admitMemberAction$impl(formData));
 }
 
 export async function deleteMemberAction(

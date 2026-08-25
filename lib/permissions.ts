@@ -275,33 +275,34 @@ export function isREaboveProject(
   return leadsTeamAbove(actor, graph, projectId);
 }
 
-/** Walk from a member up their reporting chain, collecting their Leads. */
-export function leadChain(graph: OrgGraph, memberId: string): string[] {
-  const chain: string[] = [];
-  const seen = new Set<string>([memberId]);
-  let current = graph.getMember(memberId)?.leadId ?? null;
+/*
+  `leadChain` and `isLeadOfOrAbove` lived here, and Q3 was "are you this
+  member's Lead, directly or anywhere up their chain?".
 
-  while (current && !seen.has(current)) {
-    seen.add(current);
-    chain.push(current);
-    current = graph.getMember(current)?.leadId ?? null;
-  }
-  return chain;
-}
+  The club removed the reporting chain on 2026-08-24. Nobody reports to a
+  person; members report to their REs through the work they log on a project.
+  So the three-question model is now:
 
-/**
- * Q3 — Lead authority, inherited up the reporting chain.
- * True if the actor is this member's Lead, or their Lead's Lead, etc.
- */
-export function isLeadOfOrAbove(
-  actor: Actor,
-  graph: OrgGraph,
-  memberId: string
-): boolean {
-  return leadChain(graph, memberId).includes(actor.id);
-}
+    1. Are you a Co-Lead? -> anything
+    2. Are you an RE of this project or any above it, or do you lead a team
+       that owns any of them? -> you own this subtree
+    3. Is it your own data? -> you can manage it
 
-/** Q4 */
+  Note which inheritance survived and which did not. RE authority flows DOWN
+  the project tree and team-lead authority flows down the org tree and then
+  down the project tree; both are about accountability for WORK and both stay.
+  Lead authority flowed UP a chain of PEOPLE, and that is the one that went.
+
+  `profiles.lead_id` is still a column and `Member.leadId` is still a field --
+  neither was dropped, because the decision to stop using them is a club
+  decision that could be revisited. Nothing in this file reads either.
+
+  Do not reintroduce a person-to-person authority check here. If a feature
+  needs "somebody is accountable for this member", the answer now is the RE of
+  the project the work is on.
+*/
+
+/** Q3 */
 export function isSelf(actor: Actor, memberId: string): boolean {
   return actor.id === memberId;
 }
@@ -324,10 +325,6 @@ export const can = {
   /** A unit's Lead manages the units beneath it; Co-Leads manage anything. */
   manageTeam: (actor: Actor, graph: OrgGraph, teamLeadId?: string) =>
     isCoLead(actor) || (!!teamLeadId && teamLeadId === actor.id),
-
-  /** Reassigning who someone reports to needs authority above them. */
-  reassignLead: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
 
   /** Any Lead or Co-Lead can invite a new member by Stanford email. */
   inviteMember: (actor: Actor) => isLeadership(actor),
@@ -371,23 +368,30 @@ export const can = {
    * deactivated member's past check-ins and delivered work stay attached to
    * their projects.
    *
-   * Available to anyone above them in the chain, because the person who notices
-   * someone has left the club is almost always their Lead, not a Co-Lead.
+   * Co-Lead only, since 2026-08-24. It used to be anyone above them in the
+   * reporting chain, on the reasoning that the person who notices somebody has
+   * left the club is usually their Lead. There is no chain to be above now, and
+   * the alternative -- any Lead may deactivate any member -- is a much bigger
+   * right than the one being replaced. Removing somebody from the club is the
+   * heaviest reversible act in the app, so it goes to the narrowest holder.
+   *
+   * Note the asymmetry with `admitMember` below, which stays open to every
+   * Lead. Welcoming somebody in and putting somebody out are not symmetric
+   * acts, and that was already the design.
    */
   setMemberStatus: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    !isSelf(actor, memberId) &&
-    (isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId)),
+    !isSelf(actor, memberId) && isCoLead(actor),
 
   /**
    * Letting somebody INTO the club for the first time.
    *
    * Separate from `setMemberStatus`, and the difference is not cosmetic. A
-   * person who has just signed in with no invite has **no Lead** — the trigger
-   * in migration 0005 creates their profile with `lead_id` null — so
-   * `isLeadOfOrAbove` can never be true for anybody, and the rule above admits
-   * only Co-Leads. The roster's Access panel meanwhile offers Activate to every
-   * Lead, which made it a dead control for five of the club's seven leaders:
-   * the button was there, and pressing it was refused.
+   * person who has just signed in with no invite is not on anybody's project,
+   * so no RE rule reaches them and the rule above admits only Co-Leads. The
+   * roster's Access panel meanwhile offers Activate to every Lead, which made
+   * it a dead control for five of the club's seven leaders: the button was
+   * there, and pressing it was refused. (The original version of this note said
+   * "has no Lead"; the chain is gone and the hole it left is the same one.)
    *
    * Any Lead or Co-Lead, because this is the same act as inviting somebody —
    * `can.inviteMember` is already exactly that wide — and the person who sent
@@ -396,10 +400,10 @@ export const can = {
    * that this app exists to remove, at the very first moment a new member
    * touches it.
    *
-   * Deliberately NOT wider than the first admission. Once they're in and have a
-   * Lead, deactivating them goes back through `setMemberStatus`, which is
-   * chain-scoped — removing somebody from the club is a heavier act than
-   * welcoming them, and it belongs to whoever is accountable for them.
+   * Deliberately NOT wider than the first admission. Once they're in,
+   * deactivating them goes back through `setMemberStatus`, which is Co-Lead
+   * only — removing somebody from the club is a heavier act than welcoming
+   * them.
    */
   admitMember: (actor: Actor, memberId: string) =>
     !isSelf(actor, memberId) && isLeadership(actor),
@@ -594,27 +598,6 @@ export const can = {
   setOwnSchedule: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   /**
-   * A person's WHOLE record — reliability and their private twice-weekly report.
-   *
-   * Reporting chain only:
-   *   - yourself
-   *   - anyone up your reporting chain
-   *   - a Co-Lead
-   *
-   * An RE used to qualify here via any shared project, which leaked more than it
-   * should: being RE of one project a person contributes to revealed their
-   * record on every OTHER project too. An RE needs to know what's happening on
-   * their project, not how someone is doing overall — that's the Lead's job.
-   *
-   * For the narrower question, use `viewMemberWorkOnProject`.
-   */
-  viewMemberEffort: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    isCoLead(actor) ||
-    isSelf(actor, memberId) ||
-    isAdvisor(actor) ||
-    isLeadOfOrAbove(actor, graph, memberId),
-
-  /**
    * What ONE person logged on ONE project. PUBLIC since 2026-08-16.
    *
    * ---------------------------------------------------------------------------
@@ -637,11 +620,11 @@ export const can = {
    * is written twice a week — so they are shown together, and a Division Lead
    * two levels up can see what is happening in a sub-project without asking.
    *
-   * What stays private is the PERSON-level view: `viewMemberEffort` for
-   * reliability and the contribution record, and `reviewUpdate` for the general
-   * note in a check-in that isn't about any project. Those are judgments about
-   * somebody rather than facts about a project, and they still belong to the
-   * member and their Lead chain.
+   * As of 2026-08-24 nothing is private. `viewMemberEffort` and
+   * `viewMemberContribution` guarded the person-level view -- reliability, the
+   * contribution record, the general note in a check-in that was about no
+   * project -- and all three of those things are gone. There is no rule left
+   * here to be the narrow half of, which is why this one takes no arguments.
    *
    * Takes no arguments now, like `viewProjectUpdates` and `followProject`. That
    * is the file's convention for "public": the rule stays as the documented
@@ -653,20 +636,6 @@ export const can = {
    * somewhere else, which is exactly how a rule and its enforcement drift.
    */
   viewMemberWorkOnProject: () => true,
-
-  /**
-   * Reading someone's private twice-weekly report, and marking it reviewed.
-   *
-   * Reporting chain ONLY — deliberately not REs. A Lead reviews their own
-   * reports and nobody else's, which is what makes the 15-minute weekly
-   * obligation achievable and what makes the escalation in `lib/review.ts`
-   * meaningful: if a report goes unread, exactly one person is accountable.
-   *
-   * REs are not cut out of the loop; they get the per-project half of the same
-   * update through `viewProjectUpdates`, which is public.
-   */
-  reviewUpdate: (actor: Actor, graph: OrgGraph, authorId: string) =>
-    isCoLead(actor) || isLeadOfOrAbove(actor, graph, authorId),
 
   /**
    * The per-project half of an update — progress, blockers, next steps.
@@ -709,33 +678,40 @@ export const can = {
    */
   manageGuides: (actor: Actor) => isCoLead(actor),
 
-  /** Leads roll their reports' updates up the chain. */
-  submitRollup: (actor: Actor) => isLeadership(actor),
-
   // --- Trainings and facility access ------------------------------------
 
   /** Members request; nobody self-verifies. */
   requestTraining: (actor: Actor, memberId: string) => isSelf(actor, memberId),
 
   /**
-   * Verified by the member's Lead chain, or a Co-Lead.
+   * Verified by any Lead, or a Co-Lead. Not by the member themselves.
+   *
+   * This was the member's Lead chain until 2026-08-24. There is no chain now,
+   * and this is the INTERIM rule while the replacement lands: the club decided
+   * each catalogue item is either assigned to a NAMED Lead who signs it off, or
+   * marked self-verify. Both need columns that do not exist yet
+   * (`catalogue_items.verifier_id`, `catalogue_items.self_verify`), so until
+   * then any Lead may verify -- the honest superset of "a named Lead", and
+   * strictly narrower than what a Co-Lead-only rule would force, which is a
+   * two-person bottleneck on shop access for a 35-person club.
    *
    * **A Co-Lead may verify their own**, and that exception is load-bearing
    * rather than a loophole. "Nobody self-verifies" assumes somebody is above
-   * you; a Co-Lead is the top of the chain, so a blanket rule meant their
-   * record could never be completed at all — a permanent dead end, and one
-   * that quietly pushes them to stop recording trainings rather than to find
-   * a second Co-Lead. A record nobody keeps is worse than one marked
+   * you; a Co-Lead is the top, so a blanket rule meant their record could never
+   * be completed at all -- a permanent dead end that quietly pushes them to stop
+   * recording trainings. A record nobody keeps is worse than one marked
    * self-verified, which is what the UI shows so it stays honest.
    *
-   * Everyone else still needs someone above them, checked here AND again in
-   * the operation.
+   * Everyone else still needs somebody else, checked here AND again in the
+   * operation. When `verifier_id` lands, narrow this to that person plus
+   * Co-Leads and keep the self-verify branch separate -- a member ticking a
+   * self-verify item is a different act from a Lead signing off a machine.
    */
   verifyTraining: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
+    isCoLead(actor) || (isLeadership(actor) && !isSelf(actor, memberId)),
 
   grantAccess: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    isCoLead(actor) || isLeadOfOrAbove(actor, graph, memberId),
+    isCoLead(actor) || (isLeadership(actor) && !isSelf(actor, memberId)),
 
   /**
    * Edit the catalogue itself — add a site, add a machine, retire one.
@@ -927,19 +903,28 @@ export const can = {
    */
   viewOwnContribution: () => true,
 
-  /** Someone else's record: their Lead chain, or an RE they work for. */
   /**
-   * The four contribution signals for one person.
+   * Reading somebody's ARCHIVED check-ins -- the member, or a Co-Lead.
    *
-   * Same reporting-chain-only rule as `viewMemberEffort`, and for the same
-   * reason: reliability and commitment describe the person, not the project, so
-   * they belong to whoever is responsible for supporting that person. An RE
-   * sharing one project is not that.
+   * The one thing on a member's profile that is not public, on a page where
+   * everything else now is. Worth stating why, because the obvious reading is
+   * that it was missed.
+   *
+   * A check-in carried a `generalNote`: anything not tied to a project. It was
+   * written under a stated promise that only the member and their Lead chain
+   * would read it, and a lot of it is "I am underwater in CS 161 and behind on
+   * everything". The club stopped asking for check-ins on 2026-08-24 and the
+   * chain went with them, so nothing new will ever land here -- but publishing
+   * what people already typed would break a promise retroactively, which is the
+   * one kind of privacy change that cannot be undone by changing it back.
+   *
+   * So the gate NARROWS rather than widens. It used to be the member, their
+   * whole Lead chain, and Co-Leads; it is now the member and Co-Leads. The
+   * per-project half of every one of these is public and always was, and it is
+   * in the project's feed where it belongs.
    */
-  viewMemberContribution: (actor: Actor, graph: OrgGraph, memberId: string) =>
-    isCoLead(actor) ||
-    isSelf(actor, memberId) ||
-    isLeadOfOrAbove(actor, graph, memberId),
+  readArchivedCheckIns: (actor: Actor, memberId: string) =>
+    isCoLead(actor) || isSelf(actor, memberId),
 
   /**
    * Removing a deliverable outright — the RE's list, so the RE's call.

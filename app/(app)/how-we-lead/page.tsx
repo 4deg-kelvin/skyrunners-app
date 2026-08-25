@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { LEADERSHIP_RUBRIC } from "@/lib/contribution";
+import { LEADERSHIP_RUBRIC } from "@/lib/rubric";
 
 /**
  * The published expectations and leadership rubric.

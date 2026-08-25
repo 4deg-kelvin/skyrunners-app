@@ -16,9 +16,7 @@ import {
   isAdvisor,
   isCoLead,
   isLeadership,
-  isLeadOfOrAbove,
   isREofOrAbove,
-  leadChain,
   projectChain,
   type Actor,
   type OrgGraph,
@@ -271,16 +269,15 @@ describe("a Division Lead is a top RE over their division", () => {
 
   test("a division lead still cannot read a personal report", () => {
     /*
-      "Top RE" means top RE, not Co-Lead. The private half of a check-in is the
-      Lead chain's, and an RE deliberately can't read it — that's what keeps
-      reviewing one named person's obligation. `worker` reports to lead2, not
-      to divLead, so the answer has to stay no.
+      "Top RE" means top RE, not Co-Lead, and this is the test that keeps the
+      Division-Lead route above from quietly becoming one.
+
+      It used to assert `viewMemberEffort` and `reviewUpdate`, both deleted on
+      2026-08-24. The archived check-ins are what is left of a personal report,
+      and the answer has to stay the same: leading a division is authority over
+      that division's WORK, not over the people doing it.
     */
-    assert.equal(
-      can.viewMemberEffort(actor("divLead"), graph, "worker"),
-      false
-    );
-    assert.equal(can.reviewUpdate(actor("divLead"), graph, "worker"), false);
+    assert.equal(can.readArchivedCheckIns(actor("divLead"), "worker"), false);
   });
 
   test("a team with no lead grants nobody anything", () => {
@@ -306,27 +303,24 @@ describe("a Division Lead is a top RE over their division", () => {
   });
 });
 
-describe("Lead authority inherits UP the reporting chain", () => {
-  test("chain from worker walks to the top", () => {
-    assert.deepEqual(leadChain(graph, "worker"), ["lead2", "lead1", "coLead"]);
-  });
+/*
+  "Lead authority inherits UP the reporting chain" was a five-test block here.
+  It asserted that `leadChain(graph, "worker")` walked to the top and that every
+  Lead on the way oversaw the member. Both functions went with the chain on
+  2026-08-24.
 
-  test("direct lead oversees the member", () => {
-    assert.equal(isLeadOfOrAbove(actor("lead2"), graph, "worker"), true);
-  });
+  Deleted rather than rewritten. Those assertions WERE the rule -- there is no
+  weaker version of "your Lead's Lead oversees you" that is still true -- and
+  pointing them at something else would invent a claim the club did not make.
 
-  test("lead's lead also oversees the member", () => {
-    assert.equal(isLeadOfOrAbove(actor("lead1"), graph, "worker"), true);
-  });
+  What the block protected is the separation of authority over PEOPLE from
+  authority over WORK, and that survives: the two suites above assert RE
+  authority down the project tree and the Division-Lead route into it, and they
+  pass with no reporting chain in the fixture at all.
 
-  test("a peer does not oversee the member", () => {
-    assert.equal(isLeadOfOrAbove(actor("outsider"), graph, "worker"), false);
-  });
-
-  test("nobody oversees themselves through the lead chain", () => {
-    assert.equal(isLeadOfOrAbove(actor("worker"), graph, "worker"), false);
-  });
-});
+  The invariant to preserve is narrower and stated as a test in the contribution
+  suite below: `can` has no rule left that walks the graph from a memberId.
+*/
 
 describe("co-lead is unconditional", () => {
   test("isCoLead", () => {
@@ -344,31 +338,21 @@ describe("co-lead is unconditional", () => {
   });
 });
 
-describe("effort visibility is restricted to the reporting chain", () => {
-  test("you can always see your own", () => {
-    assert.equal(can.viewMemberEffort(actor("worker"), graph, "worker"), true);
-  });
+/*
+  "effort visibility is restricted to the reporting chain" was here -- four
+  tests on `can.viewMemberEffort`. The rule was deleted on 2026-08-24 along with
+  the thing it guarded: reliability, and the contribution record it sat inside.
 
-  test("your lead chain can see it", () => {
-    assert.equal(can.viewMemberEffort(actor("lead2"), graph, "worker"), true);
-    assert.equal(can.viewMemberEffort(actor("coLead"), graph, "worker"), true);
-  });
+  This is the deletion most worth being suspicious of, so here is what it did
+  NOT do. It never guarded what somebody logged on a project; that went public
+  on 2026-08-16 and is asserted directly below. It guarded a PERSON-level
+  judgment -- how reliably they filed check-ins, how many roles they hold, a
+  completion rate. All three are gone. Two counts of finished work are what is
+  left, and a count of finished work needs no rule.
 
-  test("an RE of a project you work on CANNOT see your whole record", () => {
-    // Changed deliberately. An RE used to qualify via any shared project, which
-    // meant being RE of one thing revealed a person's hours on everything else
-    // plus their reliability record. The RE's narrower, legitimate question is
-    // covered by viewMemberWorkOnProject below, which is now public.
-    assert.equal(can.viewMemberEffort(actor("reRoot"), graph, "worker"), false);
-  });
-
-  test("an unrelated member cannot", () => {
-    assert.equal(
-      can.viewMemberEffort(actor("outsider"), graph, "worker"),
-      false
-    );
-  });
-});
+  The only thing on a member's profile that is still not public is the archived
+  check-ins, which have their own suite below.
+*/
 
 describe("work on a project is public", () => {
   /*
@@ -388,40 +372,53 @@ describe("work on a project is public", () => {
     assert.equal(can.viewMemberWorkOnProject(), true);
   });
 
-  test("the person-level record did NOT become public with it", () => {
+  test("and the archive did not become public with it", () => {
     /*
-      The line that matters. Publishing "what happened on this project" must not
-      publish "how this member is doing overall" — that is a judgment about
-      somebody rather than a fact about a project, and it stays with them and
-      their Lead chain.
+      This asserted that "how this member is doing overall" stayed private when
+      the per-project half went public. That judgment no longer exists to
+      protect -- reliability and the contribution record went on 2026-08-24 --
+      so what it guards now is the narrower thing that remains: publishing what
+      happened on a project must not publish the general note somebody wrote
+      about their term.
     */
-    assert.equal(
-      can.viewMemberEffort(actor("outsider"), graph, "worker"),
-      false
-    );
-    assert.equal(can.reviewUpdate(actor("outsider"), graph, "worker"), false);
-    assert.equal(can.reviewUpdate(actor("reRoot"), graph, "worker"), false);
+    assert.equal(can.readArchivedCheckIns(actor("outsider"), "worker"), false);
+    assert.equal(can.readArchivedCheckIns(actor("reRoot"), "worker"), false);
   });
 });
 
-describe("update review is the Lead's job, and only theirs", () => {
-  test("direct lead can review", () => {
-    assert.equal(can.reviewUpdate(actor("lead2"), graph, "worker"), true);
+describe("the archived check-ins are the last non-public thing", () => {
+  /*
+    This replaces "update review is the Lead's job, and only theirs", which
+    asserted `can.reviewUpdate` for the Lead chain. Nobody reviews anything now.
+
+    What is left points the other way. Not who OWES a reading, but who may read
+    what people already wrote: a check-in carried a `generalNote`, anything not
+    tied to a project, written under a stated promise that only the member and
+    their Lead chain would see it. Publishing that retroactively is the one
+    privacy change that cannot be undone by changing it back -- so the gate
+    NARROWED rather than opening.
+  */
+  test("the member themselves can read their own", () => {
+    assert.equal(can.readArchivedCheckIns(actor("worker"), "worker"), true);
   });
 
-  test("a lead further up the chain can review", () => {
-    assert.equal(can.reviewUpdate(actor("coLead"), graph, "worker"), true);
+  test("a Co-Lead can read anyone's", () => {
+    assert.equal(can.readArchivedCheckIns(actor("coLead"), "worker"), true);
   });
 
-  test("an RE CANNOT read someone's private report", () => {
-    // Changed deliberately. Reviewing is the Lead's obligation and exactly one
-    // person's, which is what makes the escalation in lib/review.ts mean
-    // something. REs get the per-project half publicly instead.
-    assert.equal(can.reviewUpdate(actor("reRoot"), graph, "worker"), false);
+  test("their old Lead can NOT, and that is the narrowing", () => {
+    // lead2 was this member's direct Lead in the fixture and could read these
+    // until 2026-08-24. The right to read them came from an obligation to read
+    // them; the obligation is gone, so the right goes with it.
+    assert.equal(can.readArchivedCheckIns(actor("lead2"), "worker"), false);
+  });
+
+  test("an RE of their project cannot, same as before", () => {
+    assert.equal(can.readArchivedCheckIns(actor("reRoot"), "worker"), false);
   });
 
   test("an unrelated member cannot", () => {
-    assert.equal(can.reviewUpdate(actor("outsider"), graph, "worker"), false);
+    assert.equal(can.readArchivedCheckIns(actor("outsider"), "worker"), false);
   });
 });
 
@@ -439,15 +436,36 @@ describe("training verification", () => {
     assert.equal(can.verifyTraining(actor("worker"), graph, "worker"), false);
   });
 
-  test("direct lead verifies", () => {
+  test("any Lead verifies, and this is the INTERIM rule", () => {
+    /*
+      It was the member's Lead chain until 2026-08-24. The club's replacement is
+      that each catalogue item is either assigned to a NAMED Lead who signs it
+      off, or marked self-verify -- and both need columns that do not exist yet
+      (`catalogue_items.verifier_id`, `catalogue_items.self_verify`).
+
+      "unrelated lead does not" was a test here and this asserts the opposite,
+      so be explicit: this is a WIDENING, and it is temporary. The alternative,
+      Co-Lead only, puts shop access for 35 people behind two individuals, which
+      is the bottleneck this app exists to remove. When `verifier_id` lands,
+      narrow this to that person plus Co-Leads and rewrite this test to name
+      them.
+    */
     assert.equal(can.verifyTraining(actor("lead2"), graph, "worker"), true);
-  });
-
-  test("co-lead verifies", () => {
     assert.equal(can.verifyTraining(actor("coLead"), graph, "worker"), true);
+    // A Lead of a DIFFERENT division, with no connection to `worker` at all.
+    // This is the case the old rule refused and this one allows.
+    assert.equal(
+      can.verifyTraining(actor("otherDivLead"), graph, "worker"),
+      true
+    );
   });
 
-  test("unrelated lead does not", () => {
+  test("a plain member cannot verify anybody, including themselves", () => {
+    // The half of the old rule that must not widen. Two people sign off a
+    // safety clearance and one of them is never the person being cleared.
+    assert.equal(can.verifyTraining(actor("worker"), graph, "worker"), false);
+    assert.equal(can.verifyTraining(actor("worker"), graph, "outsider"), false);
+    // `outsider` is a plain member too, despite the name.
     assert.equal(can.verifyTraining(actor("outsider"), graph, "worker"), false);
   });
 });
@@ -594,32 +612,47 @@ describe("deliverables", () => {
 });
 
 describe("contribution visibility", () => {
+  /*
+    Three of the four tests here asserted `viewMemberContribution` for the Lead
+    chain and against everybody else. It guarded a three-signal record that no
+    longer exists; what replaced it is two counts of finished work, and they are
+    public. So the interesting assertion is that NO rule guards them.
+  */
   test("everyone can always see their own record", () => {
     assert.equal(can.viewOwnContribution(), true);
   });
 
-  test("a Lead up the chain can see a member's record", () => {
-    assert.equal(
-      can.viewMemberContribution(actor("lead1"), graph, "worker"),
-      true
-    );
+  test("no rule guards anybody else's, and both are absent by name", () => {
+    // Absent, not renamed. Adding a rule back here means adding a private
+    // judgment about a person, and the club's decision on 2026-08-24 was that
+    // there is no such thing left in this app.
+    assert.equal("viewMemberContribution" in can, false);
+    assert.equal("viewMemberEffort" in can, false);
   });
 
-  test("an unrelated member cannot", () => {
-    assert.equal(
-      can.viewMemberContribution(actor("outsider"), graph, "worker"),
-      false
-    );
-  });
+  test("and no rule walks a chain of people any more", () => {
+    /*
+      The invariant left behind by the deleted "Lead authority inherits UP"
+      suite, asserted structurally because there is no function left to call.
 
-  test("an RE above a project the member works on CANNOT", () => {
-    // Changed deliberately, alongside viewMemberEffort. Reliability and
-    // commitment describe the person, so they belong to whoever supports that
-    // person — their Lead. An RE sharing one project is not that.
-    assert.equal(
-      can.viewMemberContribution(actor("reRoot"), graph, "worker"),
-      false
-    );
+      `reassignLead`, `reviewUpdate`, `viewMemberEffort` and
+      `viewMemberContribution` were the four rules that answered "who oversees
+      this PERSON". Every rule that remains asks about a PROJECT, or about the
+      actor's own row. If a name reappears here, somebody has rebuilt the chain.
+    */
+    for (const gone of [
+      "reassignLead",
+      "reviewUpdate",
+      "viewMemberEffort",
+      "viewMemberContribution",
+      "submitRollup",
+    ]) {
+      assert.equal(
+        gone in can,
+        false,
+        `can.${gone} is back -- it decided authority over a PERSON. See docs/REPORTING_REMOVAL_PLAN.md.`
+      );
+    }
   });
 });
 
@@ -930,10 +963,6 @@ describe("an advisor holds no authority", () => {
     assert.equal(can.followProject(), true);
   });
 
-  test("cannot file a roll-up", () => {
-    assert.equal(can.submitRollup(advisor()), false);
-  });
-
   test("cannot manage, complete or delete a project", () => {
     assert.equal(can.manageProject(advisor(), graph, "leaf"), false);
     assert.equal(can.manageDeliverables(advisor(), graph, "leaf"), false);
@@ -942,23 +971,21 @@ describe("an advisor holds no authority", () => {
     assert.equal(can.createProject(advisor(), graph, { teamId: "div" }), false);
   });
 
-  test("CAN read a member's contribution record, for references", () => {
+  test("CAN read what a member delivered, for references", () => {
     /*
-      This asserted the opposite until 2026-08-16, and the reversal is the club's
-      call: advisors write letters of reference, and doing that from a page that
-      hides what somebody delivered is not possible.
+      An advisor was given `viewMemberEffort` on 2026-08-16 so they could write
+      letters of reference: doing that from a page that hides what somebody
+      delivered is not possible. The rule went on 2026-08-24 with the
+      contribution record, and the need it served is now met by the profile
+      being public -- so there is nothing here to assert as a special case, which
+      is the outcome the club wanted.
 
-      Note what this does and does not open. `viewMemberEffort` is the
-      contribution record — delivered work, reliability, roles held. The
-      CONTENTS of a check-in remain with the member and their Lead chain, because
-      reviewing is one named person's obligation and that is what makes the
-      escalation in `lib/review.ts` mean anything. An advisor reading somebody's
-      weekly notes would be surveillance; reading what they finished is a
-      reference.
+      What is still NOT theirs is the archived check-ins. The original reasoning
+      holds and is the reason this test kept a line: an advisor reading
+      somebody's weekly notes about being underwater in a class is surveillance;
+      reading what they finished is a reference.
     */
-    assert.equal(can.viewMemberEffort(advisor(), graph, "worker"), true);
-    // The private half is still the Lead chain's.
-    assert.equal(can.reviewUpdate(advisor(), graph, "worker"), false);
+    assert.equal(can.readArchivedCheckIns(advisor(), "worker"), false);
   });
 
   /* The positive half: what an advisor is FOR. */

@@ -7,27 +7,17 @@ import { ActionButton, ActionForm } from "./action-form";
 import {
   inviteMemberAction,
   setGlobalRoleAction,
-  setMemberLeadAction,
   deleteMemberAction,
   setMemberStatusAction,
 } from "@/lib/actions";
 import type { GlobalRole, MemberStatus } from "@/lib/types";
 
-export interface PersonOption {
-  id: string;
-  fullName: string;
-  /** Set only on lead candidates, where the picker groups by seniority. */
-  group?: LeadGroup;
-}
-
-export type LeadGroup = (typeof LEAD_GROUPS)[number];
-
-/** Most senior first — the order the "reports to" picker renders groups in. */
-export const LEAD_GROUPS = [
-  "Co-Leads",
-  "Team Leads",
-  "Others who lead someone",
-] as const;
+/*
+  `PersonOption` and `LEAD_GROUPS` lived here, for the grouped "reports to"
+  picker on the invite form and the member admin card. Both went with the
+  reporting chain on 2026-08-24 -- there is nobody to report to, so there is no
+  list of candidates to group.
+*/
 
 /**
  * Invite someone onto the roster.
@@ -39,13 +29,9 @@ export const LEAD_GROUPS = [
  * is offered something that will be refused.
  */
 export function InviteMemberForm({
-  leads,
   canAppointLeadership,
-  defaultLeadId,
 }: {
-  leads: PersonOption[];
   canAppointLeadership: boolean;
-  defaultLeadId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -115,26 +101,6 @@ export function InviteMemberForm({
 
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">
-            Reports to
-          </span>
-          <select
-            name="leadId"
-            defaultValue={defaultLeadId ?? ""}
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          >
-            {leads.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.fullName}
-              </option>
-            ))}
-          </select>
-          <span className="text-ink-muted mt-1 block text-xs">
-            Whoever reads their check-ins. Defaults to you.
-          </span>
-        </label>
-
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
             Role
           </span>
           <select
@@ -193,10 +159,7 @@ export function MemberAdminControls({
   memberName,
   role,
   status,
-  leadId,
-  leadOptions,
   canSetRole,
-  canReassign,
   canSetStatus,
   canDelete,
 }: {
@@ -204,17 +167,14 @@ export function MemberAdminControls({
   memberName: string;
   role: GlobalRole;
   status: MemberStatus;
-  leadId: string | null;
-  leadOptions: PersonOption[];
   canSetRole: boolean;
-  canReassign: boolean;
   canSetStatus: boolean;
   /** Co-Lead only, and never their own record. */
   canDelete: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  if (!canSetRole && !canReassign && !canSetStatus && !canDelete) return null;
+  if (!canSetRole && !canSetStatus && !canDelete) return null;
 
   if (!open) {
     return (
@@ -263,55 +223,8 @@ export function MemberAdminControls({
             <span className="text-ink-muted mt-1 mb-2 block text-xs">
               An <span className="text-ink font-semibold">Advisor</span> — a
               faculty or project advisor — sees and can comment on everything,
-              but runs nothing: no projects, no deliverables, no check-ins, and
-              nobody above or below them. Making somebody an advisor clears
-              their reporting line in both directions.
+              but runs nothing: no projects, no deliverables and no RE roles.
             </span>
-          </label>
-        </ActionForm>
-      ) : null}
-
-      {canReassign ? (
-        <ActionForm
-          action={setMemberLeadAction}
-          submitLabel="Change lead"
-          submittingLabel="Saving…"
-        >
-          <input type="hidden" name="memberId" value={memberId} />
-          <label className="block">
-            <span className="text-ink mb-1 block text-sm font-semibold">
-              Reports to
-            </span>
-            <select
-              name="leadId"
-              defaultValue={leadId ?? ""}
-              className="rounded-tile border-line bg-card text-ink mb-2 w-full border px-3 py-2 text-sm"
-            >
-              <option value="">Nobody (top of the chain)</option>
-              {/*
-                Grouped, so the list reads as the org chart it describes.
-
-                A flat list of names in database order gave no clue who any of
-                these people were, and put the likely answer in a random
-                position. `PersonOption` carries the group; the data layer has
-                already sorted, so rendering is just a walk.
-              */}
-              {LEAD_GROUPS.map((group) => {
-                const inGroup = leadOptions.filter(
-                  (l) => l.group === group && l.id !== memberId
-                );
-                if (inGroup.length === 0) return null;
-                return (
-                  <optgroup key={group} label={group}>
-                    {inGroup.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.fullName}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
           </label>
         </ActionForm>
       ) : null}

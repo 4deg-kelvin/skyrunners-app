@@ -137,9 +137,6 @@ await check("/find-work      getFindWork", async () =>
 await check("/members        getRoster", async () =>
   dataModules.members.getRoster()
 );
-await check("/members        getRosterOptions", async () =>
-  dataModules.members.getRosterOptions()
-);
 await check("/members/[id]   getMemberProfile", async () =>
   dataModules.members.getMemberProfile(me.id, true)
 );
@@ -195,8 +192,8 @@ console.log("");
 console.log("page-shaped calls (Promise.all racing the preload):");
 const m = dataModules.members;
 const pr = dataModules.projects;
-await check("/members   roster + options in parallel", async () =>
-  Promise.all([m.getRoster(), m.getRosterOptions()])
+await check("/members   roster racing the preload", async () =>
+  Promise.all([m.getRoster()])
 );
 await check("/projects  tree + orphans + options in parallel", async () =>
   Promise.all([

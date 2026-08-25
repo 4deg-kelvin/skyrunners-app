@@ -781,7 +781,6 @@ export async function inviteMember(input: {
    */
   phone?: string;
   globalRole: GlobalRole;
-  leadId: string | null;
   primaryTeamId?: string;
   today: string;
 }): Promise<Result<Member>> {
@@ -811,7 +810,9 @@ export async function inviteMember(input: {
     // member signs in and is told they can't come in yet, which is the opposite
     // of the welcome this app exists to provide.
     status: "active",
-    leadId: input.leadId,
+    // Still on the row because `profiles.lead_id` still exists; nothing reads
+    // it and nothing sets it since the reporting chain went on 2026-08-24.
+    leadId: null,
     primaryTeamId: input.primaryTeamId || undefined,
     joinedAt: input.today,
     skills: [],
@@ -819,14 +820,6 @@ export async function inviteMember(input: {
 
   return guarded((store) => {
     store.members.push(member);
-    // Everyone gets a check-in schedule, or they'd have no obligation and no
-    // way to create one from Settings.
-    store.updateSchedules.push({
-      memberId: member.id,
-      weekdays: [2, 5],
-      updatesPerWeek: 2,
-      dueTime: "23:59",
-    });
     return ok(member);
   });
 }
@@ -994,32 +987,15 @@ export async function setGlobalRole(input: {
       longer has any — reviews and escalations would still route to them, and
       nothing would ever be read. Re-point those reports upward.
 
-      `advisor` counts as losing it, and that is the whole reason this check is
-      a list rather than `=== "member"`. An advisor holds no authority at all,
-      so a Lead converted into one would otherwise keep a review queue they can
-      no longer reach: their people's check-ins would pile up unread with the
-      escalation pointed at somebody the app has stopped asking anything of.
+      Both halves went with the reporting chain on 2026-08-24. There is nothing
+      to re-point: losing a title costs somebody no authority over people,
+      because nobody held any. What a demotion still costs is the RE side, and
+      that lives on `project_res` and `teams.lead_id` -- neither of which this
+      function touches, deliberately. Demoting a Division Lead does NOT silently
+      hand their division to nobody; `setTeamLead` is a separate, deliberate act.
     */
-    const losesAuthority = input.role === "member" || input.role === "advisor";
-    if (member.globalRole !== input.role && losesAuthority) {
-      for (const m of store.members) {
-        if (m.leadId === member.id) m.leadId = member.leadId;
-      }
-    }
 
     member.globalRole = input.role;
-
-    /*
-      An advisor reports to nobody, in both directions. The loop above cleared
-      the downward half; this is the upward one.
-
-      Not cosmetic: a Lead with an advisor in their queue would be asked to
-      review check-ins that will never be written, and the review escalation
-      runs on AGE — so the advisor would sit at the top of somebody's overdue
-      list forever, growing more urgent, with no action that could ever clear
-      it.
-    */
-    if (input.role === "advisor") member.leadId = null;
 
     return ok(member);
   });
@@ -1240,45 +1216,6 @@ export async function removeProjectAdvisor(input: {
       );
     }
     return ok({ projectId: input.projectId, memberId: input.memberId });
-  });
-}
-
-/** Change who someone reports to. */
-export async function setMemberLead(input: {
-  memberId: string;
-  leadId: string | null;
-}): Promise<Result<Member>> {
-  if (input.memberId === input.leadId) {
-    return fail("Nobody reports to themselves.");
-  }
-
-  return guarded((store) => {
-    const member = store.members.find((m) => m.id === input.memberId);
-    if (!member) return fail<Member>("That member no longer exists.");
-
-    if (input.leadId) {
-      const lead = store.members.find((m) => m.id === input.leadId);
-      if (!lead) return fail<Member>("That lead no longer exists.");
-
-      // Walk up from the proposed lead. If we reach `memberId`, this would
-      // close a loop — and every chain walk in the app (leadChain,
-      // reportsBelow, auth_is_lead_of) would spin or silently truncate.
-      let cursor: string | null = input.leadId;
-      const seen = new Set<string>();
-      while (cursor) {
-        if (cursor === input.memberId) {
-          return fail<Member>(
-            "That would create a loop — they already lead that person, directly or further up."
-          );
-        }
-        if (seen.has(cursor)) break;
-        seen.add(cursor);
-        cursor = store.members.find((m) => m.id === cursor)?.leadId ?? null;
-      }
-    }
-
-    member.leadId = input.leadId;
-    return ok(member);
   });
 }
 
@@ -3499,9 +3436,6 @@ export async function deleteMember(input: {
       (r) => r.memberId !== member.id
     );
     store.progressUpdates = store.progressUpdates.filter(
-      (u) => u.memberId !== member.id
-    );
-    store.updateSchedules = store.updateSchedules.filter(
       (u) => u.memberId !== member.id
     );
     store.certifications = store.certifications.filter(

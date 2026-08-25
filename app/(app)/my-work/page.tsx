@@ -13,13 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Card, CardBody } from "@/components/ui/card";
 import { CompletedProjectsSection } from "@/components/ui/completed-filter";
-import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow, ProgressBar } from "@/components/ui/deliverable-row";
 import { DeliverableTodos } from "@/components/forms/deliverable-todos";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
-import { SectionLabel } from "@/components/ui/section-label";
+import { FieldLabel, SectionLabel } from "@/components/ui/section-label";
 import {
   getMyWork,
   type MyProjectCard as MyProjectCardData,
@@ -50,7 +49,7 @@ export default async function MyWorkPage() {
     committed,
     following,
     myDeliverables,
-    contribution,
+    delivered,
     myRequests,
     requestsAwaitingMe,
     today,
@@ -97,20 +96,45 @@ export default async function MyWorkPage() {
         }
       />
 
-      {/* ---------------- Contribution: effort made visible ---------------- */}
+      {/*
+        What you have finished.
+
+        This was a four-signal ContributionPanel taking up the top of the page.
+        Reliability — check-ins filed on time — was deleted on 2026-08-24 with
+        the check-ins, and Scope measured RE roles held, which measures having
+        already been chosen. What the club wanted kept was a plain count, not
+        central. So: two numbers on one line, above the work rather than instead
+        of it.
+      */}
       <Card>
         <CardBody>
-          <ContributionPanel record={contribution} isOwnRecord />
-          <p className="text-ink-muted mt-5 text-sm">
-            Your Lead and the REs of your projects see the same four numbers.
-            There is no ranking and no hidden score —{" "}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-8">
+              <div>
+                <p className="text-ink text-2xl font-bold">
+                  {delivered.deliverablesCompleted}
+                </p>
+                <FieldLabel className="mt-0.5">
+                  Deliverables finished
+                </FieldLabel>
+              </div>
+              <div>
+                <p className="text-ink text-2xl font-bold">
+                  {delivered.projectsCompleted}
+                </p>
+                <FieldLabel className="mt-0.5">Projects finished</FieldLabel>
+              </div>
+            </div>
             <Link
               href="/how-we-lead"
-              className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
             >
-              here&apos;s what leadership looks for
+              What leadership looks for
             </Link>
-            .
+          </div>
+          <p className="text-ink-muted mt-4 text-sm">
+            Public, like the rest of your record. There is no ranking and no
+            hidden score.
           </p>
         </CardBody>
       </Card>

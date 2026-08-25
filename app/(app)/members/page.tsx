@@ -10,17 +10,13 @@ import { AccessIssues } from "@/components/ui/access-issues";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
-import { getRoster, getRosterOptions } from "@/lib/data/members";
+import { getRoster } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
 
 export default async function MembersPage() {
-  const [roster, options, viewer] = await Promise.all([
-    getRoster(),
-    getRosterOptions(),
-    getViewer(),
-  ]);
+  const [roster, viewer] = await Promise.all([getRoster(), getViewer()]);
   const mayInvite = can.inviteMember(viewer.actor);
 
   /*
@@ -46,14 +42,10 @@ export default async function MembersPage() {
       <PageHeader
         label="Roster"
         title="Members"
-        description={`${roster.length} active members. Who's on what, and what they're cleared to use, is public. Personal reports stay between a member and their Lead.`}
+        description={`${roster.length} active members. Who's on what, and what they're cleared to use, is public.`}
         action={
           mayInvite ? (
-            <InviteMemberForm
-              leads={options.leadOptions}
-              canAppointLeadership={mayAppointLeadership}
-              defaultLeadId={viewer.member.id}
-            />
+            <InviteMemberForm canAppointLeadership={mayAppointLeadership} />
           ) : undefined
         }
       />
@@ -67,8 +59,6 @@ export default async function MembersPage() {
         <AccessIssues
           waitingForActivation={waitingForActivation}
           neverSignedIn={neverSignedIn}
-          leads={options.leadOptions}
-          defaultLeadId={viewer.member.id}
         />
       ) : null}
 
@@ -218,15 +208,8 @@ export default async function MembersPage() {
                           memberName={member.fullName}
                           role={member.globalRole}
                           status={member.status}
-                          leadId={member.leadId}
-                          leadOptions={options.leadOptions}
                           canSetRole={can.setGlobalRole(
                             viewer.actor,
-                            member.id
-                          )}
-                          canReassign={can.reassignLead(
-                            viewer.actor,
-                            viewer.graph,
                             member.id
                           )}
                           canSetStatus={can.setMemberStatus(

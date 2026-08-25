@@ -7,11 +7,10 @@
  */
 
 import {
-  activeMembers,
   certificationsFor,
   daysUntil,
   committedProjectCount,
-  contributionInputsFor,
+  deliveredInputsFor,
   getMember,
   getProject,
   daysWorkedOnProject,
@@ -23,11 +22,7 @@ import {
   projectREs,
 } from "@/lib/mock-data";
 import { readStore } from "@/lib/store/disk";
-import { isAdvisor } from "@/lib/permissions";
-import {
-  buildContributionRecord,
-  type ContributionRecord,
-} from "@/lib/contribution";
+import { buildDelivered, type Delivered } from "@/lib/delivered";
 import type {
   Deliverable,
   Member,
@@ -40,26 +35,6 @@ import type {
 } from "@/lib/types";
 import type { BreadcrumbNode } from "./my-work";
 import { preloadLiveStore } from "@/lib/store/request";
-
-/** People who can be somebody's Lead — leadership plus anyone with reports. */
-export interface RosterOptions {
-  /** Candidates for the "reports to" dropdown. */
-  /**
-   * Candidates for "reports to", grouped and sorted.
-   *
-   * `group` drives an `<optgroup>` so the picker reads as an org chart rather
-   * than a list of names in whatever order the database returned them. That
-   * order was insertion order, which meant the answer somebody wanted was in a
-   * random position and the list gave no clue who any of these people were.
-   */
-  leadOptions: {
-    id: string;
-    fullName: string;
-    group: "Co-Leads" | "Team Leads" | "Others who lead someone";
-  }[];
-  /** Everyone active, for invite defaults and project assignment. */
-  everyone: { id: string; fullName: string }[];
-}
 
 export interface RosterRow {
   member: Member;
@@ -101,61 +76,6 @@ export interface RosterRow {
  * and computed here rather than in the page because pages may not import
  * `lib/mock-data` — ESLint enforces that boundary.
  */
-/** Most senior first. Drives both the sort and the `<optgroup>` order. */
-const GROUP_ORDER = [
-  "Co-Leads",
-  "Team Leads",
-  "Others who lead someone",
-] as const;
-
-export async function getRosterOptions(): Promise<RosterOptions> {
-  // Ensure the live snapshot exists before any synchronous read.
-  //
-  // Idempotent and free once loaded. It's here rather than left to the caller
-  // because pages legitimately do `Promise.all([getRoster(), getViewer()])` —
-  // which starts the read BEFORE getViewer has preloaded, and every such page
-  // then died on "Live store not loaded". Guarding at the boundary means call
-  // order stops mattering.
-  await preloadLiveStore();
-  const active = activeMembers();
-  return {
-    // Anyone who already leads someone stays eligible even if their global role
-    // is `member` — the reporting chain is a fact about the org tree, not about
-    // job titles, and demoting someone shouldn't silently orphan their reports.
-    leadOptions: active
-      .filter(
-        (m) =>
-          // Advisors are never candidates. Nobody reports to them — that's
-          // half the definition of the role — and offering one here would
-          // create a reporting line whose owner has no review queue to read it
-          // in, so the member's check-ins would go somewhere nothing renders.
-          !isAdvisor(m) &&
-          (m.globalRole !== "member" ||
-            active.some((other) => other.leadId === m.id))
-      )
-      .map((m) => ({
-        id: m.id,
-        fullName: m.fullName,
-        group:
-          m.globalRole === "co_lead"
-            ? ("Co-Leads" as const)
-            : m.globalRole === "lead"
-              ? ("Team Leads" as const)
-              : ("Others who lead someone" as const),
-      }))
-      // Rank first, then alphabetically. Same order as the roster itself, and
-      // for the same reason: the question is "who does this person report
-      // to?", which is answered by seniority long before it's answered by
-      // whose name starts with A.
-      .sort(
-        (a, b) =>
-          GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) ||
-          a.fullName.localeCompare(b.fullName)
-      ),
-    everyone: active.map((m) => ({ id: m.id, fullName: m.fullName })),
-  };
-}
-
 export async function getRoster(): Promise<RosterRow[]> {
   // Ensure the live snapshot exists before any synchronous read.
   //
@@ -236,9 +156,6 @@ export interface MemberProjectRow {
 
 export interface MemberProfileView {
   member: Member;
-  lead?: Member;
-  /** People who report directly to this member. */
-  directReports: Member[];
   /**
    * Projects this person is a named ADVISOR on, nearest thing they have to a
    * portfolio.
@@ -249,22 +166,19 @@ export interface MemberProfileView {
    */
   advising: { id: string; name: string; slug: string }[];
   projects: MemberProjectRow[];
+  /** What they have finished. Public — see `lib/delivered.ts`. */
+  delivered: Delivered;
   /**
-   * Whether the viewer may see hours, update contents, and their contribution
-   * record. Decided by the caller via `lib/permissions.ts` — this layer only
-   * carries the answer through so the page doesn't re-derive it.
-   */
-  canViewEffort: boolean;
-  /** Only populated when `canViewEffort` is true. */
-  contribution?: ContributionRecord;
-  /**
-   * This person's check-in history, newest first. Empty unless `canViewEffort`.
+   * This person's check-in history, newest first. Empty unless
+   * `canReadCheckIns`.
    *
-   * The review QUEUE on the dashboard stays scoped to direct reports, because
-   * that's an obligation and it escalates — a Co-Lead with forty items owes
-   * nothing in particular. Reading is a different act from being accountable
-   * for reading, so it lives here, on the person, and follows the wider rule:
-   * yourself, anyone up your chain, or a Co-Lead.
+   * An ARCHIVE since 2026-08-24: the club stopped asking for check-ins, so
+   * nothing new arrives here. Still gated, and that is deliberate on a profile
+   * where everything else is now public. `generalNote` was written under the
+   * promise that only the member and their Lead chain would read it, and
+   * publishing it retroactively would break a promise about words already
+   * typed. The chain is gone, so the gate narrows rather than widens: the member
+   * themselves, or a Co-Lead. See `can.readArchivedCheckIns`.
    */
   checkIns: MemberCheckIn[];
   /**
@@ -304,7 +218,11 @@ export interface MemberCheckIn {
 
 export async function getMemberProfile(
   memberId: string,
-  canViewEffort: boolean,
+  /**
+   * May the viewer read the archived check-ins? The only gate left on this
+   * page — everything else about a member is public as of 2026-08-24.
+   */
+  canReadCheckIns: boolean,
   /** Who is looking. Only used to find their own outstanding request. */
   viewerId?: string
 ): Promise<MemberProfileView | null> {
@@ -321,10 +239,6 @@ export async function getMemberProfile(
 
   return {
     member,
-    lead: member.leadId ? getMember(member.leadId) : undefined,
-    directReports: readStore().members.filter(
-      (m) => m.leadId === member.id && m.status === "active"
-    ),
     /*
       Read from `project_advisors` rather than from memberships, because being an
       advisor is not a membership. Public, like everything else about who is on
@@ -346,9 +260,9 @@ export async function getMemberProfile(
           membership: pm,
           breadcrumb: projectBreadcrumb(pm.project.id),
           res: projectREs(pm.project.id),
-          daysWorked: canViewEffort
-            ? daysWorkedOnProject(memberId, pm.project.id)
-            : 0,
+          // Public since 2026-08-16: what you did on a project is the
+          // project's business, and the project is public.
+          daysWorked: daysWorkedOnProject(memberId, pm.project.id),
           deliverables: myDeliverables(memberId).filter(
             (d) => d.projectId === pm.project!.id
           ),
@@ -356,15 +270,11 @@ export async function getMemberProfile(
         },
       ];
     }),
-    canViewEffort,
-    // Never even compute it for a viewer who isn't allowed to see it
-    contribution: canViewEffort
-      ? buildContributionRecord(contributionInputsFor(memberId))
-      : undefined,
+    delivered: buildDelivered(deliveredInputsFor(memberId)),
     myRequest: viewerId
       ? myRequestsToLeads(viewerId).find((r) => r.leadId === memberId)
       : undefined,
-    checkIns: canViewEffort
+    checkIns: canReadCheckIns
       ? readStore()
           // Only ones actually sent. A `pending` row is a slot the member
           // hasn't filled in yet, and `missed` is an empty one that expired —

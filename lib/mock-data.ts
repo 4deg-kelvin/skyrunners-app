@@ -29,7 +29,7 @@ import {
   type UpdateSchedule,
   type WorkLog,
 } from "./types.ts";
-import { type ContributionInputs } from "./contribution.ts";
+import { type DeliveredInputs } from "./delivered.ts";
 import { readStore } from "./store/disk.ts";
 import { todayInClubTime } from "./dates.ts";
 import { isLiveMode } from "./env.ts";
@@ -3024,20 +3024,21 @@ export function currentUpdateFor(memberId: string): ProgressUpdate {
 }
 
 /**
- * Assembles everything the contribution record needs for one member.
+ * The two counts on a member's profile: deliverables and projects finished.
  *
- * There used to be an `activeWeeksFor(memberId)` beside this, counting
- * in-session weeks since somebody joined so that hours-per-week could skip
- * finals and breaks. It went with the tiers on 2026-08-14: it existed only as
- * the divisor of a rate nothing computes any more, and the three remaining
- * signals are all counts of things that happened rather than rates over time.
+ * It has lost a companion at each of the last two removals, and the pattern in
+ * what went is worth keeping. `activeWeeksFor` went with the tiers on
+ * 2026-08-14 -- it was the divisor of a rate nothing computes. `updatesDue`,
+ * `updatesOnTime` and `updatesLate` went with reliability on 2026-08-24, and
+ * `deliverablesOpen`, `deliverablesOverdue`, `reRoleCount` and
+ * `projectsCommitted` went with the panel that displayed them.
  *
- * `isPaused` went for the same reason. A paused member generates no check-in
- * obligations at all, so `updatesDue` is already 0 for them and Reliability
- * already reports `null` — "nothing due" — without needing to be told about the
- * pause separately.
+ * All of them measured something OTHER than finished work. Open and overdue
+ * counts belong on the project, where the RE can act on them; they were on the
+ * person because the panel had room. Two counts is what is left, and that is
+ * the whole intent -- see `lib/delivered.ts`.
  */
-export function contributionInputsFor(memberId: string): ContributionInputs {
+export function deliveredInputsFor(memberId: string): DeliveredInputs {
   const mine = myDeliverables(memberId);
   const committed = live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
@@ -3065,32 +3066,9 @@ export function contributionInputsFor(memberId: string): ContributionInputs {
     )
   );
 
-  /*
-    Only check-ins whose moment has passed count as "due".
-
-    `myUpdates.length` counted every row including a `pending` one that isn't
-    late yet — so reliability dropped the instant an obligation was generated,
-    before the member had any chance to write it, and `missed` (due − onTime −
-    late) silently counted it as missed. Someone who had never missed anything
-    could open the page and see less than 100%.
-  */
-  const myUpdates = live()
-    .progressUpdates.filter((u) => u.memberId === memberId)
-    .filter((u) => u.status !== "pending");
-
   return {
     deliverablesCompleted: mine.filter((d) => d.status === "done").length,
-    deliverablesOpen: mine.filter((d) => d.status !== "done").length,
-    deliverablesOverdue: mine.filter(isOverdue).length,
     projectsCompleted: completedProjectIds.size,
-    updatesDue: myUpdates.length,
-    updatesOnTime: myUpdates.filter(
-      (u) => u.status === "submitted" || u.status === "reviewed"
-    ).length,
-    updatesLate: myUpdates.filter((u) => u.status === "late").length,
-    reRoleCount: live().projects.filter((p) => p.reIds.includes(memberId))
-      .length,
-    projectsCommitted: committed.length,
   };
 }
 

@@ -35,23 +35,11 @@ import type { Member } from "@/lib/types";
 export function AccessIssues({
   waitingForActivation,
   neverSignedIn,
-  leads,
-  defaultLeadId,
 }: {
   /** Signed in at least once, but not active. One click away. */
   waitingForActivation: Member[];
   /** A row that has never been signed in to. Usually a wrong email. */
   neverSignedIn: Member[];
-  /**
-   * Who this person could report to. Same list as the invite form.
-   *
-   * Admitting somebody without a Lead leaves them invisible to the half of the
-   * app that runs on the reporting chain — no review, no escalation, no
-   * dashboard. So the Lead is chosen in the same click.
-   */
-  leads: { id: string; fullName: string }[];
-  /** Whoever is looking at the page. They sent the link; they know who this is. */
-  defaultLeadId: string;
 }) {
   if (waitingForActivation.length === 0 && neverSignedIn.length === 0) {
     return null;
@@ -93,12 +81,7 @@ export function AccessIssues({
                       {m.email}
                     </span>
                   </span>
-                  <AdmitMemberForm
-                    memberId={m.id}
-                    memberName={m.fullName}
-                    leads={leads}
-                    defaultLeadId={defaultLeadId}
-                  />
+                  <AdmitMemberForm memberId={m.id} memberName={m.fullName} />
                 </div>
               ))}
             </div>

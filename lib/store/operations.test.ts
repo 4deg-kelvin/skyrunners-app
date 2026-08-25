@@ -738,60 +738,26 @@ describe("advisors named on a project", () => {
 });
 
 /*
-  The invariant that makes the role safe: an advisor sits outside the reporting
-  chain in BOTH directions. A Lead converted into one would otherwise keep a
-  review queue they can no longer reach, and the escalation — which runs on age
-  — would point at somebody the app has stopped asking anything of.
+/*
+  "becoming an advisor clears the reporting line" was a two-test suite here. It
+  asserted that converting somebody to `advisor` nulled their own `leadId` and
+  re-pointed their reports one level up -- because an advisor holds no authority,
+  so a Lead converted into one would keep a review queue they could no longer
+  reach, with the escalation pointing at somebody the app had stopped asking
+  anything of.
+
+  Both halves went with the reporting chain on 2026-08-24. `setGlobalRole` no
+  longer touches `leadId` at all, and the reasoning for that is worth keeping
+  because it is a POSITIVE change rather than only a deletion: what a demotion
+  still costs somebody is the RE side, and that lives on `project_res` and
+  `teams.lead_id`. Neither is touched here, deliberately. Demoting a Division
+  Lead does not silently hand their division to nobody; `setTeamLead` is a
+  separate, deliberate act.
+
+  What survives of the invariant is in `deleteMember`, which still clears
+  pointers at a deleted row -- see the note there. That one is a foreign key,
+  not a reporting line.
 */
-describe("becoming an advisor clears the reporting line", () => {
-  test("their own Lead is dropped", async () => {
-    const before = disk.readStore().members.find((m) => m.id === "m-tyler")!;
-    assert.ok(before.leadId, "fixture needs somebody who reports to someone");
-
-    await ops.setGlobalRole({ memberId: "m-tyler", role: "advisor" });
-
-    const after = disk.readStore().members.find((m) => m.id === "m-tyler")!;
-    assert.equal(after.leadId, null);
-  });
-
-  test("their reports are re-pointed upward, not orphaned", async () => {
-    /*
-      A `lead` specifically, not just anybody with reports.
-
-      The first person in the seed who has reports is the Co-Lead, and
-      converting the only active Co-Lead is refused by design — "the club is
-      left with nobody who can appoint anyone". Picking them made this test
-      assert against a write that never happened.
-    */
-    const seeded = disk.readStore();
-    const lead = seeded.members.find(
-      (m) =>
-        m.globalRole === "lead" && seeded.members.some((x) => x.leadId === m.id)
-    )!;
-    assert.ok(lead, "seed needs a Team Lead with reports");
-    const reports = seeded.members
-      .filter((m) => m.leadId === lead.id)
-      .map((m) => m.id);
-    /*
-      Copied out BEFORE the write, not read off `lead` afterwards.
-
-      `readStore()` hands back the live in-memory objects, so `lead` is the same
-      row `setGlobalRole` mutates — and the conversion sets an advisor's own
-      `leadId` to null. Reading it after the fact compares the reports against
-      null instead of against where they should have moved.
-    */
-    const grandLead = lead.leadId;
-
-    await ops.setGlobalRole({ memberId: lead.id, role: "advisor" });
-
-    const store = disk.readStore();
-    for (const id of reports) {
-      const m = store.members.find((x) => x.id === id)!;
-      assert.notEqual(m.leadId, lead.id, `${id} still reports to an advisor`);
-      assert.equal(m.leadId, grandLead, `${id} should move up a level`);
-    }
-  });
-});
 
 describe("asking a Lead for something", () => {
   const LEAD = "m-priya";

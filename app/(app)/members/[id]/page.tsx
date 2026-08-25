@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Lock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardBody, CardDivider } from "@/components/ui/card";
-import { ContributionPanel } from "@/components/ui/contribution-panel";
 import { DeliverableRow } from "@/components/ui/deliverable-row";
 import { DiscordStatus } from "@/components/ui/discord-status";
 import { CalendarStatus } from "@/components/ui/calendar-status";
@@ -40,24 +39,20 @@ export default async function MemberProfilePage({
   const { id } = await params;
   const viewer = await getViewer();
 
-  // Decide visibility BEFORE fetching, so restricted numbers are never loaded
-  // into a page that isn't allowed to show them.
-  const canViewEffort = can.viewMemberEffort(viewer.actor, viewer.graph, id);
-
   /*
-    Reading the CONTENTS of somebody's check-ins is a narrower right than reading
-    their contribution record, and the two have to be asked separately.
+    The one gate left on this page.
 
-    They were one gate until advisors were given the record on 2026-08-16 for
-    writing references. That change alone would have handed a professor everybody's
-    weekly notes, which is surveillance rather than a reference — so the private
-    half stays with the Lead chain, which is also what makes the escalation in
-    `lib/review.ts` mean anything.
+    There used to be two: `viewMemberEffort` for the contribution record, and a
+    narrower one for the CONTENTS of somebody's check-ins. Reliability and the
+    contribution record were deleted on 2026-08-24 and everything that is left
+    about a member is public -- so the only question remaining is the archived
+    check-ins, which are gated for a reason `can.readArchivedCheckIns` states in
+    full. Decided before fetching, so the notes are never loaded into a page that
+    is not allowed to show them.
   */
-  const canReadCheckIns =
-    viewer.member.id === id || can.reviewUpdate(viewer.actor, viewer.graph, id);
+  const canReadCheckIns = can.readArchivedCheckIns(viewer.actor, id);
   const [view, trainings, resolvedAsks] = await Promise.all([
-    getMemberProfile(id, canViewEffort, viewer.member.id),
+    getMemberProfile(id, canReadCheckIns, viewer.member.id),
     getTrainings(id),
     // Asks they posted that got sorted. Public, like the trainings below it —
     // the note on HOW it got sorted is the useful half, and it's how the next
@@ -67,15 +62,7 @@ export default async function MemberProfilePage({
 
   if (!view) notFound();
 
-  const {
-    member,
-    lead,
-    directReports,
-    projects,
-    advising,
-    contribution,
-    checkIns,
-  } = view;
+  const { member, projects, advising, delivered, checkIns } = view;
   /*
     Live work first, finished work behind a toggle at the end.
 
@@ -184,17 +171,22 @@ export default async function MemberProfilePage({
 
             <div className="mt-5">
               <CardDivider />
-              <DetailRow label="Reports to">
-                {lead ? (
-                  <Link
-                    href={`/members/${lead.id}`}
-                    className="hover:text-cardinal-600"
-                  >
-                    {lead.fullName}
-                  </Link>
-                ) : (
-                  "—"
-                )}
+              {/*
+                "Reports to" was the first row here until 2026-08-24. Nobody
+                reports to anybody now; the RE of each project below is who to
+                talk to about the work on it, which is a more useful answer and
+                is already on every row.
+
+                What replaces it are two counts of finished work — in the side
+                column next to the other details, deliberately not a panel. The
+                club's decision was that this should be available, not central.
+              */}
+              <DetailRow label="Deliverables finished">
+                {delivered.deliverablesCompleted}
+              </DetailRow>
+              <CardDivider />
+              <DetailRow label="Projects finished">
+                {delivered.projectsCompleted}
               </DetailRow>
               <CardDivider />
               <DetailRow label="Projects">{projects.length}</DetailRow>
@@ -298,11 +290,7 @@ export default async function MemberProfilePage({
                   />
                 ) : (
                   liveProjects.map((row) => (
-                    <MemberProjectCard
-                      key={row.project.id}
-                      row={row}
-                      canViewEffort={canViewEffort}
-                    />
+                    <MemberProjectCard key={row.project.id} row={row} />
                   ))
                 )}
 
@@ -319,11 +307,7 @@ export default async function MemberProfilePage({
                   <CompletedProjectsSection count={finishedProjects.length}>
                     <div className="mt-4 space-y-3">
                       {finishedProjects.map((row) => (
-                        <MemberProjectCard
-                          key={row.project.id}
-                          row={row}
-                          canViewEffort={canViewEffort}
-                        />
+                        <MemberProjectCard key={row.project.id} row={row} />
                       ))}
                     </div>
                   </CompletedProjectsSection>
@@ -331,30 +315,6 @@ export default async function MemberProfilePage({
               </div>
             </CardBody>
           </Card>
-
-          {directReports.length > 0 ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Direct Reports</SectionLabel>
-                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                  {directReports.map((report) => (
-                    <Link
-                      key={report.id}
-                      href={`/members/${report.id}`}
-                      className="rounded-tile border-line hover:bg-surface border px-4 py-3 transition-colors"
-                    >
-                      <p className="text-ink text-[15px] font-bold">
-                        {report.fullName}
-                      </p>
-                      <p className="text-ink-muted mt-0.5 text-sm">
-                        {report.major ?? "—"}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          ) : null}
 
           {/*
             What they advise on.
@@ -388,45 +348,6 @@ export default async function MemberProfilePage({
               </CardBody>
             </Card>
           ) : null}
-
-          {/* Contribution: three signals, no composite score, no ranking */}
-          {subjectIsAdvisor ? null : (
-            <Card>
-              <CardBody>
-                {canViewEffort && contribution ? (
-                  <>
-                    <ContributionPanel
-                      record={contribution}
-                      isOwnRecord={isOwnProfile}
-                    />
-                    <p className="text-ink-muted mt-5 text-sm">
-                      Four independent signals, deliberately not combined into a
-                      score and never ranked against other members.{" "}
-                      <Link
-                        href="/how-we-lead"
-                        className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
-                      >
-                        What leadership looks for
-                      </Link>
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <SectionLabel>Contribution</SectionLabel>
-                    <p className="text-ink-soft mt-3 flex items-start gap-2 text-[15px]">
-                      <Lock className="text-ink-muted mt-0.5 size-4 shrink-0" />
-                      <span>
-                        This member&apos;s reliability and contribution record
-                        are visible only to them and their Lead chain. What they
-                        did on each project is public — it&apos;s on the project
-                        pages, in the feed.
-                      </span>
-                    </p>
-                  </>
-                )}
-              </CardBody>
-            </Card>
-          )}
 
           {/*
             Their check-in history — an archive now.
@@ -587,14 +508,7 @@ export default async function MemberProfilePage({
  * identically — two copies of this markup would drift, and the one that drifts
  * is always the one behind the toggle nobody opens.
  */
-function MemberProjectCard({
-  row,
-  canViewEffort,
-}: {
-  row: MemberProjectRow;
-  /** Days worked only. The due countdown is public — see the note inside. */
-  canViewEffort: boolean;
-}) {
+function MemberProjectCard({ row }: { row: MemberProjectRow }) {
   const {
     project,
     membership,
@@ -626,7 +540,7 @@ function MemberProjectCard({
         </div>
       </div>
 
-      {/* What they own here — public, unlike hours */}
+      {/* What they own here */}
       {deliverables.length > 0 ? (
         <div className="mt-3 space-y-2">
           {deliverables.map((d) => (
@@ -651,14 +565,13 @@ function MemberProjectCard({
       ) : null}
 
       {/*
-        Days worked are gated on `canViewEffort`; the
-        countdown isn't. When a project is due is a fact about
-        the project, and the whole club can already read it on
-        the project page — hiding it here would be privacy
-        theatre that costs the page its point.
+        Days worked used to be gated and the countdown never was, on the
+        reasoning that when a project is due is a fact about the project. Both
+        are public now: a count of days somebody showed up is the same kind of
+        fact, and it is already visible in the project's own feed.
       */}
       <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-        {canViewEffort && daysWorked > 0 ? (
+        {daysWorked > 0 ? (
           <span className="flex items-center gap-1.5">
             <Clock className="size-3.5" />
             {daysWorked === 1 ? "1 day worked" : daysWorked + " days worked"}

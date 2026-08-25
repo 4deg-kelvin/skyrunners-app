@@ -1015,7 +1015,6 @@ describe("deleting a member record", () => {
       email,
       fullName: "Julia Hale",
       globalRole: "member",
-      leadId: CO_LEAD,
       today: TODAY,
     });
     if (!result.ok) throw new Error(result.error);
@@ -1116,11 +1115,21 @@ describe("deleting a member record", () => {
     if (!result.ok) assert.match(result.error, /primary RE/i);
   });
 
-  test("their reports move up rather than being orphaned", async () => {
+  test("no row is left pointing at the deleted one", async () => {
     /*
-      A member whose `leadId` points at a deleted row has nobody reading their
-      check-ins and no escalation path, and nothing in the app would report it
-      — the exact silent failure the review chain exists to prevent.
+      This asserted that reports moved UP a level, because a member whose
+      `leadId` pointed at a deleted row had nobody reading their check-ins and
+      no escalation path.
+
+      The chain went on 2026-08-24 and nothing reads `leadId` now, so the
+      "moves up" half is no longer a behaviour anybody depends on. What still
+      matters is the half underneath it: `profiles.lead_id` REFERENCES
+      `profiles(id)`, so leaving a pointer to a deleted row is a dangling
+      foreign key, and in Postgres it is a constraint violation rather than a
+      quiet inconsistency. Kept for that reason, and asserted as that.
+
+      Julia is invited with no Lead now (invites stopped setting one), so
+      Tyler's line lands on null rather than on the Co-Lead.
     */
     const julia = await freshMember();
     const store = disk.readStore();
@@ -1128,8 +1137,8 @@ describe("deleting a member record", () => {
 
     await ops.deleteMember({ memberId: julia.id, actorId: CO_LEAD });
 
-    // Julia reported to the Co-Lead, so Tyler now does too.
-    assert.equal(memberById("m-tyler")?.leadId, CO_LEAD);
+    assert.notEqual(memberById("m-tyler")?.leadId, julia.id);
+    assert.equal(memberById("m-tyler")?.leadId, null);
   });
 
   test("a division they led is left without a lead, not pointing at a ghost", async () => {

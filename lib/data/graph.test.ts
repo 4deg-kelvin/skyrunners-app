@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import { test, describe } from "node:test";
 
 import { buildOrgGraphFromRows, toMember, toProject } from "./graph.ts";
-import { can, isREofOrAbove, leadChain } from "../permissions.ts";
+import { can, isREofOrAbove } from "../permissions.ts";
 
 // --- fixtures --------------------------------------------------------------
 
@@ -70,10 +70,19 @@ describe("row mapping", () => {
     assert.equal(member.skills, undefined);
   });
 
-  test("leadId stays null rather than becoming undefined", () => {
-    // `Member.leadId` is `string | null`, and null is meaningful: it's what
-    // "reports to nobody" looks like, i.e. a Co-Lead. Collapsing it to undefined
-    // would be a type lie and would break `leadChain`'s termination check.
+  test("leadId still maps, though nothing reads it", () => {
+    /*
+      `profiles.lead_id` outlived the reporting chain deliberately -- the club's
+      decision to stop using it could be revisited, and a dropped column cannot
+      be un-dropped. So the mapping stays tested: if it silently stopped
+      round-tripping, the column would quietly fill with nulls and the history
+      of who reported to whom would be gone for real.
+
+      null is still meaningful and must not collapse to undefined. It is the
+      shape the snapshot writes back, and `null` versus `undefined` is the
+      difference between "set it to nothing" and "leave it alone" in
+      `persistDiff`.
+    */
     assert.equal(toMember(profileRow()).leadId, null);
     assert.equal(toMember(profileRow({ lead_id: "p9" })).leadId, "p9");
   });
@@ -254,9 +263,16 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     );
   });
 
-  test("Lead authority inherits UP the reporting chain", () => {
-    assert.deepEqual(leadChain(graph, MEMBER), [LEAD, CO_LEAD]);
-  });
+  /*
+    "Lead authority inherits UP the reporting chain" was a test here, asserting
+    `leadChain(graph, MEMBER)` walked to the Co-Lead. The function went with the
+    chain on 2026-08-24.
+
+    What this file still guards about the graph is the important half: the four
+    lookups are SYNCHRONOUS and built from four parallel queries, because they
+    are called in loops while walking the project tree. That has not changed --
+    there is simply one fewer tree to walk.
+  */
 
   test("a Co-Lead can still do anything", () => {
     assert.equal(
