@@ -560,7 +560,11 @@ export default async function SettingsPage() {
                               <Badge tone="neutral">Retired</Badge>
                             ) : null}
                           </span>
-                          <EditCatalogueItemForm item={item} />
+                          <EditCatalogueItemForm
+                            item={item}
+                            verifier={catalogue.verifiers.get(item.id)}
+                            verifierOptions={catalogue.verifierOptions}
+                          />
                         </div>
                       </div>
                     ))}

@@ -796,6 +796,25 @@ export interface CatalogueItem {
 export type CertificationStatus =
   "requested" | "verified" | "expired" | "rejected";
 
+/**
+ * Who verifies one catalogue item, and whether members tick it themselves.
+ *
+ * A per-ITEM answer, since 2026-08-24. Verification used to run up the member's
+ * reporting chain; there is no chain, so accountability sits with a named person
+ * the way it does for a project's RE. "Tyler verifies the mill" is a sentence a
+ * new member can act on.
+ *
+ * Lives in its own table rather than as two columns on `catalogue_items`, and
+ * that is a compromise with a reason — see the header of
+ * `lib/trainings/verifiers.ts`, which also says what to do about it.
+ */
+export interface CatalogueVerifier {
+  itemId: string;
+  /** Undefined when the item is self-verify, or not configured yet. */
+  verifierId?: string;
+  selfVerify: boolean;
+}
+
 export interface MemberCertification {
   id: string;
   memberId: string;

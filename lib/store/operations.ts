@@ -959,6 +959,50 @@ export async function updateProfile(input: {
  * appoint anyone, fixable only by hand-editing the database, and it's the sort
  * of thing that happens at 1am during a leadership handover.
  */
+/**
+ * Trainings this person is still the named verifier for, as a sentence.
+ *
+ * The lock-out safeguard the club asked for: you cannot take somebody out of a
+ * leadership position while a training is assigned to them, and the refusal has
+ * to NAME what is blocking it. "Tyler verifies the mill and the laser cutter;
+ * reassign those first" is actionable; "not allowed" on an org-chart edit is the
+ * kind of message people work around by deleting something else, and what they
+ * would delete here is a safety record.
+ *
+ * Synchronous and store-only, deliberately. It runs inside `guarded`, which
+ * holds the write, and an async read in there would be a query inside a
+ * transaction. In LIVE mode `catalogue_verifiers` is not in the snapshot -- see
+ * `lib/trainings/verifiers.ts` on why it cannot be -- so this returns null and
+ * the guard does not fire. That is the honest trade for shipping before the
+ * migration: the guard is real in demo mode and today, and becomes real in live
+ * mode when 0046 lands and the collection can join the snapshot.
+ *
+ * Returns null when there is nothing blocking, so the caller reads as a guard
+ * rather than as a length check on a list that is usually empty.
+ */
+function verifierLockOut(store: StoreShape, memberId: string): string | null {
+  const held = (store.catalogueVerifiers ?? []).filter(
+    (v) => v.verifierId === memberId
+  );
+  if (held.length === 0) return null;
+
+  const names = held.map(
+    (v) =>
+      store.catalogueItems.find((i) => i.id === v.itemId)?.name ??
+      "a retired training"
+  );
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+  return `They verify ${list}. Assign ${
+    names.length === 1 ? "it" : "those"
+  } to somebody else first, or mark ${
+    names.length === 1 ? "it" : "them"
+  } self-verify -- otherwise nobody can clear anyone for the shop.`;
+}
+
 export async function setGlobalRole(input: {
   memberId: string;
   role: GlobalRole;
@@ -994,6 +1038,20 @@ export async function setGlobalRole(input: {
       function touches, deliberately. Demoting a Division Lead does NOT silently
       hand their division to nobody; `setTeamLead` is a separate, deliberate act.
     */
+
+    /*
+      The lock-out safeguard. Refused rather than cascaded, same family as the
+      "last Co-Lead" guard above and as a parent project that cannot complete
+      while a child is open: the app should not quietly decide who inherits a
+      safety sign-off.
+
+      Only on the way DOWN. Promoting a verifier to Co-Lead takes nothing away —
+      they can still verify, and a Co-Lead can verify anything.
+    */
+    if (input.role === "member" || input.role === "advisor") {
+      const blocking = verifierLockOut(store, member.id);
+      if (blocking) return fail<Member>(blocking);
+    }
 
     member.globalRole = input.role;
 
@@ -1240,22 +1298,38 @@ export async function setMemberStatus(input: {
       }
     }
 
+    /*
+      The same lock-out safeguard as `setGlobalRole`, and it matters more here.
+
+      Deactivating somebody is what actually happens when a verifier graduates,
+      and it is the case where "the app quietly decides who inherits a safety
+      sign-off" would do real damage: the mill would still list a verifier, that
+      verifier would be inactive, and nobody would find out until a member's
+      request sat unanswered for a fortnight.
+
+      Reactivating is never blocked -- it only ever gives authority back.
+    */
+    if (input.status !== "active") {
+      const blocking = verifierLockOut(store, member.id);
+      if (blocking) return fail<Member>(blocking);
+    }
+
     member.status = input.status;
 
     if (input.status !== "active") {
-      // Their people would otherwise keep reporting to someone who has left,
-      // and their check-ins would pile up unread with nobody accountable.
-      for (const m of store.members) {
-        if (m.leadId === member.id) m.leadId = member.leadId;
-      }
-      // Drop obligations rather than leaving them to accrue as missed.
-      store.progressUpdates = store.progressUpdates.filter(
-        (u) =>
-          !(
-            u.memberId === member.id &&
-            (u.status === "pending" || u.status === "late")
-          )
-      );
+      /*
+        Two cleanups used to live here and both went with the reporting chain on
+        2026-08-24: re-pointing their reports upward, and dropping their open
+        check-in obligations so they did not accrue as missed. Nobody has reports
+        and nobody owes a check-in.
+
+        What replaces the second one is nothing, deliberately. An inactive
+        member's open DELIVERABLES stay open and stay theirs, because a
+        deliverable is somebody's accountable work rather than a recurring
+        obligation -- silently unassigning it would remove it from the RE's queue,
+        which is the one person who needs to know it now has no owner. It shows
+        up on the project as work with an inactive owner, which is the truth.
+      */
     }
 
     return ok(member);

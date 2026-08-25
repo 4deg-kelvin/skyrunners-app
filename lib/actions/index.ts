@@ -35,6 +35,11 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/data/viewer";
 import { can, isCoLead } from "@/lib/permissions";
 import {
+  catalogueVerifiers,
+  mayVerifyItem,
+  saveCatalogueVerifier,
+} from "@/lib/trainings/verifiers";
+import {
   today,
   blockerAudience,
   projectEscalationAudience,
@@ -1820,6 +1825,46 @@ async function requestCertificationAction$impl(
   return toResult(result, "Sent to your Lead to verify.");
 }
 
+/**
+ * May this viewer act on this certification request?
+ *
+ * Two questions, and both have to be asked. `can.verifyTraining` is the role
+ * question -- the interim "any Lead, not yourself" rule. `mayVerifyItem` is the
+ * per-ITEM question the club asked for on 2026-08-24: a named verifier signs off
+ * that machine, or the item is self-verify and the member ticks it themselves.
+ *
+ * Shared by all three actions below rather than inlined three times. They are
+ * verify, reject and revoke -- the same authority in three directions, and three
+ * copies of a two-part check is how one of them ends up with only half of it.
+ *
+ * Returns the item id too, because the caller needs it to decide `allowSelf`:
+ * a self-verify item is the one case where somebody signing off their own record
+ * is the intended behaviour rather than the thing being prevented.
+ */
+async function mayActOnCertification(
+  viewer: Awaited<ReturnType<typeof getViewer>>,
+  certificationId: string,
+  memberId: string
+): Promise<{ allowed: boolean; selfVerify: boolean }> {
+  const record = readStore().certifications.find(
+    (c) => c.id === certificationId
+  );
+  const config = record
+    ? (await catalogueVerifiers()).get(record.itemId)
+    : undefined;
+
+  return {
+    allowed: mayVerifyItem({
+      actorId: viewer.member.id,
+      isCoLead: isCoLead(viewer.actor),
+      subjectId: memberId,
+      config,
+      fallbackAllowed: can.verifyTraining(viewer.actor, viewer.graph, memberId),
+    }),
+    selfVerify: !!config?.selfVerify,
+  };
+}
+
 async function verifyCertificationAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -1827,26 +1872,35 @@ async function verifyCertificationAction$impl(
   const certificationId = String(formData.get("certificationId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
 
-  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
-    return denied("verify this");
-  }
+  const gate = await mayActOnCertification(viewer, certificationId, memberId);
+  if (!gate.allowed) return denied("verify this");
 
   const result = await ops.verifyCertification({
     certificationId,
     verifierId: viewer.member.id,
-    // Only a Co-Lead may sign off their own, because nobody is above them and
-    // the alternative is a record they can never complete. See the note on
-    // `can.verifyTraining`.
-    allowSelf: isCoLead(viewer.actor),
+    /*
+      Two cases where signing off your own is intended rather than prevented.
+
+      A Co-Lead, because nobody is above them and the alternative is a record
+      they can never complete -- see the note on `can.verifyTraining`.
+
+      A self-verify item, because that is the entire feature: "did you read the
+      shop induction" is a question only the member can answer, and routing it
+      through somebody else makes the answer worse rather than more trustworthy.
+    */
+    allowSelf: isCoLead(viewer.actor) || gate.selfVerify,
     today: today(),
   });
 
   if (result.ok) refresh();
+  if (!result.ok || memberId !== viewer.member.id) {
+    return toResult(result, "Verified.");
+  }
   return toResult(
     result,
-    result.ok && memberId === viewer.member.id
-      ? "Verified — recorded as self-verified, since nobody sits above a Co-Lead."
-      : "Verified."
+    gate.selfVerify
+      ? "Recorded. This one is self-verify — you're attesting to it yourself."
+      : "Verified — recorded as self-verified, since nobody sits above a Co-Lead."
   );
 }
 
@@ -1855,13 +1909,13 @@ async function rejectCertificationAction$impl(
 ): Promise<ActionResult> {
   const viewer = await getViewer();
   const memberId = String(formData.get("memberId") ?? "");
+  const certificationId = String(formData.get("certificationId") ?? "");
 
-  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
-    return denied("decide this");
-  }
+  const gate = await mayActOnCertification(viewer, certificationId, memberId);
+  if (!gate.allowed) return denied("decide this");
 
   const result = await ops.rejectCertification({
-    certificationId: String(formData.get("certificationId") ?? ""),
+    certificationId,
     verifierId: viewer.member.id,
     note: String(formData.get("note") ?? ""),
   });
@@ -1875,13 +1929,22 @@ async function revokeCertificationAction$impl(
 ): Promise<ActionResult> {
   const viewer = await getViewer();
   const memberId = String(formData.get("memberId") ?? "");
+  const certificationId = String(formData.get("certificationId") ?? "");
 
-  if (!can.verifyTraining(viewer.actor, viewer.graph, memberId)) {
-    return denied("withdraw this clearance");
-  }
+  /*
+    Withdrawing is gated the same way as granting, deliberately. It is the
+    heavier act -- it takes a clearance OFF somebody's record -- so anything
+    wider would let a Lead with no stake in that machine undo the named
+    verifier's decision.
+
+    Note that a self-verify item lets the MEMBER withdraw their own, which is
+    right: they attested to it, so they can say it is no longer true.
+  */
+  const gate = await mayActOnCertification(viewer, certificationId, memberId);
+  if (!gate.allowed) return denied("withdraw this clearance");
 
   const result = await ops.revokeCertification({
-    certificationId: String(formData.get("certificationId") ?? ""),
+    certificationId,
     verifierId: viewer.member.id,
     note: String(formData.get("note") ?? ""),
     today: today(),
@@ -1889,6 +1952,42 @@ async function revokeCertificationAction$impl(
 
   if (result.ok) refresh();
   return toResult(result, "Clearance withdrawn.");
+}
+
+/**
+ * Configure who verifies one catalogue item.
+ *
+ * Co-Lead only, same as everything else that edits the catalogue -- this is the
+ * shape the shop's sign-offs hang off, and it is the guard whose absence would
+ * let a Lead quietly make themselves the verifier for every machine.
+ */
+async function setCatalogueVerifierAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  if (!can.manageTrainingCatalogue(viewer.actor)) {
+    return denied("configure who verifies trainings");
+  }
+
+  const selfVerify = String(formData.get("selfVerify") ?? "") === "yes";
+  const verifierId = String(formData.get("verifierId") ?? "") || undefined;
+
+  const result = await saveCatalogueVerifier({
+    itemId: String(formData.get("itemId") ?? ""),
+    verifierId,
+    selfVerify,
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+  refresh();
+  return {
+    ok: true,
+    message: selfVerify
+      ? "Members can now tick this one themselves."
+      : verifierId
+        ? "Saved. They'll see requests for it on their dashboard."
+        : "Cleared — any Lead can verify this one.",
+  };
 }
 
 async function createTrainingSectionAction$impl(
@@ -3186,6 +3285,12 @@ export async function revokeCertificationAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => revokeCertificationAction$impl(formData));
+}
+
+export async function setCatalogueVerifierAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setCatalogueVerifierAction$impl(formData));
 }
 
 export async function createTrainingSectionAction(

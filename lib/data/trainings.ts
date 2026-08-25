@@ -25,6 +25,10 @@ import {
 import { readStore } from "@/lib/store/disk";
 import { expireLapsedCertifications } from "@/lib/store/operations";
 import { preloadLiveStore } from "@/lib/store/request";
+import {
+  catalogueVerifiers,
+  type CatalogueVerifier,
+} from "@/lib/trainings/verifiers";
 import type {
   CatalogueItem,
   MemberCertification,
@@ -231,6 +235,21 @@ export async function getTrainingQueue(
 export async function getCatalogue(): Promise<{
   sections: { section: TrainingSection; items: CatalogueItem[] }[];
   sectionOptions: { id: string; name: string }[];
+  /**
+   * Per-item verification config, keyed by item id. Empty before migration 0046
+   * lands, which reads as "every item falls back to any Lead".
+   */
+  verifiers: Map<string, CatalogueVerifier>;
+  /**
+   * Who can be named a verifier: active leadership.
+   *
+   * Deliberately not "anybody". The point of naming somebody is that a member
+   * knows who to ask and that person is accountable for answering, and the club
+   * chose leadership for that. It is also what makes the lock-out safeguard
+   * coherent -- a guard against demoting a verifier is meaningless if verifiers
+   * do not have to hold a position.
+   */
+  verifierOptions: { id: string; fullName: string }[];
 }> {
   await preloadLiveStore();
 
@@ -240,6 +259,15 @@ export async function getCatalogue(): Promise<{
       items: catalogueItemsFor(section.id),
     })),
     sectionOptions: trainingSections().map((s) => ({ id: s.id, name: s.name })),
+    verifiers: await catalogueVerifiers(),
+    verifierOptions: readStore()
+      .members.filter(
+        (m) =>
+          m.status === "active" &&
+          (m.globalRole === "lead" || m.globalRole === "co_lead")
+      )
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      .map((m) => ({ id: m.id, fullName: m.fullName })),
   };
 }
 

@@ -12,9 +12,10 @@ import {
   revokeCertificationAction,
   setCatalogueItemActiveAction,
   updateCatalogueItemAction,
+  setCatalogueVerifierAction,
   verifyCertificationAction,
 } from "@/lib/actions";
-import type { CatalogueItem } from "@/lib/types";
+import type { CatalogueItem, CatalogueVerifier } from "@/lib/types";
 
 /**
  * "I've done this training."
@@ -384,8 +385,29 @@ export function AddSectionForm() {
  * wrong as it was: a Lead verifying somebody's laser training could, from the
  * same row, delete the laser.
  */
-export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
+/**
+ * Edit one catalogue item: its name, its expiry, and WHO VERIFIES IT.
+ *
+ * The verifier is a separate form inside the same panel rather than three more
+ * fields on the first one, and that is deliberate. Renaming the mill and
+ * deciding who signs the mill off are different acts with different stakes: one
+ * is a typo fix, the other decides whether anybody can be cleared for a machine.
+ * Saving them together means a Co-Lead correcting a spelling has to re-confirm
+ * a safety assignment, which is how people learn to click Save without reading.
+ */
+export function EditCatalogueItemForm({
+  item,
+  verifier,
+  verifierOptions,
+}: {
+  item: CatalogueItem;
+  /** Current config. Undefined means unconfigured — any Lead can verify. */
+  verifier?: CatalogueVerifier;
+  /** Active leadership, already sorted by the data layer. */
+  verifierOptions: { id: string; fullName: string }[];
+}) {
   const [open, setOpen] = useState(false);
+  const [selfVerify, setSelfVerify] = useState(!!verifier?.selfVerify);
 
   if (!open) {
     return (
@@ -442,6 +464,81 @@ export function EditCatalogueItemForm({ item }: { item: CatalogueItem }) {
           Cancel
         </button>
       </ActionForm>
+
+      {/*
+        Who signs this off.
+
+        Three states, and all three are reachable from here: a named person,
+        self-verify, or neither. "Neither" is not a broken state — it falls back
+        to any Lead, which is what a thirty-item catalogue looks like before
+        anybody has been through it, and locking those items would keep people
+        out of the shop.
+      */}
+      <div className="border-line mt-3 border-t pt-3">
+        <ActionForm
+          action={setCatalogueVerifierAction}
+          submitLabel="Save who verifies"
+          submittingLabel="Saving…"
+        >
+          <input type="hidden" name="itemId" value={item.id} />
+          <input
+            type="hidden"
+            name="selfVerify"
+            value={selfVerify ? "yes" : "no"}
+          />
+
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={selfVerify}
+              onChange={(e) => setSelfVerify(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="text-ink block text-sm font-semibold">
+                Members tick this one themselves
+              </span>
+              <span className="text-ink-muted block text-xs">
+                For anything where the honest answer is &ldquo;did you read
+                this&rdquo; — an induction video, a document. Nobody is asked to
+                sign it off, so it never sits in a queue.
+              </span>
+            </span>
+          </label>
+
+          {/*
+            Hidden rather than disabled when self-verify is on. A greyed-out
+            picker next to a ticked box reads as "you can also choose somebody",
+            and the two settings are mutually exclusive — the SQL has a CHECK
+            constraint saying so.
+          */}
+          {selfVerify ? null : (
+            <label className="mt-3 block">
+              <span className="text-ink mb-1 block text-sm font-semibold">
+                Verified by
+              </span>
+              <select
+                name="verifierId"
+                defaultValue={verifier?.verifierId ?? ""}
+                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+              >
+                <option value="">Any Lead (nobody named)</option>
+                {verifierOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.fullName}
+                  </option>
+                ))}
+              </select>
+              <span className="text-ink-muted mt-1 block text-xs">
+                Naming somebody puts requests for this on their dashboard, and
+                nobody else can sign it off. They can&apos;t be demoted or
+                deactivated while it&apos;s assigned to them — reassign it
+                first.
+              </span>
+            </label>
+          )}
+        </ActionForm>
+      </div>
 
       <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
         <ActionButton

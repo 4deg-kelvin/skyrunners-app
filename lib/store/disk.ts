@@ -39,6 +39,7 @@ import type {
   ProgressUpdate,
   ProjectMembership,
   CatalogueItem,
+  CatalogueVerifier,
   ClubSettings,
   DeliverableTodo,
   MemberRequest,
@@ -133,6 +134,16 @@ export interface StoreShape {
   catalogueItems: CatalogueItem[];
   certifications: MemberCertification[];
   /**
+   * Who verifies each catalogue item, and which items are self-verify.
+   *
+   * OPTIONAL, and deliberately absent from `COLLECTIONS` in mapping.ts. In live
+   * mode `lib/trainings/verifiers.ts` reads `catalogue_verifiers` with its own
+   * fail-soft query, because the per-request snapshot names an explicit column
+   * list and a table that does not exist yet would 500 every page. This field is
+   * the DEMO-mode half of the same feature. See that file's header.
+   */
+  catalogueVerifiers?: CatalogueVerifier[];
+  /**
    * Club-wide configuration. Exactly one row — see `ClubSettings`.
    *
    * An array rather than a bare object so it goes through `COLLECTIONS` like
@@ -210,6 +221,9 @@ function seed(): StoreShape {
     guideBlocks: [],
     trainingSections: seedTrainingSections,
     catalogueItems: seedCatalogueItems,
+    // Nothing configured: every item falls back to "any Lead" until a Co-Lead
+    // names a verifier or marks it self-verify.
+    catalogueVerifiers: [],
     // Nobody holds anything until they say so and a Lead verifies it.
     certifications: [],
     // The defaults the tiers were hard-coded to, so seeding changes nothing
