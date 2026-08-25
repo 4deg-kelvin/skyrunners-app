@@ -801,10 +801,10 @@ export default async function ProjectDetailPage({
             <CardBody>
               <SectionLabel>Work on this project</SectionLabel>
               <p className="text-ink-soft mt-2 text-sm">
-                Everything anyone has done here, newest first — lines logged as
-                people work, and the fuller entries they write at check-in.
-                Public to the whole club: it is the project&apos;s history, and
-                how anyone above you sees what is happening without asking.
+                Everything anyone has done here, newest first. Public to the
+                whole club: it is the project&apos;s history, and how anyone
+                above you sees what is happening without asking. Reply to any
+                line — that is what tells somebody it was read.
               </p>
 
               {/*

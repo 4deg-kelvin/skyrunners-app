@@ -126,81 +126,39 @@ describe("projectEscalationAudience", () => {
   });
 });
 
-describe("raiserLeadAudience", () => {
-  test("returns exactly the raiser's direct Lead", () => {
-    const store = disk.readStore();
-    const withLead = store.members.find(
-      (m) => m.leadId && store.members.some((l) => l.id === m.leadId)
-    );
-    if (!withLead) return;
+/*
+  `describe("raiserLeadAudience")` was here -- five tests on who hears that one
+  of their reports is blocked, one step up the reporting tree.
 
-    assert.deepEqual(mock.raiserLeadAudience(withLead.id), [withLead.leadId]);
-  });
+  It went with the notification layer's share of the reporting removal on
+  2026-08-25. The function read `profiles.lead_id`, which nothing writes, so it
+  was already returning nothing for anybody invited after 2026-08-24.
+*/
 
-  test("one step, not the whole chain", () => {
+describe("the two lists stay distinct", () => {
+  test("clearing and escalating are different questions", () => {
     /*
-      A PL two levels up hearing about every blocker in their sub-tree is the
-      noise that gets a bot muted. Something that actually SITS is handled by
-      age instead: unconfirmed sign-offs and per-project silence both surface on
-      the PL's dashboard by how long they have been waiting. (This used to name
-      `lib/review.ts`, which escalated unread check-ins; it went with the
-      reporting chain on 2026-08-24, and the age-not-count principle outlived
-      it.)
+      There were THREE lists until 2026-08-25: who clears it (the project's
+      PLs), who owns the work above it, and who looks after the PERSON. The
+      third read the reporting chain and went with it.
+
+      The remaining two are still not derivable from each other, which is the
+      point worth keeping: `blockerAudience` deliberately EXCLUDES the raiser and
+      climbs one level if that empties the list, while
+      `projectEscalationAudience` answers "whose promise does this change" and
+      only fires for a whole project. A blocked deliverable earns the first and
+      not the second.
     */
     const store = disk.readStore();
-    const deep = store.members.find((m) => {
-      const lead = store.members.find((l) => l.id === m.leadId);
-      return lead?.leadId;
-    });
-    if (!deep) return;
+    const child = store.projects.find((p) => p.parentId && p.reIds.length > 0);
+    if (!child) return;
+    const raiser = child.reIds[0];
 
-    assert.equal(mock.raiserLeadAudience(deep.id).length, 1);
-  });
+    const clearers = mock.blockerAudience(child.id, raiser);
+    const above = mock.projectEscalationAudience(child.id, raiser);
 
-  test("somebody with no Lead notifies nobody", () => {
-    const store = disk.readStore();
-    const orphan = store.members.find((m) => !m.leadId);
-    if (!orphan) return;
-    assert.deepEqual(mock.raiserLeadAudience(orphan.id), []);
-  });
-
-  test("an inactive Lead is skipped rather than DMed", async () => {
-    const store = disk.readStore();
-    const withLead = store.members.find(
-      (m) => m.leadId && store.members.some((l) => l.id === m.leadId)
-    );
-    if (!withLead) return;
-
-    await disk.mutate((s) => {
-      s.members.find((m) => m.id === withLead.leadId)!.status = "inactive";
-      return { ok: true as const, value: null };
-    });
-
-    assert.deepEqual(mock.raiserLeadAudience(withLead.id), []);
-  });
-});
-
-describe("the three lists stay distinct", () => {
-  test("clearing and awareness are different questions", () => {
-    /*
-      `blockerAudience` answers "who fixes this" on the project tree;
-      `raiserLeadAudience` answers "who looks after this person" on the
-      reporting tree. They may overlap, but neither is derivable from the
-      other — a member's Lead is very often not a PL of their projects, which
-      is the whole reason the app keeps two hierarchies.
-    */
-    const store = disk.readStore();
-    const project = store.projects.find((p) => p.reIds.length > 0)!;
-    const member = store.members.find(
-      (m) => m.leadId && !project.reIds.includes(m.id)
-    );
-    if (!member) return;
-
-    const clearers = mock.blockerAudience(project.id, member.id);
-    const leads = mock.raiserLeadAudience(member.id);
-
-    assert.ok(clearers.length > 0);
-    assert.equal(clearers.includes(member.id), false);
-    assert.equal(leads.includes(member.id), false);
+    // Neither list ever contains the person who raised it.
+    assert.equal(clearers.includes(raiser), false);
+    assert.equal(above.includes(raiser), false);
   });
 });

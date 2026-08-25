@@ -1020,12 +1020,16 @@ in list rows, so it wants a real pass rather than one rule.
    project until somebody logs something. Get one real week in before judging
    any of it.
 
-6. **`npm test` opens a real Discord connection.** Four tests in
-   `lib/notify/discord.test.ts` set a FAKE token and let a real `fetch` through,
-   so the suite prints `403` and an `ECONNRESET`. It cannot DM anybody — the token
-   is fake and the real one is deleted in a `before` hook — so the only cost is
-   that the suite needs the internet. The success-case test already stubs `fetch`;
-   doing the same in the other four is about five lines.
+6. ~~**`npm test` opens a real Discord connection.**~~ **It does not** — this
+   entry was wrong when written, on 2026-08-25. Every test in
+   `lib/notify/discord.test.ts` replaces `globalThis.fetch` before calling, so
+   the `[discord] ... 403` and `[discord] send failed: ECONNRESET` lines in the
+   output are the module logging two failures the tests deliberately SIMULATE.
+   Nothing reaches the network and nothing can DM anybody.
+
+   Left here as a correction rather than deleted, because "the suite prints
+   something alarming" will come up again: those two lines are the evidence that
+   the failure paths are covered, not a warning.
 
 7. Tap-target pass (above).
 

@@ -178,17 +178,6 @@ export const discordMessages = {
     (opts.note ? `\n> ${opts.note}` : "") +
     `\nThere's plenty else going — have a look at Projects.`,
 
-  checkInSubmitted: (opts: {
-    memberName: string;
-    projectCount: number;
-    url: string;
-  }) =>
-    `**${opts.memberName}** submitted a check-in` +
-    (opts.projectCount > 0
-      ? ` covering ${opts.projectCount} project${opts.projectCount === 1 ? "" : "s"}`
-      : "") +
-    `.\n${opts.url}`,
-
   requestReceived: (opts: { memberName: string; body: string; url: string }) =>
     `**${opts.memberName}** has asked you for something.
 ` +
@@ -219,26 +208,6 @@ ${opts.answeredBy} said: ${opts.response}`
   }) =>
     `**${opts.memberName}** is blocked on **${opts.projectName}**.\n` +
     `> ${opts.note}\n${opts.url}`,
-
-  /**
-   * The same event, told to the raiser's Lead.
-   *
-   * Deliberately worded as awareness rather than a task. The PL is being asked
-   * to go clear something; the Lead is being told one of their people is
-   * stuck, which is a conversation. If both messages said "please unblock
-   * this" the Lead would either duplicate the PL's work or ignore it, and
-   * ignoring is the habit that spreads to every other message the bot sends.
-   */
-  reportBlocked: (opts: {
-    memberName: string;
-    what: string;
-    projectName: string;
-    note: string;
-    url: string;
-  }) =>
-    `Heads up — **${opts.memberName}** (one of your reports) is blocked on **${opts.what}** in ${opts.projectName}.\n` +
-    `> ${opts.note}\n` +
-    `The project's PL has been asked to clear it. Worth a word if it sits.\n${opts.url}`,
 
   /**
    * A whole project stopped, told to whoever is accountable above it.

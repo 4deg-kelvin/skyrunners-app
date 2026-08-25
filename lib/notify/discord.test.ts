@@ -140,22 +140,16 @@ describe("the messages make sense on a lock screen", () => {
     assert.ok(!bare.includes(">"));
   });
 
-  test("a check-in with no written projects doesn't claim a count", () => {
-    const none = discordMessages.checkInSubmitted({
-      memberName: "Kenji",
-      projectCount: 0,
-      url: "https://hq.example/dashboard",
-    });
-    assert.ok(!none.includes("0 project"));
+  /*
+    A `checkInSubmitted` pluralisation test was here -- "1 project" not
+    "1 projects", and no "0 project" clause at all. The template went with
+    check-ins; its only remaining references were these assertions.
 
-    const one = discordMessages.checkInSubmitted({
-      memberName: "Kenji",
-      projectCount: 1,
-      url: "https://hq.example/dashboard",
-    });
-    assert.match(one, /1 project\b/);
-    assert.ok(!one.includes("1 projects"));
-  });
+    The rule it was protecting is still worth applying to any new template:
+    never emit a count of zero as prose. "covering 0 projects" is worse than
+    saying nothing, and it is the kind of thing that only shows up in the one
+    case nobody tries by hand.
+  */
 });
 
 describe("verification distinguishes whose problem it is", () => {

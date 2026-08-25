@@ -3151,32 +3151,6 @@ export function projectEscalationAudience(
 }
 
 /**
- * Whoever the raiser reports to. One step, not the whole chain.
- *
- * A completely different axis from `blockerAudience`, which walks the PROJECT
- * tree to find who can clear the blocker. This walks the REPORTING tree to find
- * who should know their person is stuck — which is a conversation, not a task.
- *
- * The two lists overlap sometimes and that's fine; the caller de-duplicates and
- * sends whichever message is more actionable. Keeping them separate matters
- * because the messages are different: a PL is being asked to unblock
- * something, a Lead is being told to check in on somebody.
- *
- * One step deliberately. A Lead's Lead hearing about every blocker in their
- * sub-tree is the noise that gets a bot muted, and the club already escalates
- * on AGE when something actually sits: `lib/signoff.ts` for an unconfirmed
- * sign-off, `lib/quiet.ts` for a project nobody has touched.
- */
-export function raiserLeadAudience(raiserId: string): string[] {
-  const store = live();
-  const leadId = store.members.find((m) => m.id === raiserId)?.leadId;
-  if (!leadId || leadId === raiserId) return [];
-
-  const lead = store.members.find((m) => m.id === leadId);
-  return lead && lead.status === "active" ? [lead.id] : [];
-}
-
-/**
  * Requests waiting on this Lead, oldest first.
  *
  * Age-ordered like every other queue in the app: "Kenji has been waiting six

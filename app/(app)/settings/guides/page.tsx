@@ -18,10 +18,14 @@ export const metadata = {
  * Where a Co-Lead edits the two guide pages.
  *
  * Its own route rather than another card on Settings, because Settings is
- * already carrying the profile, check-in days, the pause, the AI connection,
- * the tiers, the academic calendar and the trainings catalogue. Adding a
- * two-page content editor to that would make the page unreadable for the
- * member who came to change their phone number.
+ * already carrying the profile, the AI connection, the calendar feed, the
+ * academic calendar and the trainings catalogue. Adding a two-page content
+ * editor to that would make the page unreadable for the member who came to
+ * change their phone number.
+ *
+ * (It used to also carry check-in days, the academic pause and the commitment
+ * tiers. All three are gone, and the argument still holds — the page is a
+ * junk drawer by nature.)
  */
 export default async function EditGuidesPage() {
   const viewer = await getViewer();
@@ -108,8 +112,8 @@ export default async function EditGuidesPage() {
               <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
                 Shown at the bottom of the page a PL or Lead reads. Use it for
                 what the club expects of them beyond what the app enforces —
-                chasing check-ins, running a design review, handing a project
-                over.
+                reading their projects&apos; feeds, running a design review,
+                handing a project over cleanly.
               </p>
             </div>
             <Link

@@ -43,7 +43,6 @@ import {
   today,
   blockerAudience,
   projectEscalationAudience,
-  raiserLeadAudience,
   getEvent,
   getMember,
   getProject,
@@ -387,13 +386,21 @@ async function setDeliverableStatusAction$impl(
  *      other PLs who could clear it. A single blocked deliverable does not
  *      earn this.
  *
- *   3. WHO LOOKS AFTER THE PERSON — `raiserLeadAudience`. One step up the
- *      REPORTING tree, told as awareness rather than a task.
+ * There was a third — WHO LOOKS AFTER THE PERSON, one step up the reporting
+ * tree, told as awareness rather than a task. It went on 2026-08-25, later than
+ * the rest of the reporting removal because the notification layer was never
+ * audited: it read `profiles.lead_id`, which nothing writes any more, so it
+ * either sent nothing or DMed somebody holding a stale pointer and no role in
+ * the blocker.
  *
- * The `sent` set is what keeps them exclusive. Somebody who is both the PL
- * above and the raiser's Lead gets the more actionable message once, not two
- * DMs about the same event — which is exactly how a bot teaches people that
- * its messages are safe to skim.
+ * Nothing replaced it, deliberately. Both groups above are "you can act on
+ * this". A recipient told purely for awareness is how a bot starts producing
+ * messages people skim — and once they skim one, they skim the blocker alerts
+ * too.
+ *
+ * The `sent` set keeps the remaining two exclusive: somebody who is both a PL of
+ * the project and a PL above it gets the more actionable message once, not two
+ * DMs about the same event.
  */
 function notifyBlocked(input: {
   projectId: string;
@@ -449,20 +456,6 @@ function notifyBlocked(input: {
         })
       );
     }
-  }
-
-  // 3. The raiser's own Lead. Awareness, not a task.
-  for (const id of raiserLeadAudience(input.raiserId)) {
-    send(
-      id,
-      discordMessages.reportBlocked({
-        memberName: input.raiserName,
-        what: input.what,
-        projectName: project.name,
-        note: input.note,
-        url,
-      })
-    );
   }
 }
 
