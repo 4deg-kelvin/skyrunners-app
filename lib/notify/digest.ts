@@ -1,5 +1,5 @@
 /**
- * The daily digest — one DM to each RE.
+ * The daily digest — one DM to each PL.
  *
  * ===========================================================================
  * The thing this has to get right is SILENCE
@@ -14,10 +14,10 @@
  *      most likely to be broken by a later "just add a header".
  *
  *   2. **Quiet is reported as a FACT, not a scolding.** "Nothing logged since
- *      Aug 8 (4 days)" is information an RE can act on. "Nobody has worked on
+ *      Aug 8 (4 days)" is information a PL can act on. "Nobody has worked on
  *      your project!" is a reproach, and people stop reading those.
  *
- *   3. **One message, not two.** Somebody who is an RE of several projects and
+ *   3. **One message, not two.** Somebody who is a PL of several projects and
  *      has deadlines coming gets a single DM with two sections. Two DMs at
  *      19:30 every evening is how this feature dies.
  *
@@ -29,7 +29,7 @@
  * today, or when they were last active. It went with the reporting chain on
  * 2026-08-24 — nobody has reports.
  *
- * The signal it carried did NOT go: the RE section already says "quiet today;
+ * The signal it carried did NOT go: the PL section already says "quiet today;
  * last activity Aug 8 (16 days ago)" for each project, which is the same fact
  * scoped to work rather than to a person. What is deliberately not added here is
  * a per-member version of that line. It would be four lines of code and it would
@@ -41,7 +41,7 @@
  * a list of what has been silent long enough to chase.
  *
  * Privacy is no longer a consideration here and that is worth recording rather
- * than leaving as an absence. The old note explained that the RE half was public
+ * than leaving as an absence. The old note explained that the PL half was public
  * (`can.viewMemberWorkOnProject`) while the Lead half needed
  * `can.viewMemberEffort`. Everything a member does is public as of 2026-08-24,
  * so there is no line left for a section to cross.
@@ -63,7 +63,7 @@ import type { Deliverable, Member, Project } from "@/lib/types";
 /**
  * How far ahead a deadline has to be to stay quiet.
  *
- * A week, because that's the horizon an RE can still do something about. Two
+ * A week, because that's the horizon a PL can still do something about. Two
  * weeks would put half the term's dates in every message and train people to
  * skip the section.
  */
@@ -71,7 +71,7 @@ export const DEADLINE_HORIZON_DAYS = 7;
 
 /**
  * Discord rejects a message over 2000 characters outright — the whole DM
- * fails, it isn't truncated for you. A Co-Lead who is RE of a dozen projects
+ * fails, it isn't truncated for you. A Co-Lead who is PL of a dozen projects
  * would sail past that, so the builder trims and says it trimmed.
  */
 export const MAX_DM_CHARS = 1900;
@@ -234,7 +234,7 @@ function dueLabel(dueDate: string, today: string): string {
 /**
  * Build every digest that should go out today.
  *
- * Takes the graph rather than rebuilding one, so RE authority is resolved
+ * Takes the graph rather than rebuilding one, so PL authority is resolved
  * through `isREofOrAbove` — the same function the website uses. Matching
  * `reIds` directly would miss inherited authority and every Division Lead,
  * which is the bug shape CLAUDE.md warns about twice.
@@ -271,7 +271,7 @@ export function buildDigests(input: {
     if (deadlines) sections.push(deadlines);
 
     /*
-      Rule 1. Somebody who is an RE of nothing with nothing of their own due has
+      Rule 1. Somebody who is a PL of nothing with nothing of their own due has
       nothing here, and gets no DM — not a cheerful empty one.
     */
     if (!sections.length) continue;
@@ -332,11 +332,11 @@ function deadlineSection(
 
     A third clause matched work owned by their direct reports, and it went with
     the reporting chain. It was mostly redundant even then -- a report's
-    deliverable is nearly always ON one of the RE's projects -- and what it
+    deliverable is nearly always ON one of the PL's projects -- and what it
     uniquely added was somebody else's deadline on somebody else's project,
     which the recipient could not act on.
 
-    Deduped by id, because an RE's own deliverable on their own project would
+    Deduped by id, because a PL's own deliverable on their own project would
     otherwise appear twice.
   */
   const relevant = store.deliverables.filter(

@@ -9,8 +9,8 @@
  *   - the DASHBOARD (`projectsNeedingAttention`) filtered on `health` and never
  *     looked at deliverables, so somebody marking their work blocked produced
  *     "Every project is on track";
- *   - the PROJECT PAGE (`projectAttentionFlags`) looked at deliverables, RE
- *     silence and dates but never at `health`, so a project its RE had marked
+ *   - the PROJECT PAGE (`projectAttentionFlags`) looked at deliverables, PL
+ *     silence and dates but never at `health`, so a project its PL had marked
  *     blocked raised no flag on the one page you'd open to find out why.
  *
  * Neither surface could be trusted on its own, and they disagreed about the
@@ -121,7 +121,7 @@ describe("the dashboard notices a blocked DELIVERABLE", () => {
   });
 
   test("the project's own health is untouched by that", async () => {
-    // Health is the RE's judgement. Surfacing a fact must not silently
+    // Health is the PL's judgement. Surfacing a fact must not silently
     // overwrite an opinion — see the `past_target` reasoning.
     const project = healthyProjectWithWork();
     await blockADeliverable(project.id);
@@ -230,7 +230,7 @@ describe("the two surfaces agree", () => {
       caught it, because each one looked right in isolation.
 
       Only the reasons that mean "this project needs attention now" — an
-      overdue deliverable or a past target date is a schedule problem the RE
+      overdue deliverable or a past target date is a schedule problem the PL
       owns, and deliberately does not promote a project onto the leadership
       list.
     */

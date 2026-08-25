@@ -88,7 +88,7 @@ export function ProjectNode({
               <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                 <ProjectBadges project={project} />
                 {/*
-                  Health is the RE's judgement and only moves when they change
+                  Health is the PL's judgement and only moves when they change
                   it. Somebody marking their work blocked is a fact, and the
                   person who could clear it has to see it from here.
                 */}
@@ -102,12 +102,12 @@ export function ProjectNode({
               {res.length > 0 ? (
                 <span>
                   <span className="text-ink-soft font-semibold">
-                    {res.length > 1 ? "REs" : "RE"}:
+                    {res.length > 1 ? "PLs" : "PL"}:
                   </span>{" "}
                   {res.map((r) => r.fullName).join(", ")}
                 </span>
               ) : (
-                <span className="text-warn-fg font-semibold">No RE yet</span>
+                <span className="text-warn-fg font-semibold">No PL yet</span>
               )}
               <span>
                 {memberCount} {memberCount === 1 ? "person" : "people"}

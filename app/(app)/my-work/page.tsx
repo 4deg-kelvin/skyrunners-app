@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, Eye, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  Eye,
+  FolderCheck,
+  TriangleAlert,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { ContactLink } from "@/components/ui/contact-link";
@@ -18,13 +24,12 @@ import { DeliverableTodos } from "@/components/forms/deliverable-todos";
 import { DueCountdown } from "@/components/ui/due-countdown";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProjectBadges } from "@/components/ui/project-badges";
-import { FieldLabel, SectionLabel } from "@/components/ui/section-label";
+import { SectionLabel } from "@/components/ui/section-label";
 import {
   getMyWork,
   type MyProjectCard as MyProjectCardData,
 } from "@/lib/data/my-work";
 import { getViewer } from "@/lib/data/viewer";
-import {} from "@/lib/labels";
 import { can, isAdvisor } from "@/lib/permissions";
 import { formatDay, todayInClubTime } from "@/lib/dates";
 
@@ -81,65 +86,57 @@ export default async function MyWorkPage() {
         title={`Hi, ${firstName}`}
         description="What you own, what you owe, and what you've delivered."
         action={
-          mayLogWork ? (
-            <LogWorkForm
-              projects={committed.map((c) => ({
-                id: c.project.id,
-                name: c.project.name,
-              }))}
-              defaultProjectId={committed[0]?.project.id}
-              today={today}
-              maxBackdateDays={maxBackdateDays}
-              recent={view.recentWork}
-            />
-          ) : undefined
+          <div className="flex items-center gap-5">
+            {/*
+              Two counts, beside the button rather than in a card of their own.
+
+              They were a four-signal ContributionPanel at the top of the page,
+              then a two-number card, and now this. Each shrink was the same
+              decision: the club wants the record AVAILABLE, not central — a
+              member opening My Work is here to see what they owe, and a
+              scoreboard above that answers a question nobody asked.
+
+              The label is a `title` rather than visible text. At this size the
+              words outweigh the numbers, and anybody who cares what they mean
+              only needs to be told once.
+            */}
+            <div
+              className="text-ink-muted flex items-center gap-3 text-sm"
+              title={
+                `${delivered.deliverablesCompleted} deliverables finished · ` +
+                `${delivered.projectsCompleted} projects finished. Public, and never ranked.`
+              }
+            >
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="size-3.5" />
+                <span className="text-ink font-semibold">
+                  {delivered.deliverablesCompleted}
+                </span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <FolderCheck className="size-3.5" />
+                <span className="text-ink font-semibold">
+                  {delivered.projectsCompleted}
+                </span>
+              </span>
+            </div>
+            {mayLogWork ? (
+              <LogWorkForm
+                projects={committed.map((c) => ({
+                  id: c.project.id,
+                  name: c.project.name,
+                }))}
+                defaultProjectId={committed[0]?.project.id}
+                today={today}
+                maxBackdateDays={maxBackdateDays}
+                recent={view.recentWork}
+              />
+            ) : null}
+          </div>
         }
       />
 
-      {/*
-        What you have finished.
-
-        This was a four-signal ContributionPanel taking up the top of the page.
-        Reliability — check-ins filed on time — was deleted on 2026-08-24 with
-        the check-ins, and Scope measured RE roles held, which measures having
-        already been chosen. What the club wanted kept was a plain count, not
-        central. So: two numbers on one line, above the work rather than instead
-        of it.
-      */}
-      <Card>
-        <CardBody>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-8">
-              <div>
-                <p className="text-ink text-2xl font-bold">
-                  {delivered.deliverablesCompleted}
-                </p>
-                <FieldLabel className="mt-0.5">
-                  Deliverables finished
-                </FieldLabel>
-              </div>
-              <div>
-                <p className="text-ink text-2xl font-bold">
-                  {delivered.projectsCompleted}
-                </p>
-                <FieldLabel className="mt-0.5">Projects finished</FieldLabel>
-              </div>
-            </div>
-            <Link
-              href="/how-we-lead"
-              className="text-cardinal-600 hover:text-cardinal-700 text-sm font-semibold"
-            >
-              What leadership looks for
-            </Link>
-          </div>
-          <p className="text-ink-muted mt-4 text-sm">
-            Public, like the rest of your record. There is no ranking and no
-            hidden score.
-          </p>
-        </CardBody>
-      </Card>
-
-      {/* ---------------- Requests waiting on me as an RE ---------------- */}
+      {/* ---------------- Requests waiting on me as a PL ---------------- */}
       {requestsAwaitingMe.length > 0 ? (
         <Card>
           <CardBody>
@@ -211,7 +208,7 @@ export default async function MyWorkPage() {
           <CardBody>
             <SectionLabel>My Requests</SectionLabel>
             <p className="text-ink-soft mt-2 text-sm">
-              Waiting on an RE. Nothing is lost — you can see exactly where each
+              Waiting on a PL. Nothing is lost — you can see exactly where each
               ask stands.
             </p>
             <div className="mt-4 space-y-2.5">
@@ -235,7 +232,7 @@ export default async function MyWorkPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     {isStale ? (
-                      <Badge tone="risk">No reply yet — nudge the RE</Badge>
+                      <Badge tone="risk">No reply yet — nudge the PL</Badge>
                     ) : (
                       <Badge tone="warn">Pending</Badge>
                     )}
@@ -445,7 +442,7 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
         </Link>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {membership.role === "re" ? (
-            <Badge tone="cardinal">You are RE</Badge>
+            <Badge tone="cardinal">You are PL</Badge>
           ) : null}
           {overdueCount > 0 ? (
             <Badge tone="risk">{overdueCount} overdue</Badge>
@@ -480,16 +477,16 @@ function MyProjectCard({ card }: { card: MyProjectCardData }) {
         </div>
       ) : project.phase === "complete" ? null : (
         <p className="text-ink-muted mt-3 text-sm">
-          Nothing assigned to you here yet — ask the RE what needs picking up.
+          Nothing assigned to you here yet — ask the PL what needs picking up.
         </p>
       )}
 
       {res.length > 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <SectionLabel tone="muted">
-            {res.length > 1 ? "REs" : "RE"}
+            {res.length > 1 ? "PLs" : "PL"}
           </SectionLabel>
-          {/* Name AND number: nothing else on this row says who the RE is. */}
+          {/* Name AND number: nothing else on this row says who the PL is. */}
           {res.map((re) => (
             <ContactLink key={re.id} member={re} />
           ))}

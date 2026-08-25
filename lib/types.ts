@@ -48,7 +48,7 @@ export interface Member {
    *
    * Email stays on the record because it's the auth identity — Stanford Google
    * sign-in, and `profiles.email` is what links an invite to an account. But a
-   * student emailing an RE about joining a project waits days; a text gets
+   * student emailing a PL about joining a project waits days; a text gets
    * answered. Since `/find-work` lives or dies on someone actually making
    * contact, the phone number is what gets shown.
    *
@@ -132,7 +132,7 @@ export interface Member {
   /**
    * They turned the daily Discord digest off.
    *
-   * Opt-OUT, because the digest goes to people holding responsibility — an RE
+   * Opt-OUT, because the digest goes to people holding responsibility — a PL
    * whose project has gone quiet, a Lead whose report is stuck — and those are
    * exactly the people who would never go and enable a feature they have never
    * seen. Migration 0037.
@@ -209,7 +209,7 @@ export interface Project {
    */
   primaryReId: string;
   /**
-   * All REs including the primary. Derived from `project_members` rows with
+   * All PLs including the primary. Derived from `project_members` rows with
    * `role = 're'`, so never rely on array order for who's primary — use
    * `primaryReId` for that.
    */
@@ -224,7 +224,7 @@ export interface Project {
    * from `project_members.added_by`, which happens to be recorded and happens to
    * agree, and neither of those is something to rely on twice.
    *
-   * Not used for permissions anywhere: authority comes from RE membership and the
+   * Not used for permissions anywhere: authority comes from PL membership and the
    * org graph, never from having created something.
    */
   createdBy?: string;
@@ -234,7 +234,7 @@ export interface Project {
   targetDate?: string;
   /** When false, Gantt dates roll up from children instead. */
   datesOverridden: boolean;
-  /** Members self-enroll by default; an RE can close a project if needed. */
+  /** Members self-enroll by default; a PL can close a project if needed. */
   isOpenToJoin: boolean;
   openRoles?: string;
   timeCommitment?: string;
@@ -250,14 +250,14 @@ export interface ProjectMembership {
   responsibility?: string;
   joinedAt: string;
   /**
-   * `committed` — an RE added them. Carries deliverables and update obligations.
+   * `committed` — a PL added them. Carries deliverables and update obligations.
    * `following` — they chose to watch. No obligations, self-service, unlimited.
    */
   commitment: "committed" | "following";
   /**
-   * Which RE added them. Undefined means they self-enrolled (i.e. followed).
+   * Which PL added them. Undefined means they self-enrolled (i.e. followed).
    *
-   * Mirrors `project_members.added_by`. Worth recording on an RE-controlled
+   * Mirrors `project_members.added_by`. Worth recording on a PL-controlled
    * roster: when someone asks "why am I on this project?", the answer should
    * exist somewhere other than one person's memory.
    */
@@ -320,7 +320,7 @@ export type ProjectNoticeKind =
 /**
  * One move of a project's target date, with the old date kept.
  *
- * Before this existed an RE could change `targetDate` through the project
+ * Before this existed a PL could change `targetDate` through the project
  * editor and nothing recorded that it had moved — so a project that slipped
  * three times read identically to one that was always due in March. The
  * schedule stayed believable only because nobody could check it.
@@ -359,7 +359,7 @@ export interface ProjectDeadlineChange {
    * deliverable: the action that makes the record worse has to be explained.
    */
   reason: string;
-  /** Snapshotted — REs change over a project's life. */
+  /** Snapshotted — PLs change over a project's life. */
   changedById?: string;
   changedAt: string;
 }
@@ -382,7 +382,7 @@ export interface ProjectDeadlineChange {
  *
  * `notifiedMemberIds` is the chain of command this went up, snapshotted at the
  * moment it happened. Derived live it would silently re-address itself every
- * time an RE changes or a project moves, and "who was told, and when" is the
+ * time a PL changes or a project moves, and "who was told, and when" is the
  * only thing that makes an announcement worth having.
  */
 export interface ProjectNotice {
@@ -408,7 +408,7 @@ export interface ProjectNotice {
  * The blocker board is mostly automatic: a deliverable marked blocked, or a
  * blocker written in a check-in, appears there without anyone posting. This is
  * the third source — the ask that fits neither, and the one that matters most
- * now that joining a project goes through an RE.
+ * now that joining a project goes through a PL.
  *
  * Without it, a member whose join request is sitting unanswered has exactly one
  * route to being useful and it waits on one person's inbox. "Does anyone know
@@ -459,28 +459,28 @@ export const HELP_REQUEST_STALE_DAYS = 3;
 // ---------------------------------------------------------------------------
 
 /**
- * Membership is RE-controlled: members cannot add themselves to a project.
+ * Membership is PL-controlled: members cannot add themselves to a project.
  *
  * This table is what keeps that from recreating the problem the app exists to
- * solve. Without it, "ask the RE" means an email that may never get answered,
+ * solve. Without it, "ask the PL" means an email that may never get answered,
  * and the member is back in invisible limbo — which is exactly what made people
  * quit, just with a different person to chase.
  *
- * A request is a tracked object instead: it appears in the RE's queue, the
+ * A request is a tracked object instead: it appears in the PL's queue, the
  * member can see it's pending, and it can be escalated when it goes stale. The
  * ask becomes visible rather than lost.
  */
 export type JoinRequestStatus =
   "pending" | "accepted" | "declined" | "withdrawn";
 
-/** A request older than this needs escalating — a silent RE is a blocked member. */
+/** A request older than this needs escalating — a silent PL is a blocked member. */
 export const JOIN_REQUEST_STALE_DAYS = 5;
 
 export interface JoinRequest {
   id: string;
   projectId: string;
   memberId: string;
-  /** Why they want in, and what they'd bring. Helps the RE decide fast. */
+  /** Why they want in, and what they'd bring. Helps the PL decide fast. */
   note?: string;
   status: JoinRequestStatus;
   requestedAt: string;
@@ -495,16 +495,16 @@ export interface JoinRequest {
 // ---------------------------------------------------------------------------
 
 /**
- * `submitted` is the owner saying "I'm done"; `done` is the RE agreeing.
+ * `submitted` is the owner saying "I'm done"; `done` is the PL agreeing.
  *
  * Two steps rather than one because "Delivered" is the primary contribution
  * signal and the one thing that must not be inflatable — if finishing your own
  * work were self-certified, the number would measure confidence rather than
  * output.
  *
- * The cost is real and has to be designed around: an RE who goes quiet freezes
+ * The cost is real and has to be designed around: a PL who goes quiet freezes
  * their whole project's record. So unconfirmed work AGES visibly — see
- * `pendingSignOffs` in `lib/signoff.ts`, which puts it on the RE's dashboard by
+ * `pendingSignOffs` in `lib/signoff.ts`, which puts it on the PL's dashboard by
  * how long it has been waiting, and `lib/quiet.ts`, which flags the project
  * itself. That turns a silent bottleneck into a visible one.
  *
@@ -524,12 +524,12 @@ export type DeliverableStatus =
  * a status.
  *
  * This deliberately replaces a full task board with dependencies, sub-tasks and
- * critical-path analysis. That design would have cost an RE an hour a week to
+ * critical-path analysis. That design would have cost a PL an hour a week to
  * maintain, and on a volunteer team whose availability swings with midterms the
  * dependency graph is wrong the day after it's entered — a wrong schedule is
  * worse than no schedule, because people plan against it.
  *
- * What this list buys, from five minutes of RE upkeep a week:
+ * What this list buys, from five minutes of PL upkeep a week:
  *   - every member can see exactly what they own, everywhere
  *   - update drafts pre-fill from open deliverables
  *   - project progress is a real percentage, not a vibe
@@ -548,11 +548,11 @@ export interface Deliverable {
   status: DeliverableStatus;
   /** When the OWNER marked it done. Not the same as being delivered. */
   submittedAt?: string;
-  /** When an RE confirmed it. This is the one that counts. */
+  /** When a PL confirmed it. This is the one that counts. */
   completedAt?: string;
-  /** Which RE confirmed. Snapshotted — REs change over a project's life. */
+  /** Which PL confirmed. Snapshotted — PLs change over a project's life. */
   confirmedById?: string;
-  /** Why it's stuck. Routes to the project's REs. */
+  /** Why it's stuck. Routes to the project's PLs. */
   blockerNote?: string;
   sortOrder: number;
 }
@@ -638,7 +638,7 @@ export interface Term {
  * This is the important structural bit: a member on three projects writes three
  * entries, each attached to a specific project. Without this, an update saying
  * "finished the layup, waiting on parts" is ambiguous to a reader who oversees
- * several of that person's projects — and REs would have to guess whether a
+ * several of that person's projects — and PLs would have to guess whether a
  * blocker is theirs to unblock.
  */
 export interface UpdateEntry {
@@ -649,9 +649,9 @@ export interface UpdateEntry {
   blockers?: string;
   nextSteps?: string;
   /**
-   * The RE's answer to THIS project's section.
+   * The PL's answer to THIS project's section.
    *
-   * **The RE responds, not the Lead**, and that split is the point. A Lead
+   * **The PL responds, not the Lead**, and that split is the point. A Lead
    * marks the whole check-in read — that's an obligation about a person. The
    * useful reply to "the vacuum pump seal is leaking" comes from whoever is
    * accountable for that project, and a member on three projects needs three
@@ -662,7 +662,7 @@ export interface UpdateEntry {
    * and threading here would turn a 15-minute weekly obligation into an inbox.
    */
   response?: string;
-  /** Which RE answered. Snapshotted — REs change over a project's life. */
+  /** Which PL answered. Snapshotted — PLs change over a project's life. */
   respondedBy?: string;
   respondedAt?: string;
 }
@@ -815,7 +815,7 @@ export type CertificationStatus =
  *
  * A per-ITEM answer, since 2026-08-24. Verification used to run up the member's
  * reporting chain; there is no chain, so accountability sits with a named person
- * the way it does for a project's RE. "Tyler verifies the mill" is a sentence a
+ * the way it does for a project's PL. "Tyler verifies the mill" is a sentence a
  * new member can act on.
  *
  * Lives in its own table rather than as two columns on `catalogue_items`, and
@@ -952,10 +952,10 @@ export const DEFAULT_EVENT_IMPORTANCE: Record<EventKind, number> = {
 };
 
 // ---------------------------------------------------------------------------
-// RE liveness
+// PL liveness
 // ---------------------------------------------------------------------------
 
-/** How long an RE can be silent before their projects get flagged. */
+/** How long a PL can be silent before their projects get flagged. */
 export const RE_SILENT_DAYS = 14;
 /** How long a blocker can sit unanswered before escalating. */
 export const BLOCKER_STALE_DAYS = 7;
@@ -963,9 +963,9 @@ export const BLOCKER_STALE_DAYS = 7;
 /**
  * Why a project needs leadership attention.
  *
- * RE authority inherits down the project tree, so an RE who checks out in
+ * PL authority inherits down the project tree, so a PL who checks out in
  * January freezes their entire subtree: nobody can create sub-projects, appoint
- * REs, or clear blockers beneath them. It happens every year, and nothing
+ * PLs, or clear blockers beneath them. It happens every year, and nothing
  * surfaces it — which is the exact disorganization this app exists to remove.
  */
 export type AttentionReason =
@@ -974,22 +974,22 @@ export type AttentionReason =
   | "deliverables_overdue"
   /*
     `no_deputy_re` used to live here as a standing flag on any parent project
-    with one RE. Removed 2026-08-09: in a club this size that's most of them,
+    with one PL. Removed 2026-08-09: in a club this size that's most of them,
     most of the time, and there is frequently no second person to name — so it
     was permanent, unactionable, and taught people to ignore the flags beside
     it. The risk is covered three other ways now: `re_silent` says so when the
-    sole RE actually goes quiet, `removeProjectMember` refuses to strip the
-    last RE off a parent project, and pausing in that position alerts the RE's
+    sole PL actually goes quiet, `removeProjectMember` refuses to strip the
+    last PL off a parent project, and pausing in that position alerts the PL's
     Lead.
   */
   | "health_flagged"
   /**
    * Past its target date and still not complete.
    *
-   * Raised because health is the RE's own judgement and only moves when they
+   * Raised because health is the PL's own judgement and only moves when they
    * move it — so a project could read "3 days overdue" next to a green "On
    * track", which is the app saying two contradictory things at once. The
-   * badge states the fact; this flag asks the RE to reconcile it by moving the
+   * badge states the fact; this flag asks the PL to reconcile it by moving the
    * date or changing the health. Annotating a contradiction without offering a
    * way to close it is just a tidier lie.
    */
@@ -1002,7 +1002,7 @@ export interface ProjectAttentionFlag {
   /**
    * Higher is more urgent.
    *
-   * 4 is reserved for "and nobody can cover" — a sole RE who has gone quiet
+   * 4 is reserved for "and nobody can cover" — a sole PL who has gone quiet
    * leaves every sub-project with no route to a decision at all, which is
    * worse than the same silence on a project someone else can act on.
    */
@@ -1107,7 +1107,7 @@ export interface DeliverableTodo {
 export interface ProjectAdvisor {
   projectId: string;
   memberId: string;
-  /** Which RE named them. Same reason `ProjectMembership.addedBy` exists. */
+  /** Which PL named them. Same reason `ProjectMembership.addedBy` exists. */
   addedBy?: string;
   addedAt: string;
 }

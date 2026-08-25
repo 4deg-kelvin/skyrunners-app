@@ -71,7 +71,7 @@ export type FeedCreateResult =
  * Create or replace the member's feed, returning the full subscription URL.
  *
  * The plaintext token exists only in this return value — only its hash is
- * written — but unlike an MCP token this one is deliberately RE-SHOWABLE, by
+ * written — but unlike an MCP token this one is deliberately PL-SHOWABLE, by
  * rotating. A calendar URL has to be pasted into every device the member owns,
  * possibly weeks apart, so "shown once and never again" would mean rotating just
  * to add an iPad and silently breaking the phone.

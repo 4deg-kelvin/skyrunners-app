@@ -10,10 +10,10 @@ import {
 } from "@/lib/actions";
 
 /**
- * The RE's answer to one project section of a check-in.
+ * The PL's answer to one project section of a check-in.
  *
- * Rendered wherever the section is: on the project's own feed, and in the RE's
- * unanswered queue. Both write the same field, so an RE who answers in one
+ * Rendered wherever the section is: on the project's own feed, and in the PL's
+ * unanswered queue. Both write the same field, so a PL who answers in one
  * place sees it gone from the other.
  *
  * Deliberately a single answer rather than a thread — see `UpdateEntry`. If it
@@ -45,19 +45,19 @@ export function EntryResponse({
   authorName: string;
   existing?: string;
   responderName?: string;
-  /** False for everyone who isn't an RE of this project or above it. */
+  /** False for everyone who isn't a PL of this project or above it. */
   canRespond: boolean;
 }) {
   const [editing, setEditing] = useState(false);
 
   // Everyone sees the answer — a check-in's per-project half is public, and so
-  // is the reply to it. Only an RE sees a way to change it.
+  // is the reply to it. Only a PL sees a way to change it.
   if (existing && !editing) {
     return (
       <div className="rounded-tile border-cardinal-600 bg-surface mt-2.5 border-l-2 px-3 py-2">
         <p className="text-ink-soft flex items-center gap-1.5 text-xs font-semibold">
           <CornerDownRight className="size-3" />
-          {responderName ?? "The RE"} replied
+          {responderName ?? "The PL"} replied
         </p>
         <p className="text-ink-soft mt-1 text-sm">{existing}</p>
         {canRespond ? (
@@ -117,7 +117,7 @@ export function EntryResponse({
         />
       </label>
       <p className="text-ink-muted mt-1 mb-2.5 text-xs">
-        You&apos;re answering as the RE of this project, not as their Lead.
+        You&apos;re answering as the PL of this project, not as their Lead.
         Everyone can see it — it&apos;s part of the project&apos;s history.
         {existing ? " Clearing the box removes the reply." : ""}
       </p>

@@ -56,7 +56,7 @@ for (const spec of COLLECTIONS) {
   const { rows } = await c.query(`select ${spec.columns} from ${spec.table}`);
   snap[spec.key] = rows.map((r: any) => spec.fromRow(r));
 }
-// Mirror ENTRY_COLUMNS in lib/store/supabase.ts, including the RE response
+// Mirror ENTRY_COLUMNS in lib/store/supabase.ts, including the PL response
 // columns added in 0016 — a harness that reads fewer columns than the app
 // passes on data the app would choke on.
 const ent = await c.query(
@@ -102,7 +102,7 @@ console.log(
 
 const me = snap.members.find((m: any) => m.email === "anish25@stanford.edu");
 const actor = { id: me.id, globalRole: me.globalRole };
-// All four OrgGraph lookups. `getTeam` is what the Division-Lead-is-a-top-RE
+// All four OrgGraph lookups. `getTeam` is what the Division-Lead-is-a-top-PL
 // rule walks, and omitting it doesn't fail to compile — `scripts` is excluded
 // from tsconfig — it fails at runtime, inside a permission check, as
 // "graph.getTeam is not a function". Add every new lookup here too.

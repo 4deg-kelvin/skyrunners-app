@@ -1,7 +1,7 @@
 /**
  * Everything the My Work page needs, in one call.
  *
- * Breadcrumbs, REs, hours and last-update-per-project are joined HERE rather
+ * Breadcrumbs, PLs, hours and last-update-per-project are joined HERE rather
  * than looked up per row in the component. Against Postgres, per-row lookups
  * would be one round trip each — and `projectBreadcrumb` is a recursive tree
  * walk, so it would be several.
@@ -53,7 +53,7 @@ export interface MyProjectCard {
   project: Project;
   membership: ProjectMembership;
   breadcrumb: BreadcrumbNode[];
-  /** Primary RE first. Who to ask about this project. */
+  /** Primary PL first. Who to ask about this project. */
   res: Member[];
   /**
    * Distinct days this member has logged work against this project.
@@ -134,7 +134,7 @@ export interface MyWorkView {
    *
    * This was a three-signal `ContributionRecord` until 2026-08-24. Reliability
    * measured check-ins filed on time and the club stopped filing them; Scope
-   * measured RE roles held, which measures having already been chosen. See
+   * measured PL roles held, which measures having already been chosen. See
    * `lib/delivered.ts`.
    */
   delivered: Delivered;
@@ -178,7 +178,7 @@ export interface MyWorkView {
     isStale: boolean;
   }[];
   /**
-   * Requests waiting on THEM as an RE. Controlling the gate means owing people
+   * Requests waiting on THEM as a PL. Controlling the gate means owing people
    * an answer, so this sits on their home page rather than somewhere they'd have
    * to go looking.
    */
@@ -289,7 +289,7 @@ export function workToShow(memberId: string): MyWorkView["recentWork"] {
     const entry = {
       log,
       project: log.projectId ? getProject(log.projectId) : undefined,
-      locked: workIsLocked(memberId, log.workDate),
+      locked: workIsLocked(log.workDate, today()),
     };
     const bucket = byDay.get(day);
     if (bucket) bucket.push(entry);

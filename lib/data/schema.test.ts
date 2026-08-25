@@ -371,7 +371,7 @@ describe("assumptions the org graph is built on", () => {
   });
 
   test("project_members has left_at, so departures can be filtered out", () => {
-    // Never-hard-delete: without this column the RE filter would count people
+    // Never-hard-delete: without this column the PL filter would count people
     // who left the club last year.
     assert.ok(schema.get("project_members")?.has("left_at"));
   });

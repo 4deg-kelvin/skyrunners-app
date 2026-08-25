@@ -70,7 +70,7 @@ export default async function CalendarPage() {
   const view = await getCalendar({
     memberId: viewer.member.id,
     isLeadership: isLeadership(viewer.actor),
-    // Decides which projects an event may be attached to: committed, RE-of-or-
+    // Decides which projects an event may be attached to: committed, PL-of-or-
     // above, or Co-Lead. Without it the list falls back to committed only.
     viewer: { actor: viewer.actor, graph: viewer.graph },
   });

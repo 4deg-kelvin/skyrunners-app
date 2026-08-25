@@ -6,7 +6,7 @@
  * ===========================================================================
  *
  * Until 2026-08-24, a training was verified by the member's Lead chain. There is
- * no chain, so the club chose a per-ITEM answer instead, which is the RE pattern
+ * no chain, so the club chose a per-ITEM answer instead, which is the PL pattern
  * applied to a machine: accountability sits with a named person rather than with
  * a rank.
  *

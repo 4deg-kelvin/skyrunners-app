@@ -52,7 +52,7 @@ export const ROLE_TONES: Record<GlobalRole, BadgeTone> = {
 };
 
 export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
-  re: "Responsible Engineer",
+  re: "Project Lead",
   contributor: "Contributor",
   observer: "Observer",
 };
@@ -214,9 +214,9 @@ export const DELIVERABLE_STATUS_LABELS: Record<DeliverableStatus, string> = {
   in_progress: "In progress",
   blocked: "Blocked",
   // Says who it's waiting on, not just that it's waiting. "Submitted" would
-  // read to the owner as "I'm finished" — they are, but the RE isn't, and the
+  // read to the owner as "I'm finished" — they are, but the PL isn't, and the
   // whole point of the extra step is that the difference is visible.
-  submitted: "Awaiting RE sign-off",
+  submitted: "Awaiting PL sign-off",
   done: "Done",
 };
 
@@ -382,10 +382,10 @@ export const TERM_KIND_ORDER: TermKind[] = [
 // ---------------------------------------------------------------------------
 
 export const ATTENTION_LABELS: Record<AttentionReason, string> = {
-  re_silent: "RE has gone quiet",
+  re_silent: "PL has gone quiet",
   blocker_stale: "Blocker unanswered",
   deliverables_overdue: "Deliverables overdue",
-  health_flagged: "Flagged by its RE",
+  health_flagged: "Flagged by its PL",
   past_target: "Past its target date",
 };
 

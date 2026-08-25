@@ -19,8 +19,8 @@ const HEALTHS: ProjectHealth[] = ["on_track", "at_risk", "blocked"];
  * lifecycle stage is a fact somebody knows, not a percentage to estimate.
  *
  * Who can open this is decided by the caller via `can.manageProject`, which
- * means an RE of this project OR of anything above it in the project tree — RE
- * authority inherits downward. An RE of a sibling project cannot.
+ * means a PL of this project OR of anything above it in the project tree — PL
+ * authority inherits downward. A PL of a sibling project cannot.
  */
 export function ProjectEditForm({
   project,
@@ -34,7 +34,7 @@ export function ProjectEditForm({
   /**
    * May mark this complete — a NARROWER right than opening this form.
    *
-   * The assigned RE edits everything here; only somebody above the project can
+   * The assigned PL edits everything here; only somebody above the project can
    * declare it finished. Hiding the option rather than letting the save fail:
    * a dropdown entry that always errors is a dead control, and the sentence
    * underneath says who to ask instead.
@@ -191,7 +191,7 @@ export function ProjectEditForm({
           Said before the submit, not after it.
           The operation refuses this anyway — that's the real guard, since a
           Server Action is a POST endpoint the moment it exists. This is so the
-          RE knows WHY and which sub-projects to chase, instead of pressing save
+          PL knows WHY and which sub-projects to chase, instead of pressing save
           and being told no.
         */}
         {blockedFromCompleting ? (
@@ -219,7 +219,7 @@ export function ProjectEditForm({
         {phase === "complete" && project.phase !== "complete" ? (
           <p className="text-ink-muted mt-3 mb-2.5 text-xs">
             Completing this posts a note in its updates feed and tells everyone
-            above it: the REs of any parent projects, the team leads, then the
+            above it: the PLs of any parent projects, the team leads, then the
             Division Lead. It stops there — Co-Leads aren&apos;t pinged for
             every finished project.
           </p>
@@ -230,7 +230,7 @@ export function ProjectEditForm({
             <span className="text-ink font-semibold">
               Marking this complete isn&apos;t yours to do.
             </span>{" "}
-            You&apos;re accountable for finishing it; the RE above this project
+            You&apos;re accountable for finishing it; the PL above this project
             — or your Division Lead — reviews it and agrees it&apos;s done. Set
             the stage to flight test and tell them it&apos;s ready.
           </p>

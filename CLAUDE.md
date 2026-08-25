@@ -89,7 +89,7 @@ server alone.
 ## Current state
 
 **Phases 0–8 are built and live on Supabase.** Members find work, ask to join, log what
-they did and mark work done; REs assign, sign off, manage their roster and get a scoped
+they did and mark work done; PLs assign, sign off, manage their roster and get a scoped
 queue of what they owe; there's a calendar, a trainings/facility-access catalogue, an
 academic-term editor, division archiving, and a help-wanted board on Find Work.
 
@@ -130,7 +130,7 @@ app/
     members/        roster and profiles — trainings live on the profile
     calendar/       sessions, meetings, 1:1s and deadlines
     settings/       your own, plus the Co-Lead academic calendar + catalogue
-    dashboard/      REs only, scoped to the projects you're accountable for
+    dashboard/      PLs only, scoped to the projects you're accountable for
 ```
 
 `/updates` was here and is gone (2026-08-24). It was the check-in page.
@@ -148,7 +148,7 @@ render inside a layout that redirects unauthenticated visitors to `/login` — a
 loop. Parentheses affect layout nesting, not URLs.
 
 `/` redirects to `/my-work`. Members land on their own projects and deliverables; the
-dashboard is the RE view and is hidden in the nav from anyone who is RE of nothing.
+dashboard is the PL view and is hidden in the nav from anyone who is PL of nothing.
 
 ## Architecture: the two boundaries that matter
 
@@ -168,39 +168,39 @@ a render loop: harmless against arrays, a round trip per row against Postgres.
 Never check `globalRole` inline. The whole model is three questions:
 
 1. Are you a Co-Lead? → anything
-2. Are you an RE of this project **or any above it**, or do you **lead a team that owns
+2. Are you a PL of this project **or any above it**, or do you **lead a team that owns
    any of them**? → you own this subtree
 3. Is it your own data? → you can manage it
 
 There was a fourth — "are you this member's Lead, directly or anywhere up their chain?" —
 and it went with the reporting chain on 2026-08-24 along with `isLeadOfOrAbove` and
 `leadChain`. **Do not reintroduce a person-to-person authority check.** If a feature needs
-"somebody is accountable for this member", the answer is the RE of the project the work is
+"somebody is accountable for this member", the answer is the PL of the project the work is
 on. `lib/permissions.test.ts` has a structural test asserting the five deleted rule names
 stay absent.
 
-**Two inheritances, and both run down:** RE authority flows **down** the project tree, and
+**Two inheritances, and both run down:** PL authority flows **down** the project tree, and
 team-lead authority flows **down** the org tree and then down the project tree. The one
 that flowed **up** — Lead authority over people — is the one that went. That asymmetry
 used to be where bugs hid, which is why there are 50+ tests on it.
 
 **Approving is a narrower right than doing.** `isREaboveProject` is
-`isREofOrAbove` minus the project's own RE, and exactly two rules use it:
-`can.completeProject` and `can.withdrawSignOff`. The assigned RE finishes the
-work; the RE above them, or the Division Lead, agrees it's finished. Being the
-project's own RE disqualifies you even if you'd qualify another way — a Division
+`isREofOrAbove` minus the project's own PL, and exactly two rules use it:
+`can.completeProject` and `can.withdrawSignOff`. The assigned PL finishes the
+work; the PL above them, or the Division Lead, agrees it's finished. Being the
+project's own PL disqualifies you even if you'd qualify another way — a Division
 Lead who assigns work to themselves is wearing both hats. Co-Leads always can,
 which is what stops the top of the tree deadlocking. Reopening deliberately runs
 on `manageProject`: saying something isn't done is always safe.
 
-**A Division Lead is a top RE.** `leadsTeamAbove` folds into `isREofOrAbove`, so leading a
-division gives RE powers — deliverables, sign-off, join requests, appointing REs — on
+**A Division Lead is a top PL.** `leadsTeamAbove` folds into `isREofOrAbove`, so leading a
+division gives PL powers — deliverables, sign-off, join requests, appointing PLs — on
 every project inside it, at any depth, including sub-projects that carry no `teamId` of
 their own. A sub-team lead gets the same over their own team's subtree and nothing
 sideways. It is deliberately **not** Co-Lead: a Division Lead still cannot read a
 member's archived check-ins, and cannot configure the club.
 
-Depth is unbounded in both trees and always has been — an RE four projects up really does
+Depth is unbounded in both trees and always has been — a PL four projects up really does
 own everything beneath them. `projectChain` and `teamChain` are both cycle-guarded, because
 `parent_id` / `lead_id` are plain columns and a loop would hang the request rather than
 fail it. (`leadChain` was a third, over `profiles.lead_id`, and went with the reporting
@@ -210,7 +210,7 @@ Pages get `{ actor, graph, member }` from `getViewer()` and call `can.*`.
 
 **`OrgGraph`'s four lookups are synchronous, and that's load-bearing.** They're called in
 loops while walking both trees, so they must never each become a query.
-`lib/data/graph.ts` loads every profile, project, RE membership and team in four parallel
+`lib/data/graph.ts` loads every profile, project, PL membership and team in four parallel
 queries and closes over Maps. Backing them with per-call queries turns one permission
 check into fifty.
 
@@ -226,11 +226,11 @@ Argument order is `(actor, graph, projectId)` — the graph is always second.
 One flat list per project: **title, ONE owner, a due date, a status.** No dependencies, no
 sub-tasks, no critical path, no Gantt.
 
-That's deliberate. A dependency graph costs an RE an hour a week, and on a volunteer team
+That's deliberate. A dependency graph costs a PL an hour a week, and on a volunteer team
 whose availability swings with midterms it's wrong the day after it's entered — a wrong
 schedule is worse than none, because people plan against it.
 
-Five minutes of RE upkeep buys: what each member owns, update auto-drafts, real progress
+Five minutes of PL upkeep buys: what each member owns, update auto-drafts, real progress
 percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
 add dependencies or sub-tasks, re-read this paragraph.
 
@@ -271,7 +271,7 @@ weeks, on their own profile, with no new data causing it.
 
 ## Nobody reports to anybody. Check-ins are gone. (Done 2026-08-24)
 
-The club decided **members report to their REs, through the work they log on a
+The club decided **members report to their PLs, through the work they log on a
 project** — which is public, lands in that project's feed, and can be replied to
 in place. `docs/REPORTING_REMOVAL_PLAN.md` is the plan it followed and holds the
 reasoning for every decision below.
@@ -284,18 +284,18 @@ review/escalation module, `isLeadOfOrAbove`, `leadChain`, `reassignLead`,
 thirteen sections. About 6,000 lines.
 
 **Co-Lead, Team Lead and Member are still real titles, but symbolic.** Authority
-comes from being an RE. The one exception is a **Division Lead**, who is a top RE
+comes from being a PL. The one exception is a **Division Lead**, who is a top PL
 over their whole division — that is `leadsTeamAbove`, it survives deliberately,
 and it is authority over WORK rather than over people.
 
 Three things replaced what was removed:
 
 - **`lib/quiet.ts`** — per-PROJECT "gone quiet": nothing logged in three weeks
-  while open work remains, on the RE's dashboard. This is the one thing the
+  while open work remains, on the PL's dashboard. This is the one thing the
   removal ADDED, and it is the mitigation for its real cost: the chain's actual
   function was that somebody was *named* as responsible for noticing silence.
   Three weeks, not one — one week fires on half the club every finals week and
-  teaches an RE to skip the panel. **Never add a per-person breakdown**; the work
+  teaches a PL to skip the panel. **Never add a per-person breakdown**; the work
   logs carry `memberId` so it is two lines, and it rebuilds the thing the club
   removed.
 - **`lib/delivered.ts`** — two counts on a profile, replacing the three-signal
@@ -325,13 +325,13 @@ panel: the club's decision was that this should be available, not central.
 It replaced `lib/contribution.ts`, which reported three independent signals and
 also refused to combine them. That rule held; what did not survive was
 **Reliability**, which measured check-ins filed on time. The club deleted it
-rather than redefining it. **Scope** — RE roles held — went too: it required
+rather than redefining it. **Scope** — PL roles held — went too: it required
 having already been appointed, so it measured having already been chosen.
 
 Rules that must not regress:
 
 - **Never add a rate.** A percentage needs a denominator and every candidate here
-  is a judgment: deliverables assigned depends on how finely an RE splits work,
+  is a judgment: deliverables assigned depends on how finely a PL splits work,
   projects joined depends on who invited you.
 - **Never add a third count built on volume.** See the note above.
 - **Never add a ranking function.** The data supports one; it's absent on purpose.
@@ -348,7 +348,7 @@ project's feed, and the envelope shows on a member's profile behind
 The reason for the per-project shape is worth keeping, because it applies to
 anything that reports on somebody's work across projects: members are on several
 by design, so a single text field is ambiguous to anyone overseeing more than one
-of them, and an RE couldn't tell whether a blocker was theirs to clear. Anything
+of them, and a PL couldn't tell whether a blocker was theirs to clear. Anything
 rendering an update must iterate `entries` and label each with its project.
 
 ## The fourteen things most likely to trip you up
@@ -357,7 +357,7 @@ rendering an update must iterate `entries` and label each with its project.
    (`projects.parent_id`, what work exists) carries all authority. The org tree
    (`teams.parent_id`) says which division owns what and who leads it — and
    `teams.lead_id` is live and load-bearing, because leading a division makes you
-   a top RE inside it.
+   a top PL inside it.
 
    There used to be a third: a reporting chain over `profiles.lead_id`, where
    every member had a named Lead. It went on 2026-08-24. `profiles.lead_id` still
@@ -370,7 +370,7 @@ rendering an update must iterate `entries` and label each with its project.
 3. **Phase and health are different fields.** `phase` is *where* in the lifecycle
    (concept → flight test). `health` is *how it's going* (on track / at risk / blocked).
 
-4. **Multiple REs per project.** `primaryReId` is the go-to contact; `reIds` holds all of
+4. **Multiple PLs per project.** `primaryReId` is the go-to contact; `reIds` holds all of
    them. Never infer "primary" from array order — Postgres join order isn't guaranteed.
 
 5. **A project's `teamId` may point at a sub-team, not a division.** Resolve the division
@@ -417,7 +417,7 @@ rendering an update must iterate `entries` and label each with its project.
 
 10. **A parent project can't be marked complete while any descendant isn't.** Enforced in
    `updateProject`, recursively and cycle-guarded. Refused rather than cascaded: completing
-   the children on the parent's behalf would sign off work their own REs never agreed was
+   the children on the parent's behalf would sign off work their own PLs never agreed was
    done. Completing one also writes a `ProjectNotice` addressed up the project tree —
    **not** a synthesised check-in. That reasoning outlived check-ins: never
    manufacture a record of somebody having said something they didn't say.
@@ -486,16 +486,32 @@ rendering an update must iterate `entries` and label each with its project.
 
 | Term | Meaning |
 |---|---|
+> **Four things are called "Lead", and the qualifier is load-bearing.** Renamed
+> from "RE / Responsible Engineer" on 2026-08-25 at the club's request. It reads
+> better than it sounds, because "Lead" now consistently means "accountable for a
+> thing" and the qualifier says which thing: a **Project** Lead for one project, a
+> **Division** Lead for a division, a **Co-**Lead for the club. **Team Lead** is
+> the odd one out — it is accountable for nothing and is only a directory entry,
+> which is what makes it the one to watch in copy.
+>
+> **The code still says `re`, and deliberately.** `isREofOrAbove`, `reIds`,
+> `primaryReId`, the `"re"` value of `ProjectRole`, and the database's
+> `project_res` / `primary_re_id` / `auth_is_re_for` / `v_project_re_authority`
+> are all unchanged. Renaming them means a migration touching `primary_re_id`,
+> which is in the `projects` snapshot column list — so every page would 500
+> between deploy and migration, for no user-visible gain. `lib/labels.ts` is where
+> the display name lives; that split is what it is for.
+
 | **Co-Lead** | The club's leads. `global_role = co_lead`. Configures divisions, the calendar and the catalogue, and can do anything |
-| **Team Lead** ("Lead") | A title and a directory entry — "ask this person about composites". Carries **no authority over people**. Leading a **division** is different: it makes you a top RE inside it |
+| **Team Lead** ("Lead") | A title and a directory entry — "ask this person about composites". Carries **no authority over people** and none over work. Leading a **division** is different: it makes you a top PL inside it |
 | **Member** | Everyone else |
-| **RE** | Responsible Engineer — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project. **This is where all authority comes from** |
+| **PL** | Project Lead — accountable for a project's deliverables. Project-scoped, inherits down, multiple per project. **This is where all authority comes from.** Called `re` throughout the code and the schema |
 | **Division** | Top-level org unit (`teams.parent_id IS NULL`). Co-Lead editable |
 | **Work log** | One line about what you did, on a project or as misc. Public, in the project's feed, replyable. **This is how a member reports** |
 | **Check-in / Update** | *Retired 2026-08-24.* Was a twice-weekly report to a named Lead. Existing rows still render; nothing writes new ones |
 | **Deliverable** | One unit of work with one owner and a date. The whole task model |
-| **Committed / Following** | Committed = an RE added them; carries deliverables and obligations. Following = self-service watch-only, unlimited |
-| **Join request** | A member's tracked ask to join. RE approves. Escalates after 5 days |
+| **Committed / Following** | Committed = a PL added them; carries deliverables and obligations. Following = self-service watch-only, unlimited |
+| **Join request** | A member's tracked ask to join. PL approves. Escalates after 5 days |
 | **Term** | Academic period. `generatesObligations` now means "the club is in session" — the obligations it named are gone, and the column kept its name rather than costing a migration |
 | **Gone quiet** | A PROJECT with nothing logged in three weeks and open work left. `lib/quiet.ts` |
 
@@ -504,12 +520,12 @@ rendering an update must iterate `entries` and label each with its project.
 - **`/find-work` is the point of the app.** The club's root problem is "I can't find
   something to do without asking a Co-Lead". That page ranks every active project by where
   a member would help most — unstaffed and blocked first, healthy last, already-joined at
-  the bottom — and puts the RE's email on every card. Protect its ordering logic; a list
+  the bottom — and puts the PL's email on every card. Protect its ordering logic; a list
   sorted by date or division would bury the work that needs people.
-- **Membership is RE-controlled, with no cap.** Members cannot add themselves. They see
-  everything, follow anything, and *ask* — the RE decides, because the RE is accountable
+- **Membership is PL-controlled, with no cap.** Members cannot add themselves. They see
+  everything, follow anything, and *ask* — the PL decides, because the PL is accountable
   for the deliverable.
-- **`join_requests` is what keeps that from being a dead end.** "Email the RE" produces
+- **`join_requests` is what keeps that from being a dead end.** "Email the PL" produces
   silence and an invisible member, which is the original problem wearing a different hat.
   A tracked request lands in a queue, shows as pending, and escalates at 5 days.
 - **Transparency by default for *activity*.** Everyone sees projects, who's on what,
@@ -524,7 +540,7 @@ rendering an update must iterate `entries` and label each with its project.
   | Archived check-in envelopes (incl. `generalNote`) | The member and **Co-Leads** | `can.readArchivedCheckIns` |
 
   The path to that is worth knowing, because each step had a different reason.
-  What somebody logged on a project was RE-and-Lead-chain only until 2026-08-16,
+  What somebody logged on a project was PL-and-Lead-chain only until 2026-08-16,
   because the log carried HOURS and a number invites comparison between
   volunteers with different course loads. The hours went on 2026-08-14, leaving a
   sentence about a project — and the project is public. Then reliability and the
@@ -539,7 +555,7 @@ rendering an update must iterate `entries` and label each with its project.
 - **The dashboard is scoped to the projects you're accountable for**, not the club.
   Opening thirty items, twenty-six of which aren't yours, tells you nothing about
   what you owe — the design target is a 15-minute weekly obligation. `/dashboard`
-  also redirects anyone who is an RE of nothing; hiding the nav link is not access
+  also redirects anyone who is a PL of nothing; hiding the nav link is not access
   control, and the nav has to ask the same question or it offers a link that
   bounces people straight back.
 - **Engagement is a flashlight, not a scoreboard.** Outcomes are all that count; no
@@ -572,9 +588,9 @@ rendering an update must iterate `entries` and label each with its project.
   `setEventGuestList` is the only way a closed event's list can change, since
   `setEventAttendance` refuses those by design, and closing an open event never
   evicts whoever already joined.
-- **The engineering record is the one project write open past the REs.** Anyone
+- **The engineering record is the one project write open past the PLs.** Anyone
   *committed* to a project can attach a document (`can.attachArtifact`);
-  removing is the RE's (`can.manageArtifact`). Adding extends the record,
+  removing is the PL's (`can.manageArtifact`). Adding extends the record,
   removing rewrites it — that asymmetry is the design, and it exists because
   the person who ran the test holds the test report. Following is not enough:
   watching a project isn't working on it.
@@ -624,7 +640,7 @@ The sweep was dropped on 2026-08-08 and its reasoning has partly expired, which 
 worth flagging: it rested on "every member has a named Lead who glances at their
 roster", and there are no Leads in that sense now. The conclusion stands on the
 other half — silently dropping somebody is worse than a stale membership — and the
-RE of a project is who keeps its roster honest. If it comes back up, it is the RE's
+PL of a project is who keeps its roster honest. If it comes back up, it is the PL's
 roster now, not a Lead's.
 
 

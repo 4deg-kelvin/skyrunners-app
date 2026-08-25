@@ -16,7 +16,7 @@ matters.
 
 1. ~~**Remove the reporting chain.**~~ **Done 2026-08-24.** The biggest change
    this app has had: about 6,000 lines. Nobody reports to anybody, check-ins are
-   gone, and members report to their REs through the work they log on a project.
+   gone, and members report to their PLs through the work they log on a project.
    Read the section in CLAUDE.md, then `docs/REPORTING_REMOVAL_PLAN.md` for why
    each decision went the way it did.
 
@@ -26,7 +26,7 @@ matters.
      `progress_updates.lead_id_at_submission` and the whole `update_schedules`
      table. Deliberate — the club could revisit this and a dropped column can't
      be un-dropped. `teams.lead_id` is different: it is LIVE and load-bearing,
-     because leading a division makes you a top RE inside it.
+     because leading a division makes you a top PL inside it.
    - **`lib/quiet.ts` is the mitigation, not a nice-to-have.** The chain's real
      function was that somebody was *named* as responsible for noticing silence.
      Per-project "gone quiet" is what replaced that, and if it gets weakened the
@@ -246,9 +246,9 @@ it. Seven findings, all fixed:
 
 | What | How it failed |
 |---|---|
-| The RE's join-request queue on a project page | Two plain `Button`s wired to nothing. Pressing either did nothing at all. The working control existed and was mounted only on `/my-work` |
+| The PL's join-request queue on a project page | Two plain `Button`s wired to nothing. Pressing either did nothing at all. The working control existed and was mounted only on `/my-work` |
 | `FollowToggle` | Built in Phase 2, imported nowhere. The project page even read `isFollowing` to show a badge for a state nothing could produce |
-| `withdrawJoinRequest` | An operation with no action and no button. A request sent by mistake was permanent: it sat in the RE's queue, escalated at 5 days, and showed the sender a badge they couldn't clear |
+| `withdrawJoinRequest` | An operation with no action and no button. A request sent by mistake was permanent: it sat in the PL's queue, escalated at 5 days, and showed the sender a badge they couldn't clear |
 | `deleteHoursAction` | Wired, but no screen listed a single work-log entry, so there was nothing to hang it on. A mistyped `80` for `8.0` was forever |
 | Division Lead | Shown on `/projects`, settable nowhere. Neither team form had the field |
 | …and worse: `updateTeam` did `team.leadId = input.leadId` | So every **rename** posted an empty value and silently cleared the lead. Pure data loss, invisible at the call site |
@@ -301,7 +301,7 @@ Lead filing a report in somebody's name.
 So the fix is in the app, not the schema. `persistDiff` now splits the diff:
 rows that already exist go out as `UPDATE`, only genuinely new rows insert.
 `update_entries_respond_re` had the identical latent bug and would have failed
-the first time an RE answered somebody's section.
+the first time a PL answered somebody's section.
 
 **The general lesson:** if you add a `for update` policy, an upsert will never
 reach it.
@@ -417,7 +417,7 @@ with nothing but the publishable key, the one that ships in the browser bundle:
     GET /rest/v1/v_project_tree         ->  [{...}]  (RLS bypassed)
 
 Eight of ten returned rows to an anonymous caller: project structure, the
-reporting chain, RE authority, per-member weekly HOURS, and a contribution record
+reporting chain, PL authority, per-member weekly HOURS, and a contribution record
 including `hours_total`. Keyed by UUID, so no names or prose — but hours and the
 contribution record are the two things the club spent two removals deciding not
 to show even to members.
@@ -476,48 +476,48 @@ fix when it isn't is to push operations down into SQL — which is why
 
 ### `lib/permissions.ts` — the only place authority is decided
 
-Three questions: Co-Lead? RE of this project or above? Your own data?
+Three questions: Co-Lead? PL of this project or above? Your own data?
 
 There was a fourth — "Lead of this person, or above?" — and it went with the
 reporting chain on **2026-08-24** along with `isLeadOfOrAbove` and `leadChain`.
 Do not rebuild it; `lib/permissions.test.ts` asserts the five deleted rule names
 stay absent.
 
-**Two inheritances, and both run down** — RE authority flows *down* the project
+**Two inheritances, and both run down** — PL authority flows *down* the project
 tree, and team-lead authority flows *down* the org tree and then down the project
 tree. The one that flowed *up* — over people — is the one that went. That
 asymmetry is where the bugs used to be, which is why there are 50+ tests on it.
 
-**A Division Lead is a top RE.** `leadsTeamAbove` folds into `isREofOrAbove`, so
-leading a division gives RE powers on every project inside it at any depth,
+**A Division Lead is a top PL.** `leadsTeamAbove` folds into `isREofOrAbove`, so
+leading a division gives PL powers on every project inside it at any depth,
 including sub-projects carrying no `teamId` of their own.
 
 #### Doing the work is not the same right as approving it
 
 Added 2026-08-09, and the one distinction most likely to be flattened by
-accident. `isREaboveProject` is `isREofOrAbove` **minus the project's own RE**:
-an ancestor project's RE qualifies, so does the Division Lead (who sits above
+accident. `isREaboveProject` is `isREofOrAbove` **minus the project's own PL**:
+an ancestor project's PL qualifies, so does the Division Lead (who sits above
 the project by org position — that's what covers a top-level project with no
-parent), and being the project's own RE disqualifies you *even if you would
+parent), and being the project's own PL disqualifies you *even if you would
 qualify another way*.
 
 Exactly two rules use it, and both are "review somebody else's work":
 
 | Rule | Who |
 |---|---|
-| `can.completeProject` | The RE above, or the Division Lead. **Not** the project's own RE |
+| `can.completeProject` | The PL above, or the Division Lead. **Not** the project's own PL |
 | `can.withdrawSignOff` | Same. Overturning a sign-off, as opposed to granting one |
 
 Everything else about a project still runs on `isREofOrAbove`, because the
-assigned RE has to be able to do their job. Two deliberate asymmetries:
+assigned PL has to be able to do their job. Two deliberate asymmetries:
 
 - **Reopening a project runs on `manageProject`, not `completeProject`.** Saying
   something isn't finished always makes the record more conservative, so it
   needs no permission from above.
-- **Signing a deliverable off stays with the RE at the project's own level.**
+- **Signing a deliverable off stays with the PL at the project's own level.**
   That's their job. Only *overturning* one escalates.
 
-**Co-Leads are the escape hatch.** Without it, a Co-Lead who is the RE of a
+**Co-Leads are the escape hatch.** Without it, a Co-Lead who is the PL of a
 top-level project could never complete it — nobody is above them — and it would
 be stuck forever. That fallback is what lets the rule be strict everywhere else.
 
@@ -561,13 +561,13 @@ any of it:
   side column of a profile. It was three independent signals until 2026-08-24
   and four before that; each shrink deleted something that measured presence
   rather than finished work.
-- **Nobody reports to anybody.** Members report to their REs, through the work
+- **Nobody reports to anybody.** Members report to their PLs, through the work
   they log on a project. `docs/REPORTING_REMOVAL_PLAN.md`.
-- **Two-step sign-off**: the owner marks `submitted`, an RE confirms `done`.
-  Only `done` counts as delivered. Unconfirmed work ages visibly on the RE's
-  dashboard, so a quiet RE is visible rather than silently freezing records.
-- **Completing a project is a review step, done from above.** The assigned RE
-  finishes it; the RE above them or the Division Lead agrees it's done. A
+- **Two-step sign-off**: the owner marks `submitted`, a PL confirms `done`.
+  Only `done` counts as delivered. Unconfirmed work ages visibly on the PL's
+  dashboard, so a quiet PL is visible rather than silently freezing records.
+- **Completing a project is a review step, done from above.** The assigned PL
+  finishes it; the PL above them or the Division Lead agrees it's done. A
   signed-off deliverable can be rejected from above too, with a mandatory
   reason — and that reopens the project if it was complete, because "the
   engineering doesn't meet requirements" and "the project is done" can't both
@@ -607,7 +607,7 @@ Deliverables are on the project chart and nowhere else — on the division chart
 they'd bury five projects under a hundred markers.
 
 **This is not the critical-path Gantt in the list below.** No dependencies, no
-slack, nothing new for an RE to maintain: it draws dates that already exist. The
+slack, nothing new for a PL to maintain: it draws dates that already exist. The
 moment it needs its own upkeep it has become the thing that was rejected. The
 header of `lib/gantt.ts` says this at length; read it before adding a field.
 
@@ -738,15 +738,15 @@ count. It exists because errands were being entered as deliverables, and a
 deliverable feeds the Delivered signal, so ten of them made somebody outrank the
 person who shipped the airframe.
 
-The gate: **neither the owner's "Mark done" nor the RE's "Sign off" goes through
+The gate: **neither the owner's "Mark done" nor the PL's "Sign off" goes through
 while an item is open.** Gating only sign-off would put the wall in front of the
-RE, who didn't write the list. Deleting an item is a legitimate way to clear it —
+PL, who didn't write the list. Deleting an item is a legitimate way to clear it —
 a todo counts towards nothing, so "it turned out not to be needed" must not force
 a false tick.
 
 `can.manageDeliverableTodos` is the one rule in `permissions.ts` where owning a
-row grants a right RE-only neighbours don't have. Deliberate: the person doing
-the work discovers what it involves, and making them ask an RE to write down
+row grants a right PL-only neighbours don't have. Deliberate: the person doing
+the work discovers what it involves, and making them ask a PL to write down
 "book the CNC" guarantees the list stays empty.
 
 ### Pacific time (`lib/dates.ts`)
@@ -776,7 +776,7 @@ The bot works — Kelvin verified. What exists:
 | Join request approved / declined | whoever asked |
 | Deliverable or project marked **blocked** | see `blockerAudience` below |
 | A request addressed to you is answered | whoever asked |
-| Daily digest, 7pm Pacific | every RE with something to say |
+| Daily digest, 7pm Pacific | every PL with something to say |
 | "Send a test message" from Settings | themselves |
 
 Three check-in triggers were here — submitted, due-in-4-hours, and still-open —
@@ -786,11 +786,11 @@ things somebody was supposed to do. That is the direction to keep it in; a bot
 that only ever nags is a bot people mute, and muting it takes the blocker alerts
 with it.
 
-`blockerAudience(projectId, raiserId)` is the interesting one: the project's REs
+`blockerAudience(projectId, raiserId)` is the interesting one: the project's PLs
 minus the raiser, climbing **one level** if that empties the list. Deliberately
 not the whole chain like `completionAudience` — a blocker is a request for one
 named person to act, and telling five produces the bystander effect. The
-escalation is the point: an RE stuck on their own deliverable would otherwise be
+escalation is the point: a PL stuck on their own deliverable would otherwise be
 DMed about their own blocker, so the case that most needs escalating would be the
 only one nobody heard about.
 

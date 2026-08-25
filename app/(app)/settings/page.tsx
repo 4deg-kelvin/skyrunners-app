@@ -113,7 +113,7 @@ export default async function SettingsPage() {
     nothing in it.
   */
   const digestReasons = [
-    roles.isRE ? "an RE" : "",
+    roles.isRE ? "a PL" : "",
     roles.divisionsLed.length
       ? `Division Lead for ${roles.divisionsLed.join(" and ")}`
       : "",

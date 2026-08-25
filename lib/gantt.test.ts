@@ -176,7 +176,7 @@ describe("bar tone", () => {
     assert.equal(projectTone("testing", "at_risk", false), "warn");
   });
 
-  test("past its target warns even when the RE hasn't said so", () => {
+  test("past its target warns even when the PL hasn't said so", () => {
     assert.equal(projectTone("testing", "on_track", true), "warn");
   });
 

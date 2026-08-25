@@ -20,7 +20,7 @@
  *
  * "Reliability — updates in on time" is replaced by **Visible**. That is not a
  * rename: the club's answer to "how does anyone know what you did" is now the
- * work log on the project, which is public and which an RE can reply to. It is
+ * work log on the project, which is public and which a PL can reply to. It is
  * the same virtue (people can depend on knowing where you are) measured on the
  * thing that still exists.
  *
@@ -45,7 +45,7 @@ export const LEADERSHIP_RUBRIC = [
   {
     signal: "Visible",
     what: "Work logged on the project as you go, and blockers raised early rather than discovered late",
-    why: "An RE can only help with what they can see. Logging as you go is how the rest of the club knows where a project stands without asking.",
+    why: "A PL can only help with what they can see. Logging as you go is how the rest of the club knows where a project stands without asking.",
   },
   {
     signal: "Lifting others",

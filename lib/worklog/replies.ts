@@ -111,7 +111,7 @@ export async function saveWorkLogReply(input: {
   if (error) {
     /*
       Named specifically, because there is one likely cause with one fix. Raw
-      Postgres text about a missing relation tells an RE nothing they can act on.
+      Postgres text about a missing relation tells a PL nothing they can act on.
     */
     const missing =
       error.message.includes("work_log_replies") &&

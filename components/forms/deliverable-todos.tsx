@@ -60,7 +60,7 @@ export function DeliverableTodos({
   deliverableId: string;
   projectId: string;
   todos: DeliverableTodo[];
-  /** The deliverable's owner, an RE of or above the project, or a Co-Lead. */
+  /** The deliverable's owner, a PL of or above the project, or a Co-Lead. */
   canManage: boolean;
   locked?: boolean;
 }) {

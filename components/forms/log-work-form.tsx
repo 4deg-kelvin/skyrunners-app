@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import { deleteWorkAction, logWorkAction } from "@/lib/actions";
@@ -24,10 +24,10 @@ import { formatDay } from "@/lib/dates";
  *   - the project defaults to whichever you logged against last
  *
  * Which makes the common case two taps and a sentence. That sentence is no
- * longer busywork, and saying so is worth the line of copy: it lands in the
- * member's next check-in, pre-filled, and that is the only reason anyone would
- * bother. If logging gets slower than this, people stop — and now the check-in
- * gets harder for them too, because there's nothing to draft it from.
+ * longer busywork, and saying so is worth the line of copy: since 2026-08-24 it
+ * IS the member's report — it lands in the project's public feed where its Project
+ * Lead can read it and reply. If logging gets slower than this, people stop, and
+ * now nothing else reports for them.
  *
  * Collapsed by default so it never competes with the page it sits on.
  */
@@ -160,8 +160,8 @@ export function LogWorkForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
           <span className="text-ink-muted mt-1 block text-xs">
-            A line is enough. This goes straight into your next check-in, so you
-            won&apos;t have to write it twice.
+            A line is enough. It goes into the project&apos;s feed, where your
+            Project Lead can see it and reply.
           </span>
         </label>
 
@@ -190,8 +190,9 @@ export function LogWorkForm({
                 was the only way through — which is worse for a project's diary
                 than an unattributed entry.
 
-                Misc entries do NOT pre-fill any check-in section, since they
-                belong to no project. `workByProject` drops them deliberately.
+                Misc entries land in no project's feed, since they belong to
+                no project. They still count as work and still show in the
+                member's own log.
               */}
               <option value="">Misc — helped on something else</option>
             </select>
@@ -293,23 +294,27 @@ export function LogWorkForm({
                       </span>
 
                       {/*
-                        A locked row says so instead of offering a button that
-                        would be refused. It's part of a check-in already sent,
-                        and editing it afterwards would change a report somebody
-                        has read.
+                        Past the window there is no control at all, not a
+                        disabled one and not an explanation.
+
+                        The label used to read "In a sent check-in", which was
+                        worth saying because it named a specific thing that had
+                        happened to that row. The rule is now just "older than a
+                        week", which the date beside it already tells you — a
+                        badge repeating it is noise on every historical entry, and
+                        this list is mostly historical entries.
+
+                        Removing stays quiet and small for the same reason: it is
+                        a correction for logging the wrong project, not an action
+                        anybody comes to this page to take.
                       */}
-                      {locked ? (
-                        <span className="text-ink-muted inline-flex shrink-0 items-center gap-1 text-xs">
-                          <Lock className="size-3" />
-                          In a sent check-in
-                        </span>
-                      ) : (
+                      {locked ? null : (
                         <ActionButton
                           action={deleteWorkAction}
                           fields={{ logId: log.id }}
                           label="Remove"
                           pendingLabel="Removing…"
-                          tone="danger"
+                          tone="quiet"
                         />
                       )}
                     </li>

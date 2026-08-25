@@ -134,13 +134,25 @@ export function ActionButton({
   fields: Record<string, string>;
   label: string;
   pendingLabel?: string;
-  tone?: "default" | "primary" | "danger";
+  tone?: "default" | "primary" | "danger" | "quiet";
   className?: string;
 }) {
+  /*
+    `quiet` overrides the shared size, which works because `cn` is `twMerge` —
+    later Tailwind classes of the same family win, so `text-xs font-medium` here
+    beats the `text-sm font-semibold` in the base string below.
+
+    It exists for actions that must be REACHABLE but not inviting: removing your
+    own work-log line is a correction for logging the wrong project, not
+    something anybody opens the page to do. `danger` was wrong for it — a red
+    outlined button on every row of a diary reads as a warning about the diary.
+  */
   const tones = {
     default: "border border-line bg-card text-ink hover:bg-surface",
     primary: "bg-cardinal-600 text-white hover:bg-cardinal-700",
     danger: "border border-risk-fg/40 bg-card text-risk-fg hover:bg-risk-bg",
+    quiet:
+      "border border-transparent text-ink-muted hover:text-ink hover:bg-surface px-2 py-1 text-xs font-medium",
   } as const;
 
   return (

@@ -16,31 +16,31 @@ import type { Member } from "@/lib/types";
  * Faculty and project advisors named on this project.
  *
  * ---------------------------------------------------------------------------
- * Under "Who to ask", and separate from the REs
+ * Under "Who to ask", and separate from the PLs
  * ---------------------------------------------------------------------------
  *
- * An advisor is not staff and not accountable for anything — the RE still owns
+ * An advisor is not staff and not accountable for anything — the PL still owns
  * the deliverables. But "who do I ask about this?" has two answers on a project
  * that has a professor attached, and the second one is invisible unless the
  * page says it. A student who is stuck on composites layup should not have to
  * find out from a Co-Lead that the club has somebody who teaches it.
  *
- * Deliberately below the REs and visually quieter. The RE is who you go to
- * first; the advisor is who the RE goes to.
+ * Deliberately below the PLs and visually quieter. The PL is who you go to
+ * first; the advisor is who the PL goes to.
  *
  * ---------------------------------------------------------------------------
  * Naming somebody here grants them nothing
  * ---------------------------------------------------------------------------
  *
  * An advisor can already see and comment on every project in the club. This
- * only changes which projects LIST them, which is why the RE can do it without
+ * only changes which projects LIST them, which is why the PL can do it without
  * a Co-Lead — it's the same call as deciding who the project says to contact,
  * not a grant of access.
  *
  * The picker only offers people whose role is already `advisor`. Making
  * somebody an advisor is a Co-Lead's decision on the roster, and the operation
  * refuses a non-advisor with a sentence explaining that rather than letting an
- * RE quietly invent a fifth kind of membership here.
+ * PL quietly invent a fifth kind of membership here.
  */
 export function ProjectAdvisors({
   projectId,
@@ -52,7 +52,7 @@ export function ProjectAdvisors({
   advisors: Member[];
   /** Active advisors not already named. Empty means nothing left to add. */
   choices: { id: string; fullName: string }[];
-  /** An RE of this project or above it, or a Co-Lead. */
+  /** A PL of this project or above it, or a Co-Lead. */
   canManage: boolean;
 }) {
   const [adding, setAdding] = useState(false);

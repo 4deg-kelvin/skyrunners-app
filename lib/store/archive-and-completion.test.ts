@@ -116,7 +116,7 @@ describe("a parent project cannot finish ahead of its children", () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       // Naming them matters. "Refused" on its own hands the search back to the
-      // RE, who then has to expand the tree to find out what's in the way.
+      // PL, who then has to expand the tree to find out what's in the way.
       assert.match(result.error, /Layup|Load/i);
     }
   });
@@ -214,13 +214,13 @@ describe("completing a project announces it up the chain", () => {
     assert.equal(disk.readStore().progressUpdates.length, before);
   });
 
-  test("the audience is the REs above it and the leads that own it", async () => {
+  test("the audience is the PLs above it and the leads that own it", async () => {
     await setPhase("p-layup", "complete", "m-sofia");
     const [notice] = noticesOn("p-layup");
 
-    // p-layup sits under p-wing-spar (RE m-tyler) under p-airframe-v2
-    // (RE m-priya), owned by team-composites inside div-evtol (lead m-priya).
-    assert.ok(notice.notifiedMemberIds.includes("m-tyler"), "parent RE");
+    // p-layup sits under p-wing-spar (PL m-tyler) under p-airframe-v2
+    // (PL m-priya), owned by team-composites inside div-evtol (lead m-priya).
+    assert.ok(notice.notifiedMemberIds.includes("m-tyler"), "parent PL");
     assert.ok(notice.notifiedMemberIds.includes("m-priya"), "division lead");
   });
 
@@ -237,7 +237,7 @@ describe("completing a project announces it up the chain", () => {
     );
   });
 
-  test("the Division Lead is LAST, after the REs beneath them", async () => {
+  test("the Division Lead is LAST, after the PLs beneath them", async () => {
     await setPhase("p-layup", "complete", "m-sofia");
     const [notice] = noticesOn("p-layup");
 
@@ -271,7 +271,7 @@ describe("completing a project announces it up the chain", () => {
         t.leadId = undefined;
       }
     }
-    // Strip the ancestor REs too, so only the fallback can produce a recipient.
+    // Strip the ancestor PLs too, so only the fallback can produce a recipient.
     for (const p of store.projects) {
       if (["p-wing-spar", "p-airframe-v2"].includes(p.id)) {
         p.primaryReId = "m-sofia";
@@ -285,13 +285,13 @@ describe("completing a project announces it up the chain", () => {
   });
 
   test("the person who did it isn't told about their own action", async () => {
-    await setPhase("p-layup", "complete", "m-tyler"); // an RE one level up
+    await setPhase("p-layup", "complete", "m-tyler"); // a PL one level up
     const [notice] = noticesOn("p-layup");
     assert.ok(!notice.notifiedMemberIds.includes("m-tyler"));
   });
 
   test("nobody appears twice, however many routes reach them", async () => {
-    // m-priya is both the parent project's RE and the division lead.
+    // m-priya is both the parent project's PL and the division lead.
     await setPhase("p-layup", "complete", "m-sofia");
     const [notice] = noticesOn("p-layup");
 
@@ -891,11 +891,11 @@ describe("asking for help", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 7 — the RE answers a check-in, section by section
+// Phase 7 — the PL answers a check-in, section by section
 // ---------------------------------------------------------------------------
 
-describe("the RE answers a check-in section", () => {
-  const RE = "m-tyler";
+describe("the PL answers a check-in section", () => {
+  const PL = "m-tyler";
 
   function entry(id: string) {
     for (const u of disk.readStore().progressUpdates) {
@@ -908,7 +908,7 @@ describe("the RE answers a check-in section", () => {
   test("a reply is stored against the section, with who and when", async () => {
     const result = await ops.respondToUpdateEntry({
       entryId: "ue-1",
-      responderId: RE,
+      responderId: PL,
       response: "Ordering a new seal — carry on with dry layups meanwhile.",
       today: TODAY,
     });
@@ -916,16 +916,16 @@ describe("the RE answers a check-in section", () => {
     assert.equal(result.ok, true);
     const saved = entry("ue-1");
     assert.match(saved?.response ?? "", /Ordering a new seal/);
-    assert.equal(saved?.respondedBy, RE);
+    assert.equal(saved?.respondedBy, PL);
     assert.equal(saved?.respondedAt, TODAY);
   });
 
   test("it lands on that section only, not the whole check-in", async () => {
     // The entire reason `update_entries` is per-project: a member on three
-    // projects gets three answers from three different REs.
+    // projects gets three answers from three different PLs.
     await ops.respondToUpdateEntry({
       entryId: "ue-2",
-      responderId: RE,
+      responderId: PL,
       response: "Agreed, park it until the coupons are back.",
       today: TODAY,
     });
@@ -936,10 +936,10 @@ describe("the RE answers a check-in section", () => {
 
   test("it is NOT recorded as the Lead having read the check-in", async () => {
     // Reading and answering are two obligations belonging to two people.
-    // Collapsing them would let an RE's reply silently clear a Lead's queue.
+    // Collapsing them would let a PL's reply silently clear a Lead's queue.
     await ops.respondToUpdateEntry({
       entryId: "ue-1",
-      responderId: RE,
+      responderId: PL,
       response: "On it.",
       today: TODAY,
     });
@@ -952,7 +952,7 @@ describe("the RE answers a check-in section", () => {
   test("an empty body clears a reply rather than storing nothing", async () => {
     await ops.respondToUpdateEntry({
       entryId: "ue-1",
-      responderId: RE,
+      responderId: PL,
       response: "Wrong section, sorry.",
       today: TODAY,
     });
@@ -960,7 +960,7 @@ describe("the RE answers a check-in section", () => {
 
     await ops.respondToUpdateEntry({
       entryId: "ue-1",
-      responderId: RE,
+      responderId: PL,
       response: "   ",
       today: TODAY,
     });
@@ -980,7 +980,7 @@ describe("the RE answers a check-in section", () => {
 
     const result = await ops.respondToUpdateEntry({
       entryId: draft.entries[0].id,
-      responderId: RE,
+      responderId: PL,
       response: "Too early",
       today: TODAY,
     });
@@ -990,7 +990,7 @@ describe("the RE answers a check-in section", () => {
   test("an unknown section fails rather than throwing", async () => {
     const result = await ops.respondToUpdateEntry({
       entryId: "not-an-entry",
-      responderId: RE,
+      responderId: PL,
       response: "Hello",
       today: TODAY,
     });
@@ -1087,7 +1087,7 @@ describe("deleting a member record", () => {
   test("a Co-Lead can force past the history guard", async () => {
     // The duplicate-profile case: the row looks real but isn't.
     const store = disk.readStore();
-    // Sofia is the primary RE of p-layup, which is refused separately — hand
+    // Sofia is the primary PL of p-layup, which is refused separately — hand
     // it over first so this test exercises the history guard alone.
     const layup = store.projects.find((p) => p.id === "p-layup")!;
     layup.primaryReId = CO_LEAD;
@@ -1103,8 +1103,8 @@ describe("deleting a member record", () => {
     assert.equal(memberById("m-sofia"), undefined);
   });
 
-  test("being a primary RE blocks it, even forced", async () => {
-    // A project with no RE is the one state the model can't represent, so this
+  test("being a primary PL blocks it, even forced", async () => {
+    // A project with no PL is the one state the model can't represent, so this
     // refuses rather than guessing a replacement.
     const result = await ops.deleteMember({
       memberId: "m-tyler",
@@ -1113,7 +1113,7 @@ describe("deleting a member record", () => {
     });
 
     assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.error, /primary RE/i);
+    if (!result.ok) assert.match(result.error, /primary PL/i);
   });
 
   test("no row is left pointing at the deleted one", async () => {
@@ -1165,7 +1165,7 @@ describe("deleting a member record", () => {
 
   test("a refused delete leaves reporting lines untouched", async () => {
     /*
-      The primary-RE check used to run AFTER the reparenting loop, so a delete
+      The primary-PL check used to run AFTER the reparenting loop, so a delete
       that was then refused had already rewritten everybody's Lead. A failed
       operation with a permanent side effect is the worst kind — the caller
       sees an error and reasonably assumes nothing changed.
@@ -1173,7 +1173,7 @@ describe("deleting a member record", () => {
     disk.readStore().members.find((m) => m.id === "m-sofia")!.leadId =
       "m-tyler";
 
-    // m-tyler is the primary RE of p-wing-spar, so this is refused.
+    // m-tyler is the primary PL of p-wing-spar, so this is refused.
     const result = await ops.deleteMember({
       memberId: "m-tyler",
       actorId: CO_LEAD,
@@ -1238,7 +1238,7 @@ describe("work inside a project can't be due after the project", () => {
 
     assert.equal(result.ok, false);
     if (!result.ok) {
-      // Names the parent and its date — otherwise the RE has to go and look.
+      // Names the parent and its date — otherwise the PL has to go and look.
       assert.match(result.error, /Wing Spar/i);
       assert.match(result.error, /2026-10-30/);
     }
@@ -1757,21 +1757,21 @@ describe("a deliverable can't be due after its project", () => {
 });
 
 // ---------------------------------------------------------------------------
-// What replaced the standing "No deputy RE" flag
+// What replaced the standing "No deputy PL" flag
 // ---------------------------------------------------------------------------
 
-describe("the last RE can't be stripped off a project with sub-projects", () => {
+describe("the last PL can't be stripped off a project with sub-projects", () => {
   /*
     The flag that used to warn about this fired on every parent project with
-    one RE — permanent, and usually unfixable because there was no second
+    one PL — permanent, and usually unfixable because there was no second
     person to name. A guard at the moment of removal is the same protection at
     the one moment somebody can act on it.
   */
 
-  test("un-RE-ing the last one is already blocked, by the primary guard", async () => {
+  test("un-PL-ing the last one is already blocked, by the primary guard", async () => {
     /*
       Worth pinning as the reason the sub-project guard is defensive here
-      rather than the thing doing the work. The last RE is by definition the
+      rather than the thing doing the work. The last PL is by definition the
       primary, and `setProjectRE` refuses to strip the primary first — so on
       this path you always hit that message. The sub-project guard behind it
       only fires if `primaryReId` has drifted out of `reIds`, which is a data
@@ -1786,7 +1786,7 @@ describe("the last RE can't be stripped off a project with sub-projects", () => 
     if (!result.ok) assert.match(result.error, /primary/i);
   });
 
-  test("a non-last RE can be removed freely", async () => {
+  test("a non-last PL can be removed freely", async () => {
     await ops.setProjectRE({
       projectId: "p-wing-spar",
       memberId: "m-noah",

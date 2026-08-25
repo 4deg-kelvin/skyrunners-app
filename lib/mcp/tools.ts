@@ -246,7 +246,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "guide",
     description:
-      "How SkyRunners works and how to drive it: the club's model (deliverables, REs, phase vs health, the work log), who is allowed to do what, recipes for common jobs, and what needs the website. Read this before guessing — and use it to explain the app to the member too.",
+      "How SkyRunners works and how to drive it: the club's model (deliverables, PLs, phase vs health, the work log), who is allowed to do what, recipes for common jobs, and what needs the website. Read this before guessing — and use it to explain the app to the member too.",
     inputSchema: schema({
       topic: {
         type: "string",
@@ -271,9 +271,6 @@ export const TOOLS: McpTool[] = [
 
       const leads = store.teams.filter((t) => t.leadId === m.id && t.isActive);
       const reOf = store.projects.filter((p) => p.reIds.includes(m.id));
-      const reports = store.members.filter(
-        (r) => r.leadId === m.id && r.status === "active"
-      );
 
       const lines = [
         `You are ${m.fullName} (${m.email}), role: ${m.globalRole}.`,
@@ -287,11 +284,11 @@ export const TOOLS: McpTool[] = [
 
       if (leads.length) {
         lines.push(
-          `Leads: ${leads.map((t) => t.name).join(", ")}. That makes you a top RE over every project in those, at any depth — you can assign deliverables, sign work off, appoint REs and approve join requests there.`
+          `Leads: ${leads.map((t) => t.name).join(", ")}. That makes you a top PL over every project in those, at any depth — you can assign deliverables, sign work off, appoint PLs and approve join requests there.`
         );
       }
       if (reOf.length) {
-        lines.push(`RE of: ${reOf.map((p) => p.name).join(", ")}.`);
+        lines.push(`PL of: ${reOf.map((p) => p.name).join(", ")}.`);
       }
       /*
         What they are accountable for, which since 2026-08-24 is only ever
@@ -301,7 +298,7 @@ export const TOOLS: McpTool[] = [
       lines.push(
         reOf.length || leads.length
           ? "Your authority comes from those, not from your title — you can shape deliverables and sign work off on anything at or below them."
-          : "You are not an RE of anything, so you can log work and ask to join things, but you cannot sign anything off yet."
+          : "You are not a PL of anything, so you can log work and ask to join things, but you cannot sign anything off yet."
       );
 
       const todo = profileNudges(viewer);
@@ -346,9 +343,9 @@ export const TOOLS: McpTool[] = [
       }
 
       /*
-        Blocked work in the viewer's RE subtree, resolved through the
+        Blocked work in the viewer's PL subtree, resolved through the
         permission module rather than by matching `reIds` — authority inherits
-        DOWN the project tree and a Division Lead is a top RE, so matching ids
+        DOWN the project tree and a Division Lead is a top PL, so matching ids
         would miss both and under-report what somebody actually owns.
       */
       const myProjectIds = store.projects
@@ -440,7 +437,7 @@ export const TOOLS: McpTool[] = [
       /*
         How many were hidden for being complete, so the omission is stated.
 
-        Anish hit the gap this closes: `whoami` said he was RE of a project and
+        Anish hit the gap this closes: `whoami` said he was PL of a project and
         this tool didn't list it, with nothing to explain the difference. The
         filter was right — completed work would otherwise bury the live work — but
         a silent filter reads as missing data, and an assistant reading the output
@@ -467,12 +464,12 @@ export const TOOLS: McpTool[] = [
               (!health || p.health === health) &&
               (!search || p.name.toLowerCase().includes(search));
             if (keep) {
-              const re = node.res[0]?.fullName ?? "no RE";
+              const re = node.res[0]?.fullName ?? "no PL";
               const blocked = node.blockedCount
                 ? `, ${node.blockedCount} blocked`
                 : "";
               rows.push(
-                `${"  ".repeat(depth)}${projectLine(p)} — RE ${re}, ${Math.round(node.progress.fraction * 100)}% done${blocked}`
+                `${"  ".repeat(depth)}${projectLine(p)} — PL ${re}, ${Math.round(node.progress.fraction * 100)}% done${blocked}`
               );
             }
             walk(node.children, depth + 1);
@@ -501,7 +498,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "get_project",
     description:
-      "Everything about one project: deliverables with owners and dates, who's on it, the REs, attached documentation, and why it needs attention. Takes the name or slug.",
+      "Everything about one project: deliverables with owners and dates, who's on it, the PLs, attached documentation, and why it needs attention. Takes the name or slug.",
     inputSchema: schema({ project: { type: "string" } }, ["project"]),
     async handler(args, viewer) {
       const target = requireProject(str(args.project));
@@ -519,7 +516,7 @@ export const TOOLS: McpTool[] = [
         `Phase: ${PHASE_LABELS[view.project.phase]} · Health: ${view.project.health.replace("_", " ")}${
           view.project.targetDate ? ` · Target: ${view.project.targetDate}` : ""
         }`,
-        `Division: ${view.division?.name ?? "unassigned"} · REs: ${view.res.map((r) => r.fullName).join(", ") || "none"}`,
+        `Division: ${view.division?.name ?? "unassigned"} · PLs: ${view.res.map((r) => r.fullName).join(", ") || "none"}`,
         `Progress: ${view.progress.done}/${view.progress.total} done, ${view.progress.blocked} blocked, ${view.progress.overdue} overdue`,
       ];
 
@@ -654,7 +651,7 @@ export const TOOLS: McpTool[] = [
           const match = c.matchedSkills.length
             ? `; matches your ${c.matchedSkills.join("/")}`
             : "";
-          return `- ${c.project.name} (${c.project.slug}) — ${why}; RE ${c.res[0]?.fullName ?? "none"}${match}`;
+          return `- ${c.project.name} (${c.project.slug}) — ${why}; PL ${c.res[0]?.fullName ?? "none"}${match}`;
         });
       return rows.length ? rows.join("\n") : "Nothing open right now.";
     },
@@ -663,7 +660,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "get_member",
     description:
-      "One person's record — the projects they're on, what they own on each, their skills and any RE roles. All public. Their archived check-ins are not available here; those are website-only.",
+      "One person's record — the projects they're on, what they own on each, their skills and any PL roles. All public. Their archived check-ins are not available here; those are website-only.",
     inputSchema: schema({ member: { type: "string" } }, ["member"]),
     async handler(args) {
       const m = requireMember(str(args.member));
@@ -715,7 +712,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "answer_join_request",
     description:
-      "Approve or decline someone's request to join a project. Requests escalate after 5 days, so clearing these is the highest-value thing an RE does in a week — `catch_up` lists the ones waiting on you.",
+      "Approve or decline someone's request to join a project. Requests escalate after 5 days, so clearing these is the highest-value thing a PL does in a week — `catch_up` lists the ones waiting on you.",
     write: true,
     inputSchema: schema(
       {
@@ -735,7 +732,7 @@ export const TOOLS: McpTool[] = [
 
       if (!can.reviewJoinRequest(viewer.actor, viewer.graph, project.id)) {
         refuse(
-          `Answering join requests for ${project.name} is the RE's call — you aren't one on that project.`
+          `Answering join requests for ${project.name} is the PL's call — you aren't one on that project.`
         );
       }
 
@@ -771,7 +768,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "add_project_member",
     description:
-      "Put someone on a project directly, without waiting for them to ask. Members can't add themselves — the RE decides, because the RE is accountable for the work.",
+      "Put someone on a project directly, without waiting for them to ask. Members can't add themselves — the PL decides, because the PL is accountable for the work.",
     write: true,
     inputSchema: schema(
       {
@@ -784,7 +781,7 @@ export const TOOLS: McpTool[] = [
         as_re: {
           type: "boolean",
           default: false,
-          description: "Make them a Responsible Engineer, not a contributor",
+          description: "Make them a Project Lead, not a contributor",
         },
       },
       ["project", "member"]
@@ -794,14 +791,14 @@ export const TOOLS: McpTool[] = [
       const member = requireMember(str(args.member));
 
       if (!can.addProjectMember(viewer.actor, viewer.graph, project.id)) {
-        refuse(`Adding people to ${project.name} is for its REs.`);
+        refuse(`Adding people to ${project.name} is for its PLs.`);
       }
 
-      // Appointing an RE is a bigger step than adding a contributor, and the
+      // Appointing a PL is a bigger step than adding a contributor, and the
       // app guards it separately.
       const asRE = args.as_re === true;
       if (asRE && !can.assignRE(viewer.actor, viewer.graph, project.id)) {
-        refuse(`Appointing REs on ${project.name} isn't yours to do.`);
+        refuse(`Appointing PLs on ${project.name} isn't yours to do.`);
       }
 
       ok(
@@ -815,7 +812,7 @@ export const TOOLS: McpTool[] = [
         })
       );
 
-      return `${member.fullName} added to ${project.name}${asRE ? " as an RE" : ""}${
+      return `${member.fullName} added to ${project.name}${asRE ? " as a PL" : ""}${
         str(args.responsibility) ? `, owning: ${str(args.responsibility)}` : ""
       }.`;
     },
@@ -824,7 +821,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "create_project",
     description:
-      "Start a new project. Give it a parent to nest it under existing work, or a division for a top-level one. The RE defaults to you — a project with nobody accountable is the one state the club's model can't represent.",
+      "Start a new project. Give it a parent to nest it under existing work, or a division for a top-level one. The PL defaults to you — a project with nobody accountable is the one state the club's model can't represent.",
     write: true,
     inputSchema: schema(
       {
@@ -888,7 +885,7 @@ export const TOOLS: McpTool[] = [
         })
       );
 
-      return `Created ${created.name} (${created.slug})${parent ? ` under ${parent.name}` : ` in ${division?.name}`}, RE ${re.fullName}.`;
+      return `Created ${created.name} (${created.slug})${parent ? ` under ${parent.name}` : ` in ${division?.name}`}, PL ${re.fullName}.`;
     },
   },
 
@@ -912,7 +909,7 @@ export const TOOLS: McpTool[] = [
 
       /*
         No permission check, deliberately — see `can.postHelpRequest`. The
-        board exists because membership is RE-controlled, so somebody waiting
+        board exists because membership is PL-controlled, so somebody waiting
         on a join request needs a route to being useful that doesn't depend on
         one person answering their inbox.
       */
@@ -951,7 +948,7 @@ export const TOOLS: McpTool[] = [
       const project = requireProject(str(args.project));
       if (!can.manageDeliverables(viewer.actor, viewer.graph, project.id)) {
         refuse(
-          `You can't assign work on ${project.name} — that's for its REs, the REs above it, or the Division Lead.`
+          `You can't assign work on ${project.name} — that's for its PLs, the PLs above it, or the Division Lead.`
         );
       }
 
@@ -1044,12 +1041,12 @@ export const TOOLS: McpTool[] = [
         !can.manageDeliverables(viewer.actor, viewer.graph, project.id)
       ) {
         refuse(
-          `That deliverable belongs to ${getMember(target.ownerId)?.fullName}, and you're not an RE on ${project.name}.`
+          `That deliverable belongs to ${getMember(target.ownerId)?.fullName}, and you're not a PL on ${project.name}.`
         );
       }
       if (status === "blocked" && !note) {
         refuse(
-          "Say what's blocking it. The note is what the RE gets DMed, and 'blocked' on its own tells them nothing."
+          "Say what's blocking it. The note is what the PL gets DMed, and 'blocked' on its own tells them nothing."
         );
       }
 
@@ -1061,7 +1058,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "sign_off_deliverable",
     description:
-      "Confirm finished work as an RE. This is the one that counts toward the owner's record — the owner marking it done is only a request.",
+      "Confirm finished work as a PL. This is the one that counts toward the owner's record — the owner marking it done is only a request.",
     write: true,
     inputSchema: schema(
       { project: { type: "string" }, title: { type: "string" } },
@@ -1074,10 +1071,10 @@ export const TOOLS: McpTool[] = [
       /*
         `manageDeliverables`, matching `confirmDeliverableAction` exactly.
         There is no separate `can.confirmDeliverable` — sign-off inherits down
-        the project tree, so an RE of a parent can sign off on its children.
+        the project tree, so a PL of a parent can sign off on its children.
       */
       if (!can.manageDeliverables(viewer.actor, viewer.graph, project.id)) {
-        refuse(`Signing off on ${project.name} is for its REs.`);
+        refuse(`Signing off on ${project.name} is for its PLs.`);
       }
 
       ok(await ops.confirmDeliverable(target.id, viewer.member.id, today()));
@@ -1126,7 +1123,7 @@ export const TOOLS: McpTool[] = [
         !can.completeProject(viewer.actor, viewer.graph, project.id)
       ) {
         refuse(
-          `Marking ${project.name} complete is the review step, and its own RE can't do it — that's for the RE above them or a Co-Lead.`
+          `Marking ${project.name} complete is the review step, and its own PL can't do it — that's for the PL above them or a Co-Lead.`
         );
       }
 
@@ -1161,7 +1158,7 @@ export const TOOLS: McpTool[] = [
     */
     name: "log_work",
     description:
-      "Record what the member did on a project. A diary entry, not a timesheet — there are no hours. The note is the whole point: 'ran the tensile coupons, two of five failed early' is what gets read. Since 2026-08-24 this is the member's ONLY report — it lands in the project's public feed where its RE can reply — so record what they actually tell you they did rather than composing something plausible on their behalf. Backdating is allowed up to 7 days.",
+      "Record what the member did on a project. A diary entry, not a timesheet — there are no hours. The note is the whole point: 'ran the tensile coupons, two of five failed early' is what gets read. Since 2026-08-24 this is the member's ONLY report — it lands in the project's public feed where its PL can reply — so record what they actually tell you they did rather than composing something plausible on their behalf. Backdating is allowed up to 7 days.",
     write: true,
     inputSchema: schema(
       {
@@ -1294,7 +1291,7 @@ export const TOOLS: McpTool[] = [
         !can.attachArtifact(viewer.actor, viewer.graph, project.id, committed)
       ) {
         refuse(
-          `You'd need to be on ${project.name} (or an RE above it) to add to its record.`
+          `You'd need to be on ${project.name} (or a PL above it) to add to its record.`
         );
       }
 
@@ -1607,7 +1604,7 @@ export const TOOLS: McpTool[] = [
       const project = requireProject(str(args.project));
       if (!can.manageProject(viewer.actor, viewer.graph, project.id)) {
         refuse(
-          "Only this project's RE (or an RE above them, or a Co-Lead) can move its target date."
+          "Only this project's PL (or a PL above them, or a Co-Lead) can move its target date."
         );
       }
 
@@ -1628,7 +1625,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "push_deliverable_deadline",
     description:
-      "Move one deliverable's due date, recording WHY. Bounded by the project's own target — a deliverable can't be due after the work it belongs to. RE's call, deliberately: the owner can already edit their own date with update_deliverable, whereas this writes a permanent line saying the schedule slipped.",
+      "Move one deliverable's due date, recording WHY. Bounded by the project's own target — a deliverable can't be due after the work it belongs to. PL's call, deliberately: the owner can already edit their own date with update_deliverable, whereas this writes a permanent line saying the schedule slipped.",
     write: true,
     inputSchema: schema(
       {
@@ -1643,7 +1640,7 @@ export const TOOLS: McpTool[] = [
       const project = requireProject(str(args.project));
       if (!can.manageDeliverables(viewer.actor, viewer.graph, project.id)) {
         refuse(
-          "Only this project's RE (or above), or a Co-Lead, can push back a deadline on the record."
+          "Only this project's PL (or above), or a Co-Lead, can push back a deadline on the record."
         );
       }
 

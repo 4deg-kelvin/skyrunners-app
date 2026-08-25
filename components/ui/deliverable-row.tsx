@@ -14,7 +14,7 @@ import { formatDay } from "@/lib/dates";
  * One line of a project's deliverable list.
  *
  * Deliberately plain: title, owner, date, status. No drag handles, no nesting,
- * no dependency arrows. An RE has to be able to keep this list honest in five
+ * no dependency arrows. A PL has to be able to keep this list honest in five
  * minutes a week, and every extra field is a reason not to.
  */
 export function DeliverableRow({

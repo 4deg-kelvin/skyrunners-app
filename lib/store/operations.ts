@@ -41,7 +41,7 @@
  */
 
 import { mutate, readStore, type StoreShape } from "./disk.ts";
-import { todayInClubTime } from "../dates.ts";
+import { daysBetweenDays, todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
 import { repeatProblem } from "../calendar/recurrence.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
@@ -173,29 +173,40 @@ function daysBetween(fromIso: string, toIso: string): number {
 // ---------------------------------------------------------------------------
 
 /**
- * True once a submitted check-in has already reported this date.
+ * Too old to remove — the entry has become part of the project's record.
  *
- * What a Lead has already read must not change underneath them. Without this,
- * somebody could submit "rebuilt the seal, all good", have it reviewed, then
- * rewrite the underlying entry — and the report the Lead acted on would no
- * longer exist anywhere.
+ * ---------------------------------------------------------------------------
+ * The window is the SAME one you can log into: seven days
+ * ---------------------------------------------------------------------------
  *
- * Renamed from `hoursAreLocked` when hours were removed. The rule is unchanged.
+ * This used to mean "a submitted check-in has already reported this date", and
+ * the reason was a good one: what somebody had already read must not change
+ * underneath them. Check-ins went on 2026-08-24, so that test could never fire
+ * again and every entry would have stayed removable forever.
+ *
+ * Seven days, matching `MAX_BACKDATE_DAYS` exactly — the period you can still
+ * write into is the period you can still correct. Somebody who logs the wrong
+ * project notices within a day or two. Past a week the entry is other people's
+ * context: it sits in the project's public feed, its Project Lead may have
+ * replied to it, and the digest has already reported it.
+ *
+ * ---------------------------------------------------------------------------
+ * `today` is a PARAMETER, and that is not a style preference
+ * ---------------------------------------------------------------------------
+ *
+ * The first version read `todayInClubTime()` itself and broke two tests
+ * immediately, because `logWork` computes its own `age` from the `today` it was
+ * PASSED — so the two disagreed by whatever the fixture date was. Same class of
+ * bug as the composer's `DEMO_TODAY` trap: two places deciding "what day is it"
+ * separately will eventually pick different days, and the symptom is a refusal
+ * carrying a reason the page never showed.
+ *
+ * Pure, so callers pass their own day. `memberId` went with the check-in lookup:
+ * the rule is about the date, and ownership is checked by the caller holding the
+ * row.
  */
-export function workIsLocked(memberId: string, workDate: string): boolean {
-  const { progressUpdates } = readStore();
-  return progressUpdates.some(
-    (u) =>
-      u.memberId === memberId &&
-      (u.status === "submitted" || u.status === "reviewed") &&
-      !!u.submittedAt &&
-      // STRICTLY before. An entry dated the same day as the check-in stays
-      // editable: you submit in the afternoon and then get another two hours in
-      // that evening, and refusing to record it means the diary is wrong in the
-      // direction that discourages people. Only days already closed out by a
-      // submitted check-in are locked.
-      workDate.slice(0, 10) < u.submittedAt.slice(0, 10)
-  );
+export function workIsLocked(workDate: string, today: string): boolean {
+  return daysBetween(workDate, today) > MAX_BACKDATE_DAYS;
 }
 
 /**
@@ -235,7 +246,7 @@ export async function logWork(input: {
   }
   if (note.length > MAX_DESCRIPTION_CHARS) {
     return fail(
-      `That's ${note.length} characters. Keep it under ${MAX_DESCRIPTION_CHARS} — this is a note, and it goes into your check-in.`
+      `That's ${note.length} characters. Keep it under ${MAX_DESCRIPTION_CHARS} — this is one line about what you did, not a report.`
     );
   }
 
@@ -245,14 +256,18 @@ export async function logWork(input: {
   }
   if (age > MAX_BACKDATE_DAYS) {
     return fail(
-      `That's ${age} days ago. You can log up to ${MAX_BACKDATE_DAYS} days back — ask your Lead to add anything older.`
+      `That's ${age} days ago. You can log up to ${MAX_BACKDATE_DAYS} days back — ask the project's Lead to add anything older.`
     );
   }
-  if (workIsLocked(memberId, workDate)) {
-    return fail(
-      "You've already submitted a check-in covering that day, so it's locked. Log it against today instead."
-    );
-  }
+  /*
+    No second check here.
+
+    There used to be a `workIsLocked` call, back when it meant "a submitted
+    check-in already reported this day" — a genuinely different rule from the
+    backdate window above. Now both are the same seven days, so it would be a
+    second refusal for the same reason with worse wording. The message above
+    names the number of days and what to do about it.
+  */
 
   const log: WorkLog = {
     id: newId("w"),
@@ -280,10 +295,12 @@ export async function deleteWorkLog(
   // Ownership is re-checked here as well as in the action. Cheap, and the cost
   // of getting it wrong is someone deleting another member's log entry.
   if (log.memberId !== memberId) return fail("That isn't your entry.");
-  if (workIsLocked(memberId, log.workDate)) {
-    return fail("That entry is part of a check-in you've already submitted.");
+  if (workIsLocked(log.workDate, today)) {
+    return fail(
+      `You can only remove an entry within ${MAX_BACKDATE_DAYS} days of the day ` +
+        `it covers. This one is part of the project's record now.`
+    );
   }
-  void today;
 
   return guarded((store) => {
     store.workLogs = store.workLogs.filter((w) => w.id !== logId);
@@ -365,7 +382,7 @@ export async function createDeliverable(input: {
 
     // Auto-add the owner to the project if they aren't on it.
     //
-    // Adding people IS the RE's authority, so making them do it as a separate
+    // Adding people IS the PL's authority, so making them do it as a separate
     // step is friction with no safety value — and an owner who isn't a member
     // means the roster stops matching who's actually doing the work.
     const alreadyOn = store.projectMemberships.some(
@@ -397,11 +414,11 @@ export async function createDeliverable(input: {
  *
  * The one rule the checklist enforces, in the one place both callers can see
  * it. A deliverable with an open item on its own list is, by the list's own
- * account, not finished — so neither the owner's claim nor the RE's sign-off
+ * account, not finished — so neither the owner's claim nor the PL's sign-off
  * can go through while one is open.
  *
- * Blocking the owner's claim as well as the RE's approval is deliberate. If
- * only sign-off were gated, the wall would land in front of the RE, who is the
+ * Blocking the owner's claim as well as the PL's approval is deliberate. If
+ * only sign-off were gated, the wall would land in front of the PL, who is the
  * busier person and not the one who knows whether the item is really
  * outstanding. This way whoever wrote the list is the one told about it.
  */
@@ -423,7 +440,7 @@ function openTodoBlock(
 /**
  * The owner says it's finished. This does NOT complete it.
  *
- * See `DeliverableStatus` — `submitted` is a claim, `done` is the RE agreeing,
+ * See `DeliverableStatus` — `submitted` is a claim, `done` is the PL agreeing,
  * and only `done` counts toward the Delivered signal.
  */
 export async function submitDeliverable(
@@ -449,7 +466,7 @@ export async function submitDeliverable(
   });
 }
 
-/** The RE agrees. This is the step that makes it count. */
+/** The PL agrees. This is the step that makes it count. */
 export async function confirmDeliverable(
   deliverableId: string,
   reId: string,
@@ -461,7 +478,7 @@ export async function confirmDeliverable(
     if (d.status === "done") return fail<Deliverable>("Already signed off.");
 
     /*
-      An RE can clear this themselves — ticking an item is a right they have —
+      A PL can clear this themselves — ticking an item is a right they have —
       so this isn't a dead end for them, it's a prompt to look at the list
       before putting their name on the work.
     */
@@ -470,7 +487,7 @@ export async function confirmDeliverable(
 
     d.status = "done";
     d.completedAt = now;
-    // Snapshotted: REs change over a project's life, and "who signed this off"
+    // Snapshotted: PLs change over a project's life, and "who signed this off"
     // must stay answerable after they've moved on.
     d.confirmedById = reId;
     d.blockerNote = undefined;
@@ -593,14 +610,14 @@ export async function deleteDeliverableTodo(
 }
 
 /**
- * An RE above says a signed-off deliverable wasn't actually done.
+ * A PL above says a signed-off deliverable wasn't actually done.
  *
  * ---------------------------------------------------------------------------
  * Why this isn't just `reopenDeliverable`
  * ---------------------------------------------------------------------------
  *
  * `reopenDeliverable` handles a CLAIM being rejected — the owner said done, the
- * RE disagrees, nothing ever counted. This handles an APPROVAL being withdrawn,
+ * PL disagrees, nothing ever counted. This handles an APPROVAL being withdrawn,
  * which is a different and heavier thing:
  *
  *   - It takes a completed deliverable back off somebody's record. Delivered is
@@ -608,7 +625,7 @@ export async function deleteDeliverableTodo(
  *     so removing one is not a status edit — it's a correction to the club's
  *     history, and it needs a reason attached in writing.
  *   - It contradicts a named person's judgement, not the owner's. That's why
- *     `can.withdrawSignOff` requires authority from ABOVE the project: the RE
+ *     `can.withdrawSignOff` requires authority from ABOVE the project: the PL
  *     who signed it cannot quietly un-sign it.
  *   - **A complete project goes back to active with it.** "The engineering
  *     doesn't meet requirements" and "the project is finished" cannot both be
@@ -662,7 +679,7 @@ export async function withdrawSignOff(input: {
       before it was completed. `testing` is a placeholder, chosen because it's
       where "doesn't meet the requirement" is usually discovered, and the notice
       says so out loud rather than letting a wrong stage sit there looking
-      authoritative. The RE corrects it in one edit.
+      authoritative. The PL corrects it in one edit.
 
       `at_risk` rather than `blocked`: something needs redoing, which isn't the
       same as being unable to proceed.
@@ -691,7 +708,7 @@ export async function withdrawSignOff(input: {
   });
 }
 
-/** The RE disagrees — send it back with a reason. */
+/** The PL disagrees — send it back with a reason. */
 export async function reopenDeliverable(
   deliverableId: string,
   reason: string,
@@ -775,7 +792,7 @@ export async function inviteMember(input: {
   fullName: string;
   /**
    * Optional at invite time, but asked for here because it's what the whole
-   * app shows instead of an email — an RE's contact line, a Lead chasing a
+   * app shows instead of an email — a PL's contact line, a Lead chasing a
    * check-in. Left to the member's own profile edit, it stayed empty and every
    * contact link silently fell back to email.
    */
@@ -1033,7 +1050,7 @@ export async function setGlobalRole(input: {
 
       Both halves went with the reporting chain on 2026-08-24. There is nothing
       to re-point: losing a title costs somebody no authority over people,
-      because nobody held any. What a demotion still costs is the RE side, and
+      because nobody held any. What a demotion still costs is the PL side, and
       that lives on `project_res` and `teams.lead_id` -- neither of which this
       function touches, deliberately. Demoting a Division Lead does NOT silently
       hand their division to nobody; `setTeamLead` is a separate, deliberate act.
@@ -1205,7 +1222,7 @@ export async function withdrawMemberRequest(input: {
  * The role check is HERE rather than in RLS. Migration 0032 deliberately
  * doesn't verify that the named person is an advisor, because an RLS refusal
  * reaches the user as "the database refused it" — true, useless, and it tells
- * an RE nothing about what to do instead. A `fail()` here reaches them as a
+ * a PL nothing about what to do instead. A `fail()` here reaches them as a
  * sentence.
  */
 export async function addProjectAdvisor(input: {
@@ -1326,7 +1343,7 @@ export async function setMemberStatus(input: {
         What replaces the second one is nothing, deliberately. An inactive
         member's open DELIVERABLES stay open and stay theirs, because a
         deliverable is somebody's accountable work rather than a recurring
-        obligation -- silently unassigning it would remove it from the RE's queue,
+        obligation -- silently unassigning it would remove it from the PL's queue,
         which is the one person who needs to know it now has no owner. It shows
         up on the project as work with an inactive owner, which is the truth.
       */
@@ -1378,9 +1395,9 @@ export async function createProject(input: {
   const name = input.name.trim();
   if (!name) return fail("Give the project a name.");
   if (!input.primaryReId) {
-    // A project with no accountable person is how work goes quiet. The RE is
+    // A project with no accountable person is how work goes quiet. The PL is
     // the whole point of the model.
-    return fail("Every project needs a Responsible Engineer.");
+    return fail("Every project needs a Project Lead.");
   }
 
   const store = readStore();
@@ -1522,7 +1539,7 @@ export async function createProject(input: {
   });
 }
 
-/** Add someone to a project, as a contributor or an RE. */
+/** Add someone to a project, as a contributor or a PL. */
 export async function addProjectMember(input: {
   projectId: string;
   memberId: string;
@@ -1569,18 +1586,18 @@ export async function addProjectMember(input: {
   });
 }
 
-/** Add or remove RE status on a project. */
+/** Add or remove PL status on a project. */
 /**
- * Would this leave a project that has sub-projects with a single RE?
+ * Would this leave a project that has sub-projects with a single PL?
  *
- * RE authority inherits DOWNWARD, so the REs of a parent are the escalation
+ * PL authority inherits DOWNWARD, so the PLs of a parent are the escalation
  * route for everything beneath it. Strip it to one person and every
  * sub-project's unblock path runs through somebody who might graduate, go on
  * exchange, or simply stop answering — and nobody else has the authority to
  * act.
  *
- * This replaced a standing "No deputy RE" warning that fired on every parent
- * project with one RE. That was permanent, unactionable (there often isn't a
+ * This replaced a standing "No deputy PL" warning that fired on every parent
+ * project with one PL. That was permanent, unactionable (there often isn't a
  * second person to name), and taught people to ignore the flags around it. A
  * guard at the moment of removal is the same protection at the one moment
  * somebody can do something about it — and it doesn't nag anyone who has
@@ -1607,8 +1624,8 @@ function wouldStrandSubProjects(
     (p) => p.parentId === projectId
   ).length;
   return (
-    `That would leave ${project.name} with no RE, and ${childCount} sub-project` +
-    `${childCount === 1 ? "" : "s"} escalate through it. Name another RE first — ` +
+    `That would leave ${project.name} with no PL, and ${childCount} sub-project` +
+    `${childCount === 1 ? "" : "s"} escalate through it. Name another PL first — ` +
     `otherwise nobody can unblock the work underneath.`
   );
 }
@@ -1640,7 +1657,7 @@ export async function setProjectRE(input: {
       // Removing the primary would leave the project with no go-to person and
       // `primaryReId` pointing at someone with no authority over it.
       return fail<null>(
-        "They're the primary RE. Make someone else primary first."
+        "They're the primary PL. Make someone else primary first."
       );
     }
 
@@ -1660,7 +1677,7 @@ export async function setProjectRE(input: {
   });
 }
 
-/** Hand the go-to role to a different RE. */
+/** Hand the go-to role to a different PL. */
 export async function setPrimaryRE(input: {
   projectId: string;
   memberId: string;
@@ -1688,7 +1705,7 @@ export async function setPrimaryRE(input: {
  * Checked in BOTH directions, because the same mistake arrives two ways —
  * moving a child later, or pulling a parent in over children already dated.
  * Refused rather than cascaded, for the same reason completion is: quietly
- * rewriting dates on projects other REs own is how a schedule stops being
+ * rewriting dates on projects other PLs own is how a schedule stops being
  * believed.
  *
  * Callers must only invoke this when the date actually moves. See the note in
@@ -1954,7 +1971,7 @@ export async function changeDeliverableDeadline(input: {
     /*
       Signed-off work keeps its dates.
 
-      `done` means an RE confirmed it, and moving the deadline afterwards would
+      `done` means a PL confirmed it, and moving the deadline afterwards would
       rewrite whether it was delivered on time — which feeds the Delivered signal.
       Reopening is the honest route if the work genuinely restarted.
     */
@@ -2123,7 +2140,7 @@ function cascadeTodos(store: StoreShape): void {
 /**
  * Edit a deliverable: its title and its due date.
  *
- * The RE's list, so the RE's edit. Retitling and re-dating is the ordinary
+ * The PL's list, so the PL's edit. Retitling and re-dating is the ordinary
  * upkeep the whole model costs them — five minutes a week — and without it the
  * only correction available was delete-and-retype.
  */
@@ -2244,7 +2261,7 @@ function ancestorProjects(store: StoreShape, projectId: string): Project[] {
  * Division Lead**.
  *
  * "Up the chain of command" for a project means the project tree, not the
- * reporting tree: the people accountable for the work above this are the REs of
+ * reporting tree: the people accountable for the work above this are the PLs of
  * its ancestors, then the leads of the teams that own it, ending with whoever
  * leads the division. A member's own Lead is the right audience for a check-in
  * and the wrong one here — they may have nothing to do with this project.
@@ -2281,7 +2298,7 @@ function completionAudience(
   // Up the org tree from whichever team owns this, nearest sub-team first.
   //
   // The Division Lead is held back rather than pushed in sequence, because
-  // they are very often also an RE of a parent project — and a plain dedup
+  // they are very often also a PL of a parent project — and a plain dedup
   // would then keep their FIRST appearance and leave somebody else at the end
   // of the list. They're the last stop by role, not by where they happen to
   // turn up first.
@@ -2369,7 +2386,7 @@ export async function updateProject(input: {
         goes with it: it's nested under a card people have stopped reading.
 
         Refused rather than cascaded. Marking the children complete on the
-        parent's behalf would sign off work their own REs never agreed was
+        parent's behalf would sign off work their own PLs never agreed was
         finished, which is the same self-certification the two-step deliverable
         sign-off exists to prevent.
       */
@@ -2406,7 +2423,7 @@ export async function updateProject(input: {
       Checked in BOTH directions, because the same mistake arrives two ways —
       moving a child later, or pulling a parent earlier over children already
       dated. Refused rather than cascaded, for the same reason completion is:
-      quietly rewriting dates on projects other REs own is how a schedule stops
+      quietly rewriting dates on projects other PLs own is how a schedule stops
       being believed.
     */
     const newTarget = input.targetDate || undefined;
@@ -2414,7 +2431,7 @@ export async function updateProject(input: {
     /*
       Only when the date actually MOVES.
 
-      Every save posts the whole form, so an RE renaming a project resends its
+      Every save posts the whole form, so a PL renaming a project resends its
       existing date. Validating unconditionally would let one pre-existing
       violation — a pair of dates entered before this rule, or seeded — freeze
       the project: no edit to any field would ever save again, and the error
@@ -2432,7 +2449,7 @@ export async function updateProject(input: {
       A move through the full editor is recorded too, with no reason attached.
 
       `changeProjectDeadline` is the intended path and requires one. But if only
-      that path recorded history, an RE could move the date through this form
+      that path recorded history, a PL could move the date through this form
       instead and the slip would leave no trace — a hole of exactly the shape
       this repo keeps finding (see the `for update` RLS policy, and the dead
       controls sweep). A row with an empty reason is worse history than a row
@@ -2540,7 +2557,7 @@ export interface PurgeCandidate {
  *
  * Attribution accepts either source, because the two eras differ:
  *   - `project.createdBy` for rows created after it started being written;
- *   - the primary RE's `project_members.added_by` for everything before, which
+ *   - the primary PL's `project_members.added_by` for everything before, which
  *     is all 4,000 of them.
  */
 type PurgeStore = Pick<
@@ -2617,7 +2634,7 @@ export function emptyProjectsByCreator(store: PurgeStore): EmptyProjectGroups {
   }
 
   /*
-    Per project: who its members were added by, and who its primary RE's row was
+    Per project: who its members were added by, and who its primary PL's row was
     added by. Both come from the same single sweep.
   */
   const adders = new Map<string, Set<string>>();
@@ -2642,7 +2659,7 @@ export function emptyProjectsByCreator(store: PurgeStore): EmptyProjectGroups {
     if (touched.has(project.id)) continue;
 
     /*
-      Attribution: the recorded creator, or whoever added the primary RE for the
+      Attribution: the recorded creator, or whoever added the primary PL for the
       rows written before `created_by` was mapped.
     */
     const creator = project.createdBy ?? primaryAddedBy.get(project.id);
@@ -3487,7 +3504,7 @@ export async function deleteMember(input: {
     const owned = store.projects.filter((p) => p.primaryReId === member.id);
     if (owned.length > 0) {
       return fail<null>(
-        `${member.fullName} is the primary RE of ${owned.map((p) => p.name).join(", ")}. Hand those over first — a project with no RE is the one state the model can't hold.`
+        `${member.fullName} is the primary PL of ${owned.map((p) => p.name).join(", ")}. Hand those over first — a project with no PL is the one state the model can't hold.`
       );
     }
 
@@ -4197,20 +4214,20 @@ export async function setCatalogueItemActive(input: {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 7 — the RE answers a check-in, section by section
+// Phase 7 — the PL answers a check-in, section by section
 // ---------------------------------------------------------------------------
 
 /**
  * Reply to one project's section of somebody's check-in.
  *
- * **The RE answers, not the Lead.** A Lead marking a check-in read is an
+ * **The PL answers, not the Lead.** A Lead marking a check-in read is an
  * obligation about a person; the useful reply to "the vacuum pump seal is
  * leaking" comes from whoever is accountable for that project. A member on
  * three projects needs three different people, not one person guessing at
  * three contexts — which is the whole reason `update_entries` is per-project
  * in the first place.
  *
- * The caller checks `can.manageDeliverables` on the entry's project, so RE
+ * The caller checks `can.manageDeliverables` on the entry's project, so PL
  * authority inherits down the tree and a Division Lead counts too.
  */
 export async function respondToUpdateEntry(input: {
@@ -4232,7 +4249,7 @@ export async function respondToUpdateEntry(input: {
         return fail<UpdateEntry>("That check-in hasn't been submitted yet.");
       }
 
-      // An empty body clears the response rather than storing "". Lets an RE
+      // An empty body clears the response rather than storing "". Lets a PL
       // undo a reply they posted to the wrong section.
       entry.response = response || undefined;
       entry.respondedBy = response ? input.responderId : undefined;
@@ -4252,7 +4269,7 @@ export async function respondToUpdateEntry(input: {
  * Post an ask.
  *
  * No permission check beyond being signed in, and that's the design: the board
- * exists because membership is RE-controlled, so a member waiting on a join
+ * exists because membership is PL-controlled, so a member waiting on a join
  * request needs a route to being useful that doesn't depend on one person
  * answering their inbox.
  */
@@ -4537,9 +4554,9 @@ export async function deleteTerm(
 // ---------------------------------------------------------------------------
 
 /**
- * Ask an RE to be added to a project.
+ * Ask a PL to be added to a project.
  *
- * This is the operation that makes `/find-work` mean anything. "Email the RE"
+ * This is the operation that makes `/find-work` mean anything. "Email the PL"
  * produces silence and an invisible member, which is the original problem
  * wearing a different hat — a tracked request lands in a queue, shows as
  * pending, and escalates at 5 days.
@@ -4561,7 +4578,7 @@ export async function requestToJoin(input: {
   if (alreadyCommitted) return fail("You're already on this project.");
 
   // One open ask at a time. Without this, an impatient member clicking twice
-  // puts two identical rows in the RE's queue, and the RE has to work out
+  // puts two identical rows in the PL's queue, and the PL has to work out
   // whether they're the same person asking twice or a bug.
   const openAsk = joinRequests.find(
     (r) =>
@@ -4569,7 +4586,7 @@ export async function requestToJoin(input: {
       r.memberId === input.memberId &&
       r.status === "pending"
   );
-  if (openAsk) return fail("You've already asked — it's still with the RE.");
+  if (openAsk) return fail("You've already asked — it's still with the PL.");
 
   const request: JoinRequest = {
     id: newId("jr"),
@@ -4586,7 +4603,7 @@ export async function requestToJoin(input: {
   });
 }
 
-/** The RE decides. Accepting adds them; declining must say something. */
+/** The PL decides. Accepting adds them; declining must say something. */
 export async function decideJoinRequest(input: {
   requestId: string;
   decidedById: string;
@@ -4648,7 +4665,7 @@ export async function withdrawJoinRequest(
 /**
  * Follow / unfollow — self-service, unlimited, no obligations.
  *
- * The counterpart to RE-controlled membership: you can't add yourself to the
+ * The counterpart to PL-controlled membership: you can't add yourself to the
  * work, but nobody needs permission to pay attention. Following is what stops
  * "membership is controlled" from feeling like "you're shut out".
  */
@@ -4675,11 +4692,11 @@ export async function setFollowing(input: {
       return ok(null);
     }
 
-    // Never silently drop a committed membership — that's an RE decision, and
+    // Never silently drop a committed membership — that's a PL decision, and
     // losing it here would quietly strip someone of their deliverables.
     if (existing && existing.commitment === "committed") {
       return fail<null>(
-        "You're a committed member here. Ask the RE to take you off."
+        "You're a committed member here. Ask the PL to take you off."
       );
     }
     store.projectMemberships = store.projectMemberships.filter(
@@ -4689,13 +4706,13 @@ export async function setFollowing(input: {
   });
 }
 
-/** RE removes someone from their project. */
+/** PL removes someone from their project. */
 export async function removeProjectMember(input: {
   projectId: string;
   memberId: string;
 }): Promise<Result<{ reassigned: number }>> {
   return guarded((store) => {
-    // Leaving the project takes the RE role with it, so the same guard applies
+    // Leaving the project takes the PL role with it, so the same guard applies
     // — otherwise the rule would be trivially bypassable by removing the
     // person rather than the role.
     const stranded = wouldStrandSubProjects(
@@ -4719,7 +4736,7 @@ export async function removeProjectMember(input: {
     );
 
     // Their open deliverables don't vanish with them — they'd become invisible
-    // work that nobody knows is unowned. Park them as blocked so the RE has to
+    // work that nobody knows is unowned. Park them as blocked so the PL has to
     // deal with them, which is exactly who should.
     for (const d of openWork) {
       d.status = "blocked";

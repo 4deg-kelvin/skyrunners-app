@@ -173,7 +173,7 @@ export default async function MemberProfilePage({
               <CardDivider />
               {/*
                 "Reports to" was the first row here until 2026-08-24. Nobody
-                reports to anybody now; the RE of each project below is who to
+                reports to anybody now; the PL of each project below is who to
                 talk to about the work on it, which is a more useful answer and
                 is already on every row.
 
@@ -532,7 +532,7 @@ function MemberProjectCard({ row }: { row: MemberProjectRow }) {
           {project.name}
         </Link>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {membership.role === "re" ? <Badge tone="cardinal">RE</Badge> : null}
+          {membership.role === "re" ? <Badge tone="cardinal">PL</Badge> : null}
           {membership.commitment === "following" ? (
             <Badge tone="neutral">Following</Badge>
           ) : null}

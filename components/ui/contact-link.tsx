@@ -11,7 +11,7 @@ import type { Member } from "@/lib/types";
  * ---------------------------------------------------------------------------
  *
  * `/find-work` is the point of the app, and it only works if a member actually
- * makes contact with an RE. A student emailing another student about joining a
+ * makes contact with a PL. A student emailing another student about joining a
  * project waits days for a reply, if it comes at all — a text gets answered.
  * The whole page is wasted if the last step is the one that stalls.
  *

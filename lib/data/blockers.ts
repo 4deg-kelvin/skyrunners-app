@@ -16,7 +16,7 @@
  * project in front of them, and the nav reached eight items paying for it.
  *
  * The free-form ask is the one with nowhere else to go, and the one that
- * matters most. Membership is RE-controlled, so a member waiting on a join
+ * matters most. Membership is PL-controlled, so a member waiting on a join
  * request otherwise has exactly one route to being useful and it depends on a
  * single person answering their inbox. "Does anyone know Onshape well enough
  * to look at this?" needs a home that isn't a project they haven't joined.

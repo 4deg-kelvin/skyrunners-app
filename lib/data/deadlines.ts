@@ -46,7 +46,7 @@ export interface DeadlineItem {
   date: string;
   /** The project this belongs to — its own, or the deliverable's parent. */
   project: Project;
-  /** Who's accountable. The RE for a project, the owner for a deliverable. */
+  /** Who's accountable. The PL for a project, the owner for a deliverable. */
   owner?: Member;
   daysAway: number;
   overdue: boolean;

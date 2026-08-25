@@ -17,7 +17,7 @@ import {
  *
  * The project field is optional and stays optional. Plenty of asks aren't about
  * a project a member has been added to — that's precisely the case the board
- * exists for, since membership is RE-controlled and a pending join request
+ * exists for, since membership is PL-controlled and a pending join request
  * otherwise leaves someone with nowhere to put a question.
  */
 export function AskForHelpForm({

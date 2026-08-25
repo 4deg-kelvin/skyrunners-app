@@ -96,7 +96,7 @@ describe("outcomes, not volume of time", () => {
 
   test("no rate, no score, no rank", () => {
     // A percentage needs a denominator and every candidate here is a judgment:
-    // deliverables assigned depends on how finely an RE splits work, projects
+    // deliverables assigned depends on how finely a PL splits work, projects
     // joined depends on who invited you. A number that looks comparable and
     // isn't is worse than no number.
     const d = buildDelivered({

@@ -61,7 +61,7 @@ function nested() {
 }
 
 describe("projectEscalationAudience", () => {
-  test("returns the parent's REs, not the project's own", () => {
+  test("returns the parent's PLs, not the project's own", () => {
     const { child, parent } = nested();
     const raiser = child.reIds[0] ?? "nobody";
 
@@ -69,15 +69,15 @@ describe("projectEscalationAudience", () => {
     for (const id of above) {
       assert.ok(
         parent.reIds.includes(id) || parent.primaryReId === id,
-        `${id} is not an RE of the parent`
+        `${id} is not a PL of the parent`
       );
     }
   });
 
   test("never includes the raiser", () => {
     /*
-      The whole point. An RE marking their own project blocked must not be
-      DMed about it — and if they're also an RE of the parent, the naive
+      The whole point. A PL marking their own project blocked must not be
+      DMed about it — and if they're also a PL of the parent, the naive
       version does exactly that.
     */
     const { child, parent } = nested();
@@ -92,7 +92,7 @@ describe("projectEscalationAudience", () => {
   test("climbs past an unstaffed parent rather than giving up", () => {
     const { child, parent } = nested();
 
-    // Strip the immediate parent of REs; the walk should keep going.
+    // Strip the immediate parent of PLs; the walk should keep going.
     disk.resetStore();
     return disk
       .mutate((store) => {
@@ -103,7 +103,7 @@ describe("projectEscalationAudience", () => {
       })
       .then(() => {
         const above = mock.projectEscalationAudience(child.id, "nobody");
-        // Either a grandparent's RE or the Division Lead — never empty when
+        // Either a grandparent's PL or the Division Lead — never empty when
         // the division has a lead, because "nobody hears" is the failure.
         const division = mock.divisionForProject(child.id);
         if (division?.leadId) assert.ok(above.length > 0);
@@ -139,10 +139,10 @@ describe("raiserLeadAudience", () => {
 
   test("one step, not the whole chain", () => {
     /*
-      An RE two levels up hearing about every blocker in their sub-tree is the
+      A PL two levels up hearing about every blocker in their sub-tree is the
       noise that gets a bot muted. Something that actually SITS is handled by
       age instead: unconfirmed sign-offs and per-project silence both surface on
-      the RE's dashboard by how long they have been waiting. (This used to name
+      the PL's dashboard by how long they have been waiting. (This used to name
       `lib/review.ts`, which escalated unread check-ins; it went with the
       reporting chain on 2026-08-24, and the age-not-count principle outlived
       it.)
@@ -186,7 +186,7 @@ describe("the three lists stay distinct", () => {
       `blockerAudience` answers "who fixes this" on the project tree;
       `raiserLeadAudience` answers "who looks after this person" on the
       reporting tree. They may overlap, but neither is derivable from the
-      other — a member's Lead is very often not an RE of their projects, which
+      other — a member's Lead is very often not a PL of their projects, which
       is the whole reason the app keeps two hierarchies.
     */
     const store = disk.readStore();

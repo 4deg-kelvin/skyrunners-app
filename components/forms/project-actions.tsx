@@ -20,7 +20,7 @@ import {
  * did nothing. Everything else on that page is wasted if this step fails.
  *
  * The note field is optional but expanded on click rather than hidden behind a
- * second screen: an RE deciding between two requests wants to know what someone
+ * second screen: a PL deciding between two requests wants to know what someone
  * would bring, and asking for it at the moment of intent is the only time
  * they'll write it.
  */
@@ -32,7 +32,7 @@ export function AskToJoinButton({
   projectId: string;
   projectName: string;
   /**
-   * Whether the RE has the project marked as looking for people.
+   * Whether the PL has the project marked as looking for people.
    *
    * Only changes the WORDS. The button is always here, because a project that
    * refuses asks leaves a member no route in except knowing somebody — and
@@ -65,7 +65,7 @@ export function AskToJoinButton({
       <input type="hidden" name="projectId" value={projectId} />
       <label className="block">
         <span className="text-ink mb-1 block text-sm font-semibold">
-          Anything to tell the RE of {projectName}?
+          Anything to tell the PL of {projectName}?
         </span>
         <textarea
           name="note"
@@ -87,7 +87,7 @@ export function AskToJoinButton({
  *
  * `withdrawJoinRequest` sat in the operations layer with no action and no
  * button from Phase 2 onward, so a request sent to the wrong project was
- * permanent: it stayed in an RE's queue, escalated at five days, and showed the
+ * permanent: it stayed in a PL's queue, escalated at five days, and showed the
  * sender a "Request pending" badge with no way out. The queue is supposed to
  * make asks visible, not un-cancellable.
  */
@@ -166,7 +166,7 @@ export function FollowToggle({
 }
 
 /**
- * The RE answers a join request.
+ * The PL answers a join request.
  *
  * Declining requires opening the note field first. A bare "no" from someone who
  * controls whether you can contribute is the thing that makes people leave the
@@ -240,7 +240,7 @@ export function JoinRequestDecision({
   );
 }
 
-/** RE takes someone off a project. */
+/** PL takes someone off a project. */
 export function RemoveMemberButton({
   projectId,
   memberId,

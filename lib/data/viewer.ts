@@ -159,7 +159,7 @@ async function getLiveViewer(): Promise<Viewer> {
     actor: { id: member.id, globalRole: member.globalRole },
     // Real rows, keyed by real auth UUIDs. This previously used the mock graph,
     // which meant `getMember(<real uuid>)` returned undefined and every Lead and
-    // RE silently lost their permissions in live mode.
+    // PL silently lost their permissions in live mode.
     graph: await loadLiveOrgGraph(supabase),
     isDemo: false,
   };

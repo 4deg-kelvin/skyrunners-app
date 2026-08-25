@@ -33,7 +33,7 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 | Auth | Supabase Auth, Google OAuth, `stanford.edu` restricted | Satisfies "Stanford only", no password handling |
 | File storage | Supabase Storage | Certificates, presentations, CAD, reports |
 | Email | Resend | Deadline nudges, invites |
-| Cron | Vercel Cron → API route | Missed-update checks (in-session only), RE liveness checks, deadline reminders |
+| Cron | Vercel Cron → API route | Missed-update checks (in-session only), PL liveness checks, deadline reminders |
 | ORM | **Supabase client, or Drizzle. Not Prisma** | Prisma bypasses RLS with elevated privileges, defeating read protection |
 | Data access | RLS for reads; Server Actions + `lib/permissions.ts` for writes | Reads mostly open; writes complex and belong in one tested module |
 | Gantt | Prototype `frappe-gantt`, replace with custom if nesting fights it | Nested-project Gantt is unusual; verify before committing |
@@ -44,27 +44,27 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 
 | Decision | Choice |
 |---|---|
-| Roles | **Co-Lead** → **Team Lead** → **Member**, plus project-scoped **RE** |
+| Roles | **Co-Lead** → **Team Lead** → **Member**, plus project-scoped **PL** |
 | Update cadence | **2 per week**, on member-chosen weekdays. Pausable for academics without penalty |
 | Hours expectation | **10–12 hrs/week**, published up front. Named tiers (Core / Committed / Contributing), never pass-fail |
-| REs per project | **Multiple allowed**, one primary as go-to contact |
-| Project membership | **RE-controlled. No self-enrollment, no cap.** Members see everything, follow anything, and ask to join; the RE decides |
-| Join requests | Tracked objects, not emails. RE queue, visible pending state, escalation after 5 days |
+| PLs per project | **Multiple allowed**, one primary as go-to contact |
+| Project membership | **PL-controlled. No self-enrollment, no cap.** Members see everything, follow anything, and ask to join; the PL decides |
+| Join requests | Tracked objects, not emails. PL queue, visible pending state, escalation after 5 days |
 | Task model | **Deliverables** — one flat list per project, one owner each. **No dependencies, no nesting, no critical path** |
 | Project status | **Phase** (lifecycle) + **health** (how it's going), as separate fields |
 | Divisions | Co-Lead editable in the UI — addable, removable, renameable |
 | Academic calendar | **`terms` table gates all obligations.** Finals, breaks and summer generate nothing |
 | Activity visibility | **Public to all members** — projects, deliverables, who's on what, artifacts, calendar |
-| Engineering record | **Anyone committed to the project attaches; only an RE removes.** Links must be confirmed non-expiring, and provably temporary ones are refused outright |
+| Engineering record | **Anyone committed to the project attaches; only a PL removes.** Links must be confirmed non-expiring, and provably temporary ones are refused outright |
 | Record on completion | **Frozen.** A complete project accepts new attachments but nothing can be edited or removed except by a Co-Lead |
-| Effort visibility | ~~Restricted to the member, their Lead chain and REs~~ → **Public**, in two steps: work logs on 2026-08-16, everything else on 2026-08-24 |
+| Effort visibility | ~~Restricted to the member, their Lead chain and PLs~~ → **Public**, in two steps: work logs on 2026-08-16, everything else on 2026-08-24 |
 | Contribution tracking | ~~Four independent signals~~ → three (2026-08-14) → **two plain counts** (2026-08-24): deliverables finished, projects finished. Still no composite, still no ranking |
 | Score visibility | **Everyone sees everyone's.** Rubric published at `/how-we-lead`. No ranking exists |
 | Leadership rubric | Delivered work first, then sustained over a quarter, then visible (logged as you go), then lifting others |
-| Update review | ~~Ancestor REs plus the Lead chain~~ → **nobody reviews anything.** Check-ins removed 2026-08-24; an RE reads their project's feed |
+| Update review | ~~Ancestor PLs plus the Lead chain~~ → **nobody reviews anything.** Check-ins removed 2026-08-24; a PL reads their project's feed |
 | Training verification | **Per item:** a named verifier signs it off, or it is marked self-verify. Unassigned falls back to any Lead. A named verifier cannot be demoted until reassigned |
-| Reporting chain | ~~Every member has a named Lead~~ → **removed 2026-08-24.** Members report to their REs through the work they log. `docs/REPORTING_REMOVAL_PLAN.md` |
-| RE liveness | Projects flagged when the primary RE goes quiet 14+ days, or a blocker sits 7+ days |
+| Reporting chain | ~~Every member has a named Lead~~ → **removed 2026-08-24.** Members report to their PLs through the work they log. `docs/REPORTING_REMOVAL_PLAN.md` |
+| PL liveness | Projects flagged when the primary PL goes quiet 14+ days, or a blocker sits 7+ days |
 | Calendar sync | **Opt-in only**, Google *and* Apple |
 | Local dev path | `C:\Users\anish\skyrunners\project_and_member_managment_website\skyrunners-app` |
 
@@ -73,11 +73,11 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 The original design computed a weighted engagement score, hidden from the member it
 described, and used it for leadership selection. Three problems killed it:
 
-1. **It ranked people absurdly.** A reliable non-RE contributor whose RE didn't use the
+1. **It ranked people absurdly.** A reliable non-PL contributor whose PL didn't use the
    task feature scored 50; a member on leave all term scored 45. Components disagreed on
    how to treat missing data, and the punitive convention was worth 25%.
-2. **~45% of it was gated on already holding authority** (RE roles, and tasks assigned by
-   REs). A metric for choosing future leaders substantially measured having already been
+2. **~45% of it was gated on already holding authority** (PL roles, and tasks assigned by
+   PLs). A metric for choosing future leaders substantially measured having already been
    chosen — which is how leadership becomes a clique in a club with annual turnover.
 3. **A hidden rubric that decides advancement always leaks**, and when it does the trust
    cost is retroactive: it recolors every update the person ever wrote.
@@ -111,7 +111,7 @@ resolved with recursive CTEs. NoSQL would make the core queries painful.
 1. **Postgres, not NoSQL** — recursive CTEs are load-bearing (`DATA_MODEL.md`)
 2. **Google OAuth restricted to `stanford.edu`** — this *is* the access control model
 3. **File storage** with per-object access control
-4. **Scheduled jobs** — missed-update checks (only when `in_session()` is true), RE
+4. **Scheduled jobs** — missed-update checks (only when `in_session()` is true), PL
    liveness detection, deadline reminders
 5. **Transactional email** — Resend unless you prefer otherwise
 6. **Preview deployments per branch** would help a lot, since Anish is learning and will
@@ -164,8 +164,8 @@ Non-blocking, needed when the relevant phase arrives:
 | **The hours bar shrinks the club** | A 10–12 hr/week expectation self-selects for a committed core. That may be precisely what "high class team" means — but it is a *different goal* from "stop people quitting", and the two can pull against each other. It works by being stated at recruiting, never discovered in week six |
 | **Hours gaming** | Hours are the easiest signal to inflate. Mitigated by making Delivered the primary column and publishing that finished work outranks time logged |
 | **Documented delinquency** | The biggest retention risk in the whole design. A member who drifts two weeks during midterms must be able to return without facing a record of failure. Hence academic pause, no `missed` rows while paused, and tiers instead of pass-fail |
-| **Understaffed unglamorous work** | Harnesses, layups, test stands and requirements verification will be short every year. RE-controlled staffing helps — an RE can recruit directly — but a "needs help" boost and some assigned rotation are still worth adding |
-| **Permission bugs** | Nested inherited RE authority is the trickiest logic. Covered by `lib/permissions.test.ts` — extend it when rules change |
+| **Understaffed unglamorous work** | Harnesses, layups, test stands and requirements verification will be short every year. PL-controlled staffing helps — a PL can recruit directly — but a "needs help" boost and some assigned rotation are still worth adding |
+| **Permission bugs** | Nested inherited PL authority is the trickiest logic. Covered by `lib/permissions.test.ts` — extend it when rules change |
 | **Adoption** | See `PHASE_PLAN.md` § "Before the club ever logs in" — data-entry day, killing one incumbent tool, a launch ritual, and a one-division pilot all matter more than any feature |
-| **Unanswered join requests** | The new failure mode created by RE-gated membership. A silent RE is a member with nothing to do. Mitigated by the RE queue on My Work, staleness flags at 5 days, and Co-Lead override |
+| **Unanswered join requests** | The new failure mode created by PL-gated membership. A silent PL is a member with nothing to do. Mitigated by the PL queue on My Work, staleness flags at 5 days, and Co-Lead override |
 | **Turnover** | The app must outlive Anish. Docs and `CLAUDE.md` exist for this |

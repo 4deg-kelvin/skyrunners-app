@@ -70,7 +70,7 @@ export default function HowWeLeadPage() {
                 Log what you did, not how long.
               </span>{" "}
               A line a day is enough. It goes straight into the project&apos;s
-              feed where your RE and anyone else on it can read it and reply —
+              feed where your PL and anyone else on it can read it and reply —
               that is the whole reporting relationship, and there is nothing
               else to file.
             </p>
@@ -137,7 +137,7 @@ export default function HowWeLeadPage() {
 
       <Card>
         <CardBody>
-          <SectionLabel>Becoming An RE Or Lead</SectionLabel>
+          <SectionLabel>Becoming A PL Or Lead</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
             What we actually look for
           </h2>
@@ -169,27 +169,27 @@ export default function HowWeLeadPage() {
         <CardBody>
           <SectionLabel>Joining A Project</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
-            See everything. Ask the RE.
+            See everything. Ask the PL.
           </h2>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             Every project is open for you to read: its phase, who&apos;s on it,
-            what each person owns, what&apos;s blocked, and who the Responsible
-            Engineer is. You never have to ask a Co-Lead what&apos;s going on.
+            what each person owns, what&apos;s blocked, and who its Project Lead
+            is. You never have to ask a Co-Lead what&apos;s going on.
           </p>
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             To actually join, hit{" "}
             <span className="text-ink font-semibold">Ask to join</span> and say
-            what interests you. The RE decides, because they&apos;re accountable
+            what interests you. The PL decides, because they&apos;re accountable
             for the deliverable and they know what the project needs.
             There&apos;s no limit on how many projects you can be on —
-            that&apos;s between you and the REs.
+            that&apos;s between you and the PLs.
           </p>
           <div className="rounded-tile bg-surface mt-5 px-4 py-3.5">
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">
                 Your request won&apos;t disappear.
               </span>{" "}
-              It shows up in the RE&apos;s queue, you can see it&apos;s pending,
+              It shows up in the PL&apos;s queue, you can see it&apos;s pending,
               and if nobody answers within five days it gets flagged so a
               Co-Lead can step in. Waiting on a reply should never be the reason
               you have nothing to do.

@@ -98,7 +98,7 @@ export function WorkSpotlight({ view }: { view: FindWorkView }) {
           <SectionLabel>Where You&apos;d Help Most</SectionLabel>
           <p className="text-ink-soft mt-1.5 max-w-2xl text-[15px]">
             Ranked by where you&apos;d make the biggest difference — nobody on
-            it, or stuck, first. Ask to join and the project&apos;s RE decides;
+            it, or stuck, first. Ask to join and the project&apos;s PL decides;
             the request is tracked, and escalates if it sits for five days.
           </p>
         </>
@@ -243,7 +243,7 @@ export function WorkSpotlight({ view }: { view: FindWorkView }) {
                   {res.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <span className="text-ink-muted text-sm">
-                        {res.length > 1 ? "REs:" : "RE:"}
+                        {res.length > 1 ? "PLs:" : "PL:"}
                       </span>
                       {res.map((re) => (
                         <ContactLink
@@ -255,7 +255,7 @@ export function WorkSpotlight({ view }: { view: FindWorkView }) {
                     </div>
                   ) : (
                     <span className="text-ink-muted text-sm">
-                      No RE assigned — ask a Co-Lead about this one.
+                      No PL assigned — ask a Co-Lead about this one.
                     </span>
                   )}
                 </div>

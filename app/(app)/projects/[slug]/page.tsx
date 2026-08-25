@@ -91,7 +91,7 @@ export default async function ProjectDetailPage({
   /*
     ONE feed: check-in entries and work-log lines together, newest first.
 
-    These were two cards — "Recent Work" (REs only) and "Recent Updates On This
+    These were two cards — "Recent Work" (PLs only) and "Recent Updates On This
     Project" (public) — and Anish's decision on 2026-08-16 is that they are the
     same thing and both public. With hours gone, a log line and a check-in entry
     are both just "what somebody did here"; the only difference is that one is
@@ -170,7 +170,7 @@ export default async function ProjectDetailPage({
   /*
     Approving, as opposed to running the project.
 
-    Both of these deliberately EXCLUDE the project's own RE, who has
+    Both of these deliberately EXCLUDE the project's own PL, who has
     `mayManage` and everything that comes with it. Finishing the work and
     agreeing it's finished are different jobs — see `isREaboveProject`.
   */
@@ -204,7 +204,7 @@ export default async function ProjectDetailPage({
 
   /*
     The engineering record splits adding from removing, and only this one is
-    open past the REs. `isOnProject` deliberately excludes followers — watching
+    open past the PLs. `isOnProject` deliberately excludes followers — watching
     a project isn't working on it.
   */
   const mayAttachArtifact = can.attachArtifact(
@@ -237,7 +237,7 @@ export default async function ProjectDetailPage({
           description={project.description}
           /*
             Following was built in Phase 2 and never rendered anywhere, so the
-            self-service half of "membership is RE-controlled" didn't exist —
+            self-service half of "membership is PL-controlled" didn't exist —
             you could ask to join and wait, and that was it. The page even read
             `isFollowing` to show a badge for a state nothing could produce.
 
@@ -323,11 +323,11 @@ export default async function ProjectDetailPage({
                   {/*
                     Breaking work down, from the project it belongs under.
 
-                    `can.createProject` has always allowed an RE to create a
+                    `can.createProject` has always allowed a PL to create a
                     sub-project of something they own — and the form has always
                     had the `parentId` prop for it — but it was only ever
                     mounted on /projects, where the button is Lead-and-above.
-                    So a plain-member RE had the right and no door, and anyone
+                    So a plain-member PL had the right and no door, and anyone
                     else had to create the project at top level and reparent it.
 
                     Not offered on a complete project: a live child under a
@@ -501,7 +501,7 @@ export default async function ProjectDetailPage({
                     message={
                       mayManage
                         ? "No deliverables yet. Adding a few makes it obvious who owns what."
-                        : "The RE hasn't listed deliverables for this project yet."
+                        : "The PL hasn't listed deliverables for this project yet."
                     }
                     actionLabel="See your own work"
                     actionHref="/my-work"
@@ -523,7 +523,7 @@ export default async function ProjectDetailPage({
                         {/*
                           Checklist above the buttons, because it's the reason
                           one of them may be missing. See `DeliverableTodos` —
-                          the owner writes these as much as the RE does, which
+                          the owner writes these as much as the PL does, which
                           is why `canManage` is wider here than `mayManage`.
                         */}
                         <DeliverableTodos
@@ -614,10 +614,10 @@ export default async function ProjectDetailPage({
                           </p>
                         ) : null}
                         {/*
-                          Days worked on THIS project, for the REs of it.
+                          Days worked on THIS project, for the PLs of it.
 
                           The per-project half of the privacy split, and the
-                          only effort figure an RE is allowed — never the
+                          only effort figure a PL is allowed — never the
                           person's record or reliability, which belong to them
                           and their Lead. See `can.viewMemberWorkOnProject`.
 
@@ -644,7 +644,7 @@ export default async function ProjectDetailPage({
                         </Badge>
 
                         {/*
-                          Multiple REs per project is a deliberate part of the
+                          Multiple PLs per project is a deliberate part of the
                           model, so promoting somebody has to be reachable from
                           the roster rather than living in a form nothing
                           rendered.
@@ -683,7 +683,7 @@ export default async function ProjectDetailPage({
             </CardBody>
           </Card>
 
-          {/* Join requests — visible to the RE, so an ask can't be lost */}
+          {/* Join requests — visible to the PL, so an ask can't be lost */}
           {mayReviewRequests && view.pendingRequests.length > 0 ? (
             <Card>
               <CardBody>
@@ -737,7 +737,7 @@ export default async function ProjectDetailPage({
                         {/*
                           These were two plain `Button`s wired to nothing.
 
-                          The RE's own project page is where they'd naturally
+                          The PL's own project page is where they'd naturally
                           answer a request, and pressing either did exactly
                           nothing — no error, no change, no clue. The working
                           controls existed the whole time and were only mounted
@@ -755,7 +755,7 @@ export default async function ProjectDetailPage({
                 </div>
 
                 <p className="text-ink-muted mt-4 text-sm">
-                  Answering these is part of being RE — a request left hanging
+                  Answering these is part of being PL — a request left hanging
                   is a member with nothing to do.
                 </p>
               </CardBody>
@@ -785,7 +785,7 @@ export default async function ProjectDetailPage({
                       </div>
                       {childRes.length > 0 ? (
                         <p className="text-ink-muted mt-1.5 pl-6 text-sm">
-                          {childRes.length > 1 ? "REs" : "RE"}:{" "}
+                          {childRes.length > 1 ? "PLs" : "PL"}:{" "}
                           {childRes.map((r) => r.fullName).join(", ")}
                         </p>
                       ) : null}
@@ -1138,7 +1138,7 @@ export default async function ProjectDetailPage({
               <SectionLabel>Who To Ask</SectionLabel>
               <div className="mt-4 space-y-3">
                 {res.length === 0 ? (
-                  <p className="text-ink-muted text-sm">No RE assigned yet.</p>
+                  <p className="text-ink-muted text-sm">No PL assigned yet.</p>
                 ) : (
                   /*
                     A face next to the name.
@@ -1180,8 +1180,8 @@ export default async function ProjectDetailPage({
               </div>
 
               {/*
-                Advisors under the REs, quieter. The RE is who you ask first;
-                the advisor is who the RE asks. See `ProjectAdvisors`.
+                Advisors under the PLs, quieter. The PL is who you ask first;
+                the advisor is who the PL asks. See `ProjectAdvisors`.
               */}
               <ProjectAdvisors
                 projectId={project.id}
@@ -1211,7 +1211,7 @@ export default async function ProjectDetailPage({
                 {!project.isOpenToJoin ? (
                   <p className="text-ink-muted mt-3 text-sm">
                     This project is closed to new members right now — contact
-                    the RE if you&apos;d like to help.
+                    the PL if you&apos;d like to help.
                   </p>
                 ) : null}
               </CardBody>
@@ -1228,9 +1228,9 @@ export default async function ProjectDetailPage({
 
               {/*
                 Attaching is open to anyone committed to the project, not just
-                the RE — the person who ran the test holds the test report, and
+                the PL — the person who ran the test holds the test report, and
                 routing that through one inbox is how the record stays empty.
-                Removing is the RE's, and a Co-Lead's alone once this is
+                Removing is the PL's, and a Co-Lead's alone once this is
                 complete. See `can.attachArtifact` / `can.manageArtifact`.
               */}
               {mayAttachArtifact ? (
@@ -1280,7 +1280,7 @@ function UpdateRow({
 }: {
   row: ProjectDetailView["updateFeed"][number];
   projectId: string;
-  /** RE of this project or above — who may answer an entry here. */
+  /** PL of this project or above — who may answer an entry here. */
   canRespond: boolean;
 }) {
   const { entry, author, submittedAt, responder } = row;
@@ -1310,7 +1310,7 @@ function UpdateRow({
 
       {/*
 
-                        The RE answers here, on the project, where the context
+                        The PL answers here, on the project, where the context
 
                         is. A Lead marking the whole check-in read is a
 

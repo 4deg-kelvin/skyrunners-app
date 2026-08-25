@@ -106,7 +106,7 @@ export default async function EditGuidesPage() {
                 The Lead guide
               </h2>
               <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-                Shown at the bottom of the page an RE or Lead reads. Use it for
+                Shown at the bottom of the page a PL or Lead reads. Use it for
                 what the club expects of them beyond what the app enforces —
                 chasing check-ins, running a design review, handing a project
                 over.

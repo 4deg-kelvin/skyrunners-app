@@ -6,7 +6,7 @@ import type { GanttChart, GanttTone } from "@/lib/gantt";
  * A read-only picture of dates that already exist.
  *
  * Not a critical-path Gantt — see the header of `lib/gantt.ts`. No
- * dependencies, no slack, nothing for an RE to maintain. It answers one
+ * dependencies, no slack, nothing for a PL to maintain. It answers one
  * question the deadline list underneath can't: **do these land on top of each
  * other?** A list of six dates in date order does not show you that four of
  * them are the same fortnight in November.
@@ -50,7 +50,7 @@ import type { GanttChart, GanttTone } from "@/lib/gantt";
 
     complete      green    — finished, and the bar is solid
     on track      blue     — running, nothing wrong
-    at risk       amber    — the RE flagged it, or it's past its target
+    at risk       amber    — the PL flagged it, or it's past its target
     blocked       red      — stopped
     (a date)      grey     — deliverables and sessions, which have no health
 

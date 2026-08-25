@@ -19,11 +19,11 @@ export interface Option {
  * Create a project.
  *
  * Permissions here are deliberately permissive (see `can.createProject`): any
- * Lead can start a top-level project, and an RE can start one inside their own
+ * Lead can start a top-level project, and a PL can start one inside their own
  * subtree. Making project creation feel heavyweight is how a club ends up
  * tracking real work in a side document instead.
  *
- * The RE defaults to the creator, because a project with no accountable person
+ * The PL defaults to the creator, because a project with no accountable person
  * is the one state the model cannot represent.
  */
 export function CreateProjectForm({
@@ -102,7 +102,7 @@ export function CreateProjectForm({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">
-            Responsible Engineer
+            Project Lead
           </span>
           <select
             name="primaryReId"
@@ -192,7 +192,7 @@ export function CreateProjectForm({
   );
 }
 
-/** Add someone to a project, optionally as an RE. */
+/** Add someone to a project, optionally as a PL. */
 export function AddProjectMemberForm({
   projectId,
   candidates,
@@ -260,9 +260,9 @@ export function AddProjectMemberForm({
         <label className="text-ink mt-3 flex items-start gap-2 text-sm">
           <input type="checkbox" name="asRE" value="yes" className="mt-1" />
           <span>
-            Make them a Responsible Engineer
+            Make them a Project Lead
             <span className="text-ink-muted block text-xs">
-              RE authority inherits down — they&apos;ll be able to manage this
+              PL authority inherits down — they&apos;ll be able to manage this
               project and everything under it.
             </span>
           </span>
@@ -280,7 +280,7 @@ export function AddProjectMemberForm({
   );
 }
 
-/** Promote to RE, demote, or hand over the primary role. */
+/** Promote to PL, demote, or hand over the primary role. */
 export function REControls({
   projectId,
   memberId,
@@ -293,7 +293,7 @@ export function REControls({
   isPrimary: boolean;
 }) {
   if (isPrimary) {
-    return <span className="text-ink-muted text-xs">Primary RE</span>;
+    return <span className="text-ink-muted text-xs">Primary PL</span>;
   }
 
   return (
@@ -309,7 +309,7 @@ export function REControls({
           <ActionButton
             action={setProjectREAction}
             fields={{ projectId, memberId, mode: "remove" }}
-            label="Remove RE"
+            label="Remove PL"
             pendingLabel="Saving…"
             tone="danger"
           />
@@ -318,7 +318,7 @@ export function REControls({
         <ActionButton
           action={setProjectREAction}
           fields={{ projectId, memberId, mode: "add" }}
-          label="Make RE"
+          label="Make PL"
           pendingLabel="Saving…"
         />
       )}

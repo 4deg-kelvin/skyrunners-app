@@ -223,7 +223,7 @@ export function MemberAdminControls({
             <span className="text-ink-muted mt-1 mb-2 block text-xs">
               An <span className="text-ink font-semibold">Advisor</span> — a
               faculty or project advisor — sees and can comment on everything,
-              but runs nothing: no projects, no deliverables and no RE roles.
+              but runs nothing: no projects, no deliverables and no PL roles.
             </span>
           </label>
         </ActionForm>
@@ -324,7 +324,7 @@ function DeleteMemberControl({
       <p className="text-ink-muted mt-1 text-xs">
         Their project memberships, hours, check-ins, trainings and requests go
         with it. Anyone reporting to them moves up to {memberName}&apos;s own
-        Lead rather than being orphaned. Refused if they&apos;re the primary RE
+        Lead rather than being orphaned. Refused if they&apos;re the primary PL
         of anything — hand those over first.
       </p>
 

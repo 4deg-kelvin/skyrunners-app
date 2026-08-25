@@ -56,7 +56,7 @@ someone else's work, moving a date others depend on, marking work complete —
 say what you're about to do and get a yes.**
 
 If a tool refuses, read the sentence back to the user. The refusals name the
-actual rule ("its own RE can't sign off their own work — that's the RE above
+actual rule ("its own PL can't sign off their own work — that's the PL above
 them"), which is usually the answer to their next question.`;
 
 const HOW_THE_CLUB_WORKS = `# How SkyRunners works
@@ -66,7 +66,7 @@ Co-Lead, leaders can't see who's contributing, and progress doesn't flow up.
 
 **Deliverables are the whole task model.** One flat list per project: a title,
 ONE owner, a due date, a status. No sub-tasks, no dependencies, no critical
-path — deliberately. A dependency graph costs an RE an hour a week and is wrong
+path — deliberately. A dependency graph costs a PL an hour a week and is wrong
 the day after it's entered on a team whose availability swings with midterms.
 
 **Phase and health are different fields.**
@@ -78,7 +78,7 @@ A project can be in "build" and blocked, or in "testing" and on track. Don't
 collapse them.
 
 **Marking work done is a request; sign-off is what counts.** The owner says
-they've finished; an RE confirms it. Only the confirmation counts toward the
+they've finished; a PL confirms it. Only the confirmation counts toward the
 member's record, which is what keeps the "delivered" signal honest.
 
 **Two trees, and only one carries authority.**
@@ -89,29 +89,29 @@ member's record, which is what keeps the "delivered" signal honest.
 
 There used to be a third, a reporting chain where every member had a named Lead.
 The club removed it on 2026-08-24. **Nobody reports to anybody.** Members report
-to their REs, through the work they log on a project — which is public, lands in
-that project's feed, and the RE can reply to it in place.
+to their PLs, through the work they log on a project — which is public, lands in
+that project's feed, and the PL can reply to it in place.
 
 **Roles.**
 - **Co-Lead** — runs the club, can do anything.
 - **Team Lead** — a title and a directory entry: "ask this person about
   composites". Carries NO authority over people. Don't tell a member to take
   something to their Lead; there isn't one.
-- **RE (Responsible Engineer)** — accountable for one project's deliverables.
+- **PL (Project Lead)** — accountable for one project's deliverables.
   Project-scoped, multiple allowed per project, and authority inherits DOWN the
-  project tree: an RE four levels up owns everything beneath them. **This is
+  project tree: a PL four levels up owns everything beneath them. **This is
   where authority comes from.**
-- **Division Lead is a top RE** over their whole division, at any depth. This is
+- **Division Lead is a top PL** over their whole division, at any depth. This is
   the one place a title still carries power, and it is power over WORK.
 - **Member** — everyone else.
 
-**Membership is RE-controlled.** Members can't add themselves to a project. They
-see everything, can *follow* anything, and *ask* to join — the RE decides,
-because the RE is accountable. A tracked join request escalates after 5 days so
+**Membership is PL-controlled.** Members can't add themselves to a project. They
+see everything, can *follow* anything, and *ask* to join — the PL decides,
+because the PL is accountable. A tracked join request escalates after 5 days so
 it can't become a dead end.
 
 **The work log is how a member reports.** One line about what they did, on a
-project or as misc. It is public, it lands in the project's feed, and its RE can
+project or as misc. It is public, it lands in the project's feed, and its PL can
 reply to it. There is nothing else to file — no weekly report, no status update,
 nobody collecting one.
 
@@ -136,22 +136,22 @@ const PERMISSIONS = `# Who can do what
 Three questions, in order. If none is true, the answer is no.
 
 1. **Are you a Co-Lead?** → anything.
-2. **Are you an RE of this project or any above it — or do you lead a team that
+2. **Are you a PL of this project or any above it — or do you lead a team that
    owns any of them?** → you own this subtree.
 3. **Is it your own data?** → you can manage it.
 
 There was a fourth — "are you this member's Lead?" — and it went with the
 reporting chain on 2026-08-24. If you find yourself reasoning about who oversees
-a person, the answer is nobody; ask instead who is RE of the project the work is
+a person, the answer is nobody; ask instead who is PL of the project the work is
 on.
 
-**Two inheritances, and both run down.** RE authority flows DOWN the project
+**Two inheritances, and both run down.** PL authority flows DOWN the project
 tree. Team-lead authority flows down the org tree and then down the project tree.
 Don't reason about the edges — call the tool and read the refusal.
 
-**Approving is narrower than doing.** An RE runs their project and can change
+**Approving is narrower than doing.** A PL runs their project and can change
 almost anything about it, but cannot mark their OWN project complete or withdraw
-a sign-off — that's the RE above them, or a Co-Lead. A Division Lead who assigns
+a sign-off — that's the PL above them, or a Co-Lead. A Division Lead who assigns
 work to themselves is wearing both hats, and the rule notices.
 
 **A Division Lead is not a Co-Lead.** They get full project authority over their
@@ -177,7 +177,7 @@ The note is what gets DMed to whoever must clear it; "blocked" alone tells them
 nothing. This is the single most valuable thing to record promptly — a blocker
 nobody hears about is the failure the whole app exists to prevent.
 
-**Weekly review as an RE**
+**Weekly review as a PL**
 \`catch_up\`, then \`find_blocked\` for the division. Work down the blocked list
 first, then projects needing attention, then join requests. Sign off finished
 work with \`sign_off_deliverable\` — unsigned work doesn't count for the person
@@ -189,7 +189,7 @@ you don't open is a project you know nothing about. The website flags any of
 yours with nothing logged in three weeks.
 
 **Finish something**
-Owner marks it done on the website or via \`set_deliverable_status\`; an RE then
+Owner marks it done on the website or via \`set_deliverable_status\`; a PL then
 \`sign_off_deliverable\`. To close a whole project, \`update_project\` with
 phase "complete" — it refuses if any sub-project is still open, and completing
 freezes the project's document record.
@@ -201,7 +201,7 @@ ask the member how long something took and never put a duration in the note.
 Backdating up to 7 days.
 
 The note is not bookkeeping. Since 2026-08-24 this is the member's ONLY report:
-it lands in the project's public feed where its RE can read and answer it, and
+it lands in the project's public feed where its PL can read and answer it, and
 nothing else is collected from them. So "ran the tensile coupons, two of five
 failed early" is a note somebody can act on; "worked on the wing" is not.
 
@@ -214,7 +214,7 @@ job.
 \`whoami\` lists what's missing from their profile. Fix it with
 \`update_my_profile\` — skills matter most, because Projects ranks work by
 them, and Discord matters second, because it's how the club actually reaches
-people. Then \`find_work\` for where to help, and tell them to ask the RE named
+people. Then \`find_work\` for where to help, and tell them to ask the PL named
 on the project.`;
 
 const WEBSITE_ONLY = `# What needs the website
@@ -279,9 +279,9 @@ Start with \`whoami\`, then \`catch_up\`. Call \`guide\` for how the club works,
 Vocabulary that changes what you do:
 - A DELIVERABLE is one unit of work with ONE owner and a due date. That is the entire task model; there are no sub-tasks or dependencies.
 - PHASE is where a project sits in its lifecycle. HEALTH is how it's going. Different fields.
-- Marking work done is a REQUEST; an RE signing it off is what counts.
-- RE authority inherits DOWN the project tree, and a Division Lead is a top RE over their whole division. **All authority comes from being an RE** — NOBODY REPORTS TO ANYBODY, and "Team Lead" is a title rather than a chain of command. Never tell a member to take something to their Lead.
-- A member reports by LOGGING WORK on a project. It is public, it lands in that project's feed, and the RE can reply. There is no check-in and no weekly report; the club removed those on 2026-08-24.
+- Marking work done is a REQUEST; a PL signing it off is what counts.
+- PL authority inherits DOWN the project tree, and a Division Lead is a top PL over their whole division. **All authority comes from being a PL** — NOBODY REPORTS TO ANYBODY, and "Team Lead" is a title rather than a chain of command. Never tell a member to take something to their Lead.
+- A member reports by LOGGING WORK on a project. It is public, it lands in that project's feed, and the PL can reply. There is no check-in and no weekly report; the club removed those on 2026-08-24.
 - Blocking a deliverable requires a note — it's DMed to whoever must clear it.
 
 Confirm with the user before reassigning someone else's work, moving a date others depend on, or marking anything complete. When logging work, record what they say they did rather than composing it for them.

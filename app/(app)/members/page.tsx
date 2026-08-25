@@ -132,7 +132,7 @@ export default async function MembersPage() {
                           WHAT they lead, not just that they do.
 
                           "Lead" alone doesn't say whether somebody runs a whole
-                          division — which makes them a top RE over every project
+                          division — which makes them a top PL over every project
                           inside it — or one sub-team. This page is where people
                           answer "who do I ask about this?", so it names the unit.
 
@@ -190,7 +190,7 @@ export default async function MembersPage() {
                           {reCount > 0 ? (
                             <span className="text-cardinal-600 font-semibold">
                               {" "}
-                              · RE on {reCount}
+                              · PL on {reCount}
                             </span>
                           ) : null}
                         </p>

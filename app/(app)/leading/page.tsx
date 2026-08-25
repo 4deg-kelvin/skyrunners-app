@@ -18,7 +18,7 @@ export const metadata = {
 };
 
 /**
- * What a Lead, an RE and a Co-Lead can and cannot do.
+ * What a Lead, a PL and a Co-Lead can and cannot do.
  *
  * ---------------------------------------------------------------------------
  * Why this page exists
@@ -26,9 +26,9 @@ export const metadata = {
  *
  * `lib/permissions.ts` is 900 lines and correct. Nobody in the club will read
  * it, and the app's authority model has one genuinely counter-intuitive shape
- * at its centre: **being somebody's Lead and being an RE of their project are
+ * at its centre: **being somebody's Lead and being a PL of their project are
  * different jobs, held by different people, and neither implies the other.**
- * Everything confusing downstream — why an RE can't open a report, why a Lead
+ * Everything confusing downstream — why a PL can't open a report, why a Lead
  * can't sign off a deliverable, why completing a project needs somebody else —
  * follows from that one split.
  *
@@ -41,7 +41,7 @@ export const metadata = {
  * them being read as gaps to work around.
  *
  * Open to anybody holding authority of any kind, INCLUDING a plain member who
- * is an RE — see the note in the body. Redirected rather than hidden for the
+ * is a PL — see the note in the body. Redirected rather than hidden for the
  * few who hold none: hiding a link is not access control, same rule as
  * `/dashboard`.
  */
@@ -54,10 +54,10 @@ export default async function LeadingPage() {
   /*
     Deliberately NOT gated on `globalRole`.
 
-    An RE is very often a plain member — that's the point of the role, and
+    A PL is very often a plain member — that's the point of the role, and
     `can.createEvent` and the join-request flow both lean on it. Gating this
     page on being a Lead would lock out exactly the people most likely to be
-    surprised by what an RE can and can't do.
+    surprised by what a PL can and can't do.
 
     Nothing here is sensitive either; it's the same rules published at
     /how-we-lead in less detail. So the only people sent away are those holding
@@ -81,7 +81,7 @@ export default async function LeadingPage() {
               ? "What a Division Lead does"
               : viewer.member.globalRole === "lead"
                 ? "What a Lead does"
-                : "What an RE does"
+                : "What a PL does"
         }
         description="Who can do what, and why the limits are deliberate. Members see all of this at /how-we-lead."
       />
@@ -98,7 +98,7 @@ export default async function LeadingPage() {
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-tile border-line border px-4 py-3.5">
-              <Badge tone="cardinal">RE</Badge>
+              <Badge tone="cardinal">PL</Badge>
               <p className="text-ink mt-2 text-sm font-bold">
                 You look after a PROJECT
               </p>
@@ -107,21 +107,21 @@ export default async function LeadingPage() {
                 decide who joins, you sign work off, you read its feed and
                 answer what people write in it. Authority flows{" "}
                 <span className="text-ink font-semibold">down</span> the project
-                tree — an RE of a parent covers everything beneath it, however
+                tree — a PL of a parent covers everything beneath it, however
                 deep.
               </p>
             </div>
             <div className="rounded-tile border-line border px-4 py-3.5">
               <Badge tone="neutral">Team Lead</Badge>
               <p className="text-ink mt-2 text-sm font-bold">
-                A title, plus whatever you&apos;re RE of
+                A title, plus whatever you&apos;re PL of
               </p>
               <p className="text-ink-soft mt-1 text-sm">
                 Being a Team Lead makes you findable — people know to ask you
                 about your area. It does not, by itself, give you authority over
                 anybody. If you lead a{" "}
                 <span className="text-ink font-semibold">division</span>,
-                that&apos;s different: it makes you a top RE over every project
+                that&apos;s different: it makes you a top PL over every project
                 inside it.
               </p>
             </div>
@@ -134,7 +134,7 @@ export default async function LeadingPage() {
               </span>{" "}
               There used to be a second hierarchy here: every member had a named
               Lead who read their twice-weekly check-in. The club removed it.
-              Members report to their REs now, through the work they log on a
+              Members report to their PLs now, through the work they log on a
               project — which is public, sits in that project&apos;s feed, and
               can be replied to in place.
             </p>
@@ -142,16 +142,16 @@ export default async function LeadingPage() {
               What that means for you in practice: if you want to know how
               somebody is doing, open the project you share with them. If you
               want somebody to be accountable for a piece of work, make them its
-              RE. There is no longer any other lever.
+              PL. There is no longer any other lever.
             </p>
           </div>
 
           <p className="text-ink-soft mt-4 text-[15px]">
             <span className="text-ink font-semibold">
-              A Division Lead is a top RE.
+              A Division Lead is a top PL.
             </span>{" "}
-            Leading a division gives you RE powers over every project inside it,
-            at any depth — deliverables, sign-off, join requests, appointing REs
+            Leading a division gives you PL powers over every project inside it,
+            at any depth — deliverables, sign-off, join requests, appointing PLs
             — without being named on each one. Leading a sub-team gives you the
             same over that team&apos;s work and nothing sideways. This is the
             one place a title still carries authority, and it is authority over
@@ -161,12 +161,12 @@ export default async function LeadingPage() {
       </Card>
 
       {/* ------------------------------------------------------------------
-          RE. Spelled out because the role is held by plain members, carries
+          PL. Spelled out because the role is held by plain members, carries
           real authority, and nothing about a member's badge says they have it.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
-          <SectionLabel>If you&apos;re an RE</SectionLabel>
+          <SectionLabel>If you&apos;re a PL</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
             You are accountable for one project finishing
             {role.isRE ? null : (
@@ -177,16 +177,16 @@ export default async function LeadingPage() {
             )}
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-            Not a rank. You can be a first-year member and an RE, and plenty
-            are. Authority runs{" "}
-            <span className="text-ink font-semibold">down</span> the project
-            tree: an RE of a parent project can do all of this on everything
-            beneath it, at any depth, which is what makes escalation work.
+            Not a rank. You can be a first-year member and a PL, and plenty are.
+            Authority runs <span className="text-ink font-semibold">down</span>{" "}
+            the project tree: a PL of a parent project can do all of this on
+            everything beneath it, at any depth, which is what makes escalation
+            work.
           </p>
 
           <div className="mt-4 space-y-2.5">
             <Rule can title="Decide who works on it">
-              Add people, approve join requests, appoint other REs. Members
+              Add people, approve join requests, appoint other PLs. Members
               can&apos;t add themselves — you decide, because you carry the
               deliverable.
             </Rule>
@@ -204,7 +204,7 @@ export default async function LeadingPage() {
                 so can the deliverable&apos;s owner
               </span>
               . That&apos;s the one place in the app where the person doing the
-              work has a right their RE-only neighbours don&apos;t, and
+              work has a right their PL-only neighbours don&apos;t, and
               it&apos;s deliberate: they&apos;re the one who finds out what the
               job actually involves.
             </Rule>
@@ -232,14 +232,14 @@ export default async function LeadingPage() {
               their note was read.
             </Rule>
             <Rule title="Declare your own project finished">
-              The RE above you, or the Division Lead, agrees it&apos;s done. Set
+              The PL above you, or the Division Lead, agrees it&apos;s done. Set
               the stage to flight test and tell them it&apos;s ready.
             </Rule>
-            <Rule title="Leave a parent project as its last RE">
+            <Rule title="Leave a parent project as its last PL">
               Everything underneath escalates through it, so name somebody else
               first. The same applies if you&apos;re stepping back for a quarter
               — hand it over rather than going quiet, because a project with an
-              absent sole RE blocks every sign-off beneath it.
+              absent sole PL blocks every sign-off beneath it.
             </Rule>
           </div>
         </CardBody>
@@ -248,7 +248,7 @@ export default async function LeadingPage() {
       {/* ------------------------------------------------------------------
           Advisors. Here rather than in the member guide because the people who
           need to understand the role are the ones who work alongside one — an
-          RE wondering why a professor can comment but not sign anything off.
+          PL wondering why a professor can comment but not sign anything off.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
@@ -265,7 +265,7 @@ export default async function LeadingPage() {
 
           <div className="mt-4 space-y-2.5">
             <Rule can title="Name one on your project">
-              Any RE can, from{" "}
+              Any PL can, from{" "}
               <span className="text-ink font-semibold">Who to ask</span>. It
               grants them nothing — they could already see your project, and
               every other one. All it changes is whether your project tells
@@ -281,9 +281,9 @@ export default async function LeadingPage() {
               professor is a project with two engineers.
             </Rule>
             <Rule title="Expect them to sign anything off">
-              Approving work is an RE&apos;s job and stays one. An advisor
-              saying the analysis looks wrong is exactly what they&apos;re for;
-              acting on it is still yours.
+              Approving work is a PL&apos;s job and stays one. An advisor saying
+              the analysis looks wrong is exactly what they&apos;re for; acting
+              on it is still yours.
             </Rule>
           </div>
         </CardBody>
@@ -296,7 +296,7 @@ export default async function LeadingPage() {
         <CardBody>
           <SectionLabel>If you lead a division</SectionLabel>
           <h2 className="text-ink mt-2 text-2xl font-bold">
-            You&apos;re a top RE over everything inside it
+            You&apos;re a top PL over everything inside it
             {role.divisionsLed.length > 0 ? (
               <span className="text-ink-muted text-base font-normal">
                 {" "}
@@ -306,7 +306,7 @@ export default async function LeadingPage() {
           </h2>
           <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
             This is the one that surprises people. Leading a division gives you
-            everything in the RE list above on{" "}
+            everything in the PL list above on{" "}
             <span className="text-ink font-semibold">
               every project inside it
             </span>
@@ -317,7 +317,7 @@ export default async function LeadingPage() {
 
           <div className="mt-4 space-y-2.5">
             <Rule can title="Approve completion inside your division">
-              You&apos;re the reviewer of record for work whose RE can&apos;t
+              You&apos;re the reviewer of record for work whose PL can&apos;t
               sign off their own project. In practice that&apos;s most top-level
               projects.
             </Rule>
@@ -350,13 +350,13 @@ export default async function LeadingPage() {
           </h2>
 
           <div className="mt-4 space-y-2.5">
-            <Rule can title="Read the feed on projects you're an RE of">
+            <Rule can title="Read the feed on projects you're a PL of">
               Work people log lands in the project&apos;s feed, and you can
               reply to any line of it. That is the whole reporting relationship
               now — there are no check-ins to collect and nobody files a report
               to a person.
             </Rule>
-            <Rule can title="Answer join requests on projects you're an RE of">
+            <Rule can title="Answer join requests on projects you're a PL of">
               Somebody asking to help is the whole point of Find Work.
               Unanswered requests escalate after {HELP_REQUEST_STALE_DAYS} days.
             </Rule>
@@ -392,9 +392,9 @@ export default async function LeadingPage() {
               Everything else about a member is public, including what they
               logged on every project.
             </Rule>
-            <Rule title="Mark a project complete when you're its RE">
+            <Rule title="Mark a project complete when you're its PL">
               Finishing the work and agreeing it&apos;s finished are different
-              jobs. The RE above the project — or its Division Lead — signs it
+              jobs. The PL above the project — or its Division Lead — signs it
               off. You can change everything else about it, and you can always
               reopen it: saying something isn&apos;t done is always safe.
             </Rule>
@@ -404,14 +404,14 @@ export default async function LeadingPage() {
               marking its own homework.
             </Rule>
             <Rule title="Add yourself to a project">
-              Nobody can. Ask the RE — it&apos;s tracked, and it escalates.
+              Nobody can. Ask the PL — it&apos;s tracked, and it escalates.
             </Rule>
             {!coLead ? (
               <Rule title="Start a project in a division you don't lead">
                 Work appearing in a division whose lead didn&apos;t know about
                 it is the silo problem wearing a different hat. You can create
                 freely inside your own, and sub-projects under anything
-                you&apos;re an RE of.
+                you&apos;re a PL of.
               </Rule>
             ) : null}
           </div>
@@ -429,7 +429,7 @@ export default async function LeadingPage() {
               The things that reshape the club
             </h2>
             <p className="text-ink-soft mt-2 max-w-2xl text-[15px]">
-              A Co-Lead can do anything a Lead or an RE can, anywhere. On top of
+              A Co-Lead can do anything a Lead or a PL can, anywhere. On top of
               that, these are yours alone — they change the rules rather than
               the work, which is why they sit with the smallest group.
             </p>

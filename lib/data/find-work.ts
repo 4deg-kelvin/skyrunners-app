@@ -9,7 +9,7 @@
  * without asking a Co-Lead. Every other page here is supporting cast; this is
  * the direct answer.
  *
- * Because membership is RE-controlled, "finding work" means two things, and the
+ * Because membership is PL-controlled, "finding work" means two things, and the
  * page has to do both:
  *
  *   1. See what needs doing across the whole club

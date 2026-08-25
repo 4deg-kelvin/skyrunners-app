@@ -209,7 +209,7 @@ function sameRow(a: unknown, b: unknown): boolean {
  * Loosening THAT would let a Lead file a report in somebody's name, which is
  * the one thing the reliability record must never allow.
  *
- * `update_entries_respond_re` had the identical latent bug — an RE answering a
+ * `update_entries_respond_re` had the identical latent bug — a PL answering a
  * section would have failed the same way the first time anyone tried it.
  *
  * So: rows that already exist are updated, rows that don't are inserted, and
@@ -355,7 +355,7 @@ export async function persistDiff(
     after.progressUpdates.flatMap((u) => u.entries.map((e) => [e.id, e]))
   );
 
-  // Split for the same reason as the collections above. This is the path an RE
+  // Split for the same reason as the collections above. This is the path a PL
   // takes when answering somebody's section: `update_entries_respond_re` is an
   // UPDATE policy, and an upsert would never reach it.
   const newEntries = [...nowEntries.values()].filter(

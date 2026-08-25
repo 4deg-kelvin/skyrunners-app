@@ -98,13 +98,13 @@ export interface CalendarView {
    * for the same question:
    *
    *   - you're COMMITTED to it — a session on work you're doing
-   *   - you're an RE of it or of anything above it — authority inherits down
+   *   - you're a PL of it or of anything above it — authority inherits down
    *     the project tree, so a Division Lead can schedule a review on any
    *     project inside their division without being named on it
    *   - you're a Co-Lead
    *
    * Creating used to offer only committed memberships, which silently excluded
-   * every RE who holds a project through inheritance. Editing offered EVERY
+   * every PL who holds a project through inheritance. Editing offered EVERY
    * live project to anybody who could edit the event, which let a member move
    * a club-wide session onto work they have nothing to do with. One list, one
    * rule, both forms.
@@ -189,7 +189,7 @@ export async function getCalendar(input: {
   const inWindow = expandOccurrences(store.events, now, until);
 
   /*
-    What this person may hang an event on. Committed, or RE-of-or-above, or a
+    What this person may hang an event on. Committed, or PL-of-or-above, or a
     Co-Lead — see `myProjects` on `CalendarView` for why all three.
   */
   const committedTo = new Set(

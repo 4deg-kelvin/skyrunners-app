@@ -50,7 +50,7 @@ export function MemberRequestForm({
    * The viewer's own most recent request to this person, if any.
    *
    * Shown rather than hidden. An ask that vanishes the moment you send it is
-   * the "email the RE" dead end wearing a different hat — you can't tell
+   * the "email the PL" dead end wearing a different hat — you can't tell
    * whether it arrived, and the only move left is to send it again.
    */
   existing?: MemberRequest;

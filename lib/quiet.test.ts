@@ -169,7 +169,7 @@ describe("what is deliberately not flagged", () => {
 
   test("nothing at stake: no committed members and no open work", () => {
     // /find-work already ranks unstaffed projects first, and the action there
-    // is "somebody join this" rather than "an RE chase somebody".
+    // is "somebody join this" rather than "a PL chase somebody".
     const out = call([project("p1")], [], [], []);
     assert.deepEqual(out, []);
   });

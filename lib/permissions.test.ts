@@ -84,10 +84,10 @@ const projects: Project[] = [
   project("other", null, ["reOther"], "divB"),
 
   /*
-    A deliberately DEEP branch, five levels, with an RE only at the top.
+    A deliberately DEEP branch, five levels, with a PL only at the top.
 
     The main tree is three deep, which is enough to prove inheritance happens
-    and not enough to prove it doesn't stop. "Is an RE four projects down still
+    and not enough to prove it doesn't stop. "Is a PL four projects down still
     covered?" is a real question about a real club structure, so it gets a real
     fixture rather than an argument from reading `projectChain`.
   */
@@ -165,34 +165,34 @@ describe("project tree traversal", () => {
   });
 });
 
-describe("RE authority inherits DOWN the project tree", () => {
-  test("RE of root can act on a deeply nested descendant", () => {
+describe("PL authority inherits DOWN the project tree", () => {
+  test("PL of root can act on a deeply nested descendant", () => {
     assert.equal(isREofOrAbove(actor("reRoot"), graph, "leaf"), true);
   });
 
-  test("RE of mid can act on leaf", () => {
+  test("PL of mid can act on leaf", () => {
     assert.equal(isREofOrAbove(actor("reMid"), graph, "leaf"), true);
   });
 
-  test("RE of leaf CANNOT act upward on its parent", () => {
+  test("PL of leaf CANNOT act upward on its parent", () => {
     assert.equal(isREofOrAbove(actor("reLeaf"), graph, "mid"), false);
     assert.equal(isREofOrAbove(actor("reLeaf"), graph, "root"), false);
   });
 
-  test("RE of a sibling tree has no authority here", () => {
+  test("PL of a sibling tree has no authority here", () => {
     assert.equal(isREofOrAbove(actor("reOther"), graph, "leaf"), false);
   });
 
-  test("a plain member has no RE authority", () => {
+  test("a plain member has no PL authority", () => {
     assert.equal(isREofOrAbove(actor("worker"), graph, "leaf"), false);
   });
 
   // -------------------------------------------------------------------------
   // Depth. There is no limit, and these say so at a depth nobody would reach
-  // by accident — d1 → d2 → d3 → d4 → d5, with the RE only at the top.
+  // by accident — d1 → d2 → d3 → d4 → d5, with the PL only at the top.
   // -------------------------------------------------------------------------
 
-  test("an RE four levels up still owns the bottom of the tree", () => {
+  test("a PL four levels up still owns the bottom of the tree", () => {
     assert.deepEqual(projectChain(graph, "d5"), ["d5", "d4", "d3", "d2", "d1"]);
     assert.equal(isREofOrAbove(actor("reD1"), graph, "d5"), true);
   });
@@ -211,15 +211,15 @@ describe("RE authority inherits DOWN the project tree", () => {
     assert.equal(isREofOrAbove(actor("reD5"), graph, "d5"), true);
   });
 
-  test("an RE deep in one tree has nothing in another", () => {
+  test("a PL deep in one tree has nothing in another", () => {
     assert.equal(isREofOrAbove(actor("reD5"), graph, "leaf"), false);
     assert.equal(isREofOrAbove(actor("reD1"), graph, "other"), false);
   });
 });
 
-describe("a Division Lead is a top RE over their division", () => {
-  test("they have RE authority on a project their division owns", () => {
-    // divLead is not an RE of anything. Before this rule they owned the
+describe("a Division Lead is a top PL over their division", () => {
+  test("they have PL authority on a project their division owns", () => {
+    // divLead is not a PL of anything. Before this rule they owned the
     // division on the org chart and could do nothing inside it.
     assert.equal(isREofOrAbove(actor("divLead"), graph, "root"), true);
   });
@@ -269,7 +269,7 @@ describe("a Division Lead is a top RE over their division", () => {
 
   test("a division lead still cannot read a personal report", () => {
     /*
-      "Top RE" means top RE, not Co-Lead, and this is the test that keeps the
+      "Top PL" means top PL, not Co-Lead, and this is the test that keeps the
       Division-Lead route above from quietly becoming one.
 
       It used to assert `viewMemberEffort` and `reviewUpdate`, both deleted on
@@ -314,7 +314,7 @@ describe("a Division Lead is a top RE over their division", () => {
   pointing them at something else would invent a claim the club did not make.
 
   What the block protected is the separation of authority over PEOPLE from
-  authority over WORK, and that survives: the two suites above assert RE
+  authority over WORK, and that survives: the two suites above assert PL
   authority down the project tree and the Division-Lead route into it, and they
   pass with no reporting chain in the fixture at all.
 
@@ -356,7 +356,7 @@ describe("co-lead is unconditional", () => {
 
 describe("work on a project is public", () => {
   /*
-    This block asserted the opposite until 2026-08-16: an RE of the project or
+    This block asserted the opposite until 2026-08-16: a PL of the project or
     above, the person themselves, and the Lead chain — nobody else.
 
     That rule was about HOURS. "3.5 hrs" invites comparison between volunteers
@@ -413,7 +413,7 @@ describe("the archived check-ins are the last non-public thing", () => {
     assert.equal(can.readArchivedCheckIns(actor("lead2"), "worker"), false);
   });
 
-  test("an RE of their project cannot, same as before", () => {
+  test("a PL of their project cannot, same as before", () => {
     assert.equal(can.readArchivedCheckIns(actor("reRoot"), "worker"), false);
   });
 
@@ -470,7 +470,7 @@ describe("training verification", () => {
   });
 });
 
-describe("membership is RE-controlled, with no cap", () => {
+describe("membership is PL-controlled, with no cap", () => {
   test("anyone can follow anything — visibility is never gated", () => {
     assert.equal(can.followProject(), true);
   });
@@ -489,19 +489,19 @@ describe("membership is RE-controlled, with no cap", () => {
     assert.equal(can.addProjectMember(actor("worker"), graph, "leaf"), false);
   });
 
-  test("the project's RE can add members", () => {
+  test("the project's PL can add members", () => {
     assert.equal(can.addProjectMember(actor("reLeaf"), graph, "leaf"), true);
   });
 
-  test("an ancestor RE can too, since authority inherits down", () => {
+  test("an ancestor PL can too, since authority inherits down", () => {
     assert.equal(can.addProjectMember(actor("reRoot"), graph, "leaf"), true);
   });
 
-  test("an unrelated RE cannot", () => {
+  test("an unrelated PL cannot", () => {
     assert.equal(can.addProjectMember(actor("reOther"), graph, "leaf"), false);
   });
 
-  test("there is no commitment cap — REs staff as they see fit", () => {
+  test("there is no commitment cap — PLs staff as they see fit", () => {
     assert.ok(!("isAtCommitmentCap" in can));
     assert.ok(!("commitToProject" in can));
   });
@@ -512,23 +512,23 @@ describe("membership is RE-controlled, with no cap", () => {
       That turned "we're not looking right now" into "you may not even ask",
       and hid the one button that gets somebody onto a project. A member who
       can't ask has no route in except knowing somebody, which is the problem
-      the app exists to remove. The RE still decides.
+      the app exists to remove. The PL still decides.
     */
     assert.equal(can.requestToJoin(actor("worker")), true);
     assert.equal(can.followProject(), true);
   });
 });
 
-describe("join requests keep the RE gate from becoming a dead end", () => {
-  test("the RE reviews requests for their project", () => {
+describe("join requests keep the PL gate from becoming a dead end", () => {
+  test("the PL reviews requests for their project", () => {
     assert.equal(can.reviewJoinRequest(actor("reLeaf"), graph, "leaf"), true);
   });
 
-  test("an ancestor RE can also review", () => {
+  test("an ancestor PL can also review", () => {
     assert.equal(can.reviewJoinRequest(actor("reRoot"), graph, "leaf"), true);
   });
 
-  test("a co-lead can unblock a request an RE has ignored", () => {
+  test("a co-lead can unblock a request a PL has ignored", () => {
     assert.equal(can.reviewJoinRequest(actor("coLead"), graph, "leaf"), true);
   });
 
@@ -557,28 +557,28 @@ describe("deliverables", () => {
     );
   });
 
-  test("an ancestor RE can, since they own the project subtree", () => {
+  test("an ancestor PL can, since they own the project subtree", () => {
     assert.equal(
       can.updateDeliverableStatus(actor("reRoot"), graph, "leaf", "worker"),
       true
     );
   });
 
-  test("only REs and Co-Leads shape the list itself", () => {
+  test("only PLs and Co-Leads shape the list itself", () => {
     assert.equal(can.manageDeliverables(actor("reLeaf"), graph, "leaf"), true);
     assert.equal(can.manageDeliverables(actor("worker"), graph, "leaf"), false);
   });
 
   /*
-    The checklist is the one place the OWNER gets a right their RE-only
+    The checklist is the one place the OWNER gets a right their PL-only
     neighbours don't. Safe because a todo counts towards nothing — the only
-    thing it can do is hold up a sign-off, and the RE can clear it themselves.
+    thing it can do is hold up a sign-off, and the PL can clear it themselves.
   */
   test("the owner keeps their own checklist, even though they can't shape the list", () => {
     assert.equal(
       can.manageDeliverables(actor("worker"), graph, "leaf"),
       false,
-      "precondition: the owner is not an RE here"
+      "precondition: the owner is not a PL here"
     );
     assert.equal(
       can.manageDeliverableTodos(actor("worker"), graph, "leaf", "worker"),
@@ -586,14 +586,14 @@ describe("deliverables", () => {
     );
   });
 
-  test("an RE of the project can too", () => {
+  test("a PL of the project can too", () => {
     assert.equal(
       can.manageDeliverableTodos(actor("reLeaf"), graph, "leaf", "worker"),
       true
     );
   });
 
-  test("and an RE above it, since authority inherits down the tree", () => {
+  test("and a PL above it, since authority inherits down the tree", () => {
     assert.equal(
       can.manageDeliverableTodos(actor("reRoot"), graph, "leaf", "worker"),
       true
@@ -714,14 +714,14 @@ describe("project creation is easy for leadership, but scoped to their division"
     );
   });
 
-  test("an RE can create a sub-project under something they own", () => {
+  test("a PL can create a sub-project under something they own", () => {
     assert.equal(
       can.createProject(actor("reLeaf"), graph, { parentProjectId: "leaf" }),
       true
     );
   });
 
-  test("an RE cannot create a sub-project under someone else's tree", () => {
+  test("a PL cannot create a sub-project under someone else's tree", () => {
     assert.equal(
       can.createProject(actor("reLeaf"), graph, { parentProjectId: "other" }),
       false
@@ -752,18 +752,18 @@ describe("only somebody above a project can approve it", () => {
     tree — which is exactly the case a naive implementation drops.
   */
 
-  test("the project's own RE cannot mark it complete", () => {
+  test("the project's own PL cannot mark it complete", () => {
     // The whole point. reMid runs `mid` and can edit everything about it…
     assert.equal(can.manageProject(actor("reMid"), graph, "mid"), true);
     // …but declaring their own work finished is somebody else's job.
     assert.equal(can.completeProject(actor("reMid"), graph, "mid"), false);
   });
 
-  test("the RE one level up can", () => {
+  test("the PL one level up can", () => {
     assert.equal(can.completeProject(actor("reRoot"), graph, "mid"), true);
   });
 
-  test("an RE four levels up can, at any depth", () => {
+  test("a PL four levels up can, at any depth", () => {
     assert.equal(can.completeProject(actor("reD1"), graph, "d5"), true);
   });
 
@@ -773,7 +773,7 @@ describe("only somebody above a project can approve it", () => {
     assert.equal(can.completeProject(actor("divLead"), graph, "root"), true);
   });
 
-  test("a Division Lead who is ALSO the project's RE is still excluded", () => {
+  test("a Division Lead who is ALSO the project's PL is still excluded", () => {
     /*
       Wearing both hats doesn't create a reviewer. The app can't fix an org
       that assigns a project to the person who approves it — but it can decline
@@ -793,7 +793,7 @@ describe("only somebody above a project can approve it", () => {
   });
 
   test("a Co-Lead always can — that's the escape hatch", () => {
-    // Without it, a Co-Lead who is the RE of a top-level project could never
+    // Without it, a Co-Lead who is the PL of a top-level project could never
     // complete it, and it would be stuck forever.
     const selfAssigned: Project[] = projects.map((p) =>
       p.id === "root" ? { ...p, reIds: ["coLead"], primaryReId: "coLead" } : p
@@ -812,7 +812,7 @@ describe("only somebody above a project can approve it", () => {
     assert.equal(can.completeProject(actor("subLead"), graph, "mid"), false);
   });
 
-  test("an RE of a sibling tree cannot", () => {
+  test("a PL of a sibling tree cannot", () => {
     assert.equal(can.completeProject(actor("reOther"), graph, "mid"), false);
   });
 
@@ -827,17 +827,17 @@ describe("only somebody above a project can approve it", () => {
 });
 
 describe("withdrawing a sign-off needs the same authority", () => {
-  test("signing off stays with the project's own RE", () => {
+  test("signing off stays with the project's own PL", () => {
     // Unchanged, and deliberately so — that's the job the deliverable model
     // costs them five minutes a week for.
     assert.equal(can.manageDeliverables(actor("reMid"), graph, "mid"), true);
   });
 
-  test("but that RE cannot overturn a sign-off on their own project", () => {
+  test("but that PL cannot overturn a sign-off on their own project", () => {
     assert.equal(can.withdrawSignOff(actor("reMid"), graph, "mid"), false);
   });
 
-  test("the RE above can", () => {
+  test("the PL above can", () => {
     assert.equal(can.withdrawSignOff(actor("reRoot"), graph, "mid"), true);
   });
 
@@ -897,7 +897,7 @@ describe("closing an event off is narrower than creating one", () => {
  *
  * A faculty or project advisor: sees everything, comments on anything, builds
  * nothing. Most of that falls out of the model for free — an advisor is never
- * an RE and never in a Lead chain, so every project and review right declines
+ * a PL and never in a Lead chain, so every project and review right declines
  * on its own. What needs pinning is the half that does NOT fall out:
  *
  * `globalRole !== "member"` was shorthand for "is leadership" in twenty places.
@@ -954,7 +954,7 @@ describe("an advisor holds no authority", () => {
       advisor it offered a request that, if approved, would have made them staff:
       joining is how somebody takes on deliverables, and an advisor holds none.
 
-      The way an advisor attaches to a project is an RE naming them as its
+      The way an advisor attaches to a project is a PL naming them as its
       advisor — a different act, recorded in `project_advisors`.
     */
     assert.equal(can.requestToJoin(advisor()), false);
@@ -1020,7 +1020,7 @@ const completedGraph: OrgGraph = {
 };
 
 describe("attaching to the engineering record", () => {
-  test("a committed member can attach, without being an RE", () => {
+  test("a committed member can attach, without being a PL", () => {
     // The point of the rule: the person who ran the test holds the report.
     assert.equal(
       can.attachArtifact(actor("worker"), graph, "leaf", true),
@@ -1036,7 +1036,7 @@ describe("attaching to the engineering record", () => {
     );
   });
 
-  test("an RE above the project can, without being on it", () => {
+  test("a PL above the project can, without being on it", () => {
     assert.equal(
       can.attachArtifact(actor("reRoot"), graph, "leaf", false),
       true
@@ -1082,11 +1082,11 @@ describe("attaching to the engineering record", () => {
 });
 
 describe("removing from the engineering record freezes on completion", () => {
-  test("while active, the project's own RE can remove", () => {
+  test("while active, the project's own PL can remove", () => {
     assert.equal(can.manageArtifact(actor("reLeaf"), graph, "leaf"), true);
   });
 
-  test("while active, an RE above can remove", () => {
+  test("while active, a PL above can remove", () => {
     assert.equal(can.manageArtifact(actor("reRoot"), graph, "leaf"), true);
   });
 
@@ -1095,14 +1095,14 @@ describe("removing from the engineering record freezes on completion", () => {
     assert.equal(can.manageArtifact(actor("worker"), graph, "leaf"), false);
   });
 
-  test("once COMPLETE, the RE loses it", () => {
+  test("once COMPLETE, the PL loses it", () => {
     assert.equal(
       can.manageArtifact(actor("reLeaf"), completedGraph, "leaf"),
       false
     );
   });
 
-  test("once COMPLETE, an RE above loses it too", () => {
+  test("once COMPLETE, a PL above loses it too", () => {
     assert.equal(
       can.manageArtifact(actor("reRoot"), completedGraph, "leaf"),
       false
@@ -1110,7 +1110,7 @@ describe("removing from the engineering record freezes on completion", () => {
   });
 
   test("once COMPLETE, a Division Lead loses it", () => {
-    // A Division Lead is a top RE, so this follows — but it's the case where
+    // A Division Lead is a top PL, so this follows — but it's the case where
     // "surely a Lead can" is most tempting, so it gets its own line.
     assert.equal(
       can.manageArtifact(actor("divLead"), completedGraph, "leaf"),

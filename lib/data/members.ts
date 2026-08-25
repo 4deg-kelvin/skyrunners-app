@@ -43,7 +43,7 @@ export interface RosterRow {
    *
    * `globalRole` says "lead" but not WHAT of, and leading a division is a
    * materially different job from leading a sub-team — a Division Lead is a
-   * top RE over everything inside it (see `leadsTeamAbove`). The roster is the
+   * top PL over everything inside it (see `leadsTeamAbove`). The roster is the
    * page people use to answer "who do I ask about this?", so the answer has to
    * name the thing, not the rank.
    */
@@ -142,7 +142,7 @@ export interface MemberProjectRow {
    * viewer isn't allowed to see their effort data.
    *
    * Was `hoursLogged`. Same permission gate, same reasoning — this is the
-   * per-project half of the privacy model, which an RE may see for their own
+   * per-project half of the privacy model, which a PL may see for their own
    * project and nobody else may — just no longer a duration. See
    * `can.viewMemberWorkOnProject`.
    */
@@ -185,7 +185,7 @@ export interface MemberProfileView {
    *
    * Belongs to the viewer, not the profile's owner, which is why it's passed in
    * rather than derived from `memberId`. Shown so an ask doesn't vanish the
-   * moment it's sent — an invisible request is the "email the RE and wait" dead
+   * moment it's sent — an invisible request is the "email the PL and wait" dead
    * end, and the only move it leaves is to send it again.
    */
   myRequest?: MemberRequest;
@@ -330,7 +330,7 @@ export async function getMemberProfile(
  * Teams and divisions this person leads. Divisions first.
  *
  * A division is a team with no parent, and the distinction matters on the
- * roster: leading one makes you a top RE over every project inside it, at any
+ * roster: leading one makes you a top PL over every project inside it, at any
  * depth. Leading a sub-team is the same authority over a much smaller subtree.
  * "Lead" alone says neither.
  */
@@ -355,13 +355,13 @@ function teamsLedBy(
  * What kinds of authority this person actually holds.
  *
  * `globalRole` answers "are they leadership" and nothing else — it can't tell
- * you whether a plain member is an RE of three projects, or whether a "lead"
+ * you whether a plain member is a PL of three projects, or whether a "lead"
  * runs a division or one sub-team. Both distinctions change what the leadership
  * guide should say to them, and whether they should be offered it at all.
  */
 export async function getLeadershipRoles(memberId: string): Promise<{
   /**
-   * An RE of at least one project.
+   * A PL of at least one project.
    *
    * Also decides whether the Dashboard link appears in the nav, and it has to be
    * the SAME fact `/dashboard` redirects on — `can.viewLeadershipDashboard`.

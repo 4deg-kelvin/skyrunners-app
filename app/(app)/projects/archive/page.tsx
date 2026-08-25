@@ -169,10 +169,10 @@ export default async function ProjectArchivePage() {
                             </div>
                             <p className="text-ink-muted mt-1.5 text-sm">
                               {res.length > 0
-                                ? `${res.length > 1 ? "REs" : "RE"}: ${res
+                                ? `${res.length > 1 ? "PLs" : "PL"}: ${res
                                     .map((r) => r.fullName)
                                     .join(", ")}`
-                                : "No RE recorded"}
+                                : "No PL recorded"}
                               {done > 0
                                 ? ` · ${done} delivered`
                                 : " · nothing signed off"}

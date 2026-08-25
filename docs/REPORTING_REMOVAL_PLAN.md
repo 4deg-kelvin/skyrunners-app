@@ -59,10 +59,10 @@ a deletion followed by a gap.
 - **No more bi-weekly check-ins.** Members stop filing a twice-weekly report.
 - **No reporting chain.** Nobody has a Lead they report to; `profiles.lead_id`
   stops meaning anything.
-- **Members report to their REs instead** — through the work they log on a
+- **Members report to their PLs instead** — through the work they log on a
   project, which is already public and already in the project's feed.
 - **Co-Lead, Team Lead and Member remain as titles**, but symbolic. Authority
-  comes from being an RE of a project.
+  comes from being a PL of a project.
 - **Co-Leads keep access to everything.**
 - **Trainings and facility access need a new framework**, because today a Lead
   verifies them and there will be no Leads in the authority sense.
@@ -80,11 +80,11 @@ being removed.
 | Project authority | "who is accountable for this WORK?" | `isREofOrAbove`, `leadsTeamAbove` | **Kept** |
 
 **`leadsTeamAbove` must survive, and it is the one item I would push back on if it
-were on the list.** It is what makes a Division Lead a top RE over every project
+were on the list.** It is what makes a Division Lead a top PL over every project
 in their division. That is authority over PROJECTS, not over people; it is already
-folded into `isREofOrAbove`; and it is exactly "the RE rules for projects" that the
+folded into `isREofOrAbove`; and it is exactly "the PL rules for projects" that the
 decision says to keep. Delete it and a Division Lead cannot add a deliverable in
-their own division without being named RE on every project individually — which
+their own division without being named PL on every project individually — which
 recreates the "go ask a Co-Lead" bottleneck this app exists to remove.
 
 So: **`isLeadOfOrAbove` and `leadChain` go; `isREofOrAbove` and `leadsTeamAbove`
@@ -136,8 +136,8 @@ Counted, not estimated.
 
 **Dashboard:** five of its thirteen sections are chain-shaped — Not Being Read,
 Gone Quiet, Roll-Up, Needs Review, Update Window. What remains (Waiting On You As
-RE, Requests To Answer, Trainings To Verify, Finished Recently, Deadlines Moved,
-Needs Attention) is already an RE dashboard.
+PL, Requests To Answer, Trainings To Verify, Finished Recently, Deadlines Moved,
+Needs Attention) is already a PL dashboard.
 
 **Cron:** `checkin-reminders` goes, freeing one of the two Hobby-plan cron slots.
 Worth knowing — that limit has already cost four failed deployments once.
@@ -147,16 +147,16 @@ Worth knowing — that limit has already cost four failed deployments once.
 ## What replaces it, and why most of it already exists
 
 This is what makes the change safe: **the replacement shipped last week.** Logging
-work is public, the project page shows one merged feed of work, and an RE can reply
-to any line in it. "Members report to their REs" is already the working path, so
+work is public, the project page shows one merged feed of work, and a PL can reply
+to any line in it. "Members report to their PLs" is already the working path, so
 removing check-ins removes a second, heavier way of doing the same thing rather
 than leaving a hole.
 
 Two things the chain did that nothing else does yet:
 
 1. **It made somebody accountable for reading.** An unread check-in escalated to a
-   named person after three days. Nothing replaces that, and nothing should — an RE
-   reading their own project's feed is the model now, and an RE who ignores their
+   named person after three days. Nothing replaces that, and nothing should — a PL
+   reading their own project's feed is the model now, and a PL who ignores their
    project has a visibly stalled project rather than a private failure.
 2. **It made "gone quiet" detectable.** A member who stopped appearing was flagged
    on their Lead's dashboard. **Recommendation: keep this, re-scoped to the
@@ -172,7 +172,7 @@ because each one is a rule somebody will want the reasoning for later.
 
 ### 1. Division Leads keep project authority
 
-`leadsTeamAbove` stays. A Division Lead remains a top RE over every project in
+`leadsTeamAbove` stays. A Division Lead remains a top PL over every project in
 their division. Symbolic applies to the reporting relationship between people, not
 to accountability for work.
 
@@ -180,7 +180,7 @@ to accountability for work.
 
 Each catalogue item is configured one of two ways:
 
-- **Assigned to a named Lead** who signs off requests for it. This is the RE
+- **Assigned to a named Lead** who signs off requests for it. This is the PL
   pattern applied to a machine: accountability sits with a person, not a rank.
 - **Self-verify.** The member ticks it themselves and no sign-off is asked for.
   Right for anything where the honest answer is "did you read this" — a shop
@@ -247,7 +247,7 @@ safety net, and every removed arm should have a test deleted or rewritten
 deliberately, with the reasoning in the diff.
 
 **Phase 3 — the pages.** The dashboard loses five sections and becomes explicitly
-the RE dashboard. Member profiles lose Lead and Direct Reports. `lib/review.ts` and
+the PL dashboard. Member profiles lose Lead and Direct Reports. `lib/review.ts` and
 the digest's check-in sections go. "Gone quiet" is re-scoped to the project.
 
 **Phase 4 — the new frameworks.** Delete `lib/contribution.ts`, the
@@ -269,8 +269,8 @@ be left in place with comments rather than dropped. Then CLAUDE.md, HANDOFF,
 ## Risks, and the one that worries me
 
 **Accountability genuinely thins out.** The chain's real function was that somebody
-was *named* as responsible for noticing. "The RE sees the feed" is lighter by
-design, but if REs do not look, nothing tells anyone. The per-project "gone quiet"
+was *named* as responsible for noticing. "The PL sees the feed" is lighter by
+design, but if PLs do not look, nothing tells anyone. The per-project "gone quiet"
 flag is the mitigation, and I would build it in Phase 3 rather than defer it.
 
 **966 tests currently pass, and a large block of them assert chain behaviour.**

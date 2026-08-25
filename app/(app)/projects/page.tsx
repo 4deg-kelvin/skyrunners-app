@@ -100,12 +100,12 @@ export default async function ProjectsPage() {
         <PageHeader
           label="The Club's Work"
           title="Projects"
-          description="Everything the club is building, ranked by where you'd help most. To join anything, ask its RE — the ask is tracked."
+          description="Everything the club is building, ranked by where you'd help most. To join anything, ask its PL — the ask is tracked."
           action={
             <div className="flex flex-wrap items-center gap-2">
               {/*
                 Posting an ask moved here with the rest of `/find-work`. It's
-                the route to being useful that doesn't depend on one RE reading
+                the route to being useful that doesn't depend on one PL reading
                 their inbox, so it belongs beside the projects, not on a page
                 of its own.
               */}

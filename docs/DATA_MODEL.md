@@ -29,7 +29,7 @@ WITH RECURSIVE subtree AS (
 SELECT * FROM subtree;
 ```
 
-This one query powers the project browser, the Gantt rows, and inherited RE permission
+This one query powers the project browser, the Gantt rows, and inherited PL permission
 checks. It's the reason Postgres is the right database for this app.
 
 > **Optimization for later, not now:** add a denormalized `path` column
@@ -90,7 +90,7 @@ Divisions and all nested sub-teams live here. A Division is simply a team with
 | `parent_id` | uuid? FK → teams | `NULL` = Division (Co-Lead configured) |
 | `kind` | enum | `division` \| `team` — derived, stored for query convenience |
 | `lead_id` | uuid? FK → profiles | This unit's Lead |
-| `re_id` | uuid? FK → profiles | Division-level Responsible Engineer. Sets up sub-teams beneath this unit |
+| `re_id` | uuid? FK → profiles | Division-level Project Lead. Sets up sub-teams beneath this unit |
 | `color` | text? | Visual coding across Gantt and calendar |
 | `is_active` | bool | |
 | `created_at` | timestamptz | |
@@ -120,14 +120,14 @@ Nests arbitrarily. Attached to a team, or to a parent project, or both.
 | `description` | text? | |
 | `parent_id` | uuid? FK → projects | `NULL` = top-level project |
 | `team_id` | uuid? FK → teams | Owning org unit |
-| `primary_re_id` | uuid FK → profiles | **Required.** The go-to person. Additional REs live in `project_members` with `role = 're'` — multiple REs per project are allowed |
+| `primary_re_id` | uuid FK → profiles | **Required.** The go-to person. Additional PLs live in `project_members` with `role = 're'` — multiple PLs per project are allowed |
 | `phase` | enum | Where in the lifecycle: `concept` \| `requirements` \| `preliminary_design` \| `detailed_design` \| `manufacturing` \| `integration` \| `testing` \| `flight_test` \| `complete` |
 | `health` | enum | How it's going: `on_track` \| `at_risk` \| `blocked` \| `complete`. Separate from phase — *where* and *how* are different questions |
 | `start_date` | date? | |
 | `target_date` | date? | |
 | `actual_end_date` | date? | |
 | `dates_overridden` | bool | If false, dates roll up from children (see Gantt) |
-| `is_open_to_join` | bool | **Defaults true.** Members enroll in anything that interests them; an RE can close a project if there's a real reason |
+| `is_open_to_join` | bool | **Defaults true.** Members enroll in anything that interests them; a PL can close a project if there's a real reason |
 | `open_roles` | text? | "Looking for: composites, CFD" |
 | `time_commitment` | text? | "~5 hrs/week" — sets expectations before joining |
 | `priority` | enum? | `low` \| `medium` \| `high` \| `critical` |
@@ -228,7 +228,7 @@ Index `(member_id, work_date)` and `(project_id, work_date)`.
 | `update_id` | uuid FK → progress_updates | |
 | `project_id` | uuid FK → projects | |
 | `progress` | text | What got done **on this project** |
-| `blockers` | text? | **Surface prominently — the early-warning signal.** Routes to this project's REs |
+| `blockers` | text? | **Surface prominently — the early-warning signal.** Routes to this project's PLs |
 | `next_steps` | text? | |
 | `hours` | numeric | Hours on this project in the period. Auto-filled from `work_logs` |
 
@@ -239,14 +239,14 @@ per-project activity feed.
 >
 > Members work on multiple projects — that's the whole point of open enrollment. If an
 > update is one blob of text, "finished the layup, still waiting on parts" is ambiguous
-> to a Lead who oversees several of that person's projects, and an RE can't tell whether
+> to a Lead who oversees several of that person's projects, and a PL can't tell whether
 > a blocker is theirs to clear. Splitting per project makes every note
 > self-locating.
 >
 > Three things fall out of this for free:
 >
 > 1. **Per-project activity feeds** — every note anyone wrote about a project, in order
-> 2. **Blockers route to the right RE** automatically, via `project_id`
+> 2. **Blockers route to the right PL** automatically, via `project_id`
 > 3. **Hours reconcile per project**, so the update and the time log agree
 >
 > Entries are **auto-seeded from `work_logs`** for the period, so submitting an update is
@@ -422,7 +422,7 @@ Refresh nightly via Vercel Cron.
 **`project_deadline_approaching`** \| **`milestone_at_risk`**) · `title` · `body?` ·
 `link?` · `read_at?` · `emailed_at?` · `created_at`
 
-> The last two go to **REs**, not the assignee. An RE is accountable for the
+> The last two go to **PLs**, not the assignee. A PL is accountable for the
 > deliverable, so they need to see a slipping deadline before it slips — that's what
 > makes the reminder useful rather than a post-mortem. `training_request` goes to the
 > member's Lead when a training verification is waiting on them.
@@ -479,10 +479,10 @@ Things the database or permission module must guarantee:
 |---|---|---|
 | `v_project_tree` | Flattened tree with depth and materialized path | live, invoker |
 | `v_project_division` | Resolves a project to its division | live, invoker |
-| `v_project_re_authority` | Who holds RE authority where | live, invoker |
+| `v_project_re_authority` | Who holds PL authority where | live, invoker |
 | `v_project_progress` | Deliverable counts and fraction per project | live, invoker |
 | `v_projects_needing_attention` | The exception feed | live, invoker |
-| `v_join_requests_for_re` | Requests awaiting an RE | live, invoker |
+| `v_join_requests_for_re` | Requests awaiting a PL | live, invoker |
 | `v_stale_join_requests` | Requests past the escalation window | live, invoker |
 | `v_lead_chain` | Each member's reporting chain | **dropped `0048`** — no chain |
 | `v_member_hours_weekly` | Hours per member per week | **dropped `0048`** — no hours |

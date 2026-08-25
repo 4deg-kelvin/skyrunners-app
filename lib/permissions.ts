@@ -11,7 +11,7 @@
  * ----------------------------------------------------------------------------
  *
  *   1. Are you a Co-Lead?                        -> you can do anything
- *   2. Are you an RE of this project, or of any
+ *   2. Are you a PL of this project, or of any
  *      project ABOVE it — or do you LEAD a team
  *      that owns any of them?                    -> you own this project subtree
  *   3. Are you this member's Lead,
@@ -22,13 +22,13 @@
  *
  * Three ideas make this work, and all three are *inheritance*:
  *
- *   - RE authority flows DOWN the project tree. RE of "eVTOL Airframe" can act
+ *   - PL authority flows DOWN the project tree. PL of "eVTOL Airframe" can act
  *     on every sub-project beneath it, however deep. There is no depth limit
  *     and there never was — `projectChain` walks to the root.
  *   - Lead authority flows UP the reporting chain. Your Lead's Lead oversees
  *     you too.
- *   - **A Division Lead is a top RE.** Team-lead authority flows DOWN the org
- *     tree and then down the project tree: leading a division gives you RE
+ *   - **A Division Lead is a top PL.** Team-lead authority flows DOWN the org
+ *     tree and then down the project tree: leading a division gives you PL
  *     powers on every project inside it, and leading a sub-team gives you them
  *     on that sub-team's projects. Q2 is where this lands, deliberately — one
  *     function, so every project rule inherits it at once.
@@ -55,12 +55,12 @@ export interface Actor {
 export interface OrgGraph {
   getMember(id: string): Member | undefined;
   getProject(id: string): Project | undefined;
-  /** REs of this project only — not inherited. */
+  /** PLs of this project only — not inherited. */
   directREs(projectId: string): string[];
   /**
    * A team or division by id.
    *
-   * Here because a Division Lead is a top RE over everything in their division
+   * Here because a Division Lead is a top PL over everything in their division
    * (see `leadsTeamAbove`), and answering that needs the org tree. Synchronous
    * like the other three, and for the same reason: it's called in a loop while
    * walking up from a project's team, so a query per call would turn one
@@ -99,7 +99,7 @@ export function isLeadership(actor: Actor): boolean {
  *
  * Sees everything, can say something about anything, builds nothing. The
  * permission model handles most of this by omission — an advisor is never an
- * RE and never in anybody's Lead chain, so every project and review right
+ * PL and never in anybody's Lead chain, so every project and review right
  * declines on its own. This predicate is for the handful of places that have
  * to say something POSITIVE about them: letting them comment, and keeping them
  * out of machinery that assumes a person does engineering work.
@@ -146,11 +146,11 @@ export function teamChain(graph: OrgGraph, teamId: string): string[] {
 /**
  * Does the actor lead a team that owns this project, or one above it?
  *
- * **A Division Lead is a top RE.** They're accountable for everything their
- * division builds, so they must be able to do what an RE can do — add
- * deliverables, sign work off, answer join requests, appoint REs — on any
+ * **A Division Lead is a top PL.** They're accountable for everything their
+ * division builds, so they must be able to do what a PL can do — add
+ * deliverables, sign work off, answer join requests, appoint PLs — on any
  * project inside it. Before this they could do none of that unless they
- * happened to also be an RE or the person's Lead: they owned the division on
+ * happened to also be a PL or the person's Lead: they owned the division on
  * the org chart and had no authority inside it, which is the "leaders can't see
  * who's contributing" problem wearing a different hat.
  *
@@ -181,16 +181,16 @@ export function leadsTeamAbove(
 }
 
 /**
- * Q2 — RE authority, inherited down the project tree.
+ * Q2 — PL authority, inherited down the project tree.
  *
- * True if the actor is an RE of this project or any ancestor of it, **or** if
+ * True if the actor is a PL of this project or any ancestor of it, **or** if
  * they lead a team that owns any of them. Both are the same authority arriving
  * by different routes, so they belong in one function: every `can.*` rule about
  * a project routes through here, which is what makes "a Division Lead is a top
- * RE" one rule rather than twenty places to remember.
+ * PL" one rule rather than twenty places to remember.
  *
  * Depth is unbounded and always has been — `projectChain` walks to the root. An
- * RE four levels up really does own everything below them.
+ * PL four levels up really does own everything below them.
  */
 export function isREofOrAbove(
   actor: Actor,
@@ -221,7 +221,7 @@ export function leadsTeamAtOrAbove(
 }
 
 /**
- * Q2b — RE authority arriving from STRICTLY ABOVE this project.
+ * Q2b — PL authority arriving from STRICTLY ABOVE this project.
  *
  * ---------------------------------------------------------------------------
  * Doing the work and approving the work are different jobs
@@ -229,10 +229,10 @@ export function leadsTeamAtOrAbove(
  *
  * `isREofOrAbove` answers "may you act on this project". This answers the
  * narrower question "may you APPROVE it" — and the difference is that the
- * project's own RE is excluded, whatever else is true about them.
+ * project's own PL is excluded, whatever else is true about them.
  *
- * The assigned RE is accountable for FINISHING a project. The RE above them —
- * or the Division Lead, who is a top RE — is accountable for reviewing it and
+ * The assigned PL is accountable for FINISHING a project. The PL above them —
+ * or the Division Lead, who is a top PL — is accountable for reviewing it and
  * agreeing it's actually done. Letting one person hold both means "complete"
  * only ever means "the person who built it says so", which is exactly what the
  * two-step deliverable sign-off already refuses at the smaller scale.
@@ -244,15 +244,15 @@ export function leadsTeamAtOrAbove(
  *   - challenging a signed-off deliverable (`can.withdrawSignOff`)
  *
  * Everything else about a project still runs on `isREofOrAbove`, because the
- * assigned RE must be able to do their job.
+ * assigned PL must be able to do their job.
  *
- * **Being the project's own RE disqualifies you even if you'd qualify another
+ * **Being the project's own PL disqualifies you even if you'd qualify another
  * way.** A Division Lead who assigns a project to themselves is wearing both
  * hats, and the app can't fix that organizationally — but it can decline to
  * pretend a review happened. It escalates to whoever is above them.
  *
  * **Co-Leads are the escape hatch**, checked by the callers rather than here.
- * Without one, a Co-Lead who is the RE of a top-level project could never
+ * Without one, a Co-Lead who is the PL of a top-level project could never
  * complete it — there is nobody above them — and the project would be stuck
  * forever. That fallback is why this can be strict everywhere else.
  */
@@ -280,15 +280,15 @@ export function isREaboveProject(
   member's Lead, directly or anywhere up their chain?".
 
   The club removed the reporting chain on 2026-08-24. Nobody reports to a
-  person; members report to their REs through the work they log on a project.
+  person; members report to their PLs through the work they log on a project.
   So the three-question model is now:
 
     1. Are you a Co-Lead? -> anything
-    2. Are you an RE of this project or any above it, or do you lead a team
+    2. Are you a PL of this project or any above it, or do you lead a team
        that owns any of them? -> you own this subtree
     3. Is it your own data? -> you can manage it
 
-  Note which inheritance survived and which did not. RE authority flows DOWN
+  Note which inheritance survived and which did not. PL authority flows DOWN
   the project tree and team-lead authority flows down the org tree and then
   down the project tree; both are about accountability for WORK and both stay.
   Lead authority flowed UP a chain of PEOPLE, and that is the one that went.
@@ -298,7 +298,7 @@ export function isREaboveProject(
   decision that could be revisited. Nothing in this file reads either.
 
   Do not reintroduce a person-to-person authority check here. If a feature
-  needs "somebody is accountable for this member", the answer now is the RE of
+  needs "somebody is accountable for this member", the answer now is the PL of
   the project the work is on.
 */
 
@@ -387,7 +387,7 @@ export const can = {
    *
    * Separate from `setMemberStatus`, and the difference is not cosmetic. A
    * person who has just signed in with no invite is not on anybody's project,
-   * so no RE rule reaches them and the rule above admits only Co-Leads. The
+   * so no PL rule reaches them and the rule above admits only Co-Leads. The
    * roster's Access panel meanwhile offers Activate to every Lead, which made
    * it a dead control for five of the club's seven leaders: the button was
    * there, and pressing it was refused. (The original version of this note said
@@ -412,7 +412,7 @@ export const can = {
 
   /**
    * Creating projects should feel effortless for leadership, so this is
-   * deliberately permissive: any Lead, or any RE creating a sub-project
+   * deliberately permissive: any Lead, or any PL creating a sub-project
    * under something they already own.
    */
   createProject: (
@@ -422,7 +422,7 @@ export const can = {
   ) => {
     if (isCoLead(actor)) return true;
 
-    // Under something they already own: RE authority, inheriting down.
+    // Under something they already own: PL authority, inheriting down.
     if (target.parentProjectId) {
       return isREofOrAbove(actor, graph, target.parentProjectId);
     }
@@ -458,14 +458,14 @@ export const can = {
    *
    * Deliberately WIDER than `manageProject`, and the only project write that
    * is. The person who ran the test holds the test report; routing every
-   * attachment through the RE rebuilds the "go ask someone" bottleneck this app
+   * attachment through the PL rebuilds the "go ask someone" bottleneck this app
    * exists to remove, and the predictable result is an empty record.
    *
-   * Curation stays with the RE — `manageArtifact` covers removal. Anyone on the
-   * project can ADD to the record; only an RE can take something out of it.
+   * Curation stays with the PL — `manageArtifact` covers removal. Anyone on the
+   * project can ADD to the record; only a PL can take something out of it.
    *
    * `committedToProject` is passed in rather than read from `graph` on purpose.
-   * `OrgGraph` carries RE memberships only, and its four lookups are called in
+   * `OrgGraph` carries PL memberships only, and its four lookups are called in
    * loops while walking both trees (see CLAUDE.md) — widening it to hold every
    * project membership would grow the structure that must stay cheap, to answer
    * a question exactly one rule asks. Following a project does NOT count: an
@@ -485,7 +485,7 @@ export const can = {
    * Remove something already in the engineering record.
    *
    * Once a project is COMPLETE the record stops being a working document and
-   * becomes the club's history, so the RE loses this and only a Co-Lead keeps
+   * becomes the club's history, so the PL loses this and only a Co-Lead keeps
    * it. That asymmetry is the whole point: history should be hard to rewrite,
    * and the person closest to the work is the one most tempted to tidy it.
    *
@@ -507,32 +507,32 @@ export const can = {
   /**
    * Marking a project COMPLETE — the review step, not the editing step.
    *
-   * Deliberately narrower than `manageProject`: the assigned RE runs the
+   * Deliberately narrower than `manageProject`: the assigned PL runs the
    * project and can change anything else about it, but cannot declare their own
    * work finished. See `isREaboveProject` for why, and for the Co-Lead escape
    * hatch that stops the top of the tree deadlocking.
    *
    * Only guards the crossing INTO complete. Reopening runs on `manageProject`,
    * because admitting something isn't finished makes the record more
-   * conservative, not less — and an RE whose project has restarted must not
+   * conservative, not less — and a PL whose project has restarted must not
    * need permission to say so.
    */
   completeProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREaboveProject(actor, graph, projectId),
 
-  /** Appoint or remove REs — multiple REs per project are allowed. */
+  /** Appoint or remove PLs — multiple PLs per project are allowed. */
   assignRE: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
   /**
-   * ONLY an RE (or a Co-Lead) puts someone on a project.
+   * ONLY a PL (or a Co-Lead) puts someone on a project.
    *
-   * Members can't add themselves. The RE is accountable for the deliverable, so
+   * Members can't add themselves. The PL is accountable for the deliverable, so
    * they decide who's working on it — and it keeps rosters honest, since every
    * name on a project got there because someone with context said yes.
    *
-   * No cap: an RE can staff a project with whoever they need, and a member can
-   * be on as many projects as REs want them on.
+   * No cap: a PL can staff a project with whoever they need, and a member can
+   * be on as many projects as PLs want them on.
    */
   addProjectMember: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
@@ -551,9 +551,9 @@ export const can = {
   /**
    * Asking to join: any member, any project.
    *
-   * This is the crucial counterpart to RE-controlled membership. "Go ask the RE"
+   * This is the crucial counterpart to PL-controlled membership. "Go ask the PL"
    * via email produces silence and an invisible member; a tracked request lands
-   * in the RE's queue, is visible to the member as pending, and escalates when
+   * in the PL's queue, is visible to the member as pending, and escalates when
    * it goes stale. Same gate, no limbo.
    */
   /*
@@ -565,22 +565,22 @@ export const can = {
     in at all except knowing somebody, which is the problem this app exists to
     remove.
 
-    `isOpenToJoin` is now a SIGNAL: the card says the RE isn't looking, so
+    `isOpenToJoin` is now a SIGNAL: the card says the PL isn't looking, so
     nobody wastes an ask, and somebody who really is the right person can still
-    make the case. The RE decides either way — that hasn't changed.
+    make the case. The PL decides either way — that hasn't changed.
   */
   /*
     Anyone may ask to join a project — except an advisor.
 
     Not a restriction so much as a category error being closed. Joining is how
     somebody becomes accountable for deliverables, and an advisor holds no
-    deliverables by design; the way they attach to a project is an RE naming them
+    deliverables by design; the way they attach to a project is a PL naming them
     as its advisor, which is a different act with a different meaning. The button
     was offering them a request that, if approved, would have made them staff.
   */
   requestToJoin: (actor: Actor) => !isAdvisor(actor),
 
-  /** Accepting or declining a request — the RE's call. */
+  /** Accepting or declining a request — the PL's call. */
   reviewJoinRequest: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
@@ -601,10 +601,10 @@ export const can = {
    * What ONE person logged on ONE project. PUBLIC since 2026-08-16.
    *
    * ---------------------------------------------------------------------------
-   * This used to be RE-and-Lead-chain only, and the club changed its mind
+   * This used to be PL-and-Lead-chain only, and the club changed its mind
    * ---------------------------------------------------------------------------
    *
-   * The old rule answered the RE's question — "who is actually working on the
+   * The old rule answered the PL's question — "who is actually working on the
    * thing I'm accountable for?" — and kept everyone else out, on the reasoning
    * that a member's effort was their own business.
    *
@@ -656,14 +656,14 @@ export const can = {
    * access control -- the route is reachable by typing the URL.
    *
    * `hasScope` used to mean "oversees at least one person", counted off the
-   * reporting chain. It now means "is an RE of at least one project", which is
+   * reporting chain. It now means "is a PL of at least one project", which is
    * the same question asked of the tree that still exists: this page is a list
    * of what you owe, and somebody who owes nothing sees an empty page and
    * concludes the app is broken.
    *
    * Still a boolean passed in rather than derived here, and for the original
    * reason: it is a fact about a tree, not about `globalRole`. A plain member
-   * named RE of one project belongs here; a `lead` who is RE of nothing does
+   * named PL of one project belongs here; a `lead` who is PL of nothing does
    * not. What changed is which tree.
    */
   viewLeadershipDashboard: (actor: Actor, hasScope: boolean) =>
@@ -819,9 +819,9 @@ export const can = {
   /**
    * Naming an advisor on a project, or removing one.
    *
-   * Same authority as adding a member: the RE is accountable for the project,
-   * so the RE decides who it tells people to go and ask. Inherits down the
-   * project tree, and a Division Lead counts, like every other RE right.
+   * Same authority as adding a member: the PL is accountable for the project,
+   * so the PL decides who it tells people to go and ask. Inherits down the
+   * project tree, and a Division Lead counts, like every other PL right.
    *
    * Note this grants nothing to the advisor — they could already see and
    * comment on this project, and on every other one. All it changes is whether
@@ -830,7 +830,7 @@ export const can = {
   manageProjectAdvisors: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
-  /** REs shape the list; that's the five minutes a week the model costs them. */
+  /** PLs shape the list; that's the five minutes a week the model costs them. */
   manageDeliverables: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
@@ -838,16 +838,16 @@ export const can = {
    * The checklist under a deliverable — add, tick, rename, remove.
    *
    * Deliberately WIDER than `manageDeliverables`, and this is the only rule in
-   * the file where the owner of a row gets a right their RE-only neighbours
+   * the file where the owner of a row gets a right their PL-only neighbours
    * don't. The person doing the work is the one who discovers what it turns out
    * to involve — book the CNC, chase the vendor, get the fixture back off
-   * Trudy — and making them ask an RE to write each of those down guarantees
+   * Trudy — and making them ask a PL to write each of those down guarantees
    * the list stays empty and the feature goes unused.
    *
    * It's safe to be wide because a todo is worth nothing. It carries no owner,
    * no date and no credit, and it appears in no count; the only thing it can do
-   * is hold up a sign-off, and the RE can clear it themselves. Compare
-   * `manageDeliverables`, which is RE-only precisely because a deliverable DOES
+   * is hold up a sign-off, and the PL can clear it themselves. Compare
+   * `manageDeliverables`, which is PL-only precisely because a deliverable DOES
    * count.
    *
    * `ownerId` is the deliverable's owner, not the todo's — todos have no owner.
@@ -865,7 +865,7 @@ export const can = {
   /**
    * Challenging work that has ALREADY been signed off.
    *
-   * Signing off stays with the RE at the project's own level — that's their
+   * Signing off stays with the PL at the project's own level — that's their
    * job, it's the five minutes a week the deliverable model costs them, and
    * `manageDeliverables` still covers it. This is the different, rarer act:
    * saying a sign-off was wrong. The engineering doesn't meet the requirement,
@@ -873,7 +873,7 @@ export const can = {
    *
    * That has to come from above the person who signed it, or it's the same
    * signature marking its own homework — so it routes through
-   * `isREaboveProject` rather than `isREofOrAbove`. The RE who signed off
+   * `isREaboveProject` rather than `isREofOrAbove`. The PL who signed off
    * cannot quietly un-sign it; they ask the person above them, and the record
    * shows a challenge rather than an edit.
    *
@@ -931,7 +931,7 @@ export const can = {
     isCoLead(actor) || isSelf(actor, memberId),
 
   /**
-   * Removing a deliverable outright — the RE's list, so the RE's call.
+   * Removing a deliverable outright — the PL's list, so the PL's call.
    *
    * Same authority as creating one. The operation refuses anything already
    * signed off, so this can't be used to erase someone's delivered work.
@@ -962,8 +962,8 @@ export const can = {
   /**
    * Deleting a project.
    *
-   * `isREofOrAbove` is doing the important work: an RE of a PARENT project can
-   * delete a child, because RE authority inherits down the project tree. An RE
+   * `isREofOrAbove` is doing the important work: a PL of a PARENT project can
+   * delete a child, because PL authority inherits down the project tree. A PL
    * of a sibling cannot, and neither can a plain member.
    */
   deleteProject: (actor: Actor, graph: OrgGraph, projectId: string) =>
@@ -976,8 +976,8 @@ export const can = {
    * Bulk-delete the empty projects one actor created.
    *
    * Co-Lead only, and NOT `deleteProject`'s rule, even though it deletes
-   * projects. `deleteProject` is scoped to one project you are the RE of or
-   * above; this operates across the whole club by author, so an RE could
+   * projects. `deleteProject` is scoped to one project you are the PL of or
+   * above; this operates across the whole club by author, so a PL could
    * otherwise reach projects in a division they have nothing to do with.
    *
    * It exists because an assistant on the MCP server created ~4,000 empty
@@ -1024,7 +1024,7 @@ export const can = {
    * Post an ask, or answer somebody else's.
    *
    * Unconditional for a signed-in member, like `followProject`. The board
-   * exists BECAUSE membership is RE-controlled: it's the route to being useful
+   * exists BECAUSE membership is PL-controlled: it's the route to being useful
    * that doesn't wait on one person's inbox. Gating who may answer would
    * rebuild that bottleneck one level up, and "anyone can answer, not just
    * leadership" is the phase's stated point.
@@ -1054,7 +1054,7 @@ export const can = {
  * restriction is the exception.
  *
  *   - the full division and team tree
- *   - every project: phase, health, REs, members, responsibilities, artifacts
+ *   - every project: phase, health, PLs, members, responsibilities, artifacts
  *   - who is working on what
  *   - the club calendar and events
  *   - the roster and everyone's profile basics, trainings, and access

@@ -6,7 +6,7 @@
  * ---------------------------------------------------------------------------
  *
  * The reporting removal on 2026-08-24 replaced two scopes with one. The Lead
- * half walked `profiles.lead_id`; the RE half used `isREofOrAbove`. Deleting the
+ * half walked `profiles.lead_id`; the PL half used `isREofOrAbove`. Deleting the
  * first looked like it left the second doing the same job, and it did not:
  *
  *   **`isREofOrAbove` has no Co-Lead shortcut, deliberately.** It answers "does
@@ -15,8 +15,8 @@
  *   `isCoLead(actor) || ...`.
  *
  * So the old code's `isCoLead(actor) ? everyone : reportsBelow(...)` branch was
- * load-bearing, and removing it emptied the entire page for a Co-Lead who is RE
- * of nothing — which is the live club exactly: the only Co-Lead is RE of 0 of 12
+ * load-bearing, and removing it emptied the entire page for a Co-Lead who is PL
+ * of nothing — which is the live club exactly: the only Co-Lead is PL of 0 of 12
  * projects. No queue, no quiet projects, zero people, zero log entries, and
  * `isREofNothing` true, which the route gate reads.
  *
@@ -77,10 +77,10 @@ function pick(role: "co_lead" | "lead" | "member"): Actor {
   return { id: m.id, globalRole: role };
 }
 
-describe("a Co-Lead sees the whole club, even as RE of nothing", () => {
-  test("the seed's Co-Lead really is RE of nothing", async () => {
+describe("a Co-Lead sees the whole club, even as PL of nothing", () => {
+  test("the seed's Co-Lead really is PL of nothing", async () => {
     /*
-      The premise. If somebody later makes the Co-Lead an RE in the seed, the
+      The premise. If somebody later makes the Co-Lead a PL in the seed, the
       tests below would pass for the wrong reason and stop guarding anything --
       so the premise is asserted rather than assumed.
     */
@@ -92,11 +92,11 @@ describe("a Co-Lead sees the whole club, even as RE of nothing", () => {
     assert.equal(
       owned.length,
       0,
-      "the seed's Co-Lead is now an RE, so these tests no longer test the branch they were written for"
+      "the seed's Co-Lead is now a PL, so these tests no longer test the branch they were written for"
     );
   });
 
-  test("they are not treated as an RE of nothing", async () => {
+  test("they are not treated as a PL of nothing", async () => {
     // `isREofNothing` gates the route. True here means a Co-Lead opening
     // /dashboard is redirected to /my-work.
     const view = await data.getDashboard(pick("co_lead"), graph);
@@ -142,7 +142,7 @@ describe("a Co-Lead sees the whole club, even as RE of nothing", () => {
 });
 
 describe("everyone else is scoped by the project tree", () => {
-  test("a plain member RE of nothing gets an empty page and the gate says so", async () => {
+  test("a plain member PL of nothing gets an empty page and the gate says so", async () => {
     const nobody = store().members.find(
       (m) =>
         m.globalRole === "member" &&
@@ -159,19 +159,19 @@ describe("everyone else is scoped by the project tree", () => {
     assert.equal(view.goneQuiet.length, 0);
   });
 
-  test("an RE of one project is scoped to it, not to the club", async () => {
+  test("a PL of one project is scoped to it, not to the club", async () => {
     const re = store().projects.find((p) => p.reIds.length > 0);
-    assert.ok(re, "the seed needs a project with an RE");
+    assert.ok(re, "the seed needs a project with a PL");
     const actor: Actor = { id: re.reIds[0], globalRole: "member" };
     const view = await data.getDashboard(actor, graph);
 
     assert.equal(view.isREofNothing, false);
-    // Strictly fewer people than the club, unless they happen to be RE of
+    // Strictly fewer people than the club, unless they happen to be PL of
     // everything -- which the seed does not do.
     const clubWide = await data.getDashboard(pick("co_lead"), graph);
     assert.ok(
       view.counts.peopleOnMyProjects <= clubWide.counts.peopleOnMyProjects,
-      "an RE of one project saw more people than a Co-Lead"
+      "a PL of one project saw more people than a Co-Lead"
     );
   });
 });
@@ -196,8 +196,8 @@ describe("the fields the reporting chain used to fill are gone", () => {
     assert.equal("peopleOverseen" in view.counts, false);
   });
 
-  test("the RE queue has sign-offs and no unanswered entries", async () => {
-    // `unanswered` was the RE's half of the check-in queue: project sections
+  test("the PL queue has sign-offs and no unanswered entries", async () => {
+    // `unanswered` was the PL's half of the check-in queue: project sections
     // waiting on a reply. There are no check-ins to reply to.
     const view = await data.getDashboard(pick("co_lead"), graph);
     assert.ok(Array.isArray(view.reQueue.signOffs));

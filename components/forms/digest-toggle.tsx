@@ -22,7 +22,7 @@ export function DigestToggle({
   reasons,
 }: {
   optedOut: boolean;
-  /** Why they get one — "RE of 3 projects", "Lead to 4 people". */
+  /** Why they get one — "PL of 3 projects", "Lead to 4 people". */
   reasons: string[];
 }) {
   const [off, setOff] = useState(optedOut);

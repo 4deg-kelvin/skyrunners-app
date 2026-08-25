@@ -51,7 +51,7 @@ export async function sendDailyDigests(today: string): Promise<DigestRun> {
   /*
     Same pattern as the MCP server: open a store scope with the admin client,
     preload the snapshot, then use the ordinary in-memory reads and
-    `lib/permissions.ts`. That's what lets the digest resolve RE authority with
+    `lib/permissions.ts`. That's what lets the digest resolve PL authority with
     `isREofOrAbove` instead of matching `reIds` — which would miss inherited
     authority and every Division Lead.
   */

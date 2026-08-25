@@ -37,8 +37,8 @@ export function AccountMenu({
   /**
    * Whether to offer the leadership guide.
    *
-   * True for Leads, Co-Leads AND plain members who are an RE of something —
-   * the RE role carries real authority and is the one most likely to surprise
+   * True for Leads, Co-Leads AND plain members who are a PL of something —
+   * the PL role carries real authority and is the one most likely to surprise
    * whoever holds it. Gating on `globalRole` alone would hide it from exactly
    * those people.
    */

@@ -327,7 +327,7 @@ export function DivisionExtras({
                 </Link>
               ))}
               <p className="text-ink-muted pt-1 text-xs">
-                Clear these on the project — its RE is the one who can.
+                Clear these on the project — its PL is the one who can.
               </p>
             </div>
           ) : null}

@@ -8,8 +8,8 @@
  * ---------------------------------------------------------------------------
  *
  * `docs/DECISIONS.md` rejects a critical-path Gantt, and this is not one. There
- * are **no dependencies, no slack, no critical path, and nothing new for an RE
- * to maintain.** A dependency graph costs an RE an hour a week and is wrong the
+ * are **no dependencies, no slack, no critical path, and nothing new for a PL
+ * to maintain.** A dependency graph costs a PL an hour a week and is wrong the
  * day after it's entered, which on a volunteer team whose availability swings
  * with midterms makes it worse than nothing.
  *

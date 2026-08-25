@@ -25,7 +25,7 @@ import { PushDeadlineForm } from "./push-deadline";
  * applies:
  *
  *   OWNER — move it along, flag a blocker, say when it's finished.
- *   RE    — sign off, or send it back with a reason.
+ *   PL    — sign off, or send it back with a reason.
  *
  * Showing both to everyone would put a "Sign off" button in front of the person
  * whose work it is, which is precisely what the two-step exists to prevent.
@@ -57,7 +57,7 @@ export function DeliverableActions({
    * Deliberately a SECOND flag rather than a stronger reading of `canSignOff`.
    * They answer different questions — "may you approve work here" versus "may
    * you overrule somebody who already did" — and the whole point of the split
-   * is that the project's own RE has the first and not the second. Defaulting
+   * is that the project's own PL has the first and not the second. Defaulting
    * to false means a caller who forgets it loses the button, not the rule.
    */
   canWithdrawSignOff?: boolean;
@@ -96,8 +96,8 @@ export function DeliverableActions({
       deleting it, which the operation refuses precisely because it counts
       towards somebody's record.
 
-      The RE at the project's own level signs work off; that's their job. Saying
-      the sign-off was WRONG is a different act, and it comes from the RE above
+      The PL at the project's own level signs work off; that's their job. Saying
+      the sign-off was WRONG is a different act, and it comes from the PL above
       them or the Division Lead. `canWithdrawSignOff` carries that answer down —
       it is NOT the same flag as `canSignOff`.
     */
@@ -157,13 +157,13 @@ export function DeliverableActions({
     );
   }
 
-  // Waiting on an RE. The owner sees that it's out of their hands — which is the
+  // Waiting on a PL. The owner sees that it's out of their hands — which is the
   // information they actually need, and stops them chasing it as their problem.
   if (status === "submitted") {
     if (!canSignOff) {
       return (
         <p className="text-ink-muted text-sm">
-          Waiting on an RE to sign off. Nothing more for you to do.
+          Waiting on a PL to sign off. Nothing more for you to do.
         </p>
       );
     }
@@ -257,7 +257,7 @@ export function DeliverableActions({
           />
         </label>
         <p className="text-ink-muted mt-1 mb-2.5 text-xs">
-          This goes to the project&apos;s REs, and onto the blocker board where
+          This goes to the project&apos;s PLs, and onto the blocker board where
           anyone can pick it up.
         </p>
         <button
@@ -410,7 +410,7 @@ export function DeliverableActions({
       {/*
         Edit rather than a bare Delete. Retitling and re-dating is the ordinary
         upkeep, and deleting belongs behind it rather than one stray click away
-        from the buttons everybody uses. RE only.
+        from the buttons everybody uses. PL only.
       */}
       {canSignOff ? (
         <button
@@ -481,11 +481,11 @@ function BlockedByChecklist({
 }
 
 /**
- * RE adds a deliverable.
+ * PL adds a deliverable.
  *
  * The owner dropdown lists everyone in the club, not just current project
  * members — assigning work to someone new is how they get added, and forcing the
- * RE to add them first is friction with no safety value. The action auto-adds
+ * PL to add them first is friction with no safety value. The action auto-adds
  * them as committed.
  */
 export function AddDeliverableForm({

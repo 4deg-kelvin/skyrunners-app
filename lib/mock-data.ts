@@ -94,7 +94,7 @@ export const teams: Team[] = [
     isActive: true,
   },
 
-  // Sub-teams, set up by division REs
+  // Sub-teams, set up by division PLs
   {
     id: "team-structures",
     name: "Structures",
@@ -652,7 +652,7 @@ for (const seeded of members) {
 export const CURRENT_USER_ID = "m-anish";
 
 // ---------------------------------------------------------------------------
-// Projects — nested, multiple REs allowed
+// Projects — nested, multiple PLs allowed
 // ---------------------------------------------------------------------------
 
 export const projects: Project[] = [
@@ -1435,7 +1435,7 @@ export function artifactsFor(projectId: string): ProjectArtifact[] {
 }
 
 // ---------------------------------------------------------------------------
-// Join requests — the RE gate, made visible
+// Join requests — the PL gate, made visible
 // ---------------------------------------------------------------------------
 
 export const joinRequests: JoinRequest[] = [
@@ -1512,9 +1512,9 @@ export function myJoinRequests(memberId: string) {
 }
 
 /**
- * Requests waiting on the current user as an RE — their queue.
+ * Requests waiting on the current user as a PL — their queue.
  *
- * This is the obligation that comes with RE-controlled membership: if you
+ * This is the obligation that comes with PL-controlled membership: if you
  * control the gate, you owe people an answer.
  */
 export function joinRequestsAwaitingMe(memberId: string) {
@@ -1529,7 +1529,7 @@ export function joinRequestsAwaitingMe(memberId: string) {
     }));
 }
 
-/** Requests nobody has answered in too long — a silent RE blocks a member. */
+/** Requests nobody has answered in too long — a silent PL blocks a member. */
 export function staleJoinRequests() {
   return live()
     .joinRequests.filter(
@@ -2327,7 +2327,7 @@ export const workLogs: WorkLog[] = [
   },
 
   // --- The wider club's hours ------------------------------------------------
-  // Spread across the week so "hours this week" and the per-project totals an RE
+  // Spread across the week so "hours this week" and the per-project totals a PL
   // sees are non-trivial. m-blake has none, which is the point of m-blake.
   {
     id: "w-11",
@@ -2766,9 +2766,9 @@ export function myDeliverables(memberId: string): Deliverable[] {
 
 export function isOverdue(d: Deliverable): boolean {
   // `submitted` is excluded on purpose. The owner has finished and is waiting on
-  // an RE to sign off — marking their work "overdue" because someone else is
-  // slow blames the wrong person, and it's the exact unfairness the RE-confirms
-  // rule risks introducing. The delay still surfaces, but against the RE, via
+  // a PL to sign off — marking their work "overdue" because someone else is
+  // slow blames the wrong person, and it's the exact unfairness the PL-confirms
+  // rule risks introducing. The delay still surfaces, but against the PL, via
   // `pendingSignOffs()` in lib/signoff.ts.
   if (d.status === "done" || d.status === "submitted") return false;
   return !!d.dueDate && d.dueDate < today();
@@ -2795,7 +2795,7 @@ export function openBlockerDeliverables(): Deliverable[] {
 }
 
 // ---------------------------------------------------------------------------
-// RE liveness
+// PL liveness
 // ---------------------------------------------------------------------------
 
 /**
@@ -2813,9 +2813,9 @@ function lastActive(memberId: string): string {
 /**
  * Projects that need leadership attention.
  *
- * Because RE authority inherits downward, an RE who quietly checks out freezes
+ * Because PL authority inherits downward, a PL who quietly checks out freezes
  * their whole subtree — nobody beneath them can create sub-projects, appoint
- * REs, or get a blocker cleared. This is the check that surfaces it instead of
+ * PLs, or get a blocker cleared. This is the check that surfaces it instead of
  * letting the work stall invisibly for a month.
  */
 export function projectAttentionFlags(): ProjectAttentionFlag[] {
@@ -2829,29 +2829,29 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
       responding.
 
       This used to be its own always-on flag: any project with sub-projects and
-      one RE got "No deputy RE" permanently. In a thirty-person club that's most
-      parent projects, most of the time, and it isn't something an RE can
+      one PL got "No deputy PL" permanently. In a thirty-person club that's most
+      parent projects, most of the time, and it isn't something a PL can
       realistically fix — there often isn't a second person to name. A warning
       that is always on and can't be acted on is one people learn to scroll
       past, which costs the flags next to it their credibility.
 
-      So it's folded into silence, where it's genuinely actionable: the RE has
+      So it's folded into silence, where it's genuinely actionable: the PL has
       gone quiet AND nobody else can cover, which is the moment the subtree
       actually stalls. The structural risk is handled instead by
-      `removeProjectMember` refusing to strip the last RE off a parent, and by
+      `removeProjectMember` refusing to strip the last PL off a parent, and by
       an alert to their Lead if they pause while holding that position.
     */
     const silentDays = daysBetween(lastActive(project.primaryReId), today());
     if (silentDays >= RE_SILENT_DAYS) {
       const soleRE =
         childProjects(project.id).length > 0 && project.reIds.length < 2;
-      const who = getMember(project.primaryReId)?.fullName ?? "The RE";
+      const who = getMember(project.primaryReId)?.fullName ?? "The PL";
 
       flags.push({
         projectId: project.id,
         reason: "re_silent",
         detail: soleRE
-          ? `${who} hasn't been active in ${Math.round(silentDays)} days, and they're the only RE — everything under this project is waiting on one person. Name a second RE.`
+          ? `${who} hasn't been active in ${Math.round(silentDays)} days, and they're the only PL — everything under this project is waiting on one person. Name a second PL.`
           : `${who} hasn't been active in ${Math.round(silentDays)} days.`,
         // Worse when nobody can cover: the sub-projects have no route to a
         // decision at all, rather than a slow one.
@@ -2874,9 +2874,9 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
     /*
       Past its target date and not finished.
 
-      Deliberately does NOT touch `project.health` — that's the RE's judgement
+      Deliberately does NOT touch `project.health` — that's the PL's judgement
       and silently overwriting it would make the field meaningless. Instead the
-      contradiction is surfaced so the RE closes it themselves: either the date
+      contradiction is surfaced so the PL closes it themselves: either the date
       slipped and should move, or the project really is at risk and health
       should say so.
     */
@@ -2909,13 +2909,13 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
     }
 
     /*
-      The RE said so themselves.
+      The PL said so themselves.
 
       `health_flagged` has been a declared `AttentionReason` with a label since
       Phase 2 and nothing ever produced it — the SQL view `v_project_attention`
       emits it as its `else` branch, but the app reads this function, not the
       view. The consequence was the exact mirror of the dashboard bug: a project
-      an RE had marked blocked showed up on the leadership dashboard and raised
+      a PL had marked blocked showed up on the leadership dashboard and raised
       NO flag on its own page, so the one place you'd go to find out why was the
       one place that didn't say.
 
@@ -2925,7 +2925,7 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
       thing to be in trouble", and a project can easily be one without the
       other.
 
-      Blocked outranks a non-sole silent RE but not a frozen subtree, so it sits
+      Blocked outranks a non-sole silent PL but not a frozen subtree, so it sits
       at 3. At risk is a warning rather than a stoppage, so it sits with the
       other 2s.
     */
@@ -2935,14 +2935,14 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
           projectId: project.id,
           reason: "health_flagged",
           detail:
-            "Its RE has marked this project blocked — work has stopped until somebody clears it.",
+            "Its PL has marked this project blocked — work has stopped until somebody clears it.",
           severity: 3,
         });
       } else if (project.health === "at_risk") {
         flags.push({
           projectId: project.id,
           reason: "health_flagged",
-          detail: "Its RE has marked this project at risk.",
+          detail: "Its PL has marked this project at risk.",
           severity: 2,
         });
       }
@@ -2967,7 +2967,7 @@ export function projectAttentionFlags(): ProjectAttentionFlag[] {
  * `projectsCommitted` went with the panel that displayed them.
  *
  * All of them measured something OTHER than finished work. Open and overdue
- * counts belong on the project, where the RE can act on them; they were on the
+ * counts belong on the project, where the PL can act on them; they were on the
  * person because the panel had room. Two counts is what is left, and that is
  * the whole intent -- see `lib/delivered.ts`.
  */
@@ -2982,11 +2982,11 @@ export function deliveredInputsFor(memberId: string): DeliveredInputs {
     happened to own a signed-off deliverable.
 
     The old rule counted a finished project only if this member held a `done`
-    deliverable on it, which meant the RE of a project they carried to the
+    deliverable on it, which meant the PL of a project they carried to the
     finish scored zero the moment the work was tracked as somebody else's
     deliverables. That is the person most responsible for it finishing.
 
-    Following doesn't count, and membership is RE-controlled — nobody adds
+    Following doesn't count, and membership is PL-controlled — nobody adds
     themselves — so this can't be self-inflated. Somebody who was carried still
     shows 0 delivered deliverables and near-zero hours, which is exactly what
     the other three signals are for. Adding an "and they did enough" clause
@@ -3035,24 +3035,24 @@ export function clubIdentity(): {
  * Deliberately different from `completionAudience`, which announces upward to
  * everybody accountable above a project. A blocker is not an announcement, it's
  * a request: one named person has to go clear it. Telling five people produces
- * the bystander effect — everyone assumes an RE closer to the work has it — and
+ * the bystander effect — everyone assumes a PL closer to the work has it — and
  * teaches the whole chain that these messages don't require anything of them.
  *
- * So this returns the REs of the project itself, and nothing above them. The
+ * So this returns the PLs of the project itself, and nothing above them. The
  * exception is what makes it correct:
  *
  * ---------------------------------------------------------------------------
- * If the only RE is the person who's blocked, go up one level
+ * If the only PL is the person who's blocked, go up one level
  * ---------------------------------------------------------------------------
  *
- * An RE who owns a deliverable on their own project would otherwise be DMed
+ * A PL who owns a deliverable on their own project would otherwise be DMed
  * about their own blocker, which is both useless and the fastest way to make
  * somebody mute the bot. Worse, it means the one case where a blocker genuinely
  * needs escalating — the person responsible for clearing it is the person stuck
  * — is the one case nobody hears about.
  *
  * So the raiser is dropped, and if that empties the level, it climbs: nearest
- * ancestor project's REs, then the Division Lead, then the Co-Leads. It stops
+ * ancestor project's PLs, then the Division Lead, then the Co-Leads. It stops
  * at the FIRST level that has somebody, which is what "one stage up the chain
  * of command" means.
  *
@@ -3065,7 +3065,7 @@ export function clubIdentity(): {
 export function blockerAudience(projectId: string, raiserId: string): string[] {
   const store = live();
 
-  /** REs of one project, primary first, minus whoever raised it. */
+  /** PLs of one project, primary first, minus whoever raised it. */
   const responsibleFor = (p: Project): string[] => [
     ...new Set(
       [p.primaryReId, ...p.reIds].filter((id) => id && id !== raiserId)
@@ -3103,16 +3103,16 @@ export function blockerAudience(projectId: string, raiserId: string): string[] {
 }
 
 /**
- * The REs one level UP the project tree — always, not only as a fallback.
+ * The PLs one level UP the project tree — always, not only as a fallback.
  *
  * `blockerAudience` deliberately stops at the nearest level that has somebody,
  * because a blocked deliverable is a request and telling five people produces
  * the bystander effect. A blocked PROJECT is a different claim: the whole thing
  * has stopped, and the person accountable for the work containing it needs to
- * know even when the project still has other REs who could clear it.
+ * know even when the project still has other PLs who could clear it.
  *
  * So this is additive, not a replacement. A blocked project notifies its own
- * REs (via `blockerAudience`) AND the level above (via this). A blocked
+ * PLs (via `blockerAudience`) AND the level above (via this). A blocked
  * deliverable notifies only the former.
  *
  * Climbs until it finds somebody, so a sub-project three levels under the only
@@ -3159,7 +3159,7 @@ export function projectEscalationAudience(
  *
  * The two lists overlap sometimes and that's fine; the caller de-duplicates and
  * sends whichever message is more actionable. Keeping them separate matters
- * because the messages are different: an RE is being asked to unblock
+ * because the messages are different: a PL is being asked to unblock
  * something, a Lead is being told to check in on somebody.
  *
  * One step deliberately. A Lead's Lead hearing about every blocker in their
@@ -3212,7 +3212,7 @@ export function advisorOptions(): Member[] {
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
-/** How many projects an RE has actually put this member on. No cap. */
+/** How many projects a PL has actually put this member on. No cap. */
 export function committedProjectCount(memberId: string): number {
   return live().projectMemberships.filter(
     (pm) => pm.memberId === memberId && pm.commitment === "committed"
@@ -3229,7 +3229,7 @@ export function myProjects(memberId: string) {
     }))
     .filter((x) => x.project)
     .sort((a, b) => {
-      // REs first — that's where accountability sits
+      // PLs first — that's where accountability sits
       if (a.membership.role !== b.membership.role) {
         return a.membership.role === "re" ? -1 : 1;
       }
@@ -3238,7 +3238,7 @@ export function myProjects(memberId: string) {
 }
 
 /**
- * Who to ask about this project. Primary RE first — that ordering comes from
+ * Who to ask about this project. Primary PL first — that ordering comes from
  * `primaryReId`, not array position, so it's deterministic.
  */
 export function projectREs(projectId: string): Member[] {
@@ -3620,9 +3620,9 @@ export function awaitingReview() {
  *
  * The two signals are genuinely different and both belong here:
  *
- *   - `health` is the RE's own judgement, and only moves when they move it.
+ *   - `health` is the PL's own judgement, and only moves when they move it.
  *   - a blocked deliverable is a FACT somebody recorded, and needs no
- *     agreement from the RE to be true. It is also the one a member can raise
+ *     agreement from the PL to be true. It is also the one a member can raise
  *     without any permissions at all, which is the whole point.
  *
  * Completed projects are excluded. Without that, adding the deliverable rule

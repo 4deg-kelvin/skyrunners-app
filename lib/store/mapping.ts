@@ -249,7 +249,7 @@ const projectMemberships: CollectionSpec<ProjectMembership> = {
   // No surrogate id in the app's shape, so identity is the pair — which is
   // also the unique constraint added in 0013. That constraint is what this
   // upsert conflicts on; without it, changing an existing membership (making
-  // someone an RE) inserts a second row and fails.
+  // someone a PL) inserts a second row and fails.
   identify: (m) => `${m.projectId}:${m.memberId}`,
   conflictTarget: "project_id,member_id",
   fromRow: (r) => ({

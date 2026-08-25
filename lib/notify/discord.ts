@@ -27,7 +27,7 @@
  * That's not laziness — it's the only safe shape. These are called from Server
  * Actions **after the write has already committed**. A member who logs hours
  * must not see "couldn't save that" because Discord was rate-limiting, and an
- * RE must not fail to approve a join request because somebody typed their
+ * PL must not fail to approve a join request because somebody typed their
  * Discord id wrong. The notification is a courtesy on top of the real work,
  * and it is never allowed to become a reason the real work failed.
  *
@@ -223,10 +223,10 @@ ${opts.answeredBy} said: ${opts.response}`
   /**
    * The same event, told to the raiser's Lead.
    *
-   * Deliberately worded as awareness rather than a task. The RE is being asked
+   * Deliberately worded as awareness rather than a task. The PL is being asked
    * to go clear something; the Lead is being told one of their people is
    * stuck, which is a conversation. If both messages said "please unblock
-   * this" the Lead would either duplicate the RE's work or ignore it, and
+   * this" the Lead would either duplicate the PL's work or ignore it, and
    * ignoring is the habit that spreads to every other message the bot sends.
    */
   reportBlocked: (opts: {
@@ -238,14 +238,14 @@ ${opts.answeredBy} said: ${opts.response}`
   }) =>
     `Heads up — **${opts.memberName}** (one of your reports) is blocked on **${opts.what}** in ${opts.projectName}.\n` +
     `> ${opts.note}\n` +
-    `The project's RE has been asked to clear it. Worth a word if it sits.\n${opts.url}`,
+    `The project's PL has been asked to clear it. Worth a word if it sits.\n${opts.url}`,
 
   /**
    * A whole project stopped, told to whoever is accountable above it.
    *
    * Separate from `blockerRaised` because the scope is different and the
-   * recipient's question is different: an RE on the project asks "what do I
-   * unblock", the RE above asks "does this change what I promised".
+   * recipient's question is different: a PL on the project asks "what do I
+   * unblock", the PL above asks "does this change what I promised".
    */
   projectBlockedAbove: (opts: {
     memberName: string;

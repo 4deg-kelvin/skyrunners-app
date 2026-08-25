@@ -153,7 +153,7 @@ describe("graph construction", () => {
     assert.deepEqual(graph.directREs("nope"), []);
   });
 
-  test("collects multiple REs for one project", () => {
+  test("collects multiple PLs for one project", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" }), profileRow({ id: "p2" })],
       [projectRow({ id: "prj1", primary_re_id: "p1" })],
@@ -166,7 +166,7 @@ describe("graph construction", () => {
     assert.deepEqual(graph.directREs("prj1").sort(), ["p1", "p2"]);
   });
 
-  test("keeps each project's REs separate", () => {
+  test("keeps each project's PLs separate", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" }), profileRow({ id: "p2" })],
       [
@@ -183,7 +183,7 @@ describe("graph construction", () => {
     assert.deepEqual(graph.directREs("prj2"), ["p2"]);
   });
 
-  test("the primary RE counts even with no project_members row", () => {
+  test("the primary PL counts even with no project_members row", () => {
     // `projects.primary_re_id` and the `role = 're'` membership row are two
     // separate inserts and nothing in the schema forces them to agree. If they
     // drift, the person accountable for the project must not lose authority
@@ -197,7 +197,7 @@ describe("graph construction", () => {
     assert.deepEqual(graph.directREs("prj1"), ["p1"]);
   });
 
-  test("the primary RE isn't duplicated when the row does exist", () => {
+  test("the primary PL isn't duplicated when the row does exist", () => {
     const graph = buildOrgGraphFromRows(
       [profileRow({ id: "p1" })],
       [projectRow({ id: "prj1", primary_re_id: "p1" })],
@@ -238,7 +238,7 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
       { project_id: PARENT_PRJ, member_id: LEAD },
       { project_id: CHILD_PRJ, member_id: MEMBER },
     ],
-    // No teams: this block is about RE and Lead authority resolving against
+    // No teams: this block is about PL and Lead authority resolving against
     // real uuids. The Division-Lead rule gets its own fixture below.
     []
   );
@@ -250,13 +250,13 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     );
   });
 
-  test("RE authority inherits DOWN the project tree", () => {
-    // LEAD is RE of the parent only, but that carries into the child.
+  test("PL authority inherits DOWN the project tree", () => {
+    // LEAD is PL of the parent only, but that carries into the child.
     assert.equal(
       isREofOrAbove({ id: LEAD, globalRole: "lead" }, graph, CHILD_PRJ),
       true
     );
-    // ...and not upward: the child's RE has no say over the parent.
+    // ...and not upward: the child's PL has no say over the parent.
     assert.equal(
       isREofOrAbove({ id: MEMBER, globalRole: "member" }, graph, PARENT_PRJ),
       false
@@ -285,7 +285,7 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     );
   });
 
-  test("a plain member who is an RE can manage that project", () => {
+  test("a plain member who is a PL can manage that project", () => {
     // The case that catches inline `globalRole` checks.
     assert.equal(
       can.manageProject({ id: MEMBER, globalRole: "member" }, graph, CHILD_PRJ),
@@ -304,9 +304,9 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
     );
   });
 
-  test("an RE of a parent can review join requests on a child", () => {
+  test("a PL of a parent can review join requests on a child", () => {
     // Phase 2 depends on this: the approve/decline queue is gated on
-    // `reviewJoinRequest`, and it must honour inherited RE authority.
+    // `reviewJoinRequest`, and it must honour inherited PL authority.
     assert.equal(
       can.reviewJoinRequest({ id: LEAD, globalRole: "lead" }, graph, CHILD_PRJ),
       true
@@ -314,9 +314,9 @@ describe("permissions run correctly against a Postgres-shaped graph", () => {
   });
 });
 
-// --- the Division-Lead-is-a-top-RE rule, on Postgres-shaped rows ------------
+// --- the Division-Lead-is-a-top-PL rule, on Postgres-shaped rows ------------
 
-describe("a Division Lead is a top RE, resolved from real team rows", () => {
+describe("a Division Lead is a top PL, resolved from real team rows", () => {
   /*
     The rule itself is exercised in `lib/permissions.test.ts` against a
     hand-built graph. This block exists for the OTHER half — that
@@ -386,7 +386,7 @@ describe("a Division Lead is a top RE, resolved from real team rows", () => {
 
   test("someone outside that division still can't", () => {
     const stranger = { id: OUTSIDER, globalRole: "lead" as const };
-    // OUTSIDER is the RE here, so check a member with no role at all instead.
+    // OUTSIDER is the PL here, so check a member with no role at all instead.
     assert.ok(stranger);
     assert.equal(
       can.manageProject({ id: "nobody", globalRole: "lead" }, graph, ROOT_PRJ),

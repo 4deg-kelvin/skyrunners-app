@@ -7,12 +7,12 @@
  * The rule that needs pinning
  * ---------------------------------------------------------------------------
  *
- * A blocker goes to the project's REs and no further — it's a request for one
+ * A blocker goes to the project's PLs and no further — it's a request for one
  * named person to act, not an announcement, and telling five people produces
  * the bystander effect instead of a fix.
  *
- * The exception is the whole reason this function exists: **if the only RE is
- * the person who's stuck, it climbs one level.** Without that, an RE blocked on
+ * The exception is the whole reason this function exists: **if the only PL is
+ * the person who's stuck, it climbs one level.** Without that, a PL blocked on
  * their own deliverable gets DMed about their own blocker — useless — and the
  * one case that genuinely needs escalating becomes the one case nobody hears
  * about. That inversion is silent, which is why it's tested rather than trusted.
@@ -57,16 +57,16 @@ function nestedProject() {
   const child = store.projects.find(
     (p) => p.parentId !== null && p.primaryReId
   );
-  if (!child) throw new Error("seed needs a nested project with an RE");
+  if (!child) throw new Error("seed needs a nested project with a PL");
   const parent = store.projects.find((p) => p.id === child.parentId);
   if (!parent) throw new Error("seed nesting is broken");
   return { child, parent };
 }
 
 describe("a blocker goes to the nearest level that isn't you", () => {
-  test("a member's blocker goes to their project's RE", async () => {
+  test("a member's blocker goes to their project's PL", async () => {
     const { child } = nestedProject();
-    // Somebody who is definitely not an RE here.
+    // Somebody who is definitely not a PL here.
     const outsider = disk
       .readStore()
       .members.find((m) => !child.reIds.includes(m.id))!;
@@ -74,11 +74,11 @@ describe("a blocker goes to the nearest level that isn't you", () => {
     const audience = blockerAudience(child.id, outsider.id);
     assert.ok(
       audience.includes(child.primaryReId),
-      "the primary RE has to hear about it"
+      "the primary PL has to hear about it"
     );
   });
 
-  test("the primary RE is first, since they're the go-to contact", async () => {
+  test("the primary PL is first, since they're the go-to contact", async () => {
     const { child } = nestedProject();
     const outsider = disk
       .readStore()
@@ -88,13 +88,13 @@ describe("a blocker goes to the nearest level that isn't you", () => {
   });
 
   /*
-    The case the whole function exists for. An RE stuck on their own project
+    The case the whole function exists for. A PL stuck on their own project
     would otherwise be told about their own blocker.
   */
-  test("an RE blocked on their own project escalates one level up", async () => {
+  test("a PL blocked on their own project escalates one level up", async () => {
     const { child, parent } = nestedProject();
 
-    // Strip the child down to a single RE, and make them the raiser.
+    // Strip the child down to a single PL, and make them the raiser.
     await disk.mutate((store) => {
       const p = store.projects.find((x) => x.id === child.id)!;
       p.reIds = [child.primaryReId];
@@ -117,11 +117,11 @@ describe("a blocker goes to the nearest level that isn't you", () => {
       audience.includes(
         disk.readStore().projects.find((p) => p.id === parent.id)!.primaryReId
       ),
-      "it should land on the RE one level up"
+      "it should land on the PL one level up"
     );
   });
 
-  test("a co-RE at the same level is enough — it doesn't climb past them", async () => {
+  test("a co-PL at the same level is enough — it doesn't climb past them", async () => {
     const { child } = nestedProject();
     const other = disk
       .readStore()
@@ -133,7 +133,7 @@ describe("a blocker goes to the nearest level that isn't you", () => {
       return null;
     });
 
-    // The primary raises it; their co-RE is right there and closer to the work
+    // The primary raises it; their co-PL is right there and closer to the work
     // than anybody above.
     const audience = blockerAudience(child.id, child.primaryReId);
     assert.deepEqual(audience, [other.id]);

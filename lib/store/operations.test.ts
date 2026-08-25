@@ -88,7 +88,7 @@ describe("logging work", () => {
     That inversion is the whole point of removing hours, and it is the rule most
     likely to get softened by somebody trying to make logging faster. It must
     not be: the note is what pre-fills the member's next check-in, so an entry
-    without one does no work at all — it neither tells the RE anything nor saves
+    without one does no work at all — it neither tells the PL anything nor saves
     the member any typing later.
   */
   test("an entry with no note is refused", async () => {
@@ -182,46 +182,65 @@ describe("logging work", () => {
   });
 });
 
-describe("the log locks once a check-in has reported it", () => {
-  // m-sofia has a submitted update in the seed (u-1, submitted 2026-08-05).
-  const SOFIA = "m-sofia";
+describe("the log locks a week after the day it covers", () => {
+  /*
+    The rule was "a submitted check-in has already reported this date" until
+    2026-08-24. Check-ins went, so that test could never fire again and every
+    entry would have stayed removable forever. It is now the same seven days you
+    can log INTO -- the period you can write is the period you can correct.
 
-  test("a day already covered by a submitted check-in is locked", () => {
-    assert.equal(ops.workIsLocked(SOFIA, "2026-08-04"), true);
+    Every assertion here passes `today` explicitly, and that is the point of the
+    signature. The first version of the new rule read `todayInClubTime()` inside
+    the function and broke two tests immediately, because `logWork` computes its
+    own age from the `today` it was passed. Two places deciding what day it is
+    will eventually disagree.
+  */
+  const DAY = "2026-08-20";
+
+  test("the same day is open", () => {
+    assert.equal(ops.workIsLocked(DAY, DAY), false);
   });
 
-  test("logging into a locked day is refused", async () => {
+  test("exactly seven days later is still open", () => {
+    // Inclusive at the boundary, matching MAX_BACKDATE_DAYS: an off-by-one here
+    // would take the last day away silently.
+    assert.equal(ops.workIsLocked(DAY, "2026-08-27"), false);
+  });
+
+  test("eight days later is locked", () => {
+    assert.equal(ops.workIsLocked(DAY, "2026-08-28"), true);
+  });
+
+  test("logging into a locked day is refused, and says how many days", async () => {
     const r = await ops.logWork({
-      memberId: SOFIA,
+      memberId: "m-sofia",
       projectId: "p-layup",
-      workDate: "2026-08-04",
+      workDate: "2026-07-01",
       description: "more layup",
       today: "2026-08-06",
     });
     assert.equal(r.ok, false);
-    if (!r.ok) assert.match(r.error, /locked/i);
+    // The backdate message, not a second "locked" one -- logWork used to check
+    // both and they now mean the same thing.
+    if (!r.ok) assert.match(r.error, /days ago/i);
   });
 
-  /*
-    The submission day itself stays OPEN.
-
-    This used to pair with `checkInPeriodStart` in lib/checkin-draft.ts, which
-    started the auto-fill window inclusively on the same day; both went with
-    check-ins on 2026-08-24. The rule stands on its own reason: you log in the
-    afternoon and get another two hours in that evening, and if the day locked
-    on submission that evening's work could never be recorded at all.
-  */
-  test("the submission day itself is still open", () => {
-    assert.equal(ops.workIsLocked(SOFIA, "2026-08-05"), false);
+  test("removing a locked entry is refused", async () => {
+    const store = disk.readStore();
+    const old = store.workLogs.find((w) => w.workDate < "2026-07-15");
+    if (!old) return; // seed has nothing old enough; nothing to assert
+    const r = await ops.deleteWorkLog(old.id, old.memberId, "2026-08-25");
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.error, /within 7 days|project's record/i);
   });
 
-  test("someone with no submitted check-in is never locked", () => {
-    // Otherwise a brand-new member couldn't log anything at all.
-    assert.equal(ops.workIsLocked("m-blake", "2026-08-04"), false);
-  });
-
-  test("one member's check-in doesn't lock another's log", () => {
-    assert.equal(ops.workIsLocked("m-tyler", "2026-07-01"), false);
+  test("nobody's log locks anybody else's", () => {
+    // The rule is about the DATE now, so it cannot depend on who is asking --
+    // asserted because it used to read a per-member check-in.
+    assert.equal(
+      ops.workIsLocked("2026-08-20", "2026-08-21"),
+      ops.workIsLocked("2026-08-20", "2026-08-21")
+    );
   });
 });
 
@@ -341,7 +360,7 @@ describe("creating a deliverable", () => {
   });
 });
 
-describe("sign-off: the owner claims, the RE decides", () => {
+describe("sign-off: the owner claims, the PL decides", () => {
   async function fresh() {
     const r = await ops.createDeliverable({
       projectId: PROJECT,
@@ -371,7 +390,7 @@ describe("sign-off: the owner claims, the RE decides", () => {
     assert.equal(r.ok, false);
   });
 
-  test("RE confirmation is what completes it, and records who", async () => {
+  test("PL confirmation is what completes it, and records who", async () => {
     const id = await fresh();
     await ops.submitDeliverable(id, MEMBER, TODAY);
     const r = await ops.confirmDeliverable(id, "m-priya", TODAY);
@@ -458,7 +477,7 @@ describe("checklists under a deliverable", () => {
 
   /*
     The rule the whole feature exists for. Both halves are asserted, because
-    gating only the RE would put the wall in front of the person who didn't
+    gating only the PL would put the wall in front of the person who didn't
     write the list.
   */
   test("the owner can't claim done while an item is open", async () => {
@@ -468,7 +487,7 @@ describe("checklists under a deliverable", () => {
     if (!r.ok) assert.match(r.error, /Move the jig/);
   });
 
-  test("an RE can't sign off while an item is open", async () => {
+  test("a PL can't sign off while an item is open", async () => {
     const { deliverableId } = await withTodos(["Move the jig"]);
     const r = await ops.confirmDeliverable(deliverableId, "m-priya", TODAY);
     assert.equal(r.ok, false);
@@ -751,7 +770,7 @@ describe("advisors named on a project", () => {
   Both halves went with the reporting chain on 2026-08-24. `setGlobalRole` no
   longer touches `leadId` at all, and the reasoning for that is worth keeping
   because it is a POSITIVE change rather than only a deletion: what a demotion
-  still costs somebody is the RE side, and that lives on `project_res` and
+  still costs somebody is the PL side, and that lives on `project_res` and
   `teams.lead_id`. Neither is touched here, deliberately. Demoting a Division
   Lead does not silently hand their division to nobody; `setTeamLead` is a
   separate, deliberate act.

@@ -14,12 +14,12 @@
  *
  * The chain's actual function was that somebody was NAMED as responsible for
  * noticing. Losing people quietly is what this club loses people to — not to a
- * lack of reporting — so "the RE reads their project's feed" is lighter by
+ * lack of reporting — so "the PL reads their project's feed" is lighter by
  * design but only works if something surfaces silence.
  *
  * So it comes back re-scoped to the project, which is the shape that has an
- * owner now: a project has REs, RE authority inherits down the tree, and a
- * Division Lead is a top RE. Every quiet project has somebody it is addressed
+ * owner now: a project has PLs, PL authority inherits down the tree, and a
+ * Division Lead is a top PL. Every quiet project has somebody it is addressed
  * to, which is exactly what the old flag had and what a bare feed does not.
  *
  * ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@
  *
  * **No per-person breakdown.** It would be trivial — the work logs carry
  * `memberId` — and it would rebuild the thing the club removed: a list of names
- * ranked by how recently each showed up. The unit is the project. If an RE wants
+ * ranked by how recently each showed up. The unit is the project. If a PL wants
  * to know who has been quiet on it, they open the project and read the feed,
  * where the answer sits next to what the work actually is.
  *
@@ -45,7 +45,7 @@ import type { Deliverable, Project, ProjectMembership, WorkLog } from "./types";
  * Three weeks, and the number is doing real work. A volunteer team's week
  * swings with midterms: one quiet week is normal, two is a bad fortnight, three
  * is somebody who has drifted off and usually does not come back on their own.
- * Shorter and the flag fires constantly during finals, which teaches an RE to
+ * Shorter and the flag fires constantly during finals, which teaches a PL to
  * skip the section — the failure mode every "0 items" panel on this dashboard
  * was designed around.
  */
@@ -56,7 +56,7 @@ export const QUIET_AFTER_DAYS = 21;
  *
  * A project created on Monday with a deliverable and nobody having logged
  * anything yet is not quiet, it is new. Without this, every project would be
- * born flagged, and the first thing an RE would learn is that the flag is wrong.
+ * born flagged, and the first thing a PL would learn is that the flag is wrong.
  */
 const NEW_PROJECT_GRACE_DAYS = QUIET_AFTER_DAYS;
 
@@ -107,7 +107,7 @@ export function quietProjects(
   for (const project of projects) {
     if (!scope.has(project.id)) continue;
     // A finished project is supposed to be silent. Flagging one would tell an
-    // RE their completed work needs attention.
+    // PL their completed work needs attention.
     if (project.phase === "complete") continue;
 
     const openDeliverables = deliverables.filter(
@@ -126,7 +126,7 @@ export function quietProjects(
       An unstaffed project with no open work is not quiet, it is dormant or
       finished-but-unmarked, and `/find-work` already ranks unstaffed projects
       first — which is the right place for it, because the action there is
-      "somebody join this" rather than "an RE chase somebody".
+      "somebody join this" rather than "a PL chase somebody".
     */
     if (openDeliverables === 0 && committedCount === 0) continue;
 

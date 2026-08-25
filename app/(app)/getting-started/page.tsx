@@ -57,7 +57,7 @@ export const metadata = {
  * dropped check-ins on 2026-08-24, and the log inherited the whole job: it IS
  * how a member reports now, which makes it more important rather than less.
  *
- * Written in second person and in the club's actual language — "RE", "Lead",
+ * Written in second person and in the club's actual language — "PL", "Lead",
  * "deliverable" — with each term explained the first time. A glossary at the
  * bottom would mean reading the page twice.
  */
@@ -223,7 +223,7 @@ export default async function GettingStartedPage() {
           1. The work log. First because it's the smallest habit and, since
           2026-08-24, the ONLY thing the app asks a member to write. It used to
           feed a twice-weekly check-in; now it goes straight into the project's
-          feed where the RE reads it and can reply in place.
+          feed where the PL reads it and can reply in place.
       ------------------------------------------------------------------- */}
       <Card>
         <CardBody>
@@ -269,7 +269,7 @@ export default async function GettingStartedPage() {
             <p className="text-ink-soft text-sm">
               <span className="text-ink font-semibold">Why it matters:</span>{" "}
               it&apos;s how anyone else knows what is happening on your project
-              — your RE, and a Division Lead two levels up who otherwise cannot
+              — your PL, and a Division Lead two levels up who otherwise cannot
               see inside it. This is the whole reporting relationship: there is
               no separate report to file, and no Lead collecting one. It is also
               your track record when leadership is picking people they
@@ -290,16 +290,14 @@ export default async function GettingStartedPage() {
           <SectionLabel>Second thing</SectionLabel>
           <h2 className="text-ink mt-2 flex items-center gap-2.5 text-2xl font-bold">
             <PenLine className="text-cardinal-600 size-6" strokeWidth={2.5} />
-            You report to your REs, and only through the log
+            You report to your PLs, and only through the log
           </h2>
 
           <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
             Nobody has a Lead who collects a weekly report. Each project has one
             or more{" "}
-            <span className="text-ink font-semibold">
-              Responsible Engineers
-            </span>{" "}
-            who are accountable for it finishing, and what you log lands in that
+            <span className="text-ink font-semibold">Project Leads</span> who
+            are accountable for it finishing, and what you log lands in that
             project&apos;s feed where they — and everyone else — can read it and
             reply. That is the whole thing. There is nothing else to file.
           </p>
@@ -331,7 +329,7 @@ export default async function GettingStartedPage() {
               <p className="text-ink text-sm font-bold">Midterms happen</p>
               <p className="text-ink-soft mt-1 text-sm">
                 Nothing accrues against you — there is no report to miss and no
-                backlog to come back to. If a quarter goes badly, tell the RE of
+                backlog to come back to. If a quarter goes badly, tell the PL of
                 whatever you&apos;re holding so somebody can pick it up. We
                 would much rather you hand something over than disappear.
               </p>
@@ -357,8 +355,8 @@ export default async function GettingStartedPage() {
               Every project, sorted by where you&apos;d help most — unstaffed
               and stuck first. Nobody assigns you work: find something and press{" "}
               <span className="text-ink font-semibold">Ask to join</span>. The{" "}
-              <span className="text-ink font-semibold">RE</span> (Responsible
-              Engineer, accountable for that project) gets a tracked request,
+              <span className="text-ink font-semibold">PL</span> (Project Lead —
+              the person accountable for that project) gets a tracked request,
               and it escalates on its own after five days.
             </Guide>
 
@@ -371,7 +369,7 @@ export default async function GettingStartedPage() {
               <span className="text-ink font-semibold">Follow</span> anything,
               instantly, as many as you like — that&apos;s just watching.{" "}
               <span className="text-ink font-semibold">Joining</span> needs the
-              RE to say yes, because they&apos;re accountable for the work. Same
+              PL to say yes, because they&apos;re accountable for the work. Same
               reason you can&apos;t add yourself.
             </Guide>
 
@@ -383,7 +381,7 @@ export default async function GettingStartedPage() {
             >
               One piece of work, one owner, one date. Mark it done when you
               finish — that&apos;s a{" "}
-              <span className="text-ink font-semibold">claim</span>. An RE signs
+              <span className="text-ink font-semibold">claim</span>. A PL signs
               it off, and only then does it count. Two steps so nobody marks
               their own homework.
             </Guide>

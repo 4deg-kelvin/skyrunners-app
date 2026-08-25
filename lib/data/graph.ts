@@ -14,7 +14,7 @@
  * So in live mode the permission system was reasoning about a person who, as far
  * as the graph was concerned, did not exist. It fails closed rather than open —
  * `leadChain` and `isREofOrAbove` both bail on `undefined` — so nobody gained
- * access they shouldn't have. But every Lead and RE silently lost theirs, and the
+ * access they shouldn't have. But every Lead and PL silently lost theirs, and the
  * symptom ("why can't I edit my own project?") points nowhere near the cause.
  *
  * ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ const PROJECT_COLUMNS =
 const PROJECT_MEMBER_COLUMNS = "project_id, member_id";
 
 /**
- * Teams, for the Division-Lead-is-a-top-RE rule in `leadsTeamAbove`.
+ * Teams, for the Division-Lead-is-a-top-PL rule in `leadsTeamAbove`.
  *
  * `is_active` is read but NOT filtered on. An archived division's projects keep
  * pointing at it, and the person who led it must still be able to act on that
@@ -120,7 +120,7 @@ interface ProjectRow {
   time_commitment: string | null;
 }
 
-/** One row per RE assignment — `project_members` filtered to `role = 're'`. */
+/** One row per PL assignment — `project_members` filtered to `role = 're'`. */
 interface ReRow {
   project_id: string;
   member_id: string;
@@ -190,7 +190,7 @@ export function toProject(row: ProjectRow, reIds: string[]): Project {
  * The pure half — rows in, graph out.
  *
  * Split from the fetching so it can be tested exhaustively without a database or
- * a mocked client. Every interesting case (a missing RE membership row, an
+ * a mocked client. Every interesting case (a missing PL membership row, an
  * unknown id, a member whose lead has been deleted) is exercised in
  * `graph.test.ts`.
  */
@@ -202,7 +202,7 @@ export function buildOrgGraphFromRows(
    * Required, not defaulted to `[]`.
    *
    * A default would make forgetting it compile — and the failure is invisible:
-   * no teams means no team leads, so every Division Lead silently loses RE
+   * no teams means no team leads, so every Division Lead silently loses PL
    * authority over their own division and the symptom ("why can't I sign this
    * off?") points nowhere near the cause. Same shape as the mock-data fallback
    * in docs/HANDOFF.md §2. Pass `[]` deliberately if you mean it.
@@ -226,7 +226,7 @@ export function buildOrgGraphFromRows(
     // Defensive: `primary_re_id` is a NOT NULL column on `projects`, but the
     // matching `project_members` row with `role = 're'` is a separate insert
     // that nothing in the schema forces to exist. If it's missing, the primary
-    // RE — the person accountable for the whole project — would have no
+    // PL — the person accountable for the whole project — would have no
     // authority over it. Fold them in rather than trust two tables to agree.
     if (!reIds.includes(row.primary_re_id)) reIds.unshift(row.primary_re_id);
 
@@ -276,7 +276,7 @@ export async function loadLiveOrgGraph(
       .eq("role", "re")
       // Never-hard-delete means departed members keep their row with `left_at`
       // set. Without this filter, someone who left last year still counts as an
-      // RE and can still act on the project.
+      // PL and can still act on the project.
       .is("left_at", null),
     supabase.from("teams").select(TEAM_COLUMNS),
   ]);

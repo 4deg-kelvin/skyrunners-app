@@ -36,7 +36,7 @@ export default async function DashboardPage() {
    * The gate. Hiding the nav link is not access control — this route is
    * reachable by URL.
    *
-   * Keyed on being an RE of something rather than on overseeing somebody, since
+   * Keyed on being a PL of something rather than on overseeing somebody, since
    * 2026-08-24. Sends them to /my-work rather than showing a 403: for a plain
    * member this isn't a permissions error to understand, it's a page that was
    * never meant for them, and their own work is where they were going anyway.
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       <PageHeader
         label="Lead Portal"
         title="Dashboard"
-        description="What you owe as an RE: work to sign off, requests to answer, projects that have gone quiet. Your projects only — about fifteen minutes a week."
+        description="What you owe as a PL: work to sign off, requests to answer, projects that have gone quiet. Your projects only — about fifteen minutes a week."
         action={
           mayLogWork ? (
             <LogWorkForm
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
                     There was a Co-Lead "My reports · Whole club" toggle here. It
                     widened one thing — whose check-ins counted toward your
                     reading obligation — and that obligation is gone. A Co-Lead
-                    is already a top RE everywhere, so both settings now render
+                    is already a top PL everywhere, so both settings now render
                     the same page.
                   */}
                   <p className="text-ink-soft mt-2 text-[15px]">
@@ -186,17 +186,17 @@ export default async function DashboardPage() {
           </Card>
 
           {/*
-            What you owe as an RE.
+            What you owe as a PL.
 
             Since check-ins went there is only one queue here, and it is this
             one: work somebody marked done that nobody has confirmed. It is
-            deliberately not a reading queue - an RE reads their project's feed,
+            deliberately not a reading queue - a PL reads their project's feed,
             which is a page they already have a reason to open.
           */}
           {reQueue.signOffs.length > 0 ? (
             <Card>
               <CardBody>
-                <SectionLabel>Waiting On You As RE</SectionLabel>
+                <SectionLabel>Waiting On You As PL</SectionLabel>
                 <p className="text-ink-soft mt-2 text-[15px]">
                   Not your reading queue — this is work on your projects that
                   can&apos;t move until you answer.
@@ -458,8 +458,8 @@ export default async function DashboardPage() {
             real cost: the chain's actual function was that somebody was NAMED as
             responsible for noticing silence.
 
-            Addressed to the RE, which is why it belongs on this page and not on
-            the project. An RE who opens their project sees the feed and can tell
+            Addressed to the PL, which is why it belongs on this page and not on
+            the project. A PL who opens their project sees the feed and can tell
             it is quiet; the whole problem is that they have no reason to open a
             project nothing is happening on.
 
@@ -611,7 +611,7 @@ export default async function DashboardPage() {
                         <ProjectBadges project={project} />
                       </div>
                       <p className="text-ink-soft mt-1.5 text-sm">
-                        {res.length > 1 ? "REs" : "RE"}:{" "}
+                        {res.length > 1 ? "PLs" : "PL"}:{" "}
                         {res.map((r) => r.fullName).join(", ") || "unassigned"}
                       </p>
                     </Link>

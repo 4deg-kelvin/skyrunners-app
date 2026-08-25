@@ -279,7 +279,7 @@ describe("the history is the point", () => {
   test("a move through the full project editor is recorded too", async () => {
     /*
       The hole this closes. `changeProjectDeadline` requires a reason, so if only
-      it recorded history an RE could move the date through the project editor
+      it recorded history a PL could move the date through the project editor
       instead and the slip would leave no trace at all. A row with an empty
       reason is worse history than a good one and far better than none, and the
       UI labels it as such.

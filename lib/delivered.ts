@@ -15,7 +15,7 @@
  * their profile next to the other details rather than in a panel of its own.
  * So this module is two numbers.
  *
- * Scope — how many RE roles somebody holds — went with it. It was always
+ * Scope — how many PL roles somebody holds — went with it. It was always
  * reported and never blended in, for the reason recorded in the old file: it
  * requires having already been appointed, so it measures having already been
  * chosen. Once the panel around it was gone there was nowhere honest to put a
@@ -27,7 +27,7 @@
  *
  * **No composite, no ranking, no rate.** Two counts of things that happened.
  * A percentage needs a denominator, and every available denominator here is a
- * judgment: deliverables assigned depends on an RE's granularity, and projects
+ * judgment: deliverables assigned depends on a PL's granularity, and projects
  * joined depends on who invited you.
  *
  * **Never add a third count built on volume.** Days logged, entries written,
@@ -41,15 +41,15 @@
  */
 
 export interface Delivered {
-  /** Deliverables of theirs that an RE signed off. */
+  /** Deliverables of theirs that a PL signed off. */
   deliverablesCompleted: number;
   /**
    * Projects they were COMMITTED to that reached `complete`.
    *
-   * Committed, not following — membership is RE-controlled and nobody adds
+   * Committed, not following — membership is PL-controlled and nobody adds
    * themselves, so this cannot be self-inflated. It deliberately does NOT
    * require them to have owned a deliverable on it: the old rule did, which
-   * scored the RE who carried a project to the finish at zero whenever the work
+   * scored the PL who carried a project to the finish at zero whenever the work
    * was tracked as other people's deliverables. That is the person most
    * responsible for it finishing.
    */

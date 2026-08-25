@@ -9,7 +9,7 @@
  *
  *   1. Nothing to say → nothing sent.
  *   2. A quiet project says HOW LONG it has been quiet.
- *   3. RE authority is inherited, not matched against `reIds`.
+ *   3. PL authority is inherited, not matched against `reIds`.
  *   4. It never exceeds Discord's message limit.
  *
  * Same setup rules as the other store suites: `SKYRUNNERS_STORE_DIR` is set
@@ -101,14 +101,14 @@ describe("who gets one at all", () => {
     );
   });
 
-  test("an RE does", async () => {
+  test("a PL does", async () => {
     await connectEveryone();
     const re = disk.readStore().projects.find((p) => p.reIds.length > 0)!
       .reIds[0];
     assert.ok(build().some((d) => d.memberId === re));
   });
 
-  test("opting out removes them, even as an RE", async () => {
+  test("opting out removes them, even as a PL", async () => {
     await connectEveryone();
     const re = disk.readStore().projects.find((p) => p.reIds.length > 0)!
       .reIds[0];
@@ -198,7 +198,7 @@ describe("a quiet project says how long", () => {
     assert.match(mine.body, /ran the tensile coupons/);
 
     /*
-      Check THIS project's line specifically. An RE usually holds several, and
+      Check THIS project's line specifically. A PL usually holds several, and
       the others being quiet is correct — an earlier version of this assertion
       searched the whole message and failed on a working digest.
     */
@@ -377,8 +377,8 @@ describe("deadlines inside the week", () => {
   });
 });
 
-describe("RE authority is inherited", () => {
-  test("an RE of a parent gets the child project in their digest", async () => {
+describe("PL authority is inherited", () => {
+  test("a PL of a parent gets the child project in their digest", async () => {
     /*
       The bug this guards: matching `reIds` directly instead of asking
       `isREofOrAbove`. It compiles, it looks right, and it silently drops every

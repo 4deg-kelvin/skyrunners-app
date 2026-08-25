@@ -138,7 +138,7 @@ export async function GET(
     /*
       Events this member is ON, and nothing else.
 
-      `attendeeIds` is both "invited" and "attending" in this model — an RE names
+      `attendeeIds` is both "invited" and "attending" in this model — a PL names
       people on a session, and RSVPing adds yourself — so one condition covers
       both of the things this feature was asked for: an event you were invited to
       appears in your calendar, and so does one you said you would come to.

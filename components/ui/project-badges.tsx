@@ -20,14 +20,14 @@ export function ProjectBadges({
   /*
     Past its target date and not finished.
 
-    Health is the RE's own judgement and only moves when they move it — that's
+    Health is the PL's own judgement and only moves when they move it — that's
     deliberate and it stays. But it produced a row reading "3 days overdue"
     next to a green "On track", which is the app stating two contradictory
     things and asking the reader to work out which one to believe.
 
     So the date gets its own badge rather than health being silently
     overwritten. Overdue is a FACT; on-track is an OPINION, and the fact goes
-    first. The RE is separately prompted to reconcile them by the `past_target`
+    first. The PL is separately prompted to reconcile them by the `past_target`
     attention flag — annotating the contradiction without offering a way to
     close it would just be a tidier lie.
   */

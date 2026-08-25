@@ -99,8 +99,8 @@ Reference, when you need it: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) ·
 
 Full list in [`CLAUDE.md`](CLAUDE.md); these are the ones that cost the most time.
 
-- **All authority comes from being an RE, and it inherits *down* the project tree.**
-  Leading a division makes you a top RE inside it. Nobody reports to anybody — the
+- **All authority comes from being a PL, and it inherits *down* the project tree.**
+  Leading a division makes you a top PL inside it. Nobody reports to anybody — the
   reporting chain was removed on 2026-08-24. Never check `globalRole` inline; go through
   `lib/permissions.ts`.
 - **Everything about a member is public**, except archived check-ins from before that

@@ -233,7 +233,7 @@ async function createDeliverableAction$impl(
   return toResult(result, "Deliverable added.");
 }
 
-/** The owner says it's finished. Does not complete it — an RE must confirm. */
+/** The owner says it's finished. Does not complete it — a PL must confirm. */
 async function submitDeliverableAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -242,7 +242,7 @@ async function submitDeliverableAction$impl(
 
   const result = await ops.submitDeliverable(id, viewer.member.id, today());
   if (result.ok) refresh();
-  return toResult(result, "Sent to your RE for sign-off.");
+  return toResult(result, "Sent to your PL for sign-off.");
 }
 
 async function confirmDeliverableAction$impl(
@@ -253,7 +253,7 @@ async function confirmDeliverableAction$impl(
   const projectId = String(formData.get("projectId") ?? "");
 
   // Sign-off is what makes work count, so this is the check that keeps the
-  // Delivered signal honest. Inherits down the tree: an RE of a parent project
+  // Delivered signal honest. Inherits down the tree: a PL of a parent project
   // can sign off on its children.
   if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
     return denied("sign off on this project's work");
@@ -299,7 +299,7 @@ async function withdrawSignOffAction$impl(
 
   if (!can.withdrawSignOff(viewer.actor, viewer.graph, projectId)) {
     return denied(
-      "reject work that's already been signed off here — that needs an RE above this project, or its Division Lead"
+      "reject work that's already been signed off here — that needs a PL above this project, or its Division Lead"
     );
   }
 
@@ -326,7 +326,7 @@ async function setDeliverableStatusAction$impl(
     "open" | "in_progress" | "blocked";
   const blockerNote = String(formData.get("blockerNote") ?? "");
 
-  // The owner can move their own work along; so can an RE. Anyone else can't —
+  // The owner can move their own work along; so can a PL. Anyone else can't —
   // otherwise a passer-by could mark someone's work blocked.
   const deliverable = projectDeliverables(projectId).find((d) => d.id === id);
   const isOwner = deliverable?.ownerId === viewer.member.id;
@@ -346,9 +346,9 @@ async function setDeliverableStatusAction$impl(
     and nowhere else — `discordMessages.blockerRaised` was written for exactly
     this and called from nothing, so the message existed and reached nobody.
 
-    `blockerAudience` decides who: the project's REs, minus whoever raised it,
+    `blockerAudience` decides who: the project's PLs, minus whoever raised it,
     climbing one level if that empties the list. That last part is the rule that
-    matters — an RE blocked on their own deliverable would otherwise be DMed
+    matters — a PL blocked on their own deliverable would otherwise be DMed
     about their own blocker, and the case that most needs escalating would be
     the only one nobody heard about.
   */
@@ -376,7 +376,7 @@ async function setDeliverableStatusAction$impl(
  * Three audiences, three different messages, nobody gets two
  * ---------------------------------------------------------------------------
  *
- *   1. WHO CLEARS IT — `blockerAudience`. The project's REs, minus the raiser,
+ *   1. WHO CLEARS IT — `blockerAudience`. The project's PLs, minus the raiser,
  *      climbing one level if that empties the list. Unchanged, and still the
  *      only group asked to *do* something. Telling five people to fix one
  *      thing produces the bystander effect, which is why this list stays short.
@@ -384,13 +384,13 @@ async function setDeliverableStatusAction$impl(
  *   2. WHO OWNS THE WORK ABOVE — `projectEscalationAudience`, and only when a
  *      whole PROJECT is blocked. A stopped project changes what the person
  *      above promised, so they hear about it even if the project still has
- *      other REs who could clear it. A single blocked deliverable does not
+ *      other PLs who could clear it. A single blocked deliverable does not
  *      earn this.
  *
  *   3. WHO LOOKS AFTER THE PERSON — `raiserLeadAudience`. One step up the
  *      REPORTING tree, told as awareness rather than a task.
  *
- * The `sent` set is what keeps them exclusive. Somebody who is both the RE
+ * The `sent` set is what keeps them exclusive. Somebody who is both the PL
  * above and the raiser's Lead gets the more actionable message once, not two
  * DMs about the same event — which is exactly how a bot teaches people that
  * its messages are safe to skim.
@@ -470,7 +470,7 @@ function notifyBlocked(input: {
 // Checklists under a deliverable
 //
 // All four share one permission question, asked by `todoGate` below: are you
-// the deliverable's owner, an RE of or above its project, or a Co-Lead? Wider
+// the deliverable's owner, a PL of or above its project, or a Co-Lead? Wider
 // than the deliverable itself, and `can.manageDeliverableTodos` explains why.
 // ---------------------------------------------------------------------------
 
@@ -962,7 +962,7 @@ async function createProjectAction$impl(
 
   /*
     Both halves of the target, because they gate differently: under a parent
-    project it's RE authority, into a division it's leading that division. The
+    project it's PL authority, into a division it's leading that division. The
     form sends exactly one of them.
   */
   if (
@@ -981,8 +981,8 @@ async function createProjectAction$impl(
     description: String(formData.get("description") ?? ""),
     parentId,
     teamId,
-    // Default the RE to the creator. Leadership creating a project almost
-    // always owns it initially, and a project with no RE is the one state the
+    // Default the PL to the creator. Leadership creating a project almost
+    // always owns it initially, and a project with no PL is the one state the
     // model can't represent.
     primaryReId: String(formData.get("primaryReId") ?? "") || viewer.member.id,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
@@ -1001,7 +1001,7 @@ async function addProjectMemberAction$impl(
   const projectId = String(formData.get("projectId") ?? "");
   const asRE = String(formData.get("asRE") ?? "") === "yes";
 
-  // Making someone an RE hands them authority over the whole subtree, so it's
+  // Making someone a PL hands them authority over the whole subtree, so it's
   // gated on `assignRE` rather than the looser `addProjectMember`.
   const allowed = asRE
     ? can.assignRE(viewer.actor, viewer.graph, projectId)
@@ -1035,7 +1035,7 @@ async function addProjectMemberAction$impl(
       );
     }
   }
-  return toResult(result, asRE ? "Added as an RE." : "Added to the project.");
+  return toResult(result, asRE ? "Added as a PL." : "Added to the project.");
 }
 
 async function setProjectREAction$impl(
@@ -1045,7 +1045,7 @@ async function setProjectREAction$impl(
   const projectId = String(formData.get("projectId") ?? "");
 
   if (!can.assignRE(viewer.actor, viewer.graph, projectId)) {
-    return denied("change who the REs are");
+    return denied("change who the PLs are");
   }
 
   const memberId = String(formData.get("memberId") ?? "");
@@ -1064,10 +1064,10 @@ async function setProjectREAction$impl(
   return toResult(
     result,
     mode === "primary"
-      ? "Now the primary RE."
+      ? "Now the primary PL."
       : mode === "add"
-        ? "Added as an RE."
-        : "No longer an RE."
+        ? "Added as a PL."
+        : "No longer a PL."
   );
 }
 
@@ -1096,7 +1096,7 @@ async function requestToJoinAction$impl(
     return {
       ok: false,
       error:
-        "Advisors are named on a project by its RE rather than joining it — joining is how somebody takes on deliverables, and an advisor deliberately holds none.",
+        "Advisors are named on a project by its PL rather than joining it — joining is how somebody takes on deliverables, and an advisor deliberately holds none.",
     };
   }
 
@@ -1108,7 +1108,7 @@ async function requestToJoinAction$impl(
   });
 
   if (result.ok) refresh();
-  return toResult(result, "Asked to join — the RE will see it.");
+  return toResult(result, "Asked to join — the PL will see it.");
 }
 
 async function decideJoinRequestAction$impl(
@@ -1140,7 +1140,7 @@ async function decideJoinRequestAction$impl(
 
       A tracked join request exists precisely so an ask isn't an email into the
       void — but until now the answer only appeared if the member happened to
-      open My Work. Told either way: a decline with the RE's note is far better
+      open My Work. Told either way: a decline with the PL's note is far better
       than silence, and silence is what the whole feature was built to avoid.
     */
     // From the operation's return value, not the form — the request knows who
@@ -1290,8 +1290,8 @@ async function updateDeliverableAction$impl(
  *
  * `manageProject` — the same right as editing the project, which this is a
  * narrower version of. Deliberately NOT `completeProject`: moving a date is
- * running the project, not reviewing it, and the assigned RE is exactly who
- * should be able to say "this is going to take longer". Making them ask the RE
+ * running the project, not reviewing it, and the assigned PL is exactly who
+ * should be able to say "this is going to take longer". Making them ask the PL
  * above would mean the honest answer needs somebody else's diary, and the
  * dishonest one — leaving a date everyone knows is wrong — stays free.
  */
@@ -1325,11 +1325,11 @@ async function pushDeadlineAction$impl(
 /**
  * Push back one deliverable's deadline, with a reason.
  *
- * `manageDeliverables` — Co-Lead or RE of this project or above. Deliberately NOT
+ * `manageDeliverables` — Co-Lead or PL of this project or above. Deliberately NOT
  * the owner: `updateDeliverable` already lets the person doing the work change
  * their own date, and that is right for the ordinary case. This path writes a
  * permanent line in the project's history saying the schedule slipped and why, and
- * that is the RE's call, not something somebody should be able to enter about
+ * that is the PL's call, not something somebody should be able to enter about
  * their own work unreviewed.
  */
 async function pushDeliverableDeadlineAction$impl(
@@ -1373,7 +1373,7 @@ async function pushDeliverableDeadlineAction$impl(
  * Three deliberate constraints:
  *
  *   - **Co-Lead only** (`purgeEmptyProjects`), not `deleteProject`'s per-project
- *     rule, which would let an RE reach across divisions.
+ *     rule, which would let a PL reach across divisions.
  *   - **It names the person whose projects go**, so it can never be a
  *     "delete all empty projects" button that catches somebody else's.
  *   - **It confirms by typed count.** The client sends the number it displayed;
@@ -1488,13 +1488,13 @@ async function updateProjectAction$impl(
   /*
     Completing is a separate, narrower permission than editing.
 
-    The assigned RE runs the project and may change anything else about it —
+    The assigned PL runs the project and may change anything else about it —
     name, dates, health, phase — but declaring it FINISHED is the review step,
     and reviewing your own work isn't reviewing. Checked here rather than in
     `ops.updateProject` because permissions live in `lib/permissions.ts` and the
     store layer deliberately knows nothing about actors.
 
-    Only the crossing INTO complete. An RE reopening their own project needs no
+    Only the crossing INTO complete. A PL reopening their own project needs no
     permission from above: saying something isn't finished is always safe.
   */
   const phase = String(formData.get("phase") ?? "concept") as Project["phase"];
@@ -1508,7 +1508,7 @@ async function updateProjectAction$impl(
       return {
         ok: false,
         error:
-          "Only an RE above this project, or its Division Lead, can mark it complete. You're accountable for finishing it; they're accountable for agreeing it's done. Tell them it's ready.",
+          "Only a PL above this project, or its Division Lead, can mark it complete. You're accountable for finishing it; they're accountable for agreeing it's done. Tell them it's ready.",
       };
     }
   }
@@ -1540,7 +1540,7 @@ async function updateProjectAction$impl(
 
   if (result.ok) refresh();
 
-  // Same routing as a blocked deliverable — see `notifyBlocked`. An RE marking
+  // Same routing as a blocked deliverable — see `notifyBlocked`. A PL marking
   // their OWN project blocked is exactly the case that has to reach one level
   // up, because there is nobody left at this level to tell.
   if (result.ok && health === "blocked" && healthBefore !== "blocked") {
@@ -2073,14 +2073,14 @@ async function setCatalogueItemActiveAction$impl(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 7 — the RE answers a check-in section
+// Phase 7 — the PL answers a check-in section
 // ---------------------------------------------------------------------------
 
 /**
- * An RE's reply to one work-log line.
+ * A PL's reply to one work-log line.
  *
  * The twin of `respondToUpdateEntryAction`, and gated on the SAME rule
- * (`manageDeliverables` — RE of this project or above, or a Co-Lead) so the two
+ * (`manageDeliverables` — PL of this project or above, or a Co-Lead) so the two
  * rows in the merged feed cannot end up answerable by different people. A reader
  * seeing a reply box on one row and not the next would reasonably conclude the
  * app was broken.
@@ -2126,7 +2126,7 @@ async function respondToUpdateEntryAction$impl(
   const entryId = String(formData.get("entryId") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
 
-  // `manageDeliverables`, so RE authority inherits down the project tree and a
+  // `manageDeliverables`, so PL authority inherits down the project tree and a
   // Division Lead counts. Deliberately NOT `reviewUpdate` — that's the Lead
   // chain, and this is the other obligation entirely.
   if (!can.manageDeliverables(viewer.actor, viewer.graph, projectId)) {
@@ -2343,7 +2343,7 @@ async function revokeMcpTokenAction$impl(
 /**
  * Attach a document to a project.
  *
- * The one project write open to people who aren't REs — see
+ * The one project write open to people who aren't PLs — see
  * `can.attachArtifact` for why. Committed members only; following a project
  * means you're watching it, not working on it.
  */
@@ -2441,7 +2441,7 @@ async function removeArtifactAction$impl(
   if (!can.manageArtifact(viewer.actor, viewer.graph, projectId)) {
     /*
       Two different refusals wearing one message would be confusing here: "you
-      aren't an RE" and "this project is finished" need different next steps,
+      aren't a PL" and "this project is finished" need different next steps,
       and only one of them is about the person asking.
     */
     const project = viewer.graph.getProject(projectId);
@@ -2705,7 +2705,7 @@ async function restoreTeamAction$impl(
  * Take back a join request you sent.
  *
  * `withdrawJoinRequest` has existed in the operations layer since Phase 2 with
- * nothing calling it, so a request sent by mistake sat in an RE's queue
+ * nothing calling it, so a request sent by mistake sat in a PL's queue
  * permanently — and showed the sender a "Request pending" badge they had no way
  * to clear. Ownership is checked in the operation as well; the id comes from
  * the client, so it can't be the only check.

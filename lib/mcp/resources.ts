@@ -110,9 +110,7 @@ async function myWork(viewer: McpViewer): Promise<string> {
   }
 
   if (!view.committed.length) {
-    out.push(
-      "Not committed to any project yet. Ask an RE, or use `find_work`."
-    );
+    out.push("Not committed to any project yet. Ask a PL, or use `find_work`.");
   }
   return out.join("\n");
 }

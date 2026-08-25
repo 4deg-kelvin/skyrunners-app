@@ -128,7 +128,7 @@ describe("the messages make sense on a lock screen", () => {
     assert.match(added, /https:\/\//);
   });
 
-  test("a decline carries the RE's note when there is one", () => {
+  test("a decline carries the PL's note when there is one", () => {
     const withNote = discordMessages.joinRequestDeclined({
       projectName: "Layup",
       note: "Full for now — try again next quarter.",

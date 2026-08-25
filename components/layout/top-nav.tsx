@@ -59,7 +59,7 @@ export function TopNav({
   /** Hides My Work, which is empty by construction for them. */
   isAdvisor: boolean;
   isDemo: boolean;
-  /** Leads, Co-Leads, and anyone who is an RE of something. */
+  /** Leads, Co-Leads, and anyone who is a PL of something. */
   showLeadingGuide: boolean;
   /**
    * What the club calls itself, from `club_settings`.

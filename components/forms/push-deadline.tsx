@@ -205,7 +205,7 @@ export function PushDeadlineForm({
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
           />
           <span className="text-ink-muted mt-1 block text-xs">
-            Everyone planning around this project reads this, and the REs above
+            Everyone planning around this project reads this, and the PLs above
             you are told.
           </span>
         </label>

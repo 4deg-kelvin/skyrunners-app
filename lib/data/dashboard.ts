@@ -19,7 +19,7 @@
  *
  * On 2026-08-24 the club dropped check-ins and the reporting chain, and the
  * privacy half of that reasoning went with them: there are no reports written to
- * a person any more. **What remains is an RE dashboard** — what you owe is work
+ * a person any more. **What remains is a PL dashboard** — what you owe is work
  * on YOUR projects, and `flaggedProjects` stays club-wide on purpose, because a
  * blocked project is exactly the thing a passing person should be able to
  * unblock.
@@ -98,7 +98,7 @@ export interface DashboardView {
    */
   hasAcademicCalendar: boolean;
   /**
-   * True when the viewer is an RE of nothing — changes the whole page's message,
+   * True when the viewer is a PL of nothing — changes the whole page's message,
    * and gates the route.
    *
    * Was `isLeadOfNobody`, counted off the reporting chain. Same job, asked of
@@ -174,18 +174,18 @@ export interface DashboardView {
     ageDays: number;
   }[];
   /**
-   * The RE half of the exception feed — what's waiting on YOU as an RE.
+   * The PL half of the exception feed — what's waiting on YOU as a PL.
    *
    * Separate from `reviewQueue`, which is the Lead half. Two obligations, two
    * different people, and a dashboard that merged them would tell a Lead who
-   * is also an RE that they owe "seven things" without saying which hat.
+   * is also a PL that they owe "seven things" without saying which hat.
    */
   reQueue: {
     /**
-     * Finished work no RE has signed off. `pendingSignOffs`.
+     * Finished work no PL has signed off. `pendingSignOffs`.
      *
      * This used to sit beside an `unanswered` list of check-in sections needing
-     * an RE's reply. Check-ins were removed on 2026-08-24, so that queue could
+     * a PL's reply. Check-ins were removed on 2026-08-24, so that queue could
      * only ever shrink — a backlog of historical rows is a to-do list nobody
      * chose. Replying to the project feed is still possible; it just isn't an
      * obligation with a counter.
@@ -258,9 +258,9 @@ function startOfWeek(today: string): string {
 /**
  * `graph` was a placeholder parameter for years — the reporting chain is walked
  * over the in-memory `members` array, so nothing needed it. It's load-bearing
- * now: the RE queue resolves the viewer's project subtree through
- * `isREofOrAbove`, which is the only thing that knows RE authority inherits
- * DOWN the project tree and that a Division Lead is a top RE. Matching `reIds`
+ * now: the PL queue resolves the viewer's project subtree through
+ * `isREofOrAbove`, which is the only thing that knows PL authority inherits
+ * DOWN the project tree and that a Division Lead is a top PL. Matching `reIds`
  * directly would miss both and silently under-report what somebody owes.
  */
 export async function getDashboard(
@@ -272,7 +272,7 @@ export async function getDashboard(
     toggle on the page driving it. Both are gone: the only thing it widened was
     the set of people whose check-ins you were accountable for reading, and
     nobody reads check-ins now. What is left is scoped by the project tree, where
-    a Co-Lead already sees everything because a Co-Lead is a top RE everywhere.
+    a Co-Lead already sees everything because a Co-Lead is a top PL everywhere.
 
     Removed rather than left inert. A control that changes nothing is worse than
     a missing one, because somebody clicks it, sees the same numbers, and stops
@@ -294,22 +294,22 @@ export async function getDashboard(
     The viewer's scope, and it is now ONE set instead of two.
 
     Everything on this page used to be scoped two ways: the Lead half by
-    `reportsBelow(actor.id)` walking the reporting chain, the RE half by
+    `reportsBelow(actor.id)` walking the reporting chain, the PL half by
     `isREofOrAbove`. The chain went on 2026-08-24, so there is one scope left and
     it is the project tree.
 
     Resolved through the permission module rather than by matching `reIds`
     directly: authority inherits DOWN the project tree, and a Division Lead is a
-    top RE over their whole division. Matching ids would miss both and silently
+    top PL over their whole division. Matching ids would miss both and silently
     under-report what somebody owes.
 
     **The Co-Lead branch is load-bearing, and removing it broke this page once.**
     `isREofOrAbove` has no Co-Lead shortcut, deliberately: it answers "does the
     project tree grant this person authority here", not "is this allowed". The
     Co-Lead answer lives in the `can.*` rules, each of which is
-    `isCoLead(actor) || ...`. So a Co-Lead who happens to be RE of nothing and
+    `isCoLead(actor) || ...`. So a Co-Lead who happens to be PL of nothing and
     leads no division scores zero here — which is the live club exactly, where
-    the only Co-Lead is RE of 0 of 12 projects. The whole dashboard rendered
+    the only Co-Lead is PL of 0 of 12 projects. The whole dashboard rendered
     empty for them: no queue, no quiet projects, zero people, and
     `isREofNothing` true.
 
@@ -327,7 +327,7 @@ export async function getDashboard(
   /*
     People committed to those projects. Following doesn't count: watching a
     project is not working on it, and a headcount inflated by watchers is the
-    number an RE would use to decide they have enough people.
+    number a PL would use to decide they have enough people.
   */
   const peopleOnMyProjects = new Set(
     store.projectMemberships
@@ -422,7 +422,7 @@ export async function getDashboard(
     project, which is the shape that has an owner now, and moved into
     `lib/quiet.ts` because the daily digest needs the same answer and the two
     must not drift. Three weeks rather than one week: see the note on
-    `QUIET_AFTER_DAYS` for why a shorter window trains an RE to skip the panel.
+    `QUIET_AFTER_DAYS` for why a shorter window trains a PL to skip the panel.
   */
   const goneQuiet = quietProjects(
     store.projects,

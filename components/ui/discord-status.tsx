@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * ---------------------------------------------------------------------------
  *
  * It answers a question other people have about you, not one you have about
- * yourself. A Lead wondering why their DM went nowhere, an RE about to add
+ * yourself. A Lead wondering why their DM went nowhere, a PL about to add
  * somebody to a project and expecting the bot to tell them — both need to know
  * before they rely on it, and neither can find out by asking the app anywhere
  * else. Same shape as "cleared on the laser cutter": a fact about capability

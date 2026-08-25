@@ -151,7 +151,7 @@ the work, and the description is the whole point:
 
 **This is worth the ten seconds, and it got more important in August 2026.** The
 club dropped its twice-weekly check-in on the 24th. Your log line is now the only
-thing you report: it lands in the project's feed, its RE can read it and reply to
+thing you report: it lands in the project's feed, its PL can read it and reply to
 it, and nothing else is collected from you.
 
 Which makes this a good standing instruction to give your assistant:

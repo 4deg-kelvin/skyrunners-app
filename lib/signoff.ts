@@ -1,15 +1,15 @@
 /**
- * Work that is finished and waiting on an RE.
+ * Work that is finished and waiting on a PL.
  *
  * ===========================================================================
  * Why this file exists, when `lib/review.ts` used to hold it
  * ===========================================================================
  *
  * `review.ts` held two unrelated things behind one name: the reporting chain's
- * escalation of unread check-ins, and this — the RE's sign-off queue. The
+ * escalation of unread check-ins, and this — the PL's sign-off queue. The
  * reporting chain was removed on 2026-08-24 and the file went with it, which
  * nearly took the sign-off queue too. It survives here because it was never about
- * the chain at all: it is a fact about DELIVERABLES and the RE accountable for
+ * the chain at all: it is a fact about DELIVERABLES and the PL accountable for
  * them, which is the half of the model the club kept.
  *
  * Worth remembering as a general lesson. A file named after a concept can hold
@@ -43,11 +43,11 @@ export interface PendingSignOff {
 }
 
 /**
- * Work an owner has finished that no RE has signed off yet.
+ * Work an owner has finished that no PL has signed off yet.
  *
- * This exists because of a deliberate trade: only an RE can mark a deliverable
+ * This exists because of a deliberate trade: only a PL can mark a deliverable
  * delivered, which keeps the Delivered count honest but puts one person in the
- * path of everyone else's record. A quiet RE therefore freezes their whole
+ * path of everyone else's record. A quiet PL therefore freezes their whole
  * project's count, and — worse — the members affected cannot tell whether they
  * are being ignored or whether the app is broken.
  *
@@ -55,11 +55,11 @@ export interface PendingSignOff {
  * one, which is the only honest way to run the stricter rule.
  *
  * With the reporting chain gone this matters MORE, not less: it is now the only
- * thing in the app that says "somebody is waiting on you", and the RE is the only
+ * thing in the app that says "somebody is waiting on you", and the PL is the only
  * person it can say it to.
  *
- * `projectIds` should be the subtree the RE is responsible for — authority
- * inherits DOWN the project tree, so an RE of a parent can sign off on a child.
+ * `projectIds` should be the subtree the PL is responsible for — authority
+ * inherits DOWN the project tree, so a PL of a parent can sign off on a child.
  */
 export function pendingSignOffs(
   deliverables: Deliverable[],

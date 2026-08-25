@@ -83,7 +83,7 @@ const GANTT_SESSION_DAYS = 7;
 
 export interface ProjectTreeNode {
   project: Project;
-  /** Primary RE first. */
+  /** Primary PL first. */
   res: Member[];
   /** Committed members only — following doesn't count as staffing. */
   memberCount: number;
@@ -91,7 +91,7 @@ export interface ProjectTreeNode {
   /**
    * Deliverables somebody has marked blocked.
    *
-   * Separate from `project.health`, which is the RE's own judgement and only
+   * Separate from `project.health`, which is the PL's own judgement and only
    * changes when they update it. Someone marking their work blocked is a fact,
    * and it needs to reach the page people browse — otherwise the person who
    * could unblock them never finds out.
@@ -213,10 +213,10 @@ export interface ProjectMemberRow {
    *
    * `can.viewMemberWorkOnProject` has existed since the privacy model was
    * written and was referenced by nothing but its own tests — so the one thing
-   * an RE is explicitly allowed to see about somebody's effort was computable,
+   * a PL is explicitly allowed to see about somebody's effort was computable,
    * permitted, and displayed nowhere.
    *
-   * This is the per-project half of the split: an RE sees engagement with their
+   * This is the per-project half of the split: a PL sees engagement with their
    * own work, and never the person's record, reliability or anything about
    * projects they don't run. Those belong to the member and their Lead.
    *
@@ -268,7 +268,7 @@ export interface ProjectDetailView {
    * `ProjectAdvisor`.
    */
   advisors: Member[];
-  /** Active advisors not already named here, for the RE's picker. */
+  /** Active advisors not already named here, for the PL's picker. */
   advisorChoices: { id: string; fullName: string }[];
   members: ProjectMemberRow[];
   children: ProjectTreeNode[];
@@ -302,7 +302,7 @@ export interface ProjectDetailView {
    * Recent hours logged against this project, newest first, with what people
    * wrote.
    *
-   * The per-project half of the effort split, and the useful half for an RE:
+   * The per-project half of the effort split, and the useful half for a PL:
    * "3.5 hrs — ran the tensile coupons" tells you what happened, where "3.5
    * hrs" only tells you somebody was busy. The description field has existed
    * since hours logging shipped and was rendered on exactly one screen: the
@@ -344,7 +344,7 @@ export interface ProjectDetailView {
     entry: UpdateEntry;
     author?: Member;
     submittedAt: string;
-    /** Which RE answered this section, if one has. */
+    /** Which PL answered this section, if one has. */
     responder?: Member;
   }[];
   /**
@@ -397,7 +397,7 @@ export interface ProjectDetailView {
    * error afterwards — the difference between a rule and a rejection.
    */
   incompleteDescendants: { id: string; name: string; slug: string }[];
-  /** Requests waiting on the RE, with requester attached. */
+  /** Requests waiting on the PL, with requester attached. */
   pendingRequests: {
     request: JoinRequest;
     requester?: Member;
@@ -406,7 +406,7 @@ export interface ProjectDetailView {
   /** The viewer's own pending request, if they've already asked. */
   myPendingRequest?: JoinRequest;
   /**
-   * Who an RE can hand work to: everyone active, not just current members.
+   * Who a PL can hand work to: everyone active, not just current members.
    *
    * Assigning a deliverable is how someone gets added (the action auto-adds
    * them), so limiting this to existing members would reintroduce the two-step
@@ -892,7 +892,7 @@ function upcomingEventsFor(
 /**
  * The last three weeks of logged work on one project.
  *
- * Three weeks rather than everything: an RE wants "what's been happening",
+ * Three weeks rather than everything: a PL wants "what's been happening",
  * and a project a year old would render a wall nobody reads. The total per
  * person is on the member rows above for the longer view.
  */

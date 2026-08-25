@@ -27,7 +27,7 @@ import type { BlockerItem } from "@/lib/data/blockers";
  * project, and a separate page asked people to go elsewhere to read them.
  *
  * The free-form ask is the one that had nowhere else to live, and it's the one
- * that matters most: membership is RE-controlled, so a member waiting on a
+ * that matters most: membership is PL-controlled, so a member waiting on a
  * join request otherwise has exactly one route to being useful and it depends
  * on one person answering their inbox.
  *

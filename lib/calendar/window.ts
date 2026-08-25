@@ -105,7 +105,7 @@ export interface FeedCandidate extends WindowedEvent {
  * only difference between them is that one renders titles and the other renders
  * ICS.
  *
- * `attendeeIds` is both "invited" and "attending": an RE names people on a
+ * `attendeeIds` is both "invited" and "attending": a PL names people on a
  * session, RSVPing adds yourself, and creating one adds you as the organiser. All
  * three are the same condition here, which is why creating an event puts it in
  * your own calendar without a second step.
