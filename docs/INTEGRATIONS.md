@@ -252,17 +252,39 @@ Four rules these all obey, each of which was a bug at some point:
 ### The daily digest
 
 One DM a day per person, from **one** Vercel cron
-(`/api/cron/daily-digest`, `lib/notify/digest.ts`). Sections, in the order they
-appear:
+(`/api/cron/daily-digest`, `lib/notify/digest.ts`).
+
+**Scope: projects you are actually ON.** Two ways in, answering different
+questions — you hold **PL authority** over it (so you are accountable whether or
+not you asked, and this inherits down the project tree, which is how a Division
+Lead still sees their whole division), or you hold a **membership**, committed or
+following. Nothing else.
+
+There used to be a third: every Co-Lead got every live project, added because
+`isREofOrAbove` has no Co-Lead shortcut and scoping by authority alone left a
+Co-Lead who is PL of nothing with an empty digest. **It was removed on
+2026-08-25 after one evening's real digest** — 8 live projects for somebody on 4
+of them, which is exactly the failure CLAUDE.md already names for the dashboard.
+Membership answers the original problem better and more narrowly: on the live
+club it halved the Co-Leads' digests, and it gave a digest to a Lead who is PL of
+nothing but committed to one project and was previously getting none. A Co-Lead
+who wants the club-wide view follows the projects — opt-in, not assumed.
+
+Sections, in the order they appear:
 
 | Section | Who | When |
 |---|---|---|
-| Needs attention | anyone with 2+ projects | only when something is blocked or at risk |
-| Due within 7 days | everyone | when there is anything |
-| Quiet for 21+ days | PLs and Co-Leads | **Mondays only** |
+| Needs attention | anyone on 2+ projects | only when something is blocked or at risk |
+| Due within 7 days | everyone | when there is anything, theirs or on their projects |
+| Quiet for 21+ days | everyone in scope | **Mondays only** |
 | Trainings to verify | leadership | when the queue is non-empty |
-| A project was added | PLs and Co-Leads | when one started yesterday or today |
-| Your projects | everyone | always, if they hold any |
+| A project was added | Co-Leads club-wide, others scoped | when one started yesterday or today |
+| Your projects | everyone in scope | **only when something happened on one today** |
+
+"A project was added" is the one section that does not narrow, and it cannot: a
+brand-new project has no members but its creator, so scoping it would make it
+permanently empty. Club-wide for Co-Leads keeps it working as the 994-project
+tripwire.
 
 **Order is by value, and it is load-bearing.** The 1900-character clamp trims
 from the bottom, so the roll call goes last and the things that need attention
@@ -275,10 +297,15 @@ Two more rules:
 - **Nothing to say → nothing sent.** No cheerful empty digest, and no section
   that says the same thing every evening. "3 on track" daily for a year is a
   line people learn to skip, and it takes the sections under it with it.
-- **A Co-Lead's scope is the club**, not their PL rows. `isREofOrAbove` has no
-  Co-Lead shortcut — that answer lives in the `can.*` rules — so scoping by it
-  alone gives a Co-Lead who is PL of nothing an empty digest. Same trap as the
-  empty dashboard, hit twice now. `lib/notify/digest.test.ts` guards it.
+- **The roll call is a record of what HAPPENED**, so on a day when nothing did,
+  it says nothing — and if it was the only section, no DM goes out. This was
+  found by widening the scope: members who are PL of nothing started getting a
+  daily DM whose whole content was "your one project was quiet today", about a
+  project they cannot act on. It cut 31 digests to 26 on the fixture.
+- **Deadlines include other people's work on your projects.** Deliberate, and
+  it is why "nothing of my own is due" is not the same as "nothing to say" — a
+  date slipping on a project you are committed to is something you might be the
+  one to help with.
 
 ### Why weekly sections are a weekday check, not a second cron
 

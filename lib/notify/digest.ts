@@ -333,18 +333,52 @@ export function buildDigests(input: {
     const sections: string[] = [];
 
     /*
-      A Co-Lead's scope is the club, and this branch is load-bearing.
+      =====================================================================
+      SCOPE: projects you are actually ON. Not the whole club, ever.
+      =====================================================================
 
-      `isREofOrAbove` has no Co-Lead shortcut — it answers "does the project tree
-      grant this person authority here", and the Co-Lead answer lives in the
-      `can.*` rules. Without this branch a Co-Lead who is PL of nothing gets
-      `mine = []`, no sections, and no digest at all. That is the live club
-      exactly: the only Co-Lead is PL of 0 of 12 projects. Same bug, same shape,
-      as the empty dashboard — see `lib/data/dashboard.test.ts`.
+      Two ways in, and they answer different questions:
+
+        1. **PL authority** (`isREofOrAbove`) — you are accountable for it, so
+           you hear about it whether or not you ever clicked anything. This
+           inherits DOWN the project tree and down the org tree, so a Division
+           Lead still gets everything inside their division. That is what the
+           club asked for: "so they know if things below them need attention."
+
+        2. **Membership** — committed (a PL put you there) or following (you
+           chose to watch). Either way somebody decided you should be looking.
+
+      There USED to be a third: `isCoLead(actor) ? live : ...`, handing every
+      Co-Lead every live project. It was added because `isREofOrAbove` has no
+      Co-Lead shortcut — the Co-Lead answer lives in the `can.*` rules — and
+      without something a Co-Lead who is PL of nothing got an empty digest.
+
+      That fix was too blunt, and the club felt it the first day it ran: a
+      Co-Lead's digest covered all 8 live projects, half of which they are not
+      on. That is precisely the failure CLAUDE.md already names for the
+      dashboard — "opening thirty items, twenty-six of which aren't yours tells
+      you nothing about what you owe". A digest is worse than a page, because
+      you cannot scroll past a section on a phone without scrolling past the one
+      under it.
+
+      Membership solves the original problem better than the blanket did. On the
+      live club it turns 8 projects into 4 for the Co-Leads, and it turns 0 into
+      1 for a Lead who is PL of nothing but committed to one project — who was
+      getting no digest at all under the old rule. Being a Co-Lead now changes
+      what you can DO, not how much mail you get, which is the same separation
+      `isREofOrAbove` already makes.
+
+      If a Co-Lead wants the club-wide view it is one click per project on Find
+      Work, and it is opt-in rather than assumed.
     */
-    const mine = isCoLead(actor)
-      ? live
-      : live.filter((p) => isREofOrAbove(actor, graph, p.id));
+    const onIt = new Set(
+      readStore()
+        .projectMemberships.filter((m) => m.memberId === member.id)
+        .map((m) => m.projectId)
+    );
+    const mine = live.filter(
+      (p) => onIt.has(p.id) || isREofOrAbove(actor, graph, p.id)
+    );
 
     /*
       ORDER IS BY VALUE, NOT BY CHRONOLOGY, and it is load-bearing.
@@ -399,12 +433,23 @@ export function buildDigests(input: {
     /*
       --- projects added since yesterday ---------------------------------------
 
-      Asked for as a digest line rather than a DM. Scoped to what the member
-      oversees, so a Division Lead hears about work appearing in their division —
-      which is also the tripwire that would have caught the 994-project incident
-      on day one instead of after the fact.
+      Asked for as a digest line rather than a DM.
+
+      **The one section that does NOT narrow to `mine`, and it cannot.** A
+      brand-new project has no members but its creator, so scoping this to
+      projects you are on would make it permanently empty — it is about work
+      appearing that you are NOT yet on.
+
+      Club-wide for Co-Leads, because this is also the tripwire that would have
+      caught the 994-project incident on day one rather than after the fact: a
+      Co-Lead reading "47 projects were added" in their evening digest asks a
+      question immediately. Everyone else gets it scoped, so a Division Lead
+      still hears about work appearing inside their division.
+
+      It costs one line on the days it fires and nothing on the days it does
+      not, so it is not what made the digest long.
     */
-    const added = newProjectSection(mine, today);
+    const added = newProjectSection(isCoLead(actor) ? live : mine, today);
     if (added) sections.push(added);
 
     /*
@@ -414,7 +459,8 @@ export function buildDigests(input: {
       quiet week every line of it says the same thing.
     */
     if (mine.length) {
-      sections.push(reSection(mine, today));
+      const rollCall = reSection(mine, today);
+      if (rollCall) sections.push(rollCall);
     }
 
     /*
@@ -449,12 +495,37 @@ export function buildDigests(input: {
   return digests;
 }
 
-function reSection(projects: Project[], today: string): string {
+function reSection(projects: Project[], today: string): string | null {
+  /*
+    NOTHING HAPPENED MEANS NOTHING TO SAY.
+
+    This used to always return a section, which was harmless while only PLs got
+    a digest: a PL with six quiet projects at least learned that all six were
+    quiet. Widening scope to membership broke that. Members who are PL of
+    nothing started getting a daily DM whose entire content was
+
+      __Your projects (1)__
+      **Fall Workshop Series** — quiet today; last activity 2026-08-05
+
+    identical every day, about a project they do not own and cannot act on.
+    Found by rendering the digests and reading the shortest ones, not by a test.
+
+    So the roll call is a record of what HAPPENED, and on a day when nothing
+    did, it says nothing. The other sections still stand on their own — a
+    deadline, a blocker, a quiet-three-weeks list are all reasons to write
+    regardless. This is the same rule as `healthSection` returning null when
+    nothing needs attention: a line that cannot change is a line people learn to
+    skip, and it takes the sections under it with it.
+  */
+  const activities = projects.map((p) => ({
+    project: p,
+    activity: projectActivity(p.id, today),
+  }));
+  if (!activities.some((a) => a.activity.lines.length)) return null;
+
   const out = [`__Your projects (${projects.length})__`];
 
-  for (const project of projects) {
-    const activity = projectActivity(project.id, today);
-
+  for (const { project, activity } of activities) {
     if (activity.lines.length) {
       out.push(`**${project.name}**`);
       for (const line of activity.lines.slice(0, 4)) out.push(`• ${line}`);

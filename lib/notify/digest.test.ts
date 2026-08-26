@@ -134,6 +134,110 @@ describe("who gets one at all", () => {
       false
     );
   });
+  /*
+    The noise case the scope change introduced, and the reason `reSection` can
+    return null.
+
+    Widening scope to membership meant somebody who is PL of nothing, on one
+    quiet project, with nothing due, started getting a daily DM reading
+
+      __Your projects (1)__
+      **Fall Workshop Series** — quiet today; last activity 2026-08-05
+
+    the same every day, about a project they cannot act on. Rule 1 says nothing
+    to say means nothing sent, and "your project was quiet" is nothing.
+  */
+  test("a member whose only project is quiet gets no digest at all", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const target = store.projects.find((p) => p.phase !== "complete")!;
+    const plain = store.members.find(
+      (m) =>
+        m.status === "active" &&
+        !store.projects.some((p) => p.reIds.includes(m.id)) &&
+        !store.teams.some((tm) => tm.leadId === m.id)
+    );
+    if (!plain) return;
+
+    await disk.mutate((s) => {
+      // On exactly one project, nothing of their own due, nothing logged today.
+      s.projectMemberships = s.projectMemberships.filter(
+        (m) => m.memberId !== plain.id
+      );
+      s.projectMemberships.push({
+        projectId: target.id,
+        memberId: plain.id,
+        role: "contributor",
+        joinedAt: TODAY,
+        commitment: "committed",
+      });
+      /*
+        Clear BOTH deliverables on the project and deliverables they own
+        anywhere — it took two tries to get this right, and each miss was the
+        digest being correct.
+
+        First version removed only their own, and they still got a digest:
+        "Due within 7 days" fires on ANYONE's deliverable on a project you are
+        committed to, which is worth telling you — you might be who helps.
+        Second version removed only the project's, and the member the selector
+        happens to find owns work on a DIFFERENT project, which is even more
+        clearly theirs to hear about.
+
+        What is being isolated is the one case that is pure noise: the roll call
+        is the only section with anything in it, and all it says is "quiet".
+      */
+      s.deliverables = s.deliverables.filter(
+        (d) => d.projectId !== target.id && d.ownerId !== plain.id
+      );
+      s.workLogs = s.workLogs.filter((w) => w.workDate !== TODAY);
+      return { ok: true as const, value: null };
+    });
+
+    assert.equal(
+      build().some((d) => d.memberId === plain.id),
+      false
+    );
+  });
+
+  test("but activity on it today is worth telling them about", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const target = store.projects.find((p) => p.phase !== "complete")!;
+    const plain = store.members.find(
+      (m) =>
+        m.status === "active" &&
+        !store.projects.some((p) => p.reIds.includes(m.id)) &&
+        !store.teams.some((tm) => tm.leadId === m.id)
+    );
+    if (!plain) return;
+
+    await disk.mutate((s) => {
+      s.projectMemberships = s.projectMemberships.filter(
+        (m) => m.memberId !== plain.id
+      );
+      s.projectMemberships.push({
+        projectId: target.id,
+        memberId: plain.id,
+        role: "contributor",
+        joinedAt: TODAY,
+        commitment: "committed",
+      });
+      s.workLogs.push({
+        id: "wl-happened-today",
+        memberId: target.reIds[0] ?? plain.id,
+        projectId: target.id,
+        workDate: TODAY,
+        description: "bonded the aft bulkhead",
+      });
+      return { ok: true as const, value: null };
+    });
+
+    const mine = build().find((d) => d.memberId === plain.id);
+    assert.ok(mine, "something happened, so they hear about it");
+    assert.match(mine.body, /bonded the aft bulkhead/);
+  });
 });
 
 describe("a quiet project says how long", () => {
@@ -146,7 +250,22 @@ describe("a quiet project says how long", () => {
     )!;
     const re = project.reIds[0];
 
-    // One work log, four days back, and nothing since.
+    /*
+      One work log four days back and nothing since — plus one TODAY, on a
+      different project of theirs.
+
+      The second log is what makes the roll call render at all. The section is a
+      record of what happened, so a day on which nothing happened anywhere
+      produces no section — otherwise every member on a quiet project gets an
+      identical DM daily. This test is about the WORDING of a quiet line inside
+      a section that exists, which is a different thing from whether the section
+      is worth sending.
+    */
+    const alsoTheirs = store.projects.find(
+      (p) =>
+        p.id !== project.id && p.phase !== "complete" && p.reIds.includes(re)
+    );
+
     await disk.mutate((s) => {
       s.workLogs = s.workLogs.filter((w) => w.projectId !== project.id);
       s.deliverables = s.deliverables.filter((d) => d.projectId !== project.id);
@@ -161,8 +280,19 @@ describe("a quiet project says how long", () => {
         workDate: "2026-08-08",
         description: "last thing anyone did here",
       });
+      if (alsoTheirs) {
+        s.workLogs.push({
+          id: "wl-so-the-section-renders",
+          memberId: re,
+          projectId: alsoTheirs.id,
+          workDate: TODAY,
+          description: "something today, elsewhere",
+        });
+      }
       return { ok: true as const, value: null };
     });
+
+    if (!alsoTheirs) return; // fixture has no second project for them
 
     const mine = build().find((d) => d.memberId === re);
     assert.ok(mine);
@@ -686,6 +816,15 @@ describe("needs attention", () => {
   test("silent for somebody with one project — the roll call already said it", async () => {
     await connectEveryone();
 
+    /*
+      Build the case rather than hunting for it. This used to look for a member
+      who was PL of exactly one project, which stopped meaning "has one project
+      in their digest" when scope became PL-authority UNION membership — a PL of
+      one who is also committed to three has four, and correctly gets a health
+      section.
+
+      So: take a PL of one project and strip every other membership off them.
+    */
     const store = disk.readStore();
     const counts = new Map<string, number>();
     for (const p of store.projects) {
@@ -696,8 +835,12 @@ describe("needs attention", () => {
     if (!single) return;
 
     await disk.mutate((s) => {
-      for (const p of s.projects)
-        if (p.reIds.includes(single)) p.health = "blocked";
+      const theirs = s.projects.filter((p) => p.reIds.includes(single));
+      for (const p of theirs) p.health = "blocked";
+      const keep = new Set(theirs.map((p) => p.id));
+      s.projectMemberships = s.projectMemberships.filter(
+        (m) => m.memberId !== single || keep.has(m.projectId)
+      );
       return { ok: true as const, value: null };
     });
 
@@ -785,59 +928,173 @@ describe("order survives the trim", () => {
   test("the roll call is last, so a trim eats names and not problems", async () => {
     await connectEveryone();
 
+    /*
+      Pick whoever is on the MOST projects, and make all of theirs unhealthy.
+
+      This used to pick the Co-Lead and lean on them holding every live project,
+      which is the behaviour that was removed — a Co-Lead is scoped like anyone
+      else now. The rule under test never depended on who it was: `clamp()`
+      trims from the bottom, so problems have to sit above names.
+    */
     const store = disk.readStore();
-    const co = store.members.find((m) => m.globalRole === "co_lead")!;
+    const widest = store.members
+      .map((m) => ({
+        id: m.id,
+        n: store.projectMemberships.filter((x) => x.memberId === m.id).length,
+      }))
+      .sort((a, b) => b.n - a.n)[0];
 
     await disk.mutate((s) => {
-      s.projects[0].health = "blocked";
+      const theirs = new Set(
+        s.projectMemberships
+          .filter((m) => m.memberId === widest.id)
+          .map((m) => m.projectId)
+      );
+      for (const p of s.projects) {
+        if (theirs.has(p.id) && p.phase !== "complete") p.health = "blocked";
+      }
       return { ok: true as const, value: null };
     });
 
     const body = digest
       .buildDigests({ today: TODAY, graph: graph() })
-      .find((d) => d.memberId === co.id)!.body;
+      .find((d) => d.memberId === widest.id)!.body;
 
     const attention = body.indexOf("Needs attention");
     const rollCall = body.indexOf("Your projects");
-    assert.ok(attention >= 0, "the Co-Lead sees what needs attention");
+    assert.ok(attention >= 0, "they see what needs attention");
     assert.ok(
       rollCall < 0 || attention < rollCall,
-      "and sees it before the roll call"
+      "and see it before the roll call"
     );
   });
 
   /*
-    The same trap as the empty dashboard, and it has now been hit twice.
-    `isREofOrAbove` has no Co-Lead shortcut: the Co-Lead answer lives in the
-    `can.*` rules. Scoping by it alone gives the club's only Co-Lead — who is PL
-    of 0 of 12 projects — nothing at all.
+    ==========================================================================
+    A Co-Lead is scoped like everybody else. This reverses an earlier rule.
+    ==========================================================================
+
+    It used to be `isCoLead(actor) ? live : ...` -- every Co-Lead got every live
+    project. That existed for a real reason: `isREofOrAbove` has no Co-Lead
+    shortcut, so scoping by authority alone gave a Co-Lead who was PL of nothing
+    an empty digest, the same trap that emptied the dashboard.
+
+    The blanket was the wrong fix, and one evening's real digest showed why --
+    all 8 live projects for somebody who is on 4 of them. Membership answers the
+    original problem better: you are on it, or you have authority over it.
+
+    So these assert the OPPOSITE of what they did yesterday, deliberately. If
+    somebody re-adds the blanket to fix an empty digest, the first one fails.
   */
-  test("a Co-Lead who is PL of nothing still gets a digest", async () => {
+  test("a Co-Lead does NOT get projects they are not on", async () => {
     await connectEveryone();
 
+    const store = disk.readStore();
+    const co = store.members.find((m) => m.globalRole === "co_lead")!;
+
+    // A live project they hold no membership on and no authority over.
+    const stranger = store.projects.find(
+      (p) =>
+        p.phase !== "complete" &&
+        !p.reIds.includes(co.id) &&
+        !store.projectMemberships.some(
+          (m) => m.memberId === co.id && m.projectId === p.id
+        ) &&
+        !store.teams.some((tm) => tm.leadId === co.id && tm.id === p.teamId)
+    );
+    if (!stranger) return; // fixture has none; nothing to assert
+
+    const body =
+      digest
+        .buildDigests({ today: TODAY, graph: graph() })
+        .find((d) => d.memberId === co.id)?.body ?? "";
+
+    /*
+      Checked against the ROLL CALL only. The project can legitimately appear
+      elsewhere -- a Co-Lead's own deliverable could sit on it, and the
+      new-projects line is club-wide for them on purpose.
+    */
+    const rollCall = body.slice(body.indexOf("__Your projects"));
+    assert.equal(
+      rollCall.includes(stranger.name),
+      false,
+      `${stranger.name} is not theirs and should not be in their roll call`
+    );
+  });
+
+  test("but following one is enough to get it", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const co = store.members.find((m) => m.globalRole === "co_lead")!;
+    const stranger = store.projects.find(
+      (p) =>
+        p.phase !== "complete" &&
+        !p.reIds.includes(co.id) &&
+        !store.projectMemberships.some(
+          (m) => m.memberId === co.id && m.projectId === p.id
+        )
+    );
+    if (!stranger) return;
+
     await disk.mutate((s) => {
-      const co = s.members.find((m) => m.globalRole === "co_lead")!;
-      for (const p of s.projects) {
-        p.reIds = p.reIds.filter((id) => id !== co.id);
-        if (p.primaryReId === co.id) p.primaryReId = p.reIds[0];
-      }
-      s.projectMemberships = s.projectMemberships.filter(
-        (m) => m.memberId !== co.id
-      );
-      for (const team of s.teams)
-        if (team.leadId === co.id) team.leadId = undefined;
+      s.projectMemberships.push({
+        projectId: stranger.id,
+        memberId: co.id,
+        role: "observer",
+        joinedAt: TODAY,
+        commitment: "following",
+      });
       return { ok: true as const, value: null };
     });
 
-    const co = disk
-      .readStore()
-      .members.find((m) => m.globalRole === "co_lead")!;
+    const body =
+      digest
+        .buildDigests({ today: TODAY, graph: graph() })
+        .find((d) => d.memberId === co.id)?.body ?? "";
+
+    assert.match(body, new RegExp(escapeRegExp(stranger.name)));
+  });
+
+  /*
+    The problem the blanket was papering over. Somebody with no PL authority
+    anywhere is exactly who used to get nothing, and one committed membership is
+    now enough -- which is how a Lead who is PL of nothing but committed to one
+    project goes from no digest to one.
+  */
+  test("a PL of nothing gets a digest from membership alone", async () => {
+    await connectEveryone();
+
+    const store = disk.readStore();
+    const plain = store.members.find(
+      (m) =>
+        m.status === "active" &&
+        !store.projects.some((p) => p.reIds.includes(m.id)) &&
+        !store.teams.some((tm) => tm.leadId === m.id)
+    );
+    if (!plain) return;
+
+    const target = store.projects.find((p) => p.phase !== "complete")!;
+    await disk.mutate((s) => {
+      s.projectMemberships = s.projectMemberships.filter(
+        (m) => m.memberId !== plain.id
+      );
+      s.projectMemberships.push({
+        projectId: target.id,
+        memberId: plain.id,
+        role: "contributor",
+        joinedAt: TODAY,
+        commitment: "committed",
+      });
+      return { ok: true as const, value: null };
+    });
+
     const mine = digest
       .buildDigests({ today: TODAY, graph: graph() })
-      .find((d) => d.memberId === co.id);
+      .find((d) => d.memberId === plain.id);
 
-    assert.ok(mine, "a Co-Lead's scope is the club, not their PL rows");
-    assert.match(mine.body, /Your projects/);
+    assert.ok(mine, "one membership is enough");
+    assert.match(mine.body, new RegExp(escapeRegExp(target.name)));
   });
 });
 
