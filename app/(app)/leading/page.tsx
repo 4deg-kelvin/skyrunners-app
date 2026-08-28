@@ -11,7 +11,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { getViewer } from "@/lib/data/viewer";
 import { getLeadershipRoles } from "@/lib/data/members";
 import { can, isCoLead, isLeadership } from "@/lib/permissions";
-import { HELP_REQUEST_STALE_DAYS } from "@/lib/types";
+import { HELP_REQUEST_STALE_DAYS, JOIN_REQUEST_STALE_DAYS } from "@/lib/types";
 
 export const metadata = {
   title: "Leading here",
@@ -231,6 +231,30 @@ export default async function LeadingPage() {
               now, so it is worth actually doing: a reply is what tells somebody
               their note was read.
             </Rule>
+            {/*
+              This lived under "what you deliberately can't do" until
+              2026-08-25, when it stopped being a limit. It moved here rather
+              than being deleted, because the reasoning is the useful part for
+              whoever reads this page next -- and because a rule about privacy
+              that quietly vanishes teaches nothing.
+            */}
+            <Rule
+              can
+              title="Read anything about anybody, including old check-ins"
+            >
+              Nothing about a member is private, with no exceptions. Archived
+              check-ins were the last one: they carried a note written when only
+              the member&apos;s Lead was going to read it, and they stayed shut
+              on the strength of that promise until it turned out nobody had
+              written a real one. The note was then removed outright rather than
+              published.
+              <br />
+              <br />
+              The rule to carry forward is not that everything is public. It is
+              that you decide before people type — and if you get it wrong, the
+              only direction you can still move afterwards is towards MORE
+              privacy.
+            </Rule>
             <Rule title="Declare your own project finished">
               The PL above you, or the Division Lead, agrees it&apos;s done. Set
               the stage to flight test and tell them it&apos;s ready.
@@ -331,9 +355,10 @@ export default async function LeadingPage() {
               project; they&apos;re managers, not the queue.
             </Rule>
             <Rule title="Read personal reports across your division">
-              Still no. Leading a division is project authority, not people
-              authority — unless you&apos;re also in that member&apos;s Lead
-              chain. The two hierarchies stay separate all the way up.
+              There are none to read. Leading a division is authority over WORK,
+              and no per-person report exists anywhere in the app — that went
+              with the reporting chain on 2026-08-24. If you want to know how
+              somebody is doing, open the project you share with them.
             </Rule>
           </div>
         </CardBody>
@@ -358,12 +383,57 @@ export default async function LeadingPage() {
             </Rule>
             <Rule can title="Answer join requests on projects you're a PL of">
               Somebody asking to help is the whole point of Find Work.
-              Unanswered requests escalate after {HELP_REQUEST_STALE_DAYS} days.
+              {/*
+                JOIN, not HELP. This read `HELP_REQUEST_STALE_DAYS` (3) under a
+                heading about join requests, so this page told PLs 3 while
+                /getting-started and /how-we-lead both told members 5. Two
+                constants one word apart, and the wrong one typechecks.
+              */}{" "}
+              Unanswered requests escalate after {JOIN_REQUEST_STALE_DAYS} days.
+              An ask on the help board goes stale faster, after{" "}
+              {HELP_REQUEST_STALE_DAYS}.
             </Rule>
             <Rule can title="Sign off finished deliverables">
               The owner claims it&apos;s done; you agree. Only your agreement
               makes it count, which is why the record is worth anything.
             </Rule>
+          </div>
+
+          {/*
+            The digest, described as what it is FOR rather than as a feature
+            list. A PL who does not know this exists reads the dashboard daily
+            out of anxiety, which is the opposite of a fifteen-minute
+            obligation.
+
+            Scope is worth stating explicitly, because it changed on 2026-08-25
+            and the old behaviour was memorable: every Co-Lead used to get every
+            live project, which is how one arrived covering eight projects for
+            somebody on four of them.
+          */}
+          <div className="border-line mt-5 border-t pt-4">
+            <p className="text-ink text-[15px] font-semibold">
+              You do not have to go looking for any of it
+            </p>
+            <p className="text-ink-soft mt-1.5 max-w-2xl text-[15px]">
+              Discord sends you one short summary each evening, covering only
+              the projects you are on — ones you are a PL of, plus anything you
+              are committed to or following. Not the whole club: if you want a
+              project in it, follow it. It names what is blocked or at risk,
+              what is due inside a week, and on Mondays anything nobody has
+              logged against in three weeks.
+            </p>
+            <p className="text-ink-muted mt-2 max-w-2xl text-sm">
+              If there is nothing to say you get nothing, which is the point —
+              an evening with no message means there was nothing to act on. Turn
+              it off in{" "}
+              <Link
+                href="/settings"
+                className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+              >
+                Settings
+              </Link>{" "}
+              if you would rather work off the dashboard.
+            </p>
           </div>
 
           <p className="text-ink-muted mt-4 text-sm">
@@ -384,14 +454,6 @@ export default async function LeadingPage() {
           </h2>
 
           <div className="mt-4 space-y-2.5">
-            <Rule title="Read somebody's old check-ins">
-              A member&apos;s archived check-ins are theirs and a
-              Co-Lead&apos;s. They carried a general note that was written when
-              only the member&apos;s Lead was going to read it, so publishing
-              them now would break a promise about words already typed.
-              Everything else about a member is public, including what they
-              logged on every project.
-            </Rule>
             <Rule title="Mark a project complete when you're its PL">
               Finishing the work and agreeing it&apos;s finished are different
               jobs. The PL above the project — or its Division Lead — signs it

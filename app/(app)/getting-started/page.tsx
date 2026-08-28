@@ -133,11 +133,36 @@ export default async function GettingStartedPage() {
               )}
             </h2>
 
+            {/*
+              Kept SHORT on purpose, and it is a summary rather than a list.
+
+              This used to enumerate three messages and end "nothing else",
+              which stopped being true the moment the notification set grew --
+              and one of the three was "if you lead people, when one of them
+              checks in", which outlived both check-ins and leading people. An
+              exhaustive list on an onboarding page is a promise to keep it in
+              sync with `lib/notify/discord.ts` forever, and it was not kept
+              once. So: what the messages are ABOUT, and the one guarantee that
+              actually holds.
+            */}
             <p className="text-ink-soft mt-3 max-w-2xl text-[15px]">
-              All club communication runs through Discord. The app messages you
-              there when you&apos;re added to a project, when an ask of yours is
-              answered, and — if you lead people — when one of them checks in.
-              Nothing else, and never a group ping.
+              All club communication runs through Discord, and the app messages
+              you there about your own work — being handed a deliverable, your
+              work being signed off, a blocker of yours being cleared, somebody
+              replying to a line you logged, a date two days out. Plus one short
+              summary each evening, if there is anything in it.
+              <br />
+              <br />
+              Always a direct message, never a group ping, and never anything
+              you could have found by looking. If it stops being useful you can
+              turn the evening summary off in{" "}
+              <Link
+                href="/settings"
+                className="text-cardinal-600 hover:text-cardinal-700 font-semibold"
+              >
+                Settings
+              </Link>
+              ; the rest are about work that is yours.
             </p>
 
             {connected ? (
@@ -457,13 +482,19 @@ export default async function GettingStartedPage() {
               blocker they could clear.
               <br />
               <br />
-              There is no private half any more —{" "}
+              There is no private half —{" "}
               <span className="text-ink font-semibold">
-                no reliability score, no ranking, no hidden record
+                no reliability score, no ranking, no hidden record, and no
+                exceptions
               </span>
-              . The one exception is old check-ins from before 2026-08-24, which
-              stay with you and the Co-Leads because they were written when only
-              one person was going to read them.
+              . Not even the old check-ins from before the club stopped asking
+              for them: those had a private note on them, it was removed
+              outright, and what is left is public like everything else.
+              <br />
+              <br />
+              Which cuts the other way too, and is worth knowing before you
+              type: assume anything you write in this app can be read by anyone
+              in the club.
             </Guide>
           </div>
         </CardBody>
