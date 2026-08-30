@@ -51,7 +51,11 @@ import {
   projectDeliverables,
 } from "@/lib/mock-data";
 import * as ops from "@/lib/store/operations";
-import { ARTIFACT_KIND_ORDER, eventKindOrDefault } from "@/lib/labels";
+import {
+  ARTIFACT_KIND_ORDER,
+  eventKindOrDefault,
+  PHASE_LABELS,
+} from "@/lib/labels";
 import { saveMyAdvisorProfile } from "@/lib/advisors/store";
 import { saveWorkLogReply } from "@/lib/worklog/replies";
 import { normaliseAdvisorProfile } from "@/lib/advisors/profile";
@@ -1649,6 +1653,108 @@ async function purgeEmptyProjectsAction$impl(
   };
 }
 
+/**
+ * Move a project to a different phase, and nothing else.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this exists rather than reusing `updateProjectAction`
+ * ---------------------------------------------------------------------------
+ *
+ * That action rewrites the WHOLE project — name, description, phase, health,
+ * target date, open roles — because it backs a form that carries all of them.
+ * A small inline control posting only `phase` would therefore submit an empty
+ * name and lose the description, the target date and the open-roles text. The
+ * empty name is caught (`ops.updateProject` refuses it), which means the
+ * failure mode is a phase control that simply never works; everything else
+ * would have been silently erased.
+ *
+ * So this reads the current row and changes one field. It still goes through
+ * `ops.updateProject`, which is what keeps every invariant that matters:
+ *
+ *   - a parent cannot complete while a descendant is unfinished
+ *   - completing writes the `ProjectNotice` up the project tree
+ *   - the date checks between parent and child
+ *
+ * Reimplementing any of that here is how the two paths would drift, and the
+ * drift would be in the invariants.
+ *
+ * Same permission split as the full editor: `manageProject` to change the
+ * phase, `completeProject` — which excludes the project's own PL — to cross
+ * into complete. Coming back OUT of complete needs only `manageProject`,
+ * because saying something is not finished is always safe.
+ */
+async function setProjectPhaseAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const projectId = String(formData.get("projectId") ?? "");
+
+  if (!can.manageProject(viewer.actor, viewer.graph, projectId)) {
+    return denied("change this project's phase");
+  }
+
+  const current = viewer.graph.getProject(projectId);
+  if (!current) return { ok: false, error: "That project no longer exists." };
+
+  const phase = String(formData.get("phase") ?? "") as Project["phase"];
+  if (!phase) return { ok: false, error: "Pick a phase." };
+
+  /*
+    Nothing to do, said plainly rather than written.
+
+    The control renders the current phase as a normal option so the list reads
+    as a set of states rather than a set of moves, which means picking it again
+    is an easy accident. A no-op write would fire the completion notice logic
+    and the digest's "a project was added" heuristics for no reason.
+  */
+  if (phase === current.phase) {
+    return { ok: true, message: `Already in ${phase.replace(/_/g, " ")}.` };
+  }
+
+  // The narrower right, and the same wording as the full editor so the two
+  // paths cannot disagree about who may do this.
+  if (
+    phase === "complete" &&
+    !can.completeProject(viewer.actor, viewer.graph, projectId)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Only a PL above this project, or its Division Lead, can mark it complete. You're accountable for finishing it; they're accountable for agreeing it's done. Tell them it's ready.",
+    };
+  }
+
+  const result = await ops.updateProject({
+    projectId,
+    // Everything except `phase` is the row as it stands.
+    name: current.name,
+    description: current.description,
+    phase,
+    health: current.health,
+    targetDate: current.targetDate,
+    openRoles: current.openRoles,
+    actorId: viewer.member.id,
+    today: today(),
+  });
+
+  if (result.ok) refresh();
+
+  /*
+    No blocked-health DM here, unlike `updateProjectAction`.
+
+    This control cannot change `health`, so it can never be the edit that marks
+    a project blocked — the notify block there is keyed on exactly that
+    transition. Copying it would mean re-DMing on every phase change of an
+    already-blocked project.
+  */
+  return toResult(
+    result,
+    phase === "complete"
+      ? "Marked complete. The notice is on its way up the project tree."
+      : `Moved to ${PHASE_LABELS[phase]}.`
+  );
+}
+
 async function updateProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -3209,6 +3315,12 @@ export async function updateProjectAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => updateProjectAction$impl(formData));
+}
+
+export async function setProjectPhaseAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => setProjectPhaseAction$impl(formData));
 }
 
 export async function pushDeliverableDeadlineAction(

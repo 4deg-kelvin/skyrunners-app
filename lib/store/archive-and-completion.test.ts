@@ -104,6 +104,70 @@ function teamById(teamId: string) {
 
 // ---------------------------------------------------------------------------
 
+/*
+  The contract `setProjectPhaseAction` depends on.
+
+  That action backs the inline phase control on a project page, and it works
+  exactly like `setPhase` above: read the row, change one field, hand the rest
+  back unchanged. Which means the two tests below are the ones that would catch
+  the control silently eating a project's description.
+
+  Worth stating why the action cannot just reuse `updateProjectAction`: that one
+  reads every field out of a FormData, so a control posting only `phase` submits
+  an empty name and undefined everything else.
+*/
+describe("a phase-only change leaves the rest of the project alone", () => {
+  test("name, description, target date, open roles and health all survive", async () => {
+    const before = disk
+      .readStore()
+      .projects.find((p) => p.id === "p-wing-spar")!;
+
+    assert.equal((await setPhase("p-wing-spar", "integration")).ok, true);
+
+    const after = disk
+      .readStore()
+      .projects.find((p) => p.id === "p-wing-spar")!;
+    assert.equal(after.phase, "integration", "the phase moved");
+    assert.equal(after.name, before.name);
+    assert.equal(after.description, before.description);
+    assert.equal(after.targetDate, before.targetDate);
+    assert.equal(after.openRoles, before.openRoles);
+    assert.equal(after.health, before.health, "health is a different field");
+  });
+
+  /*
+    The guard that makes a forgotten field LOUD.
+
+    If the inline control ever stops passing the name through, this refusal is
+    what turns it into "the control doesn't work" rather than "the project's
+    description quietly vanished". Silent data loss is the failure worth paying
+    a validation error to avoid.
+  */
+  test("an empty name is refused, so a partial submit cannot erase anything", async () => {
+    const before = disk
+      .readStore()
+      .projects.find((p) => p.id === "p-wing-spar")!;
+
+    const result = await ops.updateProject({
+      projectId: "p-wing-spar",
+      name: "",
+      phase: "integration",
+      health: before.health,
+      today: TODAY,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error, /name/i);
+
+    const after = disk
+      .readStore()
+      .projects.find((p) => p.id === "p-wing-spar")!;
+    assert.equal(after.description, before.description, "nothing was written");
+    assert.equal(after.targetDate, before.targetDate);
+    assert.equal(after.phase, before.phase);
+  });
+});
+
 describe("a parent project cannot finish ahead of its children", () => {
   test("a project with no sub-projects completes freely", async () => {
     assert.equal((await setPhase("p-propulsion-test", "complete")).ok, true);

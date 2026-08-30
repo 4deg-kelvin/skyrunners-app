@@ -27,6 +27,7 @@ import {
 } from "@/components/forms/project-actions";
 import { EntryResponse } from "@/components/forms/entry-response";
 import { ProjectEditForm } from "@/components/forms/project-edit";
+import { ProjectPhaseControl } from "@/components/forms/project-phase";
 import {
   AddProjectMemberForm,
   CreateProjectForm,
@@ -308,6 +309,29 @@ export default async function ProjectDetailPage({
                   <h2 className="text-ink mt-2 text-2xl font-bold">
                     {PHASE_LABELS[project.phase]}
                   </h2>
+                  {/*
+                    Directly under the phase it changes, not in the button row
+                    on the right.
+
+                    Same reasoning that put "Push back deadline" on the Target
+                    tile: a control belongs beside the value it moves. The row
+                    on the right holds page-level actions ("Edit project", "Add
+                    a sub-project"), and a third one there would say nothing
+                    about which of the several numbers on this card it touches.
+
+                    `mayManage` gates the whole thing; the narrower right to
+                    cross into complete is passed separately and handled inside.
+                  */}
+                  {mayManage ? (
+                    <ProjectPhaseControl
+                      projectId={project.id}
+                      phase={project.phase}
+                      canComplete={mayComplete}
+                      incompleteDescendants={view.incompleteDescendants.map(
+                        (p) => p.name
+                      )}
+                    />
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <ProjectBadges project={project} />
