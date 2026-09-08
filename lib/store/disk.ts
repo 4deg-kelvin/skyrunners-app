@@ -424,8 +424,9 @@ export function readStore(): Readonly<StoreShape> {
  * Next handles requests concurrently even in dev, and "log hours" fired twice
  * quickly is exactly the sort of thing that drops one write.
  *
- * The mutator runs against the live object and may edit it in place; whatever it
- * returns is ignored.
+ * The mutator edits a draft. Throwing discards the draft; live persistence must
+ * succeed before the request's original snapshot is updated. Its return value
+ * is passed back to the caller.
  */
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -462,13 +463,17 @@ export function mutate<T>(fn: (store: StoreShape) => T): Promise<T> {
     if (live && persister) {
       // Same mutation, different destination. The operation is unchanged; the
       // live backend diffs what it did and writes only that.
-      const result = fn(live);
-      await persister(live);
+      const draft = structuredClone(live);
+      const result = fn(draft);
+      await persister(draft);
+      Object.assign(live, draft);
       return result;
     }
 
     const store = load();
-    const result = fn(store);
+    const draft = structuredClone(store);
+    const result = fn(draft);
+    Object.assign(store, draft);
     persist();
     return result;
   });

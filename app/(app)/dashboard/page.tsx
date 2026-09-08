@@ -81,20 +81,25 @@ export default async function DashboardPage() {
               <TriangleAlert className="text-warn-fg mt-0.5 size-5 shrink-0" />
               <div className="min-w-0">
                 <p className="text-ink text-[15px] font-bold">
-                  No academic calendar yet, so no check-ins are being asked for
+                  Add the club&apos;s academic calendar
                 </p>
                 <p className="text-ink-soft mt-1 max-w-2xl text-[15px]">
-                  Check-ins only generate inside a term the club has entered.
-                  Until one covers today nobody is prompted, your review queue
-                  stays empty, and reliability doesn&apos;t count. Everything
-                  else works normally.
+                  No terms have been entered yet. Add the quarter dates so the
+                  app can show when the club is in session. Work logs,
+                  deliverables and project requests are already available.
                 </p>
-                <Link
-                  href="/settings"
-                  className="text-cardinal-600 hover:text-cardinal-700 mt-2 inline-block text-sm font-bold"
-                >
-                  Add this quarter in Settings →
-                </Link>
+                {can.manageTerms(viewer.actor) ? (
+                  <Link
+                    href="/settings"
+                    className="text-cardinal-600 hover:text-cardinal-700 mt-2 inline-block text-sm font-bold"
+                  >
+                    Add this quarter in Settings →
+                  </Link>
+                ) : (
+                  <p className="text-ink-muted mt-2 text-sm">
+                    Ask a Co-Lead to add this quarter in Settings.
+                  </p>
+                )}
               </div>
             </div>
           </CardBody>

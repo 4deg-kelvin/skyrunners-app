@@ -22,11 +22,10 @@
  * Concurrency
  * ---------------------------------------------------------------------------
  *
- * Two people writing at the same instant both diff against their own snapshot,
- * so the later write can revert a field the earlier one changed. Rows are
- * touched individually rather than wholesale, so the blast radius is one field
- * on one row, and the operations that matter (logging work, submitting a
- * check-in) append rather than overwrite.
+ * Updates send only changed columns, so editing a description cannot revert a
+ * concurrent deadline edit. Simultaneous edits to the SAME column still use
+ * last-write-wins, including array columns such as event attendance. Multi-row
+ * writes are not transactional; a later failure can leave earlier writes saved.
  *
  * That's an acceptable trade for a 35-person club and NOT one to keep if this
  * grows. The fix, when it's needed, is to push each operation down into SQL —
@@ -34,6 +33,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { paginate } from "../supabase/paginate.ts";
 
 import {
   COLLECTIONS,
@@ -98,32 +98,47 @@ export async function loadSnapshot(
   supabase: SupabaseClient
 ): Promise<StoreShape> {
   const results = await Promise.all([
-    ...COLLECTIONS.map((c) => supabase.from(c.table).select(c.columns)),
-    supabase.from("update_entries").select(ENTRY_COLUMNS),
-    supabase.from("help_replies").select(HELP_REPLY_COLUMNS),
+    ...COLLECTIONS.map((c) =>
+      paginate(() => {
+        let query = supabase
+          .from(c.table)
+          .select(c.columns, { count: "exact" });
+        const columns = c.columns.split(",").map((column) => column.trim());
+        const keys = columns.includes("id")
+          ? ["id"]
+          : columns.filter((column) => column.endsWith("_id"));
+        for (const key of keys) query = query.order(key);
+        return query;
+      }, c.table)
+    ),
+    paginate(
+      () =>
+        supabase
+          .from("update_entries")
+          .select(ENTRY_COLUMNS, { count: "exact" })
+          .order("id"),
+      "update_entries"
+    ),
+    paginate(
+      () =>
+        supabase
+          .from("help_replies")
+          .select(HELP_REPLY_COLUMNS, { count: "exact" })
+          .order("id"),
+      "help_replies"
+    ),
   ]);
-
-  const failed = results.find((r) => r.error);
-  if (failed?.error) {
-    // Fail loudly. A partially-loaded snapshot silently strips people of
-    // permissions and would then be written back, deleting the rows that
-    // failed to load.
-    throw new Error(`Could not load the database: ${failed.error.message}`);
-  }
 
   const snapshot = { version: -1 } as unknown as StoreShape;
 
   COLLECTIONS.forEach((spec, i) => {
-    const rows = (results[i].data ?? []) as Record<string, unknown>[];
+    const rows = results[i] as Record<string, unknown>[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (snapshot as any)[spec.key] = rows.map((r) => spec.fromRow(r));
   });
 
   // --- stitch the two halves of an update back together --------------------
-  const entryRows = (results[COLLECTIONS.length].data ?? []) as Record<
-    string,
-    unknown
-  >[];
+  const entryRows = results[COLLECTIONS.length] as Record<string, unknown>[];
   const entriesByUpdate = new Map<string, UpdateEntry[]>();
   for (const row of entryRows) {
     const entry = entryFromRow(row);
@@ -136,7 +151,7 @@ export async function loadSnapshot(
   }
 
   // --- and the same for a help request's replies ---------------------------
-  const replyRows = (results[COLLECTIONS.length + 1].data ?? []) as Record<
+  const replyRows = results[COLLECTIONS.length + 1] as Record<
     string,
     unknown
   >[];
@@ -222,9 +237,15 @@ function sameRow(a: unknown, b: unknown): boolean {
 async function updateRow(
   supabase: SupabaseClient,
   table: string,
-  row: Record<string, unknown>
+  row: Record<string, unknown>,
+  previous: Record<string, unknown>
 ): Promise<void> {
-  let query = supabase.from(table).update(row);
+  const patch = Object.fromEntries(
+    Object.entries(row).filter(
+      ([column, value]) => !sameRow(previous[column], value)
+    )
+  );
+  let query = supabase.from(table).update(patch);
 
   if ("id" in row && row.id) {
     query = query.eq("id", row.id as string);
@@ -291,7 +312,12 @@ export async function persistDiff(
     }
 
     for (const value of changes) {
-      await updateRow(supabase, spec.table, spec.toRow(value));
+      await updateRow(
+        supabase,
+        spec.table,
+        spec.toRow(value),
+        spec.toRow(was.get(spec.identify(value)))
+      );
     }
 
     const removed = wasList.filter((v) => !now.has(spec.identify(v)));
@@ -375,7 +401,12 @@ export async function persistDiff(
   }
 
   for (const entry of changedEntries) {
-    await updateRow(supabase, "update_entries", entryToRow(entry));
+    await updateRow(
+      supabase,
+      "update_entries",
+      entryToRow(entry),
+      entryToRow(wasEntries.get(entry.id)!)
+    );
   }
 
   const goneEntries = [...wasEntries.keys()].filter(
@@ -418,7 +449,12 @@ export async function persistDiff(
   }
 
   for (const reply of changedReplies) {
-    await updateRow(supabase, "help_replies", helpReplyToRow(reply));
+    await updateRow(
+      supabase,
+      "help_replies",
+      helpReplyToRow(reply),
+      helpReplyToRow(wasReplies.get(reply.id)!)
+    );
   }
 
   const goneReplies = [...wasReplies.keys()].filter(

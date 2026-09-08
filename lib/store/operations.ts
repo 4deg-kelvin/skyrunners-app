@@ -136,12 +136,21 @@ function ok<T>(value: T): Result<T> {
  * A refused write and a broken write are different things and should read
  * differently, so the message says which one this is and quotes the database.
  */
+class RefusedMutation extends Error {}
+
 async function guarded<T>(
   fn: (store: StoreShape) => Result<T>
 ): Promise<Result<T>> {
   try {
-    return await mutate(fn);
+    return await mutate((store) => {
+      const result = fn(store);
+      // Validation may fail after an operation has started changing its draft.
+      // Abort before persistence, preserving the original refusal message.
+      if (!result.ok) throw new RefusedMutation(result.error);
+      return result;
+    });
   } catch (error) {
+    if (error instanceof RefusedMutation) return fail<T>(error.message);
     const detail = error instanceof Error ? error.message : String(error);
     return fail<T>(`Couldn't save that — the database refused it: ${detail}`);
   }

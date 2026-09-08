@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -60,14 +60,31 @@ export function ActionForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ActionResult | null>(null);
+  const inFlight = useRef(false);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (disabled || inFlight.current) return;
+    inFlight.current = true;
+    setResult(null);
     const form = event.currentTarget;
     const data = new FormData(form);
 
     startTransition(async () => {
-      const outcome = await action(data);
+      let outcome: ActionResult;
+      try {
+        outcome = await action(data);
+      } catch {
+        // A transport failure may happen after the server committed. Keep the
+        // inputs and ask the member to check before retrying a possible write.
+        outcome = {
+          ok: false,
+          error:
+            "Couldn't confirm whether your changes were saved. Check your connection, then reload to check before trying again.",
+        };
+      } finally {
+        inFlight.current = false;
+      }
       setResult(outcome);
       onResult?.(outcome);
       if (outcome.ok) {
@@ -78,7 +95,7 @@ export function ActionForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className={className}>
+    <form onSubmit={onSubmit} className={className} aria-busy={pending}>
       {children}
 
       {renderSubmit ? (
@@ -164,7 +181,7 @@ export function ActionButton({
           type="submit"
           disabled={pending}
           className={cn(
-            "rounded-tile inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60",
+            "rounded-tile inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60 sm:min-h-0",
             tones[tone]
           )}
         >

@@ -37,6 +37,7 @@ interface Call {
   verb: "upsert" | "update" | "delete";
   table: string;
   rows: number;
+  payload?: unknown;
 }
 
 let calls: Call[] = [];
@@ -66,7 +67,11 @@ function fakeClient(): SupabaseClient {
     from: (table: string) => ({
       upsert: (rows: unknown[]) =>
         builder("upsert", table, Array.isArray(rows) ? rows.length : 1),
-      update: (row: unknown) => builder("update", table, row ? 1 : 0),
+      update: (row: unknown) => {
+        const chain = builder("update", table, row ? 1 : 0);
+        calls[calls.length - 1].payload = row;
+        return chain;
+      },
       delete: () => builder("delete", table, 1),
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,6 +122,27 @@ beforeEach(() => {
 });
 
 describe("persistDiff picks the right verb", () => {
+  test("an edit sends only changed columns, preserving concurrent changes elsewhere", async () => {
+    const before = storeWith();
+    const after = structuredClone(before);
+    after.progressUpdates[0].entries[0].response = "Reviewed";
+    await persistDiff(fakeClient(), before, after);
+    assert.deepEqual(calls.find((c) => c.table === "update_entries")?.payload, {
+      response: "Reviewed",
+    });
+  });
+
+  test("clearing a field sends null without resending the rest of the row", async () => {
+    const before = storeWith();
+    before.progressUpdates[0].entries[0].response = "Old reply";
+    const after = structuredClone(before);
+    after.progressUpdates[0].entries[0].response = undefined;
+    await persistDiff(fakeClient(), before, after);
+    assert.deepEqual(calls.find((c) => c.table === "update_entries")?.payload, {
+      response: null,
+    });
+  });
+
   test("marking a check-in read is an UPDATE, not an upsert", async () => {
     const before = storeWith(undefined);
     const after = storeWith("2026-08-09");

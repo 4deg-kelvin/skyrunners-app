@@ -2,6 +2,11 @@
 
 Database schema and seed data.
 
+Current write-guard changes: migrations `0051` (profile authority and admission),
+`0052` (inherited project/team authority), and `0053` (self-only RSVP). See
+[the reliability review](../docs/CODEBASE_REVIEW.md) for validation and rollout
+requirements. Apply pending migrations in order; pushing code does not apply SQL.
+
 ## Files
 
 | File | Purpose |

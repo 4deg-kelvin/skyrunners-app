@@ -33,6 +33,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { paginate } from "../supabase/paginate.ts";
 
 import type { Member, Project, Team } from "../types.ts";
 import type { OrgGraph } from "../permissions.ts";
@@ -268,30 +269,50 @@ export async function loadLiveOrgGraph(
   supabase: SupabaseClient
 ): Promise<OrgGraph> {
   const [profiles, projects, res, teams] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLUMNS),
-    supabase.from("projects").select(PROJECT_COLUMNS),
-    supabase
-      .from("project_members")
-      .select("project_id, member_id")
-      .eq("role", "re")
-      // Never-hard-delete means departed members keep their row with `left_at`
-      // set. Without this filter, someone who left last year still counts as an
-      // PL and can still act on the project.
-      .is("left_at", null),
-    supabase.from("teams").select(TEAM_COLUMNS),
+    paginate(
+      () =>
+        supabase
+          .from("profiles")
+          .select(PROFILE_COLUMNS, { count: "exact" })
+          .order("id"),
+      "org profiles"
+    ),
+    paginate(
+      () =>
+        supabase
+          .from("projects")
+          .select(PROJECT_COLUMNS, { count: "exact" })
+          .order("id"),
+      "org projects"
+    ),
+    paginate(
+      () =>
+        supabase
+          .from("project_members")
+          .select("project_id, member_id", { count: "exact" })
+          .eq("role", "re")
+          // Never-hard-delete means departed members keep their row with `left_at`
+          // set. Without this filter, someone who left last year still counts as an
+          // PL and can still act on the project.
+          .is("left_at", null)
+          .order("project_id")
+          .order("member_id"),
+      "org project leads"
+    ),
+    paginate(
+      () =>
+        supabase
+          .from("teams")
+          .select(TEAM_COLUMNS, { count: "exact" })
+          .order("id"),
+      "org teams"
+    ),
   ]);
 
-  // Fail loudly. A half-loaded graph silently strips people of authority, which
-  // is far harder to diagnose than an error page.
-  const failure = profiles.error ?? projects.error ?? res.error ?? teams.error;
-  if (failure) {
-    throw new Error(`Could not load the org graph: ${failure.message}`);
-  }
-
   return buildOrgGraphFromRows(
-    (profiles.data ?? []) as ProfileRow[],
-    (projects.data ?? []) as ProjectRow[],
-    (res.data ?? []) as ReRow[],
-    (teams.data ?? []) as TeamRow[]
+    profiles as unknown as ProfileRow[],
+    projects as unknown as ProjectRow[],
+    res as unknown as ReRow[],
+    teams as unknown as TeamRow[]
   );
 }
