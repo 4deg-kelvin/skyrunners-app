@@ -76,3 +76,13 @@ or production records were used for this review.
   subscriptions, and scheduled production jobs were not exercised end to end.
 - This review fixed demonstrated issues; it does not establish that every existing
   database policy mirrors every application permission or that all bugs are gone.
+
+## Production migration follow-up — September 7, 2026
+
+Applied migrations 0051–0053 to project `ldijsmcnjrihwvxtypqy` through the authenticated Supabase SQL editor. The preflight ledger contained all 50 earlier migrations. The three policy/trigger migrations committed together in an explicit transaction; a fresh query confirmed all 53 ledger entries, both enabled guard triggers, both authority helpers, the admission policy, and SECURITY INVOKER on the profile and RSVP guard functions.
+
+Before committing, a rollback rehearsal against the deployed schema confirmed an ordinary member's own-profile update, refusal of role/email escalation, and preserved Co-Lead project authority. The first editor attempt was rejected for a syntax error before execution; the corrected complete SQL was copied back from the editor and verified before running. A broader rehearsal involving temporary production attendance and role/status changes was rejected by automatic approval review and did not run. RSVP/admission behavior therefore remains covered by the local SQL regression tests, not an end-to-end production write test.
+
+After migration, the authenticated Vercel app successfully loaded My Work, Projects, Members, Calendar, and Dashboard. This verifies existing-session reads and rendering; fresh OAuth provisioning and all live write paths are not proven by these page checks. No attendance or membership changes were committed as test data. The reviewed application changes remain on the PR branch and have not been merged to main. Vercel, not Framer, hosts this application.
+
+This follow-up supersedes the earlier statement that production migrations were still pending. Remaining concurrency and multi-statement persistence limitations still apply.
