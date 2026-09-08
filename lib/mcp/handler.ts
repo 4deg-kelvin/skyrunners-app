@@ -48,6 +48,7 @@ import { viewerFromToken, type McpViewer } from "@/lib/mcp/viewer";
 import { SERVER_INSTRUCTIONS } from "@/lib/mcp/guide";
 import { listResources, readResource } from "@/lib/mcp/resources";
 import { checkWriteBudget } from "@/lib/mcp/rate-limit";
+import { isRpcRequest } from "@/lib/mcp/rpc";
 
 const PROTOCOL_VERSION = "2024-11-05";
 
@@ -265,7 +266,14 @@ export async function parseRpcBody(
   request: Request
 ): Promise<{ ok: true; body: RpcRequest } | { ok: false; response: Response }> {
   try {
-    return { ok: true, body: (await request.json()) as RpcRequest };
+    const body: unknown = await request.json();
+    if (!isRpcRequest(body)) {
+      return {
+        ok: false,
+        response: rpcError(null, -32600, "Invalid JSON-RPC request."),
+      };
+    }
+    return { ok: true, body: body as RpcRequest };
   } catch {
     return {
       ok: false,

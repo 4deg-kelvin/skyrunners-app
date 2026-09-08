@@ -11,8 +11,9 @@ export function DemoBanner() {
     <div className="border-warn-fg/20 bg-warn-bg border-b">
       <div className="mx-auto max-w-[1400px] px-5 py-2 sm:px-8">
         <p className="text-warn-fg text-sm">
-          <span className="font-semibold">Demo mode.</span> Running on sample
-          data — no login, and nothing you change is saved. Add Supabase keys to{" "}
+          <span className="font-semibold">Demo mode.</span> Sample data with no
+          login. Use this for testing, not real club records. Add Supabase keys
+          to{" "}
           <code className="rounded bg-white/50 px-1 py-0.5 font-mono text-xs">
             .env.local
           </code>{" "}

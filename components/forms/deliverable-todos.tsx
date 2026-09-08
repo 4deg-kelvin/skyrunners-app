@@ -97,7 +97,7 @@ export function DeliverableTodos({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-ink-soft hover:text-ink inline-flex items-center gap-1.5 text-sm font-semibold"
+          className="text-ink-soft hover:text-ink inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold sm:min-h-0"
           aria-expanded={open}
         >
           {open ? (

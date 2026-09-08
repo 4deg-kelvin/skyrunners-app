@@ -2,6 +2,13 @@
 
 **Version:** 1.0 · Postgres (Supabase)
 
+**Write-guard update (September 2026):** migrations `0051`–`0053` protect profile
+authority fields, align project authority with ancestor PLs and owning team leads,
+and constrain ordinary RSVP changes to the caller. See
+[CODEBASE_REVIEW.md](CODEBASE_REVIEW.md) for rollout requirements and remaining
+snapshot-persistence limitations. Older schema descriptions below are historical;
+the numbered migrations define the deployed schema.
+
 Reading this as a beginner: each table is a spreadsheet. A **foreign key** (`FK`) is a
 column pointing at a row in another table — that's how a task knows which project it
 belongs to. `?` marks a nullable (optional) column.

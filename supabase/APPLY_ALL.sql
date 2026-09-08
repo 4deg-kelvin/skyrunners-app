@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql, 0046_catalogue_verifiers.sql, 0047_reporting_chain_comments.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql, 0046_catalogue_verifiers.sql, 0047_reporting_chain_comments.sql, 0048_views_respect_rls.sql, 0049_fix_work_logs_policy.sql, 0050_no_private_notes.sql, 0051_profile_write_guards.sql, 0052_inherited_project_authority.sql, 0053_rsvp_write_guard.sql
 
 
 -- ==========================================================================
@@ -5666,4 +5666,566 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0047_reporting_chain_comments.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0048_views_respect_rls.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0048 — make the views respect RLS, and drop the three that are dead
+-- ===========================================================================
+--
+-- Supabase's advisor flagged all ten `v_*` views as CRITICAL "Security Definer
+-- View", and it is right. A view created without `security_invoker` runs with
+-- the OWNER's privileges, so it reads the underlying tables with RLS bypassed —
+-- and every view in the `public` schema is exposed over PostgREST.
+--
+-- ---------------------------------------------------------------------------
+-- This was live, and it was anonymous
+-- ---------------------------------------------------------------------------
+--
+-- Verified against production on 2026-08-25 with nothing but the publishable
+-- key — the one that ships in the browser bundle, no sign-in:
+--
+--     GET /rest/v1/projects?select=slug   ->  []          (RLS working)
+--     GET /rest/v1/v_project_tree         ->  [{...}]     (RLS bypassed)
+--
+-- Same data, same request, different object. Eight of the ten returned rows:
+-- project structure and division mapping, the reporting chain, RE authority,
+-- per-member weekly HOURS, per-member contribution including `hours_total`, and
+-- projects needing attention with `primary_re` and `last_active_at`.
+--
+-- Keyed by UUID rather than name or email, so this is structural and metric data
+-- rather than anything with prose in it. Worth stating the sharpest part anyway:
+-- hours and the contribution record are the two things the club decided over two
+-- separate removals not to show even to members, and they were world-readable.
+--
+-- **Nothing in the app read any of them.** `lib/data/*` goes through the
+-- per-request snapshot over TABLES, so this migration cannot break a page. The
+-- views were written in `0001_core_schema.sql` ahead of the code that was
+-- eventually going to use them, and the code never did.
+--
+-- ---------------------------------------------------------------------------
+-- Why `security_invoker` rather than revoking, for the seven that stay
+-- ---------------------------------------------------------------------------
+--
+-- `security_invoker = on` (PG15+) makes the view read its base tables as the
+-- CALLER, so the existing RLS policies apply — which is what everyone assumed
+-- was happening. It is the actual fix rather than a mitigation: after this, an
+-- anonymous call to `v_project_tree` returns `[]` for the same reason
+-- `projects` does.
+--
+-- The `revoke ... from anon` below is belt-and-braces on top. These are internal
+-- analytics helpers; no unauthenticated caller has a reason to reach one even
+-- with RLS applied. Drop that half if it ever gets in the way — the
+-- `security_invoker` half is the part that must not be reverted.
+--
+-- ---------------------------------------------------------------------------
+-- Why three are dropped instead
+-- ---------------------------------------------------------------------------
+--
+-- Securing a view that computes a number the club decided to stop keeping is
+-- worse than deleting it: it leaves the shape of the old model sitting in the
+-- schema for somebody to rediscover and wire up.
+--
+--   * `v_lead_chain`        — the reporting chain, removed 2026-08-24
+--   * `v_member_hours_weekly`  — hours, removed 2026-08-14
+--   * `v_member_contribution`  — the contribution record, removed 2026-08-24
+--
+-- Note this is a DIFFERENT call from the one made about columns. `profiles.lead_id`
+-- and `work_logs.hours` are kept, because a dropped column loses DATA and the
+-- club could revisit the decision. A view holds no data — it is derived — so
+-- dropping one loses nothing but the derivation, and `git log` has that.
+
+-- --------------------------------------------------------------------------
+-- Drop the dead three
+-- --------------------------------------------------------------------------
+
+drop view if exists v_lead_chain;
+drop view if exists v_member_hours_weekly;
+drop view if exists v_member_contribution;
+
+-- --------------------------------------------------------------------------
+-- The rest read as the caller from now on
+-- --------------------------------------------------------------------------
+--
+-- `if exists` on each, so this file is safe to re-run and safe to apply to a
+-- database where an earlier migration was partially applied.
+
+alter view if exists v_project_tree set (security_invoker = on);
+alter view if exists v_project_division set (security_invoker = on);
+alter view if exists v_project_re_authority set (security_invoker = on);
+alter view if exists v_project_progress set (security_invoker = on);
+alter view if exists v_projects_needing_attention set (security_invoker = on);
+alter view if exists v_join_requests_for_re set (security_invoker = on);
+alter view if exists v_stale_join_requests set (security_invoker = on);
+
+-- --------------------------------------------------------------------------
+-- And no anonymous caller needs any of them
+-- --------------------------------------------------------------------------
+
+revoke select on v_project_tree from anon;
+revoke select on v_project_division from anon;
+revoke select on v_project_re_authority from anon;
+revoke select on v_project_progress from anon;
+revoke select on v_projects_needing_attention from anon;
+revoke select on v_join_requests_for_re from anon;
+revoke select on v_stale_join_requests from anon;
+
+-- --------------------------------------------------------------------------
+-- Say so on the objects themselves
+-- --------------------------------------------------------------------------
+
+comment on view v_project_tree is
+  'security_invoker = on since 0048 — reads as the caller, so RLS applies. Do '
+  'not recreate without it: `create view` defaults to the owner''s privileges '
+  'and silently bypasses every policy on projects.';
+
+comment on view v_project_re_authority is
+  'security_invoker = on since 0048. Unused by the app — lib/permissions.ts '
+  'walks the project tree in memory through OrgGraph, because the four lookups '
+  'must stay synchronous.';
+
+insert into schema_migrations (version)
+values ('0048_views_respect_rls')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0048_views_respect_rls.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0049_fix_work_logs_policy.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0049 — URGENT: repair the two policies 0048 broke
+-- ===========================================================================
+--
+-- **Apply this immediately after 0048.** Until it lands, a `select` on
+-- `work_logs` or `update_schedules` can fail with
+-- `relation "v_lead_chain" does not exist`, and `work_logs` is read by the
+-- per-request snapshot on every page.
+--
+-- ---------------------------------------------------------------------------
+-- What I got wrong, and the general lesson
+-- ---------------------------------------------------------------------------
+--
+-- 0048 dropped `v_lead_chain`, having checked that no APPLICATION code read it.
+-- That was the wrong thing to check. `auth_can_view_effort()` — a `security
+-- definer` SQL function from 0004 — selects from it, and two RLS policies call
+-- that function.
+--
+-- **Postgres did not stop me, and that is the part worth remembering.** It
+-- records dependencies for views on views and for policies on views, so
+-- `drop view` normally errors with "other objects depend on it". A FUNCTION BODY
+-- is an opaque string: nothing is recorded, the drop succeeds, and the breakage
+-- surfaces at query time instead. So before dropping any view, grep the
+-- migrations for its name — `pg_depend` will not save you.
+--
+-- Worse, the failure is intermittent. `work_logs` has two SELECT policies and
+-- Postgres OR's them, but SQL does not guarantee evaluation order, so a caller
+-- who satisfies `work_logs_read_project_re` may or may not also evaluate the
+-- broken one. It worked for some callers and errored for others.
+--
+-- ---------------------------------------------------------------------------
+-- Why the fix is to replace the policies, not to restore the view
+-- ---------------------------------------------------------------------------
+--
+-- Recreating `v_lead_chain` would restore a working query that implements a model
+-- the club removed on 2026-08-24. `auth_can_view_effort` is the SQL mirror of
+-- `can.viewMemberEffort`, which was deleted — so the function and both policies
+-- are answering a question nobody asks any more.
+--
+-- The right answers, matching the app exactly:
+--
+--   * **`work_logs` is PUBLIC to any signed-in member.** Decided 2026-08-16 and
+--     `can.viewMemberWorkOnProject` is literally `() => true`. The RLS policy
+--     was still the pre-2026-08-16 restriction, which means the database and the
+--     app have disagreed about this for over a week — the app just never noticed,
+--     because `work_logs` is also covered by `work_logs_read_project_re` and the
+--     snapshot mostly reads as an RE.
+--   * **`update_schedules` is a dead table.** Nothing loads it (0047), so the
+--     narrowest workable policy is own-row plus Co-Lead.
+--
+-- Scope is deliberately minimal: exactly the two broken policies and the function
+-- they call. `progress_updates` still has policies built on `auth_is_lead_of`,
+-- which is conceptually dead but NOT broken — that function uses an inline
+-- recursive CTE, not the dropped view. Auditing those is a separate, considered
+-- change, because `progress_updates` feeds the public project feed and narrowing
+-- it carelessly would hide a project's own history.
+
+-- --------------------------------------------------------------------------
+-- work_logs — public to signed-in members, matching the app since 2026-08-16
+-- --------------------------------------------------------------------------
+
+drop policy if exists work_logs_read on work_logs;
+create policy work_logs_read on work_logs
+  for select to authenticated
+  using (true);
+
+comment on policy work_logs_read on work_logs is
+  'Public to any signed-in member since 2026-08-16 — mirrors '
+  'can.viewMemberWorkOnProject(), which returns true. Was '
+  'auth_can_view_effort(member_id) until 0049; that restriction existed because '
+  'the log carried HOURS, and a number invites comparison between volunteers '
+  'with different course loads. The hours went on 2026-08-14.';
+
+-- `work_logs_read_project_re` from 0008 is left alone. It is now redundant
+-- rather than wrong, and dropping a policy that grants nothing extra is a change
+-- with no upside.
+
+-- --------------------------------------------------------------------------
+-- update_schedules — a dead table, so the narrowest thing that works
+-- --------------------------------------------------------------------------
+
+drop policy if exists update_schedules_read on update_schedules;
+create policy update_schedules_read on update_schedules
+  for select to authenticated
+  using (member_id = auth.uid() or auth_is_co_lead());
+
+comment on policy update_schedules_read on update_schedules is
+  'The table is dead — nothing loads it since 0047, when check-in schedules were '
+  'removed from COLLECTIONS. Rows kept as history, so the policy is own-row plus '
+  'Co-Lead rather than open.';
+
+-- --------------------------------------------------------------------------
+-- And the function itself, now that nothing calls it
+-- --------------------------------------------------------------------------
+--
+-- After the two policies above, `auth_can_view_effort` has no callers. Dropped
+-- rather than left in place: a `security definer` function that reads a view
+-- which no longer exists is a loaded gun for whoever writes the next policy and
+-- reasonably assumes the helpers work.
+
+drop function if exists auth_can_view_effort(uuid);
+
+insert into schema_migrations (version)
+values ('0049_fix_work_logs_policy')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0049_fix_work_logs_policy.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0050_no_private_notes.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0050 — Private notes are gone. Nothing about a member is private any more.
+-- ===========================================================================
+--
+-- A check-in carried a `general_note`: whatever you wanted to say that wasn't
+-- tied to a project. It was readable by you and your Lead chain, then — when
+-- the reporting chain went on 2026-08-24 — by you and the Co-Leads. It was the
+-- LAST exception to "everything about a member is public", and CLAUDE.md had a
+-- long argument for why it had to survive: those notes were written under a
+-- stated promise, and publishing what somebody already typed is the one privacy
+-- change that changing your mind cannot undo.
+--
+-- That argument was sound and it no longer applies. The club is still in
+-- testing, and the only `general_note` in the database is the string
+-- "amongus" — seven characters, written by a Co-Lead trying the form. There is
+-- no promise to keep, so the club chose to remove the concept rather than
+-- carry a privacy exception, a permission rule and a special-cased read path
+-- for a feature nobody used before it was retired.
+--
+-- What this fixes at the same time
+-- -------------------------------------------------------------------------
+--
+-- The "public per-project half" of a check-in has never actually been public in
+-- live mode, and that WAS a real bug. `update_entries_read_all` is
+-- `using (true)`, exactly as designed — but the app never reads `update_entries`
+-- directly. `projectUpdateFeed()` iterates `progressUpdates[].entries`, and the
+-- snapshot attaches entries by looping over the ENVELOPE rows that came back.
+-- So an entry whose envelope RLS filtered out was unreachable no matter what the
+-- entries policy said.
+--
+-- The envelope policy was
+--   `member_id = auth.uid() or auth_is_lead_of(member_id)`
+-- which, with the reporting chain removed from the application but
+-- `profiles.lead_id` still populated on 8 of 12 rows, resolved against a
+-- structure nothing maintains. Not restrictive — arbitrary.
+--
+-- Six entries across four check-ins are affected, all written between 9 and 13
+-- August 2026, all before check-ins were retired. Nothing writes either table
+-- any more, so this is the last time these rows change.
+--
+-- Why `general_note` is emptied rather than dropped
+-- -------------------------------------------------------------------------
+--
+-- Same rule as `work_logs.hours` and `profiles.lead_id`: a dropped column
+-- cannot be un-dropped, and "stop collecting this" is a club decision that
+-- could be revisited. The column stays, empty, with a comment saying so. What
+-- is deleted is the CONTENT, which is what "remove private notes" means.
+--
+-- Re-runnable. Every statement is `if exists` / idempotent.
+
+-- ---------------------------------------------------------------------------
+-- 1. Delete the notes.
+-- ---------------------------------------------------------------------------
+update progress_updates
+   set general_note = null
+ where general_note is not null;
+
+comment on column progress_updates.general_note is
+  'RETIRED 2026-08-24. Was the private half of a check-in — readable by the '
+  'member and their Lead chain, later the member and Co-Leads. Emptied in '
+  'migration 0050 and no longer selected by the application: there is no such '
+  'thing as a private note now. Kept rather than dropped because a dropped '
+  'column cannot be un-dropped. DO NOT start writing to it — the row policy '
+  'below is `using (true)`, so anything put here is public to the whole club.';
+
+-- ---------------------------------------------------------------------------
+-- 2. Open the envelope, so the per-project half is actually public.
+-- ---------------------------------------------------------------------------
+drop policy if exists progress_updates_read_chain on progress_updates;
+
+-- Redundant once the policy below exists: SELECT policies are OR'd, so
+-- "your own" adds nothing to "everyone's". Dropped rather than left, because
+-- two policies where one suffices is the shape that makes the next reader
+-- wonder which one is doing the work.
+drop policy if exists progress_updates_read_own on progress_updates;
+
+-- Dropped first so this file is genuinely re-runnable. `create policy` takes no
+-- `if not exists` — the same gap that makes `APPLY_ALL.sql` abort on `0001`'s
+-- `create type` — so without this line a second push dies with
+-- `42710: policy "progress_updates_read_all" already exists`. Which it did.
+drop policy if exists progress_updates_read_all on progress_updates;
+
+create policy progress_updates_read_all
+  on progress_updates for select
+  using (true);
+
+-- ---------------------------------------------------------------------------
+-- 3. Drop the review policy and the function underneath it.
+-- ---------------------------------------------------------------------------
+--
+-- `progress_updates_review` let a "Lead" mark a report reviewed. Nothing marks
+-- anything reviewed since 2026-08-24 — `reviewUpdate` was deleted with the
+-- escalation module — so this granted a write nothing performs, to an authority
+-- that no longer exists.
+drop policy if exists progress_updates_review on progress_updates;
+
+-- `auth_is_lead_of` is the SQL mirror of `isLeadOfOrAbove`, deleted from
+-- `lib/permissions.ts` on 2026-08-24.
+--
+-- CHECKED BEFORE DROPPING, the way bug #14 in docs/HANDOFF.md taught: Postgres
+-- does not dependency-track function BODIES, so `drop function` succeeds while
+-- a `security definer` function still selects from it and the failure surfaces
+-- later, at query time. Dropping `v_lead_chain` broke every read of `work_logs`
+-- exactly this way.
+--
+-- Verified against the live database: the only references were the two policies
+-- dropped above (`pg_policies.qual`), and no other `pg_proc.prosrc` mentions
+-- it. Grep the migrations too — 0008 defines it, 0049 only names it in a
+-- comment.
+drop function if exists auth_is_lead_of(uuid);
+
+-- Record it, the way every migration here does. `db-push` diffs the ledger
+-- against the filenames; a migration that does not insert its own row reports
+-- "ok" and then "still not applied", and would re-run on the next push.
+insert into schema_migrations (version)
+values ('0050_no_private_notes')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0050_no_private_notes.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0051_profile_write_guards.sql
+-- ==========================================================================
+
+-- RLS grants rows, not columns. The original own-profile UPDATE policy allowed
+-- changing global_role or activating an inactive account through PostgREST.
+-- Keep normal profile edits and leadership admission, but guard authority and
+-- login identity in the database as well as in the Server Actions.
+
+create or replace function profiles_guard_authority()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  -- Auth provisioning runs inside an existing SECURITY DEFINER trigger and
+  -- must still relink invited profiles to the Google auth UUID. Service-role
+  -- maintenance also remains possible. Never base this bypass on auth.uid()
+  -- being null: that would exempt anonymous API callers.
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.global_role <> 'member' and not auth_is_co_lead() then
+      raise exception 'Only a Co-Lead can invite someone with a leadership or advisor role.'
+        using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if auth_is_co_lead() then return new; end if;
+
+  if new.id is distinct from old.id
+     or new.email is distinct from old.email
+     or new.global_role is distinct from old.global_role then
+    raise exception 'Only a Co-Lead can change account identity or roles.'
+      using errcode = '42501';
+  end if;
+
+  if old.id = auth.uid() then
+    if old.status <> 'active' or new.status is distinct from old.status then
+      raise exception 'Only leadership can activate an account; you cannot change your own status.'
+        using errcode = '42501';
+    end if;
+  elsif not (
+    auth_is_leadership() and old.status = 'inactive' and new.status = 'active'
+    and (to_jsonb(new) - 'status' - 'updated_at') = (to_jsonb(old) - 'status' - 'updated_at')
+  ) then
+    raise exception 'You may admit this member, but only a Co-Lead can edit their profile.'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_authority_guard on profiles;
+create trigger profiles_authority_guard
+  before insert or update on profiles
+  for each row execute function profiles_guard_authority();
+
+drop policy if exists profiles_update_own on profiles;
+create policy profiles_update_own on profiles
+  for update to authenticated
+  using (id = auth.uid() and status = 'active')
+  with check (id = auth.uid() and status = 'active');
+
+-- The app permits a Lead to admit a new member. Previously only Co-Leads had
+-- the database UPDATE policy, so the ordinary Lead's button failed.
+drop policy if exists profiles_admit_leadership on profiles;
+create policy profiles_admit_leadership on profiles
+  for update to authenticated
+  using (auth_is_leadership() and status = 'inactive' and id <> auth.uid())
+  with check (auth_is_leadership() and status = 'active' and id <> auth.uid());
+
+insert into schema_migrations (version) values ('0051_profile_write_guards')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0051_profile_write_guards.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0052_inherited_project_authority.sql
+-- ==========================================================================
+
+-- Match lib/permissions.ts: project authority includes every ancestor PL and
+-- the leads of owning teams/divisions. The original SQL helper knew only PL
+-- memberships, so a Division Lead's app-permitted edits failed in PostgREST.
+
+create or replace function auth_leads_team_at_or_above(target_team uuid)
+returns boolean language sql stable security definer set search_path = public
+as $$
+  with recursive ancestors as (
+    select id, parent_id, lead_id from teams where id = target_team
+    union
+    select t.id, t.parent_id, t.lead_id from teams t
+    join ancestors a on t.id = a.parent_id
+  )
+  select auth_is_member() and exists (
+    select 1 from ancestors where lead_id = auth.uid()
+  );
+$$;
+
+create or replace function auth_is_re_for(target_project uuid)
+returns boolean language sql stable security definer set search_path = public
+as $$
+  with recursive ancestors as (
+    select id, parent_id, team_id, primary_re_id from projects where id = target_project
+    union
+    select p.id, p.parent_id, p.team_id, p.primary_re_id from projects p
+    join ancestors a on p.id = a.parent_id
+  )
+  select auth_is_member() and (
+    auth_is_co_lead()
+    or exists (select 1 from ancestors where primary_re_id = auth.uid())
+    or exists (
+      select 1 from project_members m join ancestors a on a.id = m.project_id
+      where m.member_id = auth.uid() and m.role = 're' and m.left_at is null
+    )
+    or exists (select 1 from ancestors where auth_leads_team_at_or_above(team_id))
+  );
+$$;
+
+drop policy if exists projects_insert on projects;
+create policy projects_insert on projects
+  for insert to authenticated with check (
+    auth_is_member() and (
+      auth_is_co_lead()
+      or case when parent_id is not null then auth_is_re_for(parent_id)
+              else auth_leads_team_at_or_above(team_id) end
+    )
+  );
+
+insert into schema_migrations (version) values ('0052_inherited_project_authority')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0052_inherited_project_authority.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0053_rsvp_write_guard.sql
+-- ==========================================================================
+
+-- RSVP must only add/remove the caller. The original trigger allowed replacing
+-- everyone's attendance and omitted later recurrence columns from its guard.
+create or replace function events_rsvp_only_touches_attendance()
+returns trigger language plpgsql security invoker set search_path = public
+as $$
+begin
+  -- Preserve trusted service-role operations, including the MCP backend.
+  if current_user not in ('anon', 'authenticated') then return new; end if;
+  if not auth_is_member() then
+    raise exception 'An active membership is required.' using errcode = '42501';
+  end if;
+  if auth_is_leadership() or old.created_by = auth.uid() then return new; end if;
+
+  -- Comparing the record protects new columns automatically, including the
+  -- recurrence fields from 0043. updated_at may be maintained by a trigger.
+  if (to_jsonb(new) - 'attendee_ids' - 'updated_at')
+     is distinct from (to_jsonb(old) - 'attendee_ids' - 'updated_at') then
+    raise exception 'Only the organiser can change this event. You can add or remove yourself from it.'
+      using errcode = '42501';
+  end if;
+  if array(select distinct v from unnest(coalesce(new.attendee_ids, '{}'::uuid[])) v where v <> auth.uid() order by v)
+     is distinct from
+     array(select distinct v from unnest(coalesce(old.attendee_ids, '{}'::uuid[])) v where v <> auth.uid() order by v) then
+    raise exception 'You can only change your own attendance.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+-- Keep the existing trigger binding from 0024.
+insert into schema_migrations (version) values ('0053_rsvp_write_guard')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0053_rsvp_write_guard.sql
 -- ==========================================================================
