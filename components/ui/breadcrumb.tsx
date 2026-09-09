@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,7 +13,13 @@ export function Breadcrumb({
   trail,
   className,
 }: {
-  trail: { id: string; name: string; kind: "division" | "team" | "project" }[];
+  trail: {
+    id: string;
+    name: string;
+    kind: "division" | "team" | "project";
+    /** Rendered as a link when present. Ancestor projects have one. */
+    href?: string;
+  }[];
   className?: string;
 }) {
   if (trail.length === 0) return null;
@@ -26,15 +34,24 @@ export function Breadcrumb({
       {trail.map((node, i) => (
         <span key={`${node.id}-${i}`} className="flex items-center gap-1.5">
           {i > 0 ? <span aria-hidden="true">›</span> : null}
-          <span
-            className={
-              node.kind === "division"
-                ? "text-cardinal-600 font-semibold"
-                : undefined
-            }
-          >
-            {node.name}
-          </span>
+          {node.href ? (
+            <Link
+              href={node.href}
+              className="hover:text-ink hover:decoration-ink-muted font-medium underline decoration-transparent underline-offset-2 transition-colors"
+            >
+              {node.name}
+            </Link>
+          ) : (
+            <span
+              className={
+                node.kind === "division"
+                  ? "text-cardinal-600 font-semibold"
+                  : undefined
+              }
+            >
+              {node.name}
+            </span>
+          )}
         </span>
       ))}
     </p>

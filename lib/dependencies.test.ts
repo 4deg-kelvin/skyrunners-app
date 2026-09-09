@@ -6,9 +6,11 @@
  * Four rules carry the design, and each one is a decision that could plausibly
  * have gone the other way:
  *
- *   1. `project → deliverable` is not a legal shape.
- *   2. Targets are siblings and ancestors. Never descendants — the tree already
- *      says a parent cannot finish before its children.
+ *   1. All four dependent/target shapes are legal. `project → deliverable` was
+ *      refused for a day; `0056` dropped the CHECK.
+ *   2. Scope is ONE TOP-LEVEL PROJECT'S TREE. A project may not wait on its own
+ *      descendants — the tree already says a parent cannot finish before its
+ *      children — but a deliverable may, because it contains nothing.
  *   3. Cycles are refused.
  *   4. A conflict is "the thing you wait on lands after you do", and a finished
  *      target never conflicts however the dates read.
@@ -23,10 +25,11 @@ import { test, describe } from "node:test";
 
 import {
   ancestorsOf,
+  descendantIdsOf,
   eligibleDeliverableTargets,
   eligibleProjectTargets,
-  isLegalPair,
   resolveDependencies,
+  rootProjectIdOf,
   wouldCycle,
   type Dependency,
 } from "./dependencies.ts";
@@ -83,24 +86,53 @@ function deliverable(
   } as Deliverable;
 }
 
-describe("which shapes are legal", () => {
-  test("a deliverable may wait on a deliverable or a project", () => {
-    assert.equal(isLegalPair("deliverable", "deliverable"), true);
-    assert.equal(isLegalPair("deliverable", "project"), true);
+describe("the top-level project a thing sits under", () => {
+  test("a grandchild resolves to its root", () => {
+    assert.equal(rootProjectIdOf("grand-a1a", PROJECTS), "root-a");
   });
 
-  test("a project may wait on a project", () => {
-    assert.equal(isLegalPair("project", "project"), true);
+  test("a top-level project is its own root", () => {
+    assert.equal(rootProjectIdOf("root-b", PROJECTS), "root-b");
+  });
+
+  test("an unknown project has no root rather than a wrong one", () => {
+    assert.equal(rootProjectIdOf("nope", PROJECTS), undefined);
   });
 
   /*
-    The one that is refused. A whole project waiting on one person's single task
-    inverts the sizes: if a project genuinely hinges on one deliverable, either
-    that deliverable belongs to the project, or the two projects depend on each
-    other.
+    `parent_id` is a plain column, so a loop is representable. It must terminate
+    rather than hang the request — same reasoning as `projectChain` in
+    `lib/permissions.ts`.
   */
-  test("a project may NOT wait on a single deliverable", () => {
-    assert.equal(isLegalPair("project", "deliverable"), false);
+  test("a cycle terminates instead of hanging", () => {
+    const looped = [
+      project("a", "b"),
+      project("b", "c"),
+      project("c", "a"),
+      ...PROJECTS,
+    ];
+    assert.ok(rootProjectIdOf("a", looped));
+  });
+});
+
+describe("descendants", () => {
+  test("all the way down, not just children", () => {
+    assert.deepEqual([...descendantIdsOf("root-a", PROJECTS)].sort(), [
+      "child-a1",
+      "child-a2",
+      "grand-a1a",
+    ]);
+  });
+
+  test("a leaf has none", () => {
+    assert.deepEqual([...descendantIdsOf("grand-a1a", PROJECTS)], []);
+  });
+
+  test("never includes itself, even through a cycle", () => {
+    const looped = [project("x"), project("y", "x"), project("x2", "y")];
+    // Point the top back at the bottom to make a loop.
+    looped[0] = project("x", "x2");
+    assert.equal(descendantIdsOf("x", looped).has("x"), false);
   });
 });
 
@@ -127,7 +159,7 @@ describe("the ancestor chain", () => {
 });
 
 describe("which projects are offered", () => {
-  test("siblings, for a nested project", () => {
+  test("siblings and ancestors, for a nested project", () => {
     const ids = eligibleProjectTargets("child-a1", PROJECTS).map((p) => p.id);
     assert.ok(ids.includes("child-a2"), "its sibling");
     assert.ok(ids.includes("root-a"), "its parent");
@@ -152,21 +184,60 @@ describe("which projects are offered", () => {
   });
 
   /*
-    Two top-level projects share a parent in the only sense the tree has —
-    both have none — so they are siblings. Without this a top-level project
-    could depend on nothing at all, which would make the feature useless for
-    exactly the biggest projects.
+    THE RULE THAT CHANGED, and the one this suite exists to pin down.
+
+    Two top-level projects were treated as siblings, because they share a parent
+    in the only sense the tree has — both have none. On the live club that made
+    every unrelated project in the club an eligible dependency of every other:
+    a deliverable on one course was offered the Zipline company visit and the
+    sponsor pipeline as things it might be waiting for.
+
+    The general lesson is in the module header. A scope rule phrased in tree
+    terms has to be checked at BOTH ends of the tree, because "sibling" means
+    something different at the root than it does in the middle.
   */
-  test("two top-level projects are siblings", () => {
-    const ids = eligibleProjectTargets("root-a", PROJECTS).map((p) => p.id);
-    assert.deepEqual(ids, ["root-b"]);
+  test("NEVER another top-level project", () => {
+    assert.deepEqual(eligibleProjectTargets("root-a", PROJECTS), []);
   });
 
-  test("a grandchild reaches its whole ancestor chain", () => {
+  test("never anything in another top-level project's tree", () => {
     const ids = eligibleProjectTargets("grand-a1a", PROJECTS).map((p) => p.id);
     assert.ok(ids.includes("child-a1"), "parent");
     assert.ok(ids.includes("root-a"), "grandparent");
+    assert.ok(ids.includes("child-a2"), "an uncle, still in the same tree");
     assert.equal(ids.includes("root-b"), false, "but not an unrelated root");
+  });
+
+  /*
+    The asymmetry between the two kinds, which is the whole reason
+    `dependentKind` is an argument. A deliverable is not a container of the
+    sub-projects under its project, so no tree rule covers it — "I can't book
+    the room until the floor-design sub-project lands" is a real sentence. What
+    it may not wait on is its OWN project, which IS its container.
+  */
+  test("a deliverable's project scope is not its project's", () => {
+    const forProject = eligibleProjectTargets(
+      "child-a1",
+      PROJECTS,
+      "project"
+    ).map((p) => p.id);
+    const forDeliverable = eligibleProjectTargets(
+      "child-a1",
+      PROJECTS,
+      "deliverable"
+    ).map((p) => p.id);
+
+    assert.equal(
+      forProject.includes("grand-a1a"),
+      false,
+      "a project may not wait on its own child"
+    );
+    assert.ok(forDeliverable.includes("grand-a1a"), "a deliverable on it may");
+    assert.equal(
+      forDeliverable.includes("child-a1"),
+      false,
+      "but never on its own project"
+    );
   });
 });
 
@@ -175,33 +246,65 @@ describe("which deliverables are offered", () => {
     deliverable("d1", "child-a1"),
     deliverable("d2", "child-a1"),
     deliverable("d3", "child-a2"),
+    deliverable("d4", "grand-a1a"),
+    deliverable("d5", "root-b"),
   ];
 
+  const forDeliverable = (id: string, homeProjectId: string) =>
+    eligibleDeliverableTargets({
+      dependentKind: "deliverable",
+      dependentId: id,
+      homeProjectId,
+      projects: PROJECTS,
+      deliverables: DELIVERABLES,
+    }).map((d) => d.id);
+
+  const forProject = (homeProjectId: string) =>
+    eligibleDeliverableTargets({
+      dependentKind: "project",
+      dependentId: homeProjectId,
+      homeProjectId,
+      projects: PROJECTS,
+      deliverables: DELIVERABLES,
+    }).map((d) => d.id);
+
   test("the others on its own project", () => {
-    const ids = eligibleDeliverableTargets("d1", "child-a1", DELIVERABLES).map(
-      (d) => d.id
-    );
-    assert.deepEqual(ids, ["d2"]);
+    assert.ok(forDeliverable("d1", "child-a1").includes("d2"));
   });
 
   /*
-    Same-project only. Reaching across a boundary is available through
-    `deliverable → project` instead — wait on the project, not on one row inside
-    it, because the other project's PL may split or rename their deliverables at
-    any time.
+    This USED to be refused, on the argument that reaching across a boundary
+    should go through the project rather than one row inside it. It was wrong
+    for a measurable reason: waiting on the whole project warns against the
+    project's target date rather than the deliverable's, so the coarser link
+    reads as landing later than the thing actually being waited for.
   */
-  test("never another project's", () => {
-    const ids = eligibleDeliverableTargets("d1", "child-a1", DELIVERABLES).map(
-      (d) => d.id
-    );
-    assert.equal(ids.includes("d3"), false);
+  test("and the ones elsewhere in the same tree", () => {
+    const ids = forDeliverable("d1", "child-a1");
+    assert.ok(ids.includes("d3"), "an uncle project's");
+    assert.ok(ids.includes("d4"), "a nephew project's");
+  });
+
+  test("never another top-level project's", () => {
+    assert.equal(forDeliverable("d1", "child-a1").includes("d5"), false);
   });
 
   test("never itself", () => {
-    const ids = eligibleDeliverableTargets("d1", "child-a1", DELIVERABLES).map(
-      (d) => d.id
-    );
-    assert.equal(ids.includes("d1"), false);
+    assert.equal(forDeliverable("d1", "child-a1").includes("d1"), false);
+  });
+
+  /*
+    `project → deliverable`, legal since `0056`. A project reaches deliverables
+    elsewhere in its tree but never its own — those are its own work, and it is
+    not finished until they are.
+  */
+  test("a project reaches other projects' deliverables, not its own", () => {
+    const ids = forProject("child-a1");
+    assert.equal(ids.includes("d1"), false, "its own");
+    assert.equal(ids.includes("d2"), false, "its own");
+    assert.ok(ids.includes("d3"), "a sibling project's");
+    assert.equal(ids.includes("d4"), false, "not a descendant's");
+    assert.equal(ids.includes("d5"), false, "not another tree's");
   });
 });
 

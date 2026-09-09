@@ -243,18 +243,42 @@ rules and migration `0055` the table. What makes it not the rejected feature:
 - **Nothing blocks work.** The club chose "show it, and warn on date conflicts"
   over enforcement, because a stale link would otherwise deadlock a sign-off
   until somebody hunted it down.
-- **Three shapes only** — deliverable→deliverable, project→project,
-  deliverable→project. A project waiting on one person's single task inverts the
-  sizes and is refused by a CHECK constraint, not just by the UI.
-- **Scope is siblings and ancestors.** Never descendants: `updateProject`
-  already refuses to complete a parent while a child is unfinished, and a link
-  there would be a hand-maintained second copy of a rule the database enforces.
+- **All four shapes are legal**, since `0056` on 2026-09-09.
+- **Scope is ONE TOP-LEVEL PROJECT'S TREE** — everything under the project
+  sitting directly below a division. Nothing reaches into another one, at any
+  depth. Within that tree, a project may wait on its own ancestors (warned,
+  since a child's date can never be later than its parent's, so it always
+  conflicts) but never on its descendants: `updateProject` already refuses to
+  complete a parent while a child is unfinished, and a link there would be a
+  hand-maintained second copy of a rule the database enforces. A DELIVERABLE
+  may reach descendants — it contains nothing, so no tree rule covers it — but
+  never its own project.
 
 The honest cost is that this IS new upkeep, which is what the computed version
 was rejected for. What makes it acceptable is that letting it rot degrades to "a
 note that looks wrong" rather than "a schedule that is wrong". **If anything
 here ever computes a date from a link, it has become the thing that was
 rejected.**
+
+**Both of the original rules were wrong within a day, and both failures are
+worth learning from rather than just correcting.**
+
+Shipped 2026-09-08 with three shapes and "siblings and ancestors"; both were
+replaced on 2026-09-09 after the club used them on real data.
+
+- **`project → deliverable` was refused** on the argument that a whole project
+  waiting on one person's single task inverts the sizes. The available
+  workaround was to wait on the whole sibling PROJECT — which warns against
+  *that project's* target date rather than the deliverable's, so the coarser
+  link reads as landing weeks later than the thing actually being waited for.
+  **A refusal that pushes people towards a wronger answer is not a guardrail.**
+- **"Siblings and ancestors" was right in the middle of the tree and wrong at
+  the top**, because every top-level project is a "sibling" of every other one.
+  A deliverable on one course was offered the Zipline company visit and the
+  sponsor pipeline as candidate blockers. **When a scope rule is phrased in tree
+  terms, check what it degenerates to at BOTH ends of the tree** — the rule was
+  correct about the relationship and wrong about what that relationship means at
+  the root.
 
 ## There are no hours. The tiers are gone. (Done 2026-08-14)
 

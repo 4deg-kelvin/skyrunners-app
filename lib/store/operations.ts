@@ -44,8 +44,9 @@ import { mutate, readStore, type StoreShape } from "./disk.ts";
 import { todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
 import {
+  descendantIdsOf,
+  eligibleDeliverableTargets,
   eligibleProjectTargets,
-  isLegalPair,
   wouldCycle,
 } from "../dependencies.ts";
 import { repeatProblem } from "../calendar/recurrence.ts";
@@ -4935,12 +4936,6 @@ export async function addDependency(input: {
   actorId: string;
   now?: string;
 }): Promise<Result<Dependency>> {
-  if (!isLegalPair(input.dependentKind, input.targetKind)) {
-    return fail<Dependency>(
-      "A project can't wait on a single deliverable. If it really hinges on one piece of work, either move that deliverable onto this project or link the two projects."
-    );
-  }
-
   const note = (input.note ?? "").trim();
   if (note.length > 300) {
     return fail<Dependency>(
@@ -4981,22 +4976,81 @@ export async function addDependency(input: {
     const homeProjectId =
       dependentProject?.id ?? dependentDeliverable!.projectId;
 
+    /*
+      Scope, re-checked here rather than trusted from the form.
+
+      Both branches ask the SAME functions the picker builds its options from,
+      so a list that offers something the write then refuses is impossible by
+      construction. That mattered on the first version of this feature: the
+      picker offered every top-level project in the club and the refusal messages
+      described a rule nobody could see.
+    */
     if (input.targetKind === "project") {
-      const allowed = eligibleProjectTargets(homeProjectId, store.projects);
+      const allowed = eligibleProjectTargets(
+        homeProjectId,
+        store.projects,
+        input.dependentKind
+      );
       if (!allowed.some((p) => p.id === input.targetId)) {
+        /*
+          Which rule was broken, said specifically.
+
+          One message covering both cases named descendants first, so a
+          cross-tree attempt was refused with a sentence about sub-projects —
+          true in general and irrelevant to what the person just did. A refusal
+          that describes the wrong rule is worse than a terse one, because it
+          sends somebody looking in the wrong place.
+        */
+        if (input.targetId === homeProjectId) {
+          return fail<Dependency>(
+            "A deliverable can't wait on the project it's already part of — that project isn't finished until this is."
+          );
+        }
+        if (
+          descendantIdsOf(homeProjectId, store.projects).has(input.targetId)
+        ) {
+          return fail<Dependency>(
+            "A project can't wait on its own sub-project — it already can't be marked complete while any of them is unfinished."
+          );
+        }
         return fail<Dependency>(
-          "You can only wait on a project alongside this one or above it — a sibling, or one it sits under. Its own sub-projects are already covered, because a project can't be finished while its children aren't."
+          "That's under a different top-level project. A dependency reaches other work in the same one, so if these really do depend on each other, one of them is filed in the wrong place."
         );
       }
     } else {
-      const target = store.deliverables.find((d) => d.id === input.targetId)!;
-      if (target.projectId !== homeProjectId) {
-        return fail<Dependency>(
-          "A deliverable can only wait on another one on the same project. To wait on work somewhere else, wait on that project instead — its PL may split or rename their deliverables at any time."
-        );
-      }
-      if (target.id === input.dependentId) {
+      if (input.targetId === input.dependentId) {
         return fail<Dependency>("Something can't wait on itself.");
+      }
+      const allowed = eligibleDeliverableTargets({
+        dependentKind: input.dependentKind,
+        dependentId: input.dependentId,
+        homeProjectId,
+        projects: store.projects,
+        deliverables: store.deliverables,
+      });
+      if (!allowed.some((d) => d.id === input.targetId)) {
+        // Same specificity as the project branch above.
+        const target = store.deliverables.find((d) => d.id === input.targetId)!;
+
+        if (
+          input.dependentKind === "project" &&
+          target.projectId === homeProjectId
+        ) {
+          return fail<Dependency>(
+            "A project can't wait on its own deliverable — that's its own work, and it isn't finished until they are."
+          );
+        }
+        if (
+          input.dependentKind === "project" &&
+          descendantIdsOf(homeProjectId, store.projects).has(target.projectId)
+        ) {
+          return fail<Dependency>(
+            "That deliverable is on one of this project's own sub-projects, which it already can't be completed ahead of."
+          );
+        }
+        return fail<Dependency>(
+          "That deliverable is under a different top-level project. A dependency reaches other work in the same one, so if these really do depend on each other, one of them is filed in the wrong place."
+        );
       }
     }
 

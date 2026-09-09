@@ -52,24 +52,28 @@ export function DependencyPicker({
   dependentId,
   current,
   projectOptions,
-  deliverableOptions,
+  deliverableOptions = [],
+  scopeRootName,
 }: {
   dependentKind: DependencyEndKind;
   dependentId: string;
   /** Already declared, resolved and date-checked by the server. */
   current: DependencyRow[];
-  /** Projects in scope: siblings and ancestors. */
+  /** Projects in scope, already filtered for this dependent's kind. */
   projectOptions: { id: string; name: string }[];
+  /** Deliverables in scope, attributed when they live on another project. */
+  deliverableOptions?: { id: string; title: string; projectName?: string }[];
   /**
-   * Other deliverables on the same project. Absent for a project, which cannot
-   * wait on a single deliverable — see `isLegalPair`.
+   * The top-level project scope is confined to, when that isn't this project.
+   *
+   * Named in the copy rather than left implicit: "nothing here" is a puzzle,
+   * and "nothing else under DroneHacks yet" is an answer.
    */
-  deliverableOptions?: { id: string; title: string }[];
+  scopeRootName?: string;
 }) {
   const [adding, setAdding] = useState(false);
 
-  const hasOptions =
-    projectOptions.length > 0 || (deliverableOptions?.length ?? 0) > 0;
+  const hasOptions = projectOptions.length > 0 || deliverableOptions.length > 0;
 
   return (
     <div className="border-line mt-4 border-t pt-3.5">
@@ -89,6 +93,7 @@ export function DependencyPicker({
       <p className="text-ink-muted mt-1 text-xs">
         Saves as you go — separately from the rest of this panel. Shows on the
         timeline as a tick where the awaited date lands.
+        {scopeRootName ? <> Reaches anything under {scopeRootName}.</> : null}
       </p>
 
       {current.length > 0 ? (
@@ -165,11 +170,12 @@ export function DependencyPicker({
           {hasOptions
             ? "Add one if this can't start until something else lands."
             : /*
-                No eligible target is a real state, not an error: a lone
-                top-level project with no siblings has nothing in scope to wait
-                on. Saying why beats an empty dropdown.
+                No eligible target is a real state, not an error: a top-level
+                project with no sub-projects and no deliverables elsewhere in
+                its tree genuinely has nothing to wait on. Saying why beats an
+                empty dropdown, and naming the tree says where to look.
               */
-              "Nothing alongside this one to wait on yet — dependencies reach siblings and the projects above, not sub-projects."}
+              `Nothing to wait on yet — a dependency reaches other work under ${scopeRootName ?? "this top-level project"}, not into another one.`}
         </p>
       )}
 
@@ -205,17 +211,19 @@ export function DependencyPicker({
               <option value="" disabled>
                 Pick one…
               </option>
-              {deliverableOptions?.length ? (
-                <optgroup label="Deliverables on this project">
+              {deliverableOptions.length ? (
+                <optgroup label="Deliverables">
                   {deliverableOptions.map((d) => (
                     <option key={d.id} value={`deliverable:${d.id}`}>
-                      {d.title}
+                      {d.projectName
+                        ? `${d.title} — ${d.projectName}`
+                        : d.title}
                     </option>
                   ))}
                 </optgroup>
               ) : null}
               {projectOptions.length ? (
-                <optgroup label="Projects alongside or above this one">
+                <optgroup label="Projects">
                   {projectOptions.map((p) => (
                     <option key={p.id} value={`project:${p.id}`}>
                       {p.name}

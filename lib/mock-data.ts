@@ -2676,9 +2676,12 @@ export function getTeam(id: string) {
  * little on its own; showing that it lives under the spar redesign inside the
  * eVTOL division tells you instantly which piece of work it is.
  */
-export function projectBreadcrumb(
-  projectId: string
-): { id: string; name: string; kind: "division" | "team" | "project" }[] {
+export function projectBreadcrumb(projectId: string): {
+  id: string;
+  name: string;
+  kind: "division" | "team" | "project";
+  href?: string;
+}[] {
   const project = getProject(projectId);
   if (!project) return [];
 
@@ -2714,10 +2717,18 @@ export function projectBreadcrumb(
 
   return [
     ...teamTrail,
+    /*
+      Ancestor projects carry an href; the org units above them do not, because
+      a division has no page of its own. Every ancestor is clickable and not
+      just the immediate parent — on a project three deep, "jump two up" is the
+      same one click as "jump one up", and a trail where only the last entry
+      responds to a click teaches people that none of them do.
+    */
     ...projectTrail.map((p) => ({
       id: p.id,
       name: p.name,
       kind: "project" as const,
+      href: `/projects/${p.slug}`,
     })),
   ];
 }

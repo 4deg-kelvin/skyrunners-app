@@ -35,36 +35,57 @@
  * What can wait on what
  * ---------------------------------------------------------------------------
  *
- * Three of the four combinations, chosen by the club on 2026-09-08:
+ * All four combinations, as of 2026-09-09:
  *
  *   deliverable → deliverable   "my layup waits on your mould"
  *   project     → project       "load testing waits on the spar redesign"
  *   deliverable → project       "the coupon report waits on layup qualification"
+ *   project     → deliverable   "the walls wait on the floor plan being signed"
  *
- * **project → deliverable is deliberately absent.** A whole project waiting on
- * one person's single task inverts the sizes: if a project genuinely hinges on
- * one deliverable, the honest model is that the deliverable belongs to that
- * project, or that the two projects depend on each other.
+ * The last one was refused for a day, on the argument that a whole project
+ * waiting on one person's single task inverts the sizes. Real data disproved it:
+ * the available workaround was to wait on the whole sibling PROJECT instead,
+ * which warns against that project's target date rather than the deliverable's
+ * — so the coarser link reads as landing weeks later than the thing actually
+ * being waited for. A refusal that pushes people towards a wronger answer is
+ * not a guardrail. Migration `0056` dropped the CHECK.
  *
  * ---------------------------------------------------------------------------
- * Scope: siblings and ancestors
+ * Scope: one top-level project's tree
  * ---------------------------------------------------------------------------
  *
- * A project may wait on a project that shares its parent, or on one of its own
- * ancestors. Nothing else — not another division's work, and not its own
- * descendants.
+ * **Everything in scope lives under the same top-level project** — the one
+ * sitting directly under a division. Nothing reaches sideways into another
+ * top-level project, at any depth.
  *
- * Descendants are excluded because the tree already says it: `updateProject`
- * refuses to complete a parent while any descendant is unfinished. A link there
- * would be a second, hand-maintained copy of a rule the database enforces, and
- * the two would disagree the moment one was edited.
+ * This replaced "siblings and ancestors" on 2026-09-09, and the reason is worth
+ * keeping because it is a general trap. That rule was correct in the middle of a
+ * tree and wrong at the top, where every top-level project is a "sibling" of
+ * every other — so a deliverable on one course was offered every unrelated
+ * project in the club, seven of them, as things it might be waiting for. The
+ * rule was right about the relationship and wrong about what the relationship
+ * MEANS at the root. When a scope rule is phrased in tree terms, check what it
+ * degenerates to at both ends of the tree.
  *
- * Ancestors are allowed because the club asked for them, and they are worth a
- * warning rather than a refusal: a sub-project's target date can never be after
- * its parent's (`updateProject` enforces that too), so waiting on your own
- * ancestor ALWAYS produces a date conflict. That is informative — it is the
- * shape of a link somebody probably did not mean — and it costs nothing to
- * allow, because nothing here blocks.
+ * Within that tree, one asymmetry, and both halves have reasons:
+ *
+ *   - **A project may wait on its own ancestors** (warned, never refused). The
+ *     club chose this. A sub-project's target can never be after its parent's,
+ *     which `updateProject` enforces, so such a link ALWAYS shows a date
+ *     conflict. That is informative rather than annoying — it is the shape of a
+ *     link somebody probably did not mean — and it costs nothing, because
+ *     nothing here blocks.
+ *   - **A project may NOT wait on its own descendants.** `updateProject`
+ *     already refuses to complete a parent while a child is unfinished, so a
+ *     link there is a second hand-maintained copy of a rule the database
+ *     enforces, and the two disagree the moment one is edited.
+ *
+ * A DELIVERABLE gets the descendants back, and that is deliberate. It is not a
+ * container of anything, so no tree rule covers it: "I can't book the room until
+ * the floor-design sub-project lands" is a real sentence with no database rule
+ * saying it already. What a deliverable may not wait on is its OWN project —
+ * that one is its container, and the project is not finished until its
+ * deliverables are.
  */
 
 import type {
@@ -80,15 +101,6 @@ import type {
   split does not leak into every consumer.
 */
 export type { Dependency, DependencyEndKind };
-
-/** The three legal shapes. `project → deliverable` is not one of them. */
-export function isLegalPair(
-  dependentKind: DependencyEndKind,
-  targetKind: DependencyEndKind
-): boolean {
-  if (dependentKind === "project" && targetKind === "deliverable") return false;
-  return true;
-}
 
 /**
  * A project's ancestor chain, nearest first. Cycle-guarded.
@@ -116,54 +128,142 @@ export function ancestorsOf(
 }
 
 /**
- * Projects this project may wait on: its siblings, and its ancestors.
+ * The top-level project a project sits under — the one directly below a
+ * division. Its own id when it is already top-level.
  *
- * A top-level project's "siblings" are the other top-level projects — both have
- * `parentId` undefined, so they share a parent in the only sense the tree has.
+ * This is the boundary of every scope decision below, so it is the one function
+ * to get right. Cycle-guarded via `ancestorsOf`.
+ */
+export function rootProjectIdOf(
+  projectId: string,
+  projects: Project[]
+): string | undefined {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  if (!byId.has(projectId)) return undefined;
+
+  const chain = ancestorsOf(projectId, byId);
+  return chain.length ? chain[chain.length - 1].id : projectId;
+}
+
+/**
+ * Every project under the same top-level project, including it — the "tree"
+ * that scope is confined to.
+ *
+ * Walks DOWN from the root rather than testing each project's chain upwards,
+ * so the cycle guard is one `seen` set instead of one per candidate.
+ */
+function treeIdsOf(projectId: string, projects: Project[]): Set<string> {
+  const rootId = rootProjectIdOf(projectId, projects);
+  if (!rootId) return new Set();
+
+  const childrenOf = new Map<string, string[]>();
+  for (const p of projects) {
+    const parent = p.parentId ?? null;
+    if (!parent) continue;
+    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), p.id]);
+  }
+
+  const out = new Set<string>();
+  const queue = [rootId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (out.has(id)) continue;
+    out.add(id);
+    for (const child of childrenOf.get(id) ?? []) queue.push(child);
+  }
+  return out;
+}
+
+/** A project's descendants, not including itself. Cycle-guarded. */
+export function descendantIdsOf(
+  projectId: string,
+  projects: Project[]
+): Set<string> {
+  const childrenOf = new Map<string, string[]>();
+  for (const p of projects) {
+    const parent = p.parentId ?? null;
+    if (!parent) continue;
+    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), p.id]);
+  }
+
+  const out = new Set<string>();
+  const queue = [...(childrenOf.get(projectId) ?? [])];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (out.has(id) || id === projectId) continue;
+    out.add(id);
+    for (const child of childrenOf.get(id) ?? []) queue.push(child);
+  }
+  return out;
+}
+
+/**
+ * Projects that something living at `projectId` may wait on.
+ *
+ * `dependentKind` changes the answer, which is the whole reason it is an
+ * argument rather than being inferred:
+ *
+ *   - **project** — the tree, minus itself and minus its own descendants. The
+ *     descendants are already covered by `updateProject`'s completion rule.
+ *   - **deliverable** — the tree, minus the project it lives on. A deliverable
+ *     is not a container, so its project's sub-projects are fair game; its own
+ *     project is not, because that IS its container.
+ *
  * Completed projects are included deliberately: recording that you waited on
  * something already finished is how a dependency stops being a warning, and
- * removing the row is not the only honest way to say "that's done".
+ * deleting the row is not the only honest way to say "that's done".
  */
 export function eligibleProjectTargets(
   projectId: string,
-  projects: Project[]
+  projects: Project[],
+  dependentKind: DependencyEndKind = "project"
 ): Project[] {
-  const byId = new Map(projects.map((p) => [p.id, p]));
-  const self = byId.get(projectId);
-  if (!self) return [];
+  const tree = treeIdsOf(projectId, projects);
+  if (tree.size === 0) return [];
 
-  const ancestorIds = new Set(ancestorsOf(projectId, byId).map((p) => p.id));
+  const excluded = new Set<string>([projectId]);
+  if (dependentKind === "project") {
+    for (const id of descendantIdsOf(projectId, projects)) excluded.add(id);
+  }
 
   return projects
-    .filter((p) => {
-      if (p.id === projectId) return false;
-      if (ancestorIds.has(p.id)) return true;
-      // Siblings: same parent, including "both top-level".
-      return (p.parentId ?? null) === (self.parentId ?? null);
-    })
+    .filter((p) => tree.has(p.id) && !excluded.has(p.id))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Deliverables a deliverable may wait on: the others on its own project.
+ * Deliverables that something living at `homeProjectId` may wait on.
  *
- * Same-project only, which is what "siblings" means for a deliverable. It also
- * happens to be the common real case — design the mould, machine the mould, do
- * the layup are three deliverables on one project — and it keeps the picker to
- * a list somebody can actually read.
+ * Every deliverable on an in-scope project, plus — for a deliverable dependent
+ * — the others on its own project, which is the commonest real case by far
+ * (design the mould, machine the mould, do the layup). A project dependent does
+ * NOT get its own deliverables: they are its own work, and it is not finished
+ * until they are.
  *
- * Reaching another project's deliverables is available through the
- * `deliverable → project` shape instead: wait on the project, not on one row
- * inside it. That is the more honest granularity across a boundary, because the
- * other project's PL may split or rename their deliverables at any time.
+ * This used to be same-project-only, on the argument that reaching across a
+ * boundary should go through the PROJECT rather than one row inside it, since
+ * the other PL may split or rename their deliverables at any time. That risk is
+ * real and is now carried instead by the cascade on the foreign key: if the
+ * target deliverable is deleted, the link goes with it rather than dangling.
  */
-export function eligibleDeliverableTargets(
-  deliverableId: string,
-  projectId: string,
-  deliverables: Deliverable[]
-): Deliverable[] {
-  return deliverables
-    .filter((d) => d.projectId === projectId && d.id !== deliverableId)
+export function eligibleDeliverableTargets(input: {
+  dependentKind: DependencyEndKind;
+  dependentId: string;
+  homeProjectId: string;
+  projects: Project[];
+  deliverables: Deliverable[];
+}): Deliverable[] {
+  const scope = new Set(
+    eligibleProjectTargets(
+      input.homeProjectId,
+      input.projects,
+      input.dependentKind
+    ).map((p) => p.id)
+  );
+  if (input.dependentKind === "deliverable") scope.add(input.homeProjectId);
+
+  return input.deliverables
+    .filter((d) => scope.has(d.projectId) && d.id !== input.dependentId)
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 

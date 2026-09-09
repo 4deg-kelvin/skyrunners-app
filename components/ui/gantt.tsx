@@ -307,21 +307,41 @@ export function Gantt({
                   `buildGantt` drops marks outside the window rather than
                   clamping them, for the same reason as the baseline above.
                 */}
+                {/*
+                  A dependency date, as a tick on the row that is waiting.
+
+                  Two things here are not decoration:
+
+                  1. The 2px line lives inside a 14px-wide TRANSPARENT parent.
+                     A 2px hover target is not a hover target — the tooltip was
+                     unreachable in practice, which reads as "there is no
+                     tooltip" rather than "you missed". The visible mark is
+                     unchanged; only the hit area grew.
+                  2. The tooltip names BOTH ends. "Waiting on X" alone assumes
+                     you know which row the pointer is on, and on a chart with
+                     a dozen rows at 12px apart that is exactly what you have
+                     lost by the time the tooltip appears.
+                */}
                 {(bar.waitingOnMarks ?? []).map((mark) => (
                   <span
                     key={`${mark.name}-${mark.pct}`}
-                    className={
-                      mark.conflict
-                        ? "bg-risk-fg absolute top-1/2 h-4 w-[2px] -translate-x-1/2 -translate-y-1/2"
-                        : "bg-ink-muted/70 absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2"
-                    }
+                    className="absolute top-1/2 flex h-5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
                     style={{ left: `${mark.pct}%` }}
                     title={
                       mark.conflict
-                        ? `Waiting on ${mark.name} (${mark.date}) — which lands after this is due`
-                        : `Waiting on ${mark.name}`
+                        ? `${bar.name} is waiting on ${mark.name}, which lands ${mark.date} — after ${bar.name} is itself due`
+                        : `${bar.name} is waiting on ${mark.name}, due ${mark.date}`
                     }
-                  />
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={
+                        mark.conflict
+                          ? "bg-risk-fg h-4 w-[2px]"
+                          : "bg-ink-muted/70 h-3 w-[2px]"
+                      }
+                    />
+                  </span>
                 ))}
               </div>
             </div>

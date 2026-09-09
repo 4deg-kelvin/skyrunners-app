@@ -231,7 +231,17 @@ export default async function ProjectDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Breadcrumb trail={breadcrumb.slice(0, -1)} className="mb-3 px-1" />
+        {/*
+          The whole trail, NOT `slice(0, -1)`.
+
+          That slice was written to avoid repeating the project's own name above
+          its title — but `projectBreadcrumb` returns ANCESTORS ONLY and never
+          included this project, so the slice silently deleted the immediate
+          parent instead. A sub-project three deep showed just its division, and
+          the one link a member actually wants — up to the project this is part
+          of — was the one being cut.
+        */}
+        <Breadcrumb trail={breadcrumb} className="mb-3 px-1" />
         <PageHeader
           label="Project"
           title={project.name}
@@ -643,17 +653,17 @@ export default async function ProjectDetailPage({
                                     }
                                   : undefined,
                               }))}
-                              dependencyDeliverableOptions={
-                                deliverableDepOptions
-                              }
                               /*
-                              A deliverable may also wait on a whole PROJECT
-                              alongside or above its own — the same list the
-                              project panel offers, reused.
+                              NOT the project panel's list.
+
+                              A deliverable and the project it sits on see
+                              different things — the deliverable may wait on its
+                              project's sub-projects and not on the project
+                              itself, and the project is the other way round.
+                              This used to reuse `view.dependencyOptions`, which
+                              was wrong in both directions at once.
                             */
-                              dependencyProjectOptions={
-                                view.dependencyOptions.projects
-                              }
+                              dependencyOptions={deliverableDepOptions}
                             />
                           </div>
                         </div>

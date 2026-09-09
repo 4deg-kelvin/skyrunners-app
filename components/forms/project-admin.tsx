@@ -125,15 +125,22 @@ export function CreateProjectForm({
             Target date{" "}
             <span className="text-ink-muted font-normal">(optional)</span>
           </span>
+          {/*
+            A sub-project starts on its parent's date — see the longer note in
+            `project-edit.tsx`. Still optional: clear it and the project is
+            created undated, exactly as before.
+          */}
           <input
             type="date"
             name="targetDate"
+            defaultValue={parentTargetDate ?? ""}
             max={parentTargetDate}
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
           {parentTargetDate ? (
             <span className="text-ink-muted mt-1 block text-xs">
-              No later than {parentTargetDate} — when the project above is due.
+              Filled in from the project above, which is due {parentTargetDate}.
+              Pick an earlier date if this lands sooner.
             </span>
           ) : null}
         </label>

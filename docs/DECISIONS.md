@@ -51,6 +51,7 @@ Stanford UAV (Sky Runners) — ~30–40 members, five divisions — needs an app
 | Project membership | **PL-controlled. No self-enrollment, no cap.** Members see everything, follow anything, and ask to join; the PL decides |
 | Join requests | Tracked objects, not emails. PL queue, visible pending state, escalation after 5 days |
 | Task model | **Deliverables** — one flat list per project, one owner each. **No nesting, no critical path, no computed schedule.** Declared "waits on" links added 2026-09-08: displayed and date-checked, never used to derive a date — see `lib/dependencies.ts` |
+| Dependency scope | **One top-level project's tree** (revised 2026-09-09, migration `0056`). All four dependent/target shapes are legal; scope never crosses into another top-level project. Replaced "three shapes / siblings and ancestors", which failed within a day on real data — see `CLAUDE.md` for both failures and what they teach |
 | Project status | **Phase** (lifecycle) + **health** (how it's going), as separate fields |
 | Divisions | Co-Lead editable in the UI — addable, removable, renameable |
 | Academic calendar | **`terms` table gates all obligations.** Finals, breaks and summer generate nothing |

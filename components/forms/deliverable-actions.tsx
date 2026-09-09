@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import {
@@ -40,8 +40,7 @@ export function DeliverableActions({
   projectTargetDate,
   openTodos = 0,
   dependencies = [],
-  dependencyProjectOptions = [],
-  dependencyDeliverableOptions = [],
+  dependencyOptions,
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
@@ -53,8 +52,11 @@ export function DeliverableActions({
    * appears where a caller passes options, which is the project page.
    */
   dependencies?: DependencyRow[];
-  dependencyProjectOptions?: { id: string; name: string }[];
-  dependencyDeliverableOptions?: { id: string; title: string }[];
+  dependencyOptions?: {
+    projects: { id: string; name: string }[];
+    deliverables: { id: string; title: string; projectName?: string }[];
+    rootName?: string;
+  };
   /**
    * Unticked checklist items. Zero unless somebody wrote a list.
    *
@@ -287,6 +289,19 @@ export function DeliverableActions({
   if (editing) {
     return (
       <div className="rounded-tile border-line bg-surface border p-3">
+        {/* Same header close as the project panel — see the note there. */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-ink text-sm font-bold">Editing this deliverable</p>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="text-ink-muted hover:text-ink hover:bg-card rounded-tile -mr-1 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold transition-colors"
+          >
+            <X className="size-3.5" />
+            Close
+          </button>
+        </div>
+
         <ActionForm
           action={updateDeliverableAction}
           submitLabel="Save"
@@ -350,14 +365,6 @@ export function DeliverableActions({
             Leave the date empty for no deadline. Dates drive the project&apos;s
             timeline, so a real one is worth more than a guessed one.
           </p>
-
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
-          >
-            Cancel
-          </button>
         </ActionForm>
 
         {/*
@@ -368,8 +375,9 @@ export function DeliverableActions({
           dependentKind="deliverable"
           dependentId={deliverable.id}
           current={dependencies}
-          projectOptions={dependencyProjectOptions}
-          deliverableOptions={dependencyDeliverableOptions}
+          projectOptions={dependencyOptions?.projects ?? []}
+          deliverableOptions={dependencyOptions?.deliverables ?? []}
+          scopeRootName={dependencyOptions?.rootName}
         />
 
         <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">

@@ -43,6 +43,7 @@ import {
   eligibleDeliverableTargets,
   eligibleProjectTargets,
   resolveDependencies,
+  rootProjectIdOf,
   type ResolvedDependency,
 } from "@/lib/dependencies";
 import { signDocumentUrls } from "@/lib/supabase/storage";
@@ -258,8 +259,29 @@ export interface DeliverableRowData {
    * never disagree about whether something is late.
    */
   dependencies: ResolvedDependency[];
-  /** The other deliverables on this project, for its picker. */
-  dependencyOptions: { id: string; title: string }[];
+  /** What this deliverable may wait on, for its picker. */
+  dependencyOptions: DependencyOptions;
+}
+
+/**
+ * What a picker may offer, for one dependent.
+ *
+ * Shared between the project panel and every deliverable panel, and NOT the
+ * same list for each: the scope rules take the dependent's kind into account,
+ * so a project and a deliverable on that project see different things. See
+ * `lib/dependencies.ts`.
+ */
+export interface DependencyOptions {
+  projects: { id: string; name: string }[];
+  /** Attributed to their project when that isn't the one being edited. */
+  deliverables: { id: string; title: string; projectName?: string }[];
+  /**
+   * The top-level project everything above sits under, for the panel's copy.
+   *
+   * Absent when the panel's own project IS that top-level project, because
+   * "anything under X" reads as a restriction and there is none to state.
+   */
+  rootName?: string;
 }
 
 /** One scheduled session on a project, with everything the row needs. */
@@ -370,14 +392,12 @@ export interface ProjectDetailView {
    */
   blocking: { name: string; href?: string; kind: DependencyEndKind }[];
   /**
-   * What this project could wait on, for the picker. Siblings and ancestors.
+   * What this project could wait on, for the picker.
    *
    * Computed here rather than in the form because it needs the whole project
    * list, and a Client Component must not read the store.
    */
-  dependencyOptions: {
-    projects: { id: string; name: string }[];
-  };
+  dependencyOptions: DependencyOptions;
   /** Why this project may need leadership attention. */
   attentionFlags: ProjectAttentionFlag[];
   /** Every update entry written about this project, newest first. */
@@ -510,6 +530,47 @@ export async function getProjectBySlug(
   const requests = pendingRequestsFor(project.id);
 
   /*
+    What the pickers may offer, for the project itself and for each deliverable.
+
+    One helper for both, because the two lists differ ONLY by `dependentKind` —
+    and the scope rules already take that as an argument. Two hand-written
+    versions is how the panel and the write path drifted the first time.
+
+    `projectName` is attached only when the deliverable lives somewhere other
+    than the panel's own project: on its own project it is noise, and across a
+    boundary it is the difference between two similarly-named rows.
+  */
+  const rootId = rootProjectIdOf(project.id, allProjects);
+  const rootName = allProjects.find((p) => p.id === rootId)?.name;
+
+  const dependencyOptionsFor = (
+    dependentKind: DependencyEndKind,
+    dependentId: string
+  ) => ({
+    projects: eligibleProjectTargets(
+      project.id,
+      allProjects,
+      dependentKind
+    ).map((p) => ({ id: p.id, name: p.name })),
+    deliverables: eligibleDeliverableTargets({
+      dependentKind,
+      dependentId,
+      homeProjectId: project.id,
+      projects: allProjects,
+      deliverables: allDeliverables,
+    }).map((d) => ({
+      id: d.id,
+      title: d.title,
+      ...(d.projectId === project.id
+        ? {}
+        : {
+            projectName: allProjects.find((p) => p.id === d.projectId)?.name,
+          }),
+    })),
+    ...(rootName && rootId !== project.id ? { rootName } : {}),
+  });
+
+  /*
     Sign every stored document in ONE batch before building the view model.
 
     Not inside the map below: `createSignedUrl` is a network call, and calling
@@ -564,12 +625,8 @@ export async function getProjectBySlug(
         projects: allProjects,
         deliverables: allDeliverables,
       }),
-      /** The others on this project, for its picker. */
-      dependencyOptions: eligibleDeliverableTargets(
-        d.id,
-        project.id,
-        allDeliverables
-      ).map((other) => ({ id: other.id, title: other.title })),
+      /** What this deliverable may wait on, for its picker. */
+      dependencyOptions: dependencyOptionsFor("deliverable", d.id),
     })),
     artifacts: record.map((a) => ({
       artifact: a,
@@ -617,12 +674,7 @@ export async function getProjectBySlug(
       })
       .filter((x): x is NonNullable<typeof x> => Boolean(x))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    dependencyOptions: {
-      projects: eligibleProjectTargets(project.id, allProjects).map((p) => ({
-        id: p.id,
-        name: p.name,
-      })),
-    },
+    dependencyOptions: dependencyOptionsFor("project", project.id),
     attentionFlags: allFlags.filter((f) => f.projectId === project.id),
     updateFeed: projectUpdateFeed(project.id).map((f) => ({
       entry: f.entry,

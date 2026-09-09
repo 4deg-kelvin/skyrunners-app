@@ -46,6 +46,13 @@ export interface BreadcrumbNode {
   id: string;
   name: string;
   kind: "division" | "team" | "project";
+  /**
+   * Where clicking it goes. Projects have a page; divisions and teams don't.
+   *
+   * Optional rather than derived in the component, because turning a project
+   * into a URL needs its slug and the component is only given the trail.
+   */
+  href?: string;
 }
 
 /** One of the member's projects, with all context pre-attached. */

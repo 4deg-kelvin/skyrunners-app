@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, TriangleAlert } from "lucide-react";
+import { Pencil, TriangleAlert, X } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import { deleteProjectAction, updateProjectAction } from "@/lib/actions";
@@ -41,7 +41,11 @@ export function ProjectEditForm({
    * Client Component and cannot read the store anyway.
    */
   dependencies: DependencyRow[];
-  dependencyOptions: { projects: { id: string; name: string }[] };
+  dependencyOptions: {
+    projects: { id: string; name: string }[];
+    deliverables: { id: string; title: string; projectName?: string }[];
+    rootName?: string;
+  };
   canDelete: boolean;
   /**
    * May mark this complete — a NARROWER right than opening this form.
@@ -90,6 +94,34 @@ export function ProjectEditForm({
 
   return (
     <div className="rounded-tile border-line bg-surface mt-3 w-full border p-3.5">
+      {/*
+        One exit, at the top right, where a panel's close control is looked for.
+
+        There used to be a "Cancel" buried mid-panel, directly against the Save
+        button with nothing between them — and by the time the dependency picker
+        and the delete control were added below it, the only way out of an open
+        panel was above the section you were working in. A close affordance has
+        to be findable from the BOTTOM of a long panel too, which is what pinning
+        it to the header gets: it is the last thing in the tab order to move
+        backwards to, and it does not drift as the panel grows.
+
+        Nothing is discarded by closing, and nothing needs to be: the fields
+        below are uncommitted until Save, and each dependency has already
+        written itself. Sticking a confirmation in front of that would be
+        guarding nothing.
+      */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-ink text-sm font-bold">Editing this project</p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-ink-muted hover:text-ink hover:bg-card rounded-tile -mr-1 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold transition-colors"
+        >
+          <X className="size-3.5" />
+          Close
+        </button>
+      </div>
+
       <ActionForm
         action={updateProjectAction}
         submitLabel="Save changes"
@@ -170,17 +202,34 @@ export function ProjectEditForm({
             <span className="text-ink mb-1 block text-sm font-semibold">
               Target date
             </span>
+            {/*
+              An undated sub-project pre-fills with its parent's date.
+
+              A sub-project can't be due after the thing it's part of, so the
+              parent's date is the latest this could honestly be — which makes
+              it the right SUGGESTION and the wrong silent default. It is filled
+              into the field, where it is visible and editable, and is written
+              only when somebody presses Save. `createProject` and
+              `updateProject` still accept no date at all; clearing the field
+              works exactly as before.
+
+              What this deliberately does NOT do is store a date nobody chose.
+              A target date is a commitment somebody made, and the app already
+              refuses to manufacture a record of something a person didn't say
+              — see the ProjectNotice note in CLAUDE.md §10.
+            */}
             <input
               type="date"
               name="targetDate"
-              defaultValue={project.targetDate ?? ""}
+              defaultValue={project.targetDate ?? parentTargetDate ?? ""}
               max={parentTargetDate}
               className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
             {parentTargetDate ? (
               <span className="text-ink-muted mt-1 block text-xs">
-                Can&apos;t be after {parentTargetDate} — the project above is
-                due then.
+                {project.targetDate
+                  ? `Can't be after ${parentTargetDate} — the project above is due then.`
+                  : `Filled in from the project above, which is due ${parentTargetDate}. Save to keep it, or pick an earlier date.`}
               </span>
             ) : null}
           </label>
@@ -253,14 +302,6 @@ export function ProjectEditForm({
           separate — a project can be at flight test and still blocked. Help
           wanted is matched against people&apos;s skills on Projects.
         </p>
-
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
-        >
-          Cancel
-        </button>
       </ActionForm>
 
       {/*
@@ -274,6 +315,8 @@ export function ProjectEditForm({
         dependentId={project.id}
         current={dependencies}
         projectOptions={dependencyOptions.projects}
+        deliverableOptions={dependencyOptions.deliverables}
+        scopeRootName={dependencyOptions.rootName}
       />
 
       {canDelete ? (
