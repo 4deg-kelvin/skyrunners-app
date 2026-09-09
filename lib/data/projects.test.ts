@@ -35,10 +35,12 @@ process.env.SKYRUNNERS_STORE_DIR = TEST_DIR;
 
 let disk: typeof import("../store/disk.ts");
 let getProjectTree: typeof import("./projects.ts").getProjectTree;
+let mock: typeof import("../mock-data.ts");
 
 before(async () => {
   disk = await import("../store/disk.ts");
   ({ getProjectTree } = await import("./projects.ts"));
+  mock = await import("../mock-data.ts");
 });
 
 beforeEach(() => {
@@ -69,6 +71,117 @@ function allLevels(
   const below = nodes.flatMap((n) => allLevels(n.children as typeof nodes));
   return [...here, ...below];
 }
+
+describe("progress counts the whole subtree", () => {
+  /*
+    The club's report on 2026-09-08: a project's bar ignored its sub-projects,
+    so a parent that breaks its work down into children — which is what a large
+    project does — read 0% while dozens of its deliverables were finished. The
+    bar was most wrong on the projects it mattered most for.
+  */
+  function ownOnly(projectId: string) {
+    const s = disk.readStore();
+    const own = s.deliverables.filter((d) => d.projectId === projectId);
+    return {
+      total: own.length,
+      done: own.filter((d) => d.status === "done").length,
+    };
+  }
+
+  test("a parent with no deliverables of its own inherits its children's", () => {
+    const s = disk.readStore();
+    const parent = s.projects.find(
+      (p) =>
+        s.projects.some((x) => x.parentId === p.id) &&
+        !s.deliverables.some((d) => d.projectId === p.id)
+    );
+    if (!parent) return; // fixture has none; nothing to assert
+
+    assert.equal(ownOnly(parent.id).total, 0, "it really holds none itself");
+
+    const progress = mock.projectProgress(parent.id);
+    assert.ok(progress.total > 0, "but the subtree has some");
+    assert.equal(
+      progress.fromSubProjects,
+      progress.total,
+      "all of them inherited"
+    );
+  });
+
+  test("a parent's count is its own plus every descendant's", () => {
+    const s = disk.readStore();
+    const parent = s.projects.find((p) =>
+      s.projects.some((x) => x.parentId === p.id)
+    )!;
+
+    const ids = new Set(mock.projectSubtreeIds(parent.id));
+    const expected = s.deliverables.filter((d) => ids.has(d.projectId));
+
+    const progress = mock.projectProgress(parent.id);
+    assert.equal(progress.total, expected.length);
+    assert.equal(
+      progress.done,
+      expected.filter((d) => d.status === "done").length
+    );
+  });
+
+  test("it reaches grandchildren, not just direct children", () => {
+    const s = disk.readStore();
+    // A project whose child also has a child.
+    const grandparent = s.projects.find((p) =>
+      s.projects.some(
+        (kid) =>
+          kid.parentId === p.id && s.projects.some((g) => g.parentId === kid.id)
+      )
+    );
+    if (!grandparent) return;
+
+    const ids = mock.projectSubtreeIds(grandparent.id);
+    const kidIds = s.projects
+      .filter((x) => x.parentId === grandparent.id)
+      .map((x) => x.id);
+    const grandIds = s.projects
+      .filter((x) => kidIds.includes(x.parentId ?? ""))
+      .map((x) => x.id);
+
+    for (const g of grandIds) {
+      assert.ok(ids.includes(g), `${g} should be in the subtree`);
+    }
+  });
+
+  test("a leaf project is unchanged", () => {
+    const s = disk.readStore();
+    const leaf = s.projects.find(
+      (p) =>
+        !s.projects.some((x) => x.parentId === p.id) &&
+        s.deliverables.some((d) => d.projectId === p.id)
+    )!;
+
+    const progress = mock.projectProgress(leaf.id);
+    assert.equal(progress.total, ownOnly(leaf.id).total);
+    assert.equal(progress.done, ownOnly(leaf.id).done);
+    assert.equal(progress.fromSubProjects, 0);
+  });
+
+  /*
+    `parent_id` is a plain column, so a loop is representable. Everything else
+    in this repo that walks a tree is cycle-guarded for the same reason: a hang
+    is a worse failure than an error.
+  */
+  test("a cycle terminates instead of hanging", async () => {
+    await disk.mutate((store) => {
+      const [a, b] = store.projects;
+      a.parentId = b.id;
+      b.parentId = a.id;
+      return { ok: true as const, value: null };
+    });
+
+    const s = disk.readStore();
+    const ids = mock.projectSubtreeIds(s.projects[0].id);
+    assert.ok(ids.length >= 1);
+    assert.equal(new Set(ids).size, ids.length, "no id visited twice");
+  });
+});
 
 describe("the project tree is alphabetical", () => {
   test("divisions are in name order", async () => {

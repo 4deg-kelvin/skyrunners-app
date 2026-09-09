@@ -2775,8 +2775,59 @@ export function isOverdue(d: Deliverable): boolean {
 }
 
 /** Real percentage rather than a vibe — the payoff of one flat list. */
+/**
+ * Every project at or below this one, nearest first. Cycle-guarded.
+ *
+ * `parent_id` is a plain column, so a loop is representable and would hang the
+ * request rather than fail it — the same reason `projectChain` in
+ * `lib/permissions.ts` and `descendantProjects` in `lib/store/operations.ts`
+ * both carry a `seen` set.
+ */
+export function projectSubtreeIds(projectId: string): string[] {
+  const all = live().projects;
+  const out: string[] = [];
+  const queue = [projectId];
+  const seen = new Set<string>();
+
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    for (const child of all) {
+      if (child.parentId === id && !seen.has(child.id)) queue.push(child.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * How far along a project is, counting the WHOLE SUBTREE beneath it.
+ *
+ * Own deliverables plus every sub-project's, at any depth. The club asked for
+ * this on 2026-09-08, and it is the right reading of the question a progress
+ * bar answers: "how much of this project is done" means the project, not the
+ * paperwork filed directly against its own row.
+ *
+ * It used to count only `projectDeliverables(projectId)`. On a project that
+ * breaks its work down into sub-projects — which is exactly what a large one
+ * does — that made the bar read 0% while dozens of its deliverables were
+ * finished, because the parent held none of them itself. The bar was most wrong
+ * on the projects it mattered most for.
+ *
+ * **A parent with no deliverables of its own is now the interesting case**, not
+ * a degenerate one: it inherits its children's numbers, which is what somebody
+ * looking at the top of a tree wants to see.
+ *
+ * Note the `total` and `done` counts are subtree-wide too, deliberately — a bar
+ * and a caption disagreeing is worse than either alone. Where the number sits
+ * beside a list of only the project's OWN deliverables, the label says so; see
+ * the "Deliverables done" tile on the project page.
+ */
 export function projectProgress(projectId: string) {
-  const list = projectDeliverables(projectId);
+  const ids = new Set(projectSubtreeIds(projectId));
+  const list = live().deliverables.filter((d) => ids.has(d.projectId));
+
   const done = list.filter((d) => d.status === "done").length;
   const blocked = list.filter((d) => d.status === "blocked").length;
   const overdue = list.filter(isOverdue).length;
@@ -2786,6 +2837,8 @@ export function projectProgress(projectId: string) {
     blocked,
     overdue,
     fraction: list.length > 0 ? done / list.length : 0,
+    /** How many of the above came from sub-projects rather than this project. */
+    fromSubProjects: list.filter((d) => d.projectId !== projectId).length,
   };
 }
 

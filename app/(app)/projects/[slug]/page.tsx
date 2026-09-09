@@ -441,13 +441,36 @@ export default async function ProjectDetailPage({
                     ) : undefined
                   }
                 />
+                {/*
+                  Counts the WHOLE SUBTREE, and says so when that differs.
+
+                  `projectProgress` includes every sub-project's deliverables,
+                  so on a parent this number is larger than the list further
+                  down the page — which shows only the deliverables filed
+                  against this project itself. Without the hint that reads as a
+                  bug; with it, it reads as the two different questions they
+                  are.
+                */}
                 <StatTile
                   label="Deliverables done"
                   value={`${progress.done} / ${progress.total}`}
                   hint={
-                    progress.overdue > 0
-                      ? `${progress.overdue} overdue`
-                      : undefined
+                    /*
+                      A STRING or undefined, never an empty fragment.
+
+                      `<>{a ? x : null}{b ? y : null}</>` renders a truthy but
+                      empty node when both are absent, which is every leaf
+                      project — and `StatTile` would then reserve space for a
+                      hint that says nothing.
+                    */
+                    [
+                      progress.overdue > 0 ? `${progress.overdue} overdue` : "",
+                      progress.fromSubProjects > 0
+                        ? `${progress.fromSubProjects} in sub-projects`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
                   }
                 />
                 <StatTile
