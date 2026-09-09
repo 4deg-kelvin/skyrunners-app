@@ -580,6 +580,55 @@ export default async function ProjectDetailPage({
             </CardBody>
           </Card>
 
+          {/*
+            Sub-projects, directly under the deliverables.
+
+            Both answer "what is the work here", so they read as one section
+            with a line between them: a sub-project IS a unit of work, just one
+            large enough to have its own PL and its own deliverables. This card
+            used to sit below Team and the join-request queue, which put two
+            people-shaped sections between a project and the rest of its work
+            breakdown — so on anything with sub-projects you had to scroll past
+            the roster to find out the project even had children.
+
+            Deliberately NOT folded into the Deliverables card. A sub-project is
+            not a deliverable: it has no single owner, no one date, and it is
+            somebody else's to run. Nesting them in one list would invite the
+            dependency graph that CLAUDE.md rules out.
+          */}
+          {children.length > 0 ? (
+            <Card>
+              <CardBody>
+                <SectionLabel>Sub-projects</SectionLabel>
+                <div className="mt-4 space-y-2.5">
+                  {children.map(({ project: child, res: childRes }) => (
+                    <Link
+                      key={child.id}
+                      href={`/projects/${child.slug}`}
+                      className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="flex items-center gap-2">
+                          <CornerDownRight className="text-ink-muted size-4 shrink-0" />
+                          <span className="text-ink text-[15px] font-bold">
+                            {child.name}
+                          </span>
+                        </span>
+                        <ProjectBadges project={child} />
+                      </div>
+                      {childRes.length > 0 ? (
+                        <p className="text-ink-muted mt-1.5 pl-6 text-sm">
+                          {childRes.length > 1 ? "PLs" : "PL"}:{" "}
+                          {childRes.map((r) => r.fullName).join(", ")}
+                        </p>
+                      ) : null}
+                    </Link>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
           {mayManage ? (
             <ProjectTeamForm
               projectId={project.id}
@@ -782,40 +831,6 @@ export default async function ProjectDetailPage({
                   Answering these is part of being PL — a request left hanging
                   is a member with nothing to do.
                 </p>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {/* Sub-projects */}
-          {children.length > 0 ? (
-            <Card>
-              <CardBody>
-                <SectionLabel>Sub-projects</SectionLabel>
-                <div className="mt-4 space-y-2.5">
-                  {children.map(({ project: child, res: childRes }) => (
-                    <Link
-                      key={child.id}
-                      href={`/projects/${child.slug}`}
-                      className="rounded-tile border-line hover:bg-surface block border px-4 py-3 transition-colors"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="flex items-center gap-2">
-                          <CornerDownRight className="text-ink-muted size-4 shrink-0" />
-                          <span className="text-ink text-[15px] font-bold">
-                            {child.name}
-                          </span>
-                        </span>
-                        <ProjectBadges project={child} />
-                      </div>
-                      {childRes.length > 0 ? (
-                        <p className="text-ink-muted mt-1.5 pl-6 text-sm">
-                          {childRes.length > 1 ? "PLs" : "PL"}:{" "}
-                          {childRes.map((r) => r.fullName).join(", ")}
-                        </p>
-                      ) : null}
-                    </Link>
-                  ))}
-                </div>
               </CardBody>
             </Card>
           ) : null}
