@@ -223,16 +223,38 @@ Argument order is `(actor, graph, projectId)` — the graph is always second.
 
 ## Deliverables are the entire task model
 
-One flat list per project: **title, ONE owner, a due date, a status.** No dependencies, no
-sub-tasks, no critical path, no Gantt.
+One flat list per project: **title, ONE owner, a due date, a status.** No sub-tasks, no
+critical path, no computed schedule.
 
-That's deliberate. A dependency graph costs a PL an hour a week, and on a volunteer team
-whose availability swings with midterms it's wrong the day after it's entered — a wrong
-schedule is worse than none, because people plan against it.
+That's deliberate. A schedule DERIVED from a dependency graph costs a PL an hour a week,
+and on a volunteer team whose availability swings with midterms it's wrong the day after
+it's entered — a wrong schedule is worse than none, because people plan against it.
 
 Five minutes of PL upkeep buys: what each member owns, update auto-drafts, real progress
 percentages, trustworthy "projects completed", and an honest timeline. If you're tempted to
-add dependencies or sub-tasks, re-read this paragraph.
+add sub-tasks, re-read this paragraph.
+
+**Declared dependencies exist as of 2026-09-08, and the distinction is the whole
+point.** The club asked for "this waits on that"; `lib/dependencies.ts` holds the
+rules and migration `0055` the table. What makes it not the rejected feature:
+
+- **Nothing computes a date.** No slack, no earliest-start, no reflow when a date
+  moves. Delete every link and no bar changes.
+- **Nothing blocks work.** The club chose "show it, and warn on date conflicts"
+  over enforcement, because a stale link would otherwise deadlock a sign-off
+  until somebody hunted it down.
+- **Three shapes only** — deliverable→deliverable, project→project,
+  deliverable→project. A project waiting on one person's single task inverts the
+  sizes and is refused by a CHECK constraint, not just by the UI.
+- **Scope is siblings and ancestors.** Never descendants: `updateProject`
+  already refuses to complete a parent while a child is unfinished, and a link
+  there would be a hand-maintained second copy of a rule the database enforces.
+
+The honest cost is that this IS new upkeep, which is what the computed version
+was rejected for. What makes it acceptable is that letting it rot degrades to "a
+note that looks wrong" rather than "a schedule that is wrong". **If anything
+here ever computes a date from a link, it has become the thing that was
+rejected.**
 
 ## There are no hours. The tiers are gone. (Done 2026-08-14)
 

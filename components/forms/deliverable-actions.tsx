@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions";
 import type { Deliverable } from "@/lib/types";
 import { formatDay } from "@/lib/dates";
+import { DependencyPicker, type DependencyRow } from "./dependency-picker";
 import { PushDeadlineForm } from "./push-deadline";
 
 /**
@@ -38,10 +39,22 @@ export function DeliverableActions({
   candidates = [],
   projectTargetDate,
   openTodos = 0,
+  dependencies = [],
+  dependencyProjectOptions = [],
+  dependencyDeliverableOptions = [],
 }: {
   deliverable: Deliverable;
   isOwner: boolean;
   canSignOff: boolean;
+  /**
+   * What this deliverable waits on, and what it may wait on.
+   *
+   * Default empty so every existing call site keeps compiling: the picker only
+   * appears where a caller passes options, which is the project page.
+   */
+  dependencies?: DependencyRow[];
+  dependencyProjectOptions?: { id: string; name: string }[];
+  dependencyDeliverableOptions?: { id: string; title: string }[];
   /**
    * Unticked checklist items. Zero unless somebody wrote a list.
    *
@@ -346,6 +359,18 @@ export function DeliverableActions({
             Cancel
           </button>
         </ActionForm>
+
+        {/*
+          Outside the form for the same reason as on the project panel — nested
+          forms are invalid HTML — so each link saves as it is added.
+        */}
+        <DependencyPicker
+          dependentKind="deliverable"
+          dependentId={deliverable.id}
+          current={dependencies}
+          projectOptions={dependencyProjectOptions}
+          deliverableOptions={dependencyDeliverableOptions}
+        />
 
         <div className="border-line mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
           <ActionButton

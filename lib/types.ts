@@ -181,6 +181,35 @@ export interface Team {
  * Where the project is in its lifecycle. Deliberately aerospace-flavored,
  * since that's the vocabulary the team already uses in design reviews.
  */
+/** Either end of a dependency. See `lib/dependencies.ts`. */
+export type DependencyEndKind = "project" | "deliverable";
+
+/**
+ * One thing waiting on another.
+ *
+ * Declared by a PL and displayed. **Not a critical path** — nothing computes a
+ * date from these and nothing blocks a sign-off. `lib/dependencies.ts` holds
+ * the rules and the argument for why the computed version stays rejected.
+ *
+ * Stored in Postgres as four nullable columns with real foreign keys rather
+ * than a polymorphic `(kind, id)` pair, so a deleted project or deliverable
+ * takes its links with it. This shape is the flattened view of that; see
+ * migration `0055`.
+ */
+export interface Dependency {
+  id: string;
+  /** The thing that is waiting. */
+  dependentKind: DependencyEndKind;
+  dependentId: string;
+  /** The thing it waits on. */
+  targetKind: DependencyEndKind;
+  targetId: string;
+  /** Optional one-line "why", from whoever added it. */
+  note?: string;
+  createdById?: string;
+  createdAt: string;
+}
+
 export type ProjectPhase =
   | "concept"
   | "requirements"

@@ -43,6 +43,11 @@
 import { mutate, readStore, type StoreShape } from "./disk.ts";
 import { todayInClubTime } from "../dates.ts";
 import { checkLinkPermanence } from "../artifacts.ts";
+import {
+  eligibleProjectTargets,
+  isLegalPair,
+  wouldCycle,
+} from "../dependencies.ts";
 import { repeatProblem } from "../calendar/recurrence.ts";
 import { DEFAULT_EVENT_IMPORTANCE } from "../types.ts";
 import type {
@@ -51,6 +56,8 @@ import type {
   CatalogueItemKind,
   ClubEvent,
   Deliverable,
+  Dependency,
+  DependencyEndKind,
   DeliverableStatus,
   DeliverableTodo,
   MemberRequest,
@@ -4891,5 +4898,156 @@ export async function updateClubIdentity(input: {
     row.updatedAt = new Date().toISOString();
     row.updatedBy = input.actorId;
     return ok(row);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dependencies — "this waits on that"
+// ---------------------------------------------------------------------------
+
+/**
+ * Record that one thing is waiting on another.
+ *
+ * Every rule this enforces is one a later edit CANNOT fix, which is the line
+ * between what belongs here and what belongs in the picker:
+ *
+ *   - the shape must be legal (`project -> deliverable` is not)
+ *   - both ends must exist
+ *   - the target must be in scope (siblings and ancestors)
+ *   - it must not create a cycle
+ *   - it must not already exist
+ *
+ * Scope is checked here as well as in the picker, unlike most UI constraints,
+ * because the picker's list is a convenience and this is the actual rule. The
+ * database deliberately does NOT check scope — that would need a recursive walk
+ * of `parent_id` on every write, and two implementations of a tree rule
+ * disagree the first time either is edited. See migration `0055`.
+ *
+ * Permissions are the caller's job, as everywhere in this file. `lib/actions`
+ * checks `can.manageDependency` before getting here.
+ */
+export async function addDependency(input: {
+  dependentKind: DependencyEndKind;
+  dependentId: string;
+  targetKind: DependencyEndKind;
+  targetId: string;
+  note?: string;
+  actorId: string;
+  now?: string;
+}): Promise<Result<Dependency>> {
+  if (!isLegalPair(input.dependentKind, input.targetKind)) {
+    return fail<Dependency>(
+      "A project can't wait on a single deliverable. If it really hinges on one piece of work, either move that deliverable onto this project or link the two projects."
+    );
+  }
+
+  const note = (input.note ?? "").trim();
+  if (note.length > 300) {
+    return fail<Dependency>(
+      "That's long for a note — one line about why is enough."
+    );
+  }
+
+  return guarded((store) => {
+    /*
+      Resolve BOTH ends first, and bail before writing anything.
+
+      A dependency naming a row that does not exist is the one failure mode
+      that renders as a broken page rather than a wrong answer, so it is worth
+      the two lookups.
+    */
+    const dependentProject =
+      input.dependentKind === "project"
+        ? store.projects.find((p) => p.id === input.dependentId)
+        : undefined;
+    const dependentDeliverable =
+      input.dependentKind === "deliverable"
+        ? store.deliverables.find((d) => d.id === input.dependentId)
+        : undefined;
+
+    if (!dependentProject && !dependentDeliverable) {
+      return fail<Dependency>("That no longer exists.");
+    }
+
+    if (input.targetKind === "project") {
+      if (!store.projects.some((p) => p.id === input.targetId)) {
+        return fail<Dependency>("That project no longer exists.");
+      }
+    } else if (!store.deliverables.some((d) => d.id === input.targetId)) {
+      return fail<Dependency>("That deliverable no longer exists.");
+    }
+
+    // Which project the dependent sits in — the anchor for the scope rule.
+    const homeProjectId =
+      dependentProject?.id ?? dependentDeliverable!.projectId;
+
+    if (input.targetKind === "project") {
+      const allowed = eligibleProjectTargets(homeProjectId, store.projects);
+      if (!allowed.some((p) => p.id === input.targetId)) {
+        return fail<Dependency>(
+          "You can only wait on a project alongside this one or above it — a sibling, or one it sits under. Its own sub-projects are already covered, because a project can't be finished while its children aren't."
+        );
+      }
+    } else {
+      const target = store.deliverables.find((d) => d.id === input.targetId)!;
+      if (target.projectId !== homeProjectId) {
+        return fail<Dependency>(
+          "A deliverable can only wait on another one on the same project. To wait on work somewhere else, wait on that project instead — its PL may split or rename their deliverables at any time."
+        );
+      }
+      if (target.id === input.dependentId) {
+        return fail<Dependency>("Something can't wait on itself.");
+      }
+    }
+
+    const already = store.dependencies.some(
+      (d) =>
+        d.dependentKind === input.dependentKind &&
+        d.dependentId === input.dependentId &&
+        d.targetKind === input.targetKind &&
+        d.targetId === input.targetId
+    );
+    if (already) return fail<Dependency>("That's already recorded.");
+
+    if (wouldCycle(input, store.dependencies)) {
+      return fail<Dependency>(
+        "That would make a loop — the thing you'd be waiting on is already waiting on this, directly or through something else."
+      );
+    }
+
+    const dependency: Dependency = {
+      id: newId("dep"),
+      dependentKind: input.dependentKind,
+      dependentId: input.dependentId,
+      targetKind: input.targetKind,
+      targetId: input.targetId,
+      ...(note ? { note } : {}),
+      createdById: input.actorId,
+      createdAt: input.now ?? new Date().toISOString(),
+    };
+    store.dependencies.push(dependency);
+    return ok(dependency);
+  });
+}
+
+/**
+ * Remove a dependency.
+ *
+ * No status to check and nothing to preserve: unlike a work log or a sign-off,
+ * a dependency is not a record of something that happened. It is a claim about
+ * the present, and the honest way to withdraw a claim is to delete it.
+ */
+export async function removeDependency(input: {
+  dependencyId: string;
+}): Promise<Result<Dependency>> {
+  return guarded((store) => {
+    const index = store.dependencies.findIndex(
+      (d) => d.id === input.dependencyId
+    );
+    if (index === -1) {
+      return fail<Dependency>("That link is already gone.");
+    }
+    const [removed] = store.dependencies.splice(index, 1);
+    return ok(removed);
   });
 }

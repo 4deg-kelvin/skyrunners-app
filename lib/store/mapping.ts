@@ -13,6 +13,7 @@
  */
 
 import type {
+  Dependency,
   CatalogueItem,
   DeliverableTodo,
   MemberRequest,
@@ -908,6 +909,53 @@ const guideBlocks: CollectionSpec<GuideBlock> = {
   dependsOn: ["members"],
 };
 
+/**
+ * Dependencies — "this waits on that".
+ *
+ * The table stores FOUR nullable columns with real foreign keys rather than a
+ * polymorphic `(kind, id)` pair, so a deleted project or deliverable takes its
+ * links with it (`on delete cascade`) and nothing can ever point at a row that
+ * is gone. `Dependency` is the flattened `(kind, id)` view of that, because
+ * every reader wants "what does this wait on" and none of them wants to know
+ * which of four columns held the answer.
+ *
+ * The flattening is the only thing here worth checking: `fromRow` picks
+ * whichever end is non-null, and `toRow` writes back to the column matching the
+ * kind. Migration `0055` has CHECK constraints asserting exactly one end per
+ * side, so a row that would confuse this cannot exist.
+ */
+const dependencies: CollectionSpec<Dependency> = {
+  key: "dependencies",
+  table: "dependencies",
+  columns:
+    "id, dependent_project_id, dependent_deliverable_id, target_project_id, target_deliverable_id, note, created_by, created_at",
+  identify: (d) => d.id,
+  fromRow: (r) => ({
+    id: r.id as string,
+    dependentKind: r.dependent_project_id ? "project" : "deliverable",
+    dependentId: (r.dependent_project_id ??
+      r.dependent_deliverable_id) as string,
+    targetKind: r.target_project_id ? "project" : "deliverable",
+    targetId: (r.target_project_id ?? r.target_deliverable_id) as string,
+    note: opt(r.note as string),
+    createdById: opt(r.created_by as string),
+    createdAt: r.created_at as string,
+  }),
+  toRow: (d) => ({
+    id: d.id,
+    dependent_project_id: d.dependentKind === "project" ? d.dependentId : null,
+    dependent_deliverable_id:
+      d.dependentKind === "deliverable" ? d.dependentId : null,
+    target_project_id: d.targetKind === "project" ? d.targetId : null,
+    target_deliverable_id: d.targetKind === "deliverable" ? d.targetId : null,
+    note: nul(d.note),
+    created_by: nul(d.createdById),
+    created_at: d.createdAt,
+  }),
+  // Both ends are foreign keys, so the rows they point at must land first.
+  dependsOn: ["members", "projects", "deliverables"],
+};
+
 export const COLLECTIONS = [
   members,
   teams,
@@ -937,6 +985,7 @@ export const COLLECTIONS = [
   projectAdvisors,
   memberRequests,
   guideBlocks,
+  dependencies,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as CollectionSpec<any>[];
 

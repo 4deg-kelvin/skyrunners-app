@@ -5,6 +5,7 @@ import { Pencil, TriangleAlert } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import { deleteProjectAction, updateProjectAction } from "@/lib/actions";
+import { DependencyPicker, type DependencyRow } from "./dependency-picker";
 import { HEALTH_LABELS, PHASE_LABELS, PHASE_ORDER } from "@/lib/labels";
 import type { Project, ProjectHealth } from "@/lib/types";
 
@@ -28,8 +29,19 @@ export function ProjectEditForm({
   canComplete,
   parentTargetDate,
   incompleteDescendants,
+  dependencies,
+  dependencyOptions,
 }: {
   project: Project;
+  /**
+   * What this project waits on, and what it may wait on.
+   *
+   * Resolved and date-checked on the server, because the conflict comparison
+   * must have exactly one implementation — see `resolveDependencies`. This is a
+   * Client Component and cannot read the store anyway.
+   */
+  dependencies: DependencyRow[];
+  dependencyOptions: { projects: { id: string; name: string }[] };
   canDelete: boolean;
   /**
    * May mark this complete — a NARROWER right than opening this form.
@@ -250,6 +262,19 @@ export function ProjectEditForm({
           Cancel
         </button>
       </ActionForm>
+
+      {/*
+        OUTSIDE the ActionForm above, and it has to be: a `<form>` inside a
+        `<form>` is invalid HTML. Each dependency therefore saves on its own
+        press rather than on "Save changes", which the picker's own subtitle
+        admits.
+      */}
+      <DependencyPicker
+        dependentKind="project"
+        dependentId={project.id}
+        current={dependencies}
+        projectOptions={dependencyOptions.projects}
+      />
 
       {canDelete ? (
         <div className="border-line mt-3 border-t pt-3">

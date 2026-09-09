@@ -293,6 +293,36 @@ export function Gantt({
                     title={`Originally due ${bar.baselineEnd} — pushed back since`}
                   />
                 ) : null}
+
+                {/*
+                  What this row is WAITING ON — a declared dependency's date.
+
+                  A vertical tick rather than a diamond, so it cannot be
+                  mistaken for a deliverable of this project's own, and an
+                  arrow is deliberately not drawn: a line between two distant
+                  rows is hard to follow, while a tick on your own bar is
+                  readable at a glance. When it sits to the RIGHT of the bar's
+                  end, that IS the date conflict, with no annotation needed.
+
+                  `buildGantt` drops marks outside the window rather than
+                  clamping them, for the same reason as the baseline above.
+                */}
+                {(bar.waitingOnMarks ?? []).map((mark) => (
+                  <span
+                    key={`${mark.name}-${mark.pct}`}
+                    className={
+                      mark.conflict
+                        ? "bg-risk-fg absolute top-1/2 h-4 w-[2px] -translate-x-1/2 -translate-y-1/2"
+                        : "bg-ink-muted/70 absolute top-1/2 h-3 w-[2px] -translate-x-1/2 -translate-y-1/2"
+                    }
+                    style={{ left: `${mark.pct}%` }}
+                    title={
+                      mark.conflict
+                        ? `Waiting on ${mark.name} (${mark.date}) — which lands after this is due`
+                        : `Waiting on ${mark.name}`
+                    }
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -334,6 +364,20 @@ export function Gantt({
           <span className="inline-flex items-center gap-1.5">
             <span className="border-ink-muted/70 inline-block size-2 rotate-45 border" />
             Original target
+          </span>
+        ) : null}
+
+        {/* Same rule: only keyed when at least one row actually has one. */}
+        {chart.bars.some((b) => b.waitingOnMarks?.length) ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="bg-ink-muted/70 inline-block h-3 w-[2px]" />
+            Waiting on
+          </span>
+        ) : null}
+        {chart.bars.some((b) => b.waitingOnMarks?.some((m) => m.conflict)) ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="bg-risk-fg inline-block h-4 w-[2px]" />
+            Waiting past its own date
           </span>
         ) : null}
       </div>

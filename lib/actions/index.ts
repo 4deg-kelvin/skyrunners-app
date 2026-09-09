@@ -72,6 +72,7 @@ import {
 } from "@/lib/supabase/storage";
 import { GUIDE_PAGES } from "@/lib/types";
 import type {
+  DependencyEndKind,
   ArtifactKind,
   Deliverable,
   EventKind,
@@ -1755,6 +1756,119 @@ async function setProjectPhaseAction$impl(
   );
 }
 
+/**
+ * Record that one thing waits on another.
+ *
+ * The permission is the DEPENDENT side's, resolved to the project it lives in:
+ * a project's own id, or a deliverable's parent project. Saying "my work waits
+ * on yours" needs nothing from you — see `can.manageDependency`.
+ *
+ * Note the target is NOT permission-checked, deliberately. It is already
+ * readable by everyone in the club, and requiring the other PL's consent to
+ * record a fact about your own schedule is how the feature would go unused.
+ */
+async function addDependencyAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+
+  const dependentKind = String(
+    formData.get("dependentKind") ?? ""
+  ) as DependencyEndKind;
+  const dependentId = String(formData.get("dependentId") ?? "");
+  /*
+    The target arrives as ONE field, `kind:id`.
+
+    The picker offers projects and deliverables in a single `<select>` with
+    `optgroup` headings, because two selects would let somebody choose in both
+    and leave this guessing which they meant. Split here rather than in the
+    component so the encoding has exactly one reader.
+
+    The separate `targetKind` / `targetId` fields are still honoured, for any
+    caller that finds them easier to build.
+  */
+  const combined = String(formData.get("target") ?? "");
+  const [encodedKind, ...encodedIdParts] = combined.split(":");
+  const targetKind = (
+    combined ? encodedKind : String(formData.get("targetKind") ?? "")
+  ) as DependencyEndKind;
+  const targetId = combined
+    ? encodedIdParts.join(":")
+    : String(formData.get("targetId") ?? "");
+
+  if (!targetId) return { ok: false, error: "Pick what it's waiting on." };
+  if (targetKind !== "project" && targetKind !== "deliverable") {
+    return { ok: false, error: "Pick what it's waiting on." };
+  }
+
+  /*
+    Which project governs this. A deliverable's dependency is its PROJECT's
+    call, not its owner's — the PL shapes the deliverables, and this is a
+    statement about the shape of the work.
+  */
+  const homeProjectId =
+    dependentKind === "project"
+      ? dependentId
+      : projectIdOfDeliverable(dependentId);
+
+  if (!homeProjectId) {
+    return { ok: false, error: "That no longer exists." };
+  }
+  if (!can.manageDependency(viewer.actor, viewer.graph, homeProjectId)) {
+    return denied("change what this project waits on");
+  }
+
+  const result = await ops.addDependency({
+    dependentKind,
+    dependentId,
+    targetKind,
+    targetId,
+    note: String(formData.get("note") ?? "") || undefined,
+    actorId: viewer.member.id,
+  });
+
+  if (result.ok) refresh();
+  return toResult(result, "Saved. It shows on the timeline too.");
+}
+
+async function removeDependencyAction$impl(
+  formData: FormData
+): Promise<ActionResult> {
+  const viewer = await getViewer();
+  const dependencyId = String(formData.get("dependencyId") ?? "");
+
+  /*
+    Read the row BEFORE deleting, to find out whose permission governs it.
+
+    The id alone says nothing about which project it belongs to, and checking
+    after the write would be checking nothing.
+  */
+  const existing = readStore().dependencies.find((d) => d.id === dependencyId);
+  if (!existing) return { ok: false, error: "That link is already gone." };
+
+  const homeProjectId =
+    existing.dependentKind === "project"
+      ? existing.dependentId
+      : projectIdOfDeliverable(existing.dependentId);
+
+  if (
+    !homeProjectId ||
+    !can.manageDependency(viewer.actor, viewer.graph, homeProjectId)
+  ) {
+    return denied("change what this project waits on");
+  }
+
+  const result = await ops.removeDependency({ dependencyId });
+  if (result.ok) refresh();
+  return toResult(result, "Removed.");
+}
+
+/** Which project a deliverable sits on, or undefined if it is gone. */
+function projectIdOfDeliverable(deliverableId: string): string | undefined {
+  return readStore().deliverables.find((d) => d.id === deliverableId)
+    ?.projectId;
+}
+
 async function updateProjectAction$impl(
   formData: FormData
 ): Promise<ActionResult> {
@@ -3321,6 +3435,18 @@ export async function setProjectPhaseAction(
   formData: FormData
 ): Promise<ActionResult> {
   return withRequestStore(() => setProjectPhaseAction$impl(formData));
+}
+
+export async function addDependencyAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => addDependencyAction$impl(formData));
+}
+
+export async function removeDependencyAction(
+  formData: FormData
+): Promise<ActionResult> {
+  return withRequestStore(() => removeDependencyAction$impl(formData));
 }
 
 export async function pushDeliverableDeadlineAction(

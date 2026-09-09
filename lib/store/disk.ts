@@ -41,6 +41,7 @@ import type {
   CatalogueVerifier,
   ClubSettings,
   DeliverableTodo,
+  Dependency,
   MemberRequest,
   ProjectAdvisor,
   HelpRequest,
@@ -157,6 +158,14 @@ export interface StoreShape {
   projectAdvisors: ProjectAdvisor[];
   /** "Can I have access to…" — see `MemberRequest`. */
   memberRequests: MemberRequest[];
+  /**
+   * "This waits on that", declared by a PL — see `Dependency`.
+   *
+   * NOT a critical path. Nothing computes a date from these and nothing blocks
+   * a sign-off; they are drawn on the project page and marked on the timeline.
+   * `lib/dependencies.ts` has the reasoning.
+   */
+  dependencies: Dependency[];
 }
 
 /**
@@ -167,7 +176,72 @@ export interface StoreShape {
  * that's going to be deleted is work spent on the wrong thing, and silently
  * half-migrating it would produce bugs that look like application bugs.
  */
-const STORE_VERSION = 12;
+/**
+ * Two dependencies for the sample club, one clean and one in conflict.
+ *
+ * Seeded so demo mode shows the feature working rather than an empty panel, and
+ * so the CONFLICT state -- the whole reason the warning exists -- is visible
+ * without anybody having to construct it.
+ *
+ * Every id here was checked against `eligibleProjectTargets` /
+ * `eligibleDeliverableTargets` before being written down, because a seed that
+ * violates the app's own scope rule is worse than none: it teaches the shape
+ * the picker refuses.
+ */
+const seedDependencies: Dependency[] = [
+  {
+    // Clean: the FEA (due Aug 15) waits on the coupon allowables (due Jul 30).
+    // Earlier target, so no warning -- this is a healthy link.
+    id: "dep-1",
+    dependentKind: "deliverable",
+    dependentId: "d-1",
+    targetKind: "deliverable",
+    targetId: "d-3",
+    note: "Can't converge the model without real material numbers.",
+    createdById: "m-priya",
+    createdAt: "2026-08-01T17:00:00.000Z",
+  },
+  {
+    /*
+      In CONFLICT, deliberately: the memo is due Aug 12 and waits on the FEA,
+      which is due Aug 15. Three days late by its own dates, which is exactly
+      the contradiction the panel and the timeline marker exist to show.
+    */
+    id: "dep-2",
+    dependentKind: "deliverable",
+    dependentId: "d-2",
+    targetKind: "deliverable",
+    targetId: "d-1",
+    note: "The mass numbers come out of the FEA run.",
+    createdById: "m-priya",
+    createdAt: "2026-08-02T16:30:00.000Z",
+  },
+  {
+    // project -> project, between two siblings under Wing Spar Redesign.
+    id: "dep-3",
+    dependentKind: "project",
+    dependentId: "p-load-test",
+    targetKind: "project",
+    targetId: "p-layup",
+    note: "No point building the rig until the layup process is qualified.",
+    createdById: "m-priya",
+    createdAt: "2026-08-03T15:00:00.000Z",
+  },
+  {
+    // deliverable -> project, the third legal shape. The rig CAD (Aug 30) waits
+    // on the whole layup qualification project (target Aug 30) -- same day, so
+    // no conflict, but tight.
+    id: "dep-4",
+    dependentKind: "deliverable",
+    dependentId: "d-26",
+    targetKind: "project",
+    targetId: "p-layup",
+    createdById: "m-noah",
+    createdAt: "2026-08-04T18:00:00.000Z",
+  },
+];
+
+const STORE_VERSION = 13;
 
 /**
  * Overridable so the test suite doesn't write to the developer's real store.
@@ -229,6 +303,15 @@ function seed(): StoreShape {
     projectAdvisors: [],
     // And nobody has had to ask for anything yet.
     memberRequests: [],
+    /*
+      Two seeded links, so demo mode shows the feature rather than an empty
+      panel — one clean, one deliberately in conflict.
+
+      Seeded here rather than in `mock-data.ts` alongside the projects because
+      they reference deliverable ids, and a link to a row that got renamed would
+      be a dangling id in the sample club. Resolved by id from the seeds above.
+    */
+    dependencies: seedDependencies,
     clubSettings: [
       {
         id: "1",

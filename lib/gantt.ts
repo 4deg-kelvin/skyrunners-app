@@ -7,16 +7,31 @@
  * What this is NOT
  * ---------------------------------------------------------------------------
  *
- * `docs/DECISIONS.md` rejects a critical-path Gantt, and this is not one. There
- * are **no dependencies, no slack, no critical path, and nothing new for a PL
- * to maintain.** A dependency graph costs a PL an hour a week and is wrong the
- * day after it's entered, which on a volunteer team whose availability swings
- * with midterms makes it worse than nothing.
+ * `docs/DECISIONS.md` rejects a critical-path Gantt, and this is still not
+ * one. There is **no slack, no earliest-start, no critical path, and nothing
+ * here computes a date.** A schedule DERIVED from a dependency graph costs a PL
+ * an hour a week and is wrong the day after it's entered, which on a volunteer
+ * team whose availability swings with midterms makes it worse than nothing.
  *
  * This draws dates that already exist — a project's start and target, a
  * deliverable's due date — so you can see at a glance that three things land in
- * the same week. If it ever needs its own upkeep, it has become the thing that
- * was rejected. Read that paragraph again before adding a field.
+ * the same week.
+ *
+ * **Amended 2026-09-08: declared dependencies are drawn.** The club asked for
+ * them and the distinction that made it allowable is worth keeping in front of
+ * whoever reads this next:
+ *
+ *   - A `waitingOn` mark is a date somebody ELSE's row already has. Nothing is
+ *     inferred, nothing reflows, and removing every link changes no bar.
+ *   - It is drawn as a MARK ON THE ROW rather than an arrow between rows. An
+ *     arrow between distant rows is hard to follow; a "the thing I'm waiting
+ *     for lands here" tick on your own bar is readable at a glance, and when it
+ *     sits to the RIGHT of your bar's end, the date conflict IS the picture.
+ *   - Same clamping rule as `baselineEnd` below: a mark outside the window is
+ *     omitted, never clamped.
+ *
+ * If this file ever computes a date FROM a dependency, it has become the thing
+ * that was rejected. Read that paragraph again before adding a field.
  *
  * ---------------------------------------------------------------------------
  * Why the maths lives here and not in the component
@@ -81,6 +96,18 @@ export interface GanttRow {
    * doesn't have.
    */
   kind: "project" | "deliverable" | "event";
+  /**
+   * Dates this row is waiting on, from DECLARED dependencies.
+   *
+   * Each is a date the target row already carries — nothing here is derived.
+   * `conflict` is true when the target lands after this row's own end, which is
+   * the contradiction worth drawing: you cannot finish on time waiting for
+   * something that arrives later.
+   *
+   * Empty or absent for anything with no links, which is most rows. See
+   * `lib/dependencies.ts`.
+   */
+  waitingOn?: { name: string; date: string; conflict: boolean }[];
 }
 
 export interface GanttBar extends GanttRow {
@@ -106,6 +133,20 @@ export interface GanttBar extends GanttRow {
    * below exists to avoid for finished rows.
    */
   baselineEndPct?: number;
+  /**
+   * Where each awaited date sits, as a percent of the window.
+   *
+   * Rows whose date falls outside the window are DROPPED rather than clamped,
+   * for the reason spelled out on `baselineEndPct`: a mark glued to the edge
+   * points at a date the chart doesn't cover, and the reader cannot tell.
+   */
+  waitingOnMarks?: {
+    pct: number;
+    name: string;
+    /** The awaited date itself, for the tooltip. */
+    date: string;
+    conflict: boolean;
+  }[];
 }
 
 export interface GanttChart {
@@ -337,11 +378,29 @@ export function buildGantt(
       }
     }
 
+    /*
+      Declared dependency dates, positioned. Same omit-don't-clamp rule as the
+      baseline above, and for the same reason.
+    */
+    const waitingOnMarks = (r.waitingOn ?? [])
+      .map((w) => {
+        const ms = utc(w.date);
+        if (ms < min || ms > max) return undefined;
+        return {
+          pct: pct(ms),
+          name: w.name,
+          date: w.date,
+          conflict: w.conflict,
+        };
+      })
+      .filter((m): m is NonNullable<typeof m> => Boolean(m));
+
     return {
       ...r,
       leftPct: left,
       widthPct: Math.max(0, right - left),
       baselineEndPct,
+      ...(waitingOnMarks.length ? { waitingOnMarks } : {}),
       /*
         A project that began before the window reads as open-ended on the left,
         the same way one with no recorded start does. Both mean "it didn't start

@@ -830,6 +830,27 @@ export const can = {
   manageProjectAdvisors: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
 
+  /**
+   * Declaring that something waits on something else.
+   *
+   * Governed by the DEPENDENT side only, and the asymmetry is the whole rule:
+   * saying "my work waits on yours" is a statement about MY work and needs no
+   * permission from you. The reverse would let anyone hang a warning off a
+   * project they have nothing to do with.
+   *
+   * `projectId` is the project the DEPENDENT lives in — its own id when a
+   * project is waiting, or its parent project when a deliverable is. Same
+   * authority as shaping the deliverables, because that is what this is: a
+   * statement about the shape of the work, which is the PL's to make. It
+   * inherits down the project tree, so a parent's PL and a Division Lead both
+   * qualify.
+   *
+   * Mirrored in the database by `dependencies_write_dependent_side` in
+   * migration `0055`, which is the same rule expressed in SQL.
+   */
+  manageDependency: (actor: Actor, graph: OrgGraph, projectId: string) =>
+    isCoLead(actor) || isREofOrAbove(actor, graph, projectId),
+
   /** PLs shape the list; that's the five minutes a week the model costs them. */
   manageDeliverables: (actor: Actor, graph: OrgGraph, projectId: string) =>
     isCoLead(actor) || isREofOrAbove(actor, graph, projectId),

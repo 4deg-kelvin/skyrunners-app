@@ -39,8 +39,15 @@ import {
 import { readStore } from "@/lib/store/disk";
 import { MAX_BACKDATE_DAYS } from "@/lib/store/operations";
 import { addDays, daysBetweenDays } from "@/lib/dates";
+import {
+  eligibleDeliverableTargets,
+  eligibleProjectTargets,
+  resolveDependencies,
+  type ResolvedDependency,
+} from "@/lib/dependencies";
 import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
+  DependencyEndKind,
   ClubEvent,
   Deliverable,
   DeliverableTodo,
@@ -243,6 +250,16 @@ export interface DeliverableRowData {
    * Postgres.
    */
   todos: DeliverableTodo[];
+  /**
+   * What this deliverable waits on, resolved and date-checked.
+   *
+   * Declared links only. The conflict flag is computed here, in the one place
+   * that comparison lives, so the panel, the row and the timeline mark can
+   * never disagree about whether something is late.
+   */
+  dependencies: ResolvedDependency[];
+  /** The other deliverables on this project, for its picker. */
+  dependencyOptions: { id: string; title: string }[];
 }
 
 /** One scheduled session on a project, with everything the row needs. */
@@ -337,6 +354,30 @@ export interface ProjectDetailView {
     href?: string;
   }[];
   progress: ReturnType<typeof projectProgress>;
+  /**
+   * What this PROJECT waits on, resolved and date-checked.
+   *
+   * Declared links only — nothing here is derived from the tree. See
+   * `lib/dependencies.ts` for why this is not a critical path.
+   */
+  dependencies: ResolvedDependency[];
+  /**
+   * What waits on THIS project, so a PL can see they are holding somebody up.
+   *
+   * The half a PL cannot otherwise discover: the other project's page shows the
+   * link, and theirs would not. Names only — the detail belongs on the page
+   * that declared it.
+   */
+  blocking: { name: string; href?: string; kind: DependencyEndKind }[];
+  /**
+   * What this project could wait on, for the picker. Siblings and ancestors.
+   *
+   * Computed here rather than in the form because it needs the whole project
+   * list, and a Client Component must not read the store.
+   */
+  dependencyOptions: {
+    projects: { id: string; name: string }[];
+  };
   /** Why this project may need leadership attention. */
   attentionFlags: ProjectAttentionFlag[];
   /** Every update entry written about this project, newest first. */
@@ -452,6 +493,20 @@ export async function getProjectBySlug(
   if (!project) return null;
 
   const allFlags = projectAttentionFlags();
+
+  /*
+    Read the three collections dependencies need ONCE, here.
+
+    `resolveDependencies` is called for the project and again for every
+    deliverable, and each call needs the full project and deliverable lists to
+    resolve a target's name and date. Reading the store inside that loop would
+    be a snapshot read per deliverable — the round-trip-per-row mistake
+    `lib/data/*` exists to prevent.
+  */
+  const store = readStore();
+  const allDependencies = store.dependencies;
+  const allProjects = store.projects;
+  const allDeliverables = store.deliverables;
   const requests = pendingRequestsFor(project.id);
 
   /*
@@ -493,6 +548,28 @@ export async function getProjectBySlug(
       owner: getMember(d.ownerId),
       overdue: isOverdue(d),
       todos: deliverableTodos(d.id),
+      /*
+        Resolved per deliverable, in the same pass that already loops them.
+
+        `resolveDependencies` filters the whole list each time, which is O(n*m)
+        — fine at this size, and the alternative is a second grouped structure
+        the page would have to join back up. If the club ever has thousands of
+        links, group once here rather than pushing the lookup into the render.
+      */
+      dependencies: resolveDependencies({
+        dependencies: allDependencies,
+        ownKind: "deliverable",
+        ownId: d.id,
+        ownDate: d.dueDate,
+        projects: allProjects,
+        deliverables: allDeliverables,
+      }),
+      /** The others on this project, for its picker. */
+      dependencyOptions: eligibleDeliverableTargets(
+        d.id,
+        project.id,
+        allDeliverables
+      ).map((other) => ({ id: other.id, title: other.title })),
     })),
     artifacts: record.map((a) => ({
       artifact: a,
@@ -502,6 +579,50 @@ export async function getProjectBySlug(
       href: a.externalUrl ?? a.fileUrl ?? signedFor(signed, a.storagePath),
     })),
     progress: projectProgress(project.id),
+    dependencies: resolveDependencies({
+      dependencies: allDependencies,
+      ownKind: "project",
+      ownId: project.id,
+      ownDate: project.targetDate,
+      projects: allProjects,
+      deliverables: allDeliverables,
+    }),
+    /*
+      Who is waiting on us. Both kinds, because a deliverable on another project
+      can wait on this whole project.
+    */
+    blocking: allDependencies
+      .filter(
+        (dep) => dep.targetKind === "project" && dep.targetId === project.id
+      )
+      .map((dep) => {
+        if (dep.dependentKind === "project") {
+          const p = allProjects.find((x) => x.id === dep.dependentId);
+          return p
+            ? {
+                name: p.name,
+                href: `/projects/${p.slug}`,
+                kind: "project" as const,
+              }
+            : undefined;
+        }
+        const d = allDeliverables.find((x) => x.id === dep.dependentId);
+        if (!d) return undefined;
+        const home = allProjects.find((x) => x.id === d.projectId);
+        return {
+          name: home ? `${d.title} (${home.name})` : d.title,
+          href: home ? `/projects/${home.slug}` : undefined,
+          kind: "deliverable" as const,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    dependencyOptions: {
+      projects: eligibleProjectTargets(project.id, allProjects).map((p) => ({
+        id: p.id,
+        name: p.name,
+      })),
+    },
     attentionFlags: allFlags.filter((f) => f.projectId === project.id),
     updateFeed: projectUpdateFeed(project.id).map((f) => ({
       entry: f.entry,
@@ -725,6 +846,35 @@ function projectTimeline(project: Project): GanttChart | null {
   const rows: Parameters<typeof buildGantt>[0] = [];
   const seen = new Set<string>();
 
+  /*
+    Declared dependencies, turned into dates for the chart.
+
+    Nothing is computed: each mark is a date the TARGET row already carries.
+    `conflict` comes from `resolveDependencies`, which is the one place the
+    comparison lives, so the panel on the page and the mark on the bar can
+    never disagree about whether something is late.
+  */
+  const waitingOnFor = (
+    kind: "project" | "deliverable",
+    id: string,
+    ownDate?: string
+  ) =>
+    resolveDependencies({
+      dependencies: store.dependencies,
+      ownKind: kind,
+      ownId: id,
+      ownDate,
+      projects: store.projects,
+      deliverables: store.deliverables,
+    })
+      // A mark needs a date to sit on, and a finished target is not a wait.
+      .filter((r) => r.targetDate && !r.targetDone)
+      .map((r) => ({
+        name: r.targetName,
+        date: r.targetDate!,
+        conflict: Boolean(r.conflict),
+      }));
+
   const addProject = (p: Project, depth: number) => {
     // `parent_id` is a plain column; a loop would hang the request rather than
     // fail it. Same guard as `projectChain`.
@@ -757,6 +907,7 @@ function projectTimeline(project: Project): GanttChart | null {
       ),
       progress: progress.total > 0 ? progress.fraction : undefined,
       kind: "project",
+      waitingOn: waitingOnFor("project", p.id, p.targetDate),
     });
 
     // Its deliverables sit one level in from it — they belong to it, and the
@@ -797,6 +948,7 @@ function projectTimeline(project: Project): GanttChart | null {
               ? "risk"
               : "neutral",
         kind: "deliverable",
+        waitingOn: waitingOnFor("deliverable", d.id, d.dueDate),
       });
     }
 

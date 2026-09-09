@@ -78,6 +78,7 @@ const liveSnapshot = {
   projectAdvisors: [],
   memberRequests: [],
   guideBlocks: [],
+  dependencies: [],
 };
 
 describe("mutate resolves the backend inside the request", () => {

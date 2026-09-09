@@ -338,6 +338,28 @@ export default async function ProjectDetailPage({
                   {mayManage ? (
                     <ProjectEditForm
                       project={project}
+                      /*
+                        Mapped to the picker's shape here rather than passed
+                        raw, so the Client Component takes a flat row and not
+                        the whole resolved object — it has no business knowing
+                        about `Dependency` or how the conflict was computed.
+                      */
+                      dependencies={view.dependencies.map((d) => ({
+                        id: d.dependency.id,
+                        targetName: d.targetName,
+                        targetKind: d.targetKind,
+                        targetHref: d.targetHref,
+                        targetDate: d.targetDate,
+                        targetDone: d.targetDone,
+                        note: d.dependency.note,
+                        conflict: d.conflict
+                          ? {
+                              days: d.conflict.days,
+                              waitingUntil: d.conflict.waitingUntil,
+                            }
+                          : undefined,
+                      }))}
+                      dependencyOptions={view.dependencyOptions}
                       canDelete={mayDelete}
                       canComplete={mayComplete}
                       parentTargetDate={view.parent?.targetDate}
@@ -554,50 +576,90 @@ export default async function ProjectDetailPage({
                     actionHref="/my-work"
                   />
                 ) : (
-                  deliverables.map(({ deliverable, owner, overdue, todos }) => {
-                    const isOwner = deliverable.ownerId === viewer.member.id;
-                    return (
-                      <div
-                        key={deliverable.id}
-                        className="rounded-tile border-line border px-3.5 py-3"
-                      >
-                        <DeliverableRow
-                          deliverable={deliverable}
-                          owner={owner}
-                          overdue={overdue}
-                        />
+                  deliverables.map(
+                    ({
+                      deliverable,
+                      owner,
+                      overdue,
+                      todos,
+                      dependencies: deliverableDeps,
+                      dependencyOptions: deliverableDepOptions,
+                    }) => {
+                      const isOwner = deliverable.ownerId === viewer.member.id;
+                      return (
+                        <div
+                          key={deliverable.id}
+                          className="rounded-tile border-line border px-3.5 py-3"
+                        >
+                          <DeliverableRow
+                            deliverable={deliverable}
+                            owner={owner}
+                            overdue={overdue}
+                          />
 
-                        {/*
+                          {/*
                           Checklist above the buttons, because it's the reason
                           one of them may be missing. See `DeliverableTodos` —
                           the owner writes these as much as the PL does, which
                           is why `canManage` is wider here than `mayManage`.
                         */}
-                        <DeliverableTodos
-                          deliverableId={deliverable.id}
-                          projectId={project.id}
-                          todos={todos}
-                          canManage={isOwner || mayManage}
-                          locked={deliverable.status === "done"}
-                        />
-
-                        <div className="mt-2.5">
-                          <DeliverableActions
-                            deliverable={deliverable}
-                            isOwner={isOwner}
-                            canSignOff={mayManage}
-                            canWithdrawSignOff={mayWithdrawSignOff}
-                            projectTargetDate={project.targetDate}
-                            openTodos={todos.filter((t) => !t.done).length}
-                            candidates={assignableMembers.map((m) => ({
-                              id: m.id,
-                              name: m.fullName,
-                            }))}
+                          <DeliverableTodos
+                            deliverableId={deliverable.id}
+                            projectId={project.id}
+                            todos={todos}
+                            canManage={isOwner || mayManage}
+                            locked={deliverable.status === "done"}
                           />
+
+                          <div className="mt-2.5">
+                            <DeliverableActions
+                              deliverable={deliverable}
+                              isOwner={isOwner}
+                              canSignOff={mayManage}
+                              canWithdrawSignOff={mayWithdrawSignOff}
+                              projectTargetDate={project.targetDate}
+                              openTodos={todos.filter((t) => !t.done).length}
+                              candidates={assignableMembers.map((m) => ({
+                                id: m.id,
+                                name: m.fullName,
+                              }))}
+                              /*
+                              Flattened for the picker, same as on the project
+                              panel: the Client Component takes rows, not the
+                              resolved objects.
+                            */
+                              dependencies={deliverableDeps.map((d) => ({
+                                id: d.dependency.id,
+                                targetName: d.targetName,
+                                targetKind: d.targetKind,
+                                targetHref: d.targetHref,
+                                targetDate: d.targetDate,
+                                targetDone: d.targetDone,
+                                note: d.dependency.note,
+                                conflict: d.conflict
+                                  ? {
+                                      days: d.conflict.days,
+                                      waitingUntil: d.conflict.waitingUntil,
+                                    }
+                                  : undefined,
+                              }))}
+                              dependencyDeliverableOptions={
+                                deliverableDepOptions
+                              }
+                              /*
+                              A deliverable may also wait on a whole PROJECT
+                              alongside or above its own — the same list the
+                              project panel offers, reused.
+                            */
+                              dependencyProjectOptions={
+                                view.dependencyOptions.projects
+                              }
+                            />
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    }
+                  )
                 )}
               </div>
             </CardBody>
