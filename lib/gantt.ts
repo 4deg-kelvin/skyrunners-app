@@ -489,32 +489,43 @@ export function projectTone(
 }
 
 /**
- * Which edge a hover panel on a mark should hang from.
+ * Which edge a label sitting AT a percentage should hang from.
  *
- * A panel centred on its mark is correct in the middle of the chart and wrong
- * at the ends, where half of it lands outside the card and gets clipped by
- * whatever is around the chart. Near the left edge it should align its own left
- * edge to the mark and open rightwards, and the mirror at the right edge.
+ * A label centred on its position is correct in the middle of the track and
+ * wrong at the ends, where half of it lands outside and gets clipped. Near the
+ * left edge it should align its own left edge to the mark and read rightwards,
+ * and the mirror at the right edge.
  *
- * Lives here rather than inline in `components/ui/gantt.tsx` for the same
- * reason every other number in this file does: it is a geometry decision with a
- * threshold somebody will want to tune, and a magic `22` buried in JSX is
- * neither findable nor testable. The component maps these three values to
- * classes and holds no arithmetic.
+ * Lives here rather than inline in the component for the same reason every
+ * other number in this file does: it is a geometry decision with a threshold
+ * somebody will want to tune, and a magic number buried in JSX is neither
+ * findable nor testable. The component maps these three values to classes and
+ * holds no arithmetic.
+ *
+ * **Its consumer is now the axis's "Today" label, not the dependency panel.**
+ * That panel was a CSS hover popover positioned inside the chart, and this
+ * decided where it hung; `components/ui/gantt-dependency.tsx` replaced it on
+ * 2026-09-09 with one that portals to `document.body` and positions itself
+ * `fixed` from a measured `getBoundingClientRect`. That cannot be clipped by
+ * any ancestor, so it needs no threshold at all — a strictly better answer to
+ * the same problem, and the reason the numbers below are no longer load-bearing
+ * for it.
  *
  * ---------------------------------------------------------------------------
- * Where 30 and 70 come from — MEASURED, not guessed
+ * Where 30 and 70 came from — MEASURED, not guessed
  * ---------------------------------------------------------------------------
  *
- * The first version of this used 22 and 78, reasoned from nothing, and both
- * were wrong. Measured against the real project-page sidebar, which is the
- * narrowest place this chart renders:
+ * Kept because the reasoning still applies to anything positioned by percentage
+ * inside the track, and because the first attempt shows how easily this is got
+ * wrong. That attempt used 22 and 78, reasoned from nothing, and both were
+ * wrong. Measured against the real project-page sidebar, the narrowest place
+ * this chart rendered:
  *
  *     card    320px      track   262px      panel   12rem / 192px
  *
- * A CENTRED panel needs half its width clear on each side, so the tick has to
+ * A CENTRED panel needs half its width clear on each side, so the mark has to
  * land inside a 128px window in the middle of a 320px card — 25.6% to 74.4% of
- * the track. At 22% a centred panel hung 17px off the left edge of the card.
+ * the track. At 22% a centred panel hung 17px off the left edge.
  *
  * The three safe ranges overlap, which is what makes a threshold possible at
  * all:
@@ -523,13 +534,13 @@ export function projectTone(
  *     centred                      fits 25.6% – 74.4%
  *     end-aligned (opens left)     fits above 62.2%
  *
- * 30 and 70 sit inside both overlaps, so each has roughly 5% of slack before
- * anything clips. On a WIDER card every range only grows, and edge-anchoring
- * opens inward, so these thresholds cannot start overflowing on a bigger
- * screen — they were chosen against the tightest case on purpose.
+ * 30 and 70 sit inside both overlaps, so each has roughly 5% of slack. On a
+ * WIDER container every range only grows, and edge-anchoring opens inward, so
+ * these cannot start overflowing on a bigger screen — they were chosen against
+ * the tightest case on purpose.
  *
- * **If the panel's `max-w` changes, re-measure.** The relationship is not
- * intuitive: at 12rem in a 320px card, centring is unsafe across nearly half
+ * **If a consumer's own width changes, re-measure.** The relationship is not
+ * intuitive: at 12rem in a 320px card, centring was unsafe across nearly half
  * the chart.
  */
 export function markAnchor(pct: number): "start" | "center" | "end" {
