@@ -353,9 +353,7 @@ export function DeliverableActions({
                 </select>
               </label>
             ) : (
-              <p className="text-ink-muted text-sm">
-                Project milestone · no owner
-              </p>
+              <p className="text-ink-muted text-sm">Project milestone</p>
             )}{" "}
             <label className="block">
               <span className="text-ink mb-1 block text-sm font-semibold">

@@ -96,7 +96,7 @@ export function DeliverableRow({
 
       <div className="text-ink-muted mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         {deliverable.kind === "milestone" ? (
-          <span className="text-info-fg font-medium">Milestone · no owner</span>
+          <span className="text-info-fg font-medium">Milestone</span>
         ) : null}
         {showOwner && owner ? (
           <Link

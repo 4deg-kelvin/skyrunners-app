@@ -1049,7 +1049,21 @@ function projectTimeline(project: Project): GanttChart | null {
       const stage = milestoneStage(d, projectDeliverables(d.projectId), now);
       if (stage === "reached") return "done";
       if (stage === "overdue") return "risk";
-      if (stage === "active" || stage === "awaiting") return "warn";
+      /*
+        The current checkpoint is ON TRACK, not "at risk".
+
+        This was `warn`, and `warn` is the chart's amber — whose legend entry
+        reads "At risk". So being the next milestone up, which is the ordinary
+        healthy state, was drawn in the colour that means somebody should
+        worry. It was also the only amber on the chart: a regular deliverable
+        in progress is `neutral`, so milestones alone claimed a health nobody
+        had reported.
+
+        `ok` says "on track", which is exactly what an unreached checkpoint
+        whose date has not passed is. `overdue` above is the branch that turns
+        it red, and that is the only judgement this derivation makes.
+      */
+      if (stage === "active" || stage === "awaiting") return "ok";
       return "neutral";
     }
     return d.status === "done"
