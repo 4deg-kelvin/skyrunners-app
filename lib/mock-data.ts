@@ -31,6 +31,7 @@ import { type DeliveredInputs } from "./delivered.ts";
 import { readStore } from "./store/disk.ts";
 import { todayInClubTime } from "./dates.ts";
 import { isLiveMode } from "./env.ts";
+import { compareProjectDueDates } from "./project-order.ts";
 
 // ---------------------------------------------------------------------------
 // Club
@@ -2635,7 +2636,7 @@ export function childTeams(parentId: string) {
 }
 
 /**
- * Alphabetical at every depth, because the tree recurses through here.
+ * Earliest target first at every depth, with undated projects last.
  *
  * `parentId: null` gives the roots, so sorting once covers the top level and
  * every nest below it. Pages that want a different order — /find-work ranks by
@@ -2645,7 +2646,7 @@ export function childTeams(parentId: string) {
 export function childProjects(parentId: string | null) {
   return live()
     .projects.filter((p) => p.parentId === parentId)
-    .sort(byName);
+    .sort(compareProjectDueDates);
 }
 
 export function projectMembers(projectId: string) {

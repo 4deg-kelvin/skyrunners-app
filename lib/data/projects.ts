@@ -184,8 +184,8 @@ export async function getProjectTree(): Promise<DivisionProjects[]> {
   await preloadLiveStore();
   /*
     `childProjects(null)` rather than filtering the store by hand: it's the
-    same set, and it comes back alphabetical. Divisions and every level of
-    sub-project sort the same way, from one comparator in `mock-data.ts`.
+    same set, with projects ordered by target date and undated ones last.
+    Every level uses the same order as the project and division timelines.
   */
   const roots = childProjects(null);
 

@@ -4,11 +4,11 @@
 
 Project milestones now share the deliverable workflow and waiting-on dependencies, but have no owner and award no personal credit. Project leads create, edit and mark them reached. Migration `0057_project_milestones` is applied to the production database; `APPLY_ALL.sql` is for fresh databases only.
 
-The project timeline sits below Deliverables and Sub-projects, with a scrollable Gantt chart, sticky labels and date headers on phones. Date generation and dependency conflict rules are unchanged.
+The project timeline sits below Deliverables and Sub-projects, with a scrollable Gantt chart, sticky labels and date headers on phones. Project groups and sub-project lists are ordered by due date, earliest first and undated last; deliverables stay in their existing order under each project. Date generation and dependency conflict rules are unchanged.
 
 The app MCP supports current protocol negotiation, validated arguments, bounded requests and read-only personal URLs. Write tokens require bearer authentication. Codex and ChatGPT setup is documented in [`CONNECT_YOUR_AI.md`](CONNECT_YOUR_AI.md). Supabase administration remains a separate, project-scoped OAuth connection.
 
-Validation: `npm run check` passed (1,034 tests), with database constraints, RLS and milestone dependency tests.
+Validation: `npm run check` passed (1,035 tests), with database constraints, RLS and milestone dependency tests.
 
 
 **Written 2026-08-08, last revised 2026-08-24.** Everything a fresh session

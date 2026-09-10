@@ -1,5 +1,5 @@
 /**
- * The project tree comes back in a stable, alphabetical order.
+ * Project siblings use stable due-date order; divisions remain alphabetical.
  *
  * Run with:  npm test
  *
@@ -64,10 +64,15 @@ function isSorted(names: string[]): boolean {
 
 /** Every project name in the tree, one array per nesting level walked. */
 function allLevels(
-  nodes: { project: { name: string }; children: unknown[] }[]
+  nodes: {
+    project: { name: string; targetDate?: string };
+    children: unknown[];
+  }[]
 ): string[][] {
   if (nodes.length === 0) return [];
-  const here = [nodes.map((n) => n.project.name)];
+  const here = [
+    nodes.map((n) => `${n.project.targetDate || "9999"} ${n.project.name}`),
+  ];
   const below = nodes.flatMap((n) => allLevels(n.children as typeof nodes));
   return [...here, ...below];
 }
@@ -183,7 +188,7 @@ describe("progress counts the whole subtree", () => {
   });
 });
 
-describe("the project tree is alphabetical", () => {
+describe("project siblings are ordered by due date", () => {
   test("divisions are in name order", async () => {
     const tree = await getProjectTree();
     const names = tree.map((d) => d.division.name);
@@ -195,12 +200,14 @@ describe("the project tree is alphabetical", () => {
     assert.ok(isSorted(names), `divisions out of order: ${names.join(", ")}`);
   });
 
-  test("root projects inside each division are in name order", async () => {
+  test("root projects inside each division are in due-date order", async () => {
     const tree = await getProjectTree();
     let checked = 0;
 
     for (const division of tree) {
-      const names = division.roots.map((r) => r.project.name);
+      const names = division.roots.map(
+        (r) => `${r.project.targetDate || "9999"} ${r.project.name}`
+      );
       if (names.length > 1) checked++;
       assert.ok(
         isSorted(names),
@@ -216,7 +223,7 @@ describe("the project tree is alphabetical", () => {
     all the way down. This walks every level rather than just the second,
     because "we sorted the top two levels" is the shape the bug comes back in.
   */
-  test("sub-projects are in name order at every depth", async () => {
+  test("sub-projects are in due-date order at every depth", async () => {
     const tree = await getProjectTree();
 
     for (const division of tree) {
@@ -235,4 +242,117 @@ describe("the project tree is alphabetical", () => {
       second.map((d) => [d.division.name, d.roots.map((r) => r.project.name)])
     );
   });
+});
+
+test("sub-project lists and both Gantt charts share due-date order without separating project work", async () => {
+  const { getProjectBySlug } = await import("./projects.ts");
+  const { getDivisionExtras } = await import("./deadlines.ts");
+  const divisionId = mock.divisions()[0].id;
+  await disk.mutate((store) => {
+    const template = store.projects[0];
+    const make = (
+      id: string,
+      name: string,
+      targetDate: string | undefined,
+      parentId: string | null = "sort-parent"
+    ) => ({
+      ...template,
+      id,
+      slug: id,
+      name,
+      targetDate,
+      parentId,
+      teamId: divisionId,
+      startDate: "2026-07-01",
+      phase: "concept" as const,
+    });
+    store.projects.push(
+      make("sort-parent", "Parent", "2026-12-15", null),
+      make("sort-late", "A late project", "2026-10-01"),
+      make("sort-undated", "A undated project", undefined),
+      make("sort-tie-b", "Beta tie", "2026-09-01"),
+      make("sort-early", "Z earliest project", "2026-08-15"),
+      make("sort-tie-a", "Alpha tie", "2026-09-01"),
+      make("sort-grandchild", "Nested child", "2026-08-01", "sort-early")
+    );
+    const ownerId = store.members[0].id;
+    store.deliverables.push(
+      {
+        id: "sort-d1",
+        projectId: "sort-early",
+        title: "First listed",
+        ownerId,
+        dueDate: "2026-08-14",
+        status: "open",
+        sortOrder: 0,
+      },
+      {
+        id: "sort-d2",
+        projectId: "sort-early",
+        title: "Second listed",
+        ownerId,
+        dueDate: "2026-08-10",
+        status: "open",
+        sortOrder: 1,
+      },
+      {
+        id: "sort-m1",
+        projectId: "sort-early",
+        title: "Checkpoint",
+        kind: "milestone",
+        dueDate: "2026-08-12",
+        status: "open",
+        sortOrder: 2,
+      }
+    );
+    return { ok: true as const, value: null };
+  });
+  const before = JSON.stringify(disk.readStore());
+  const detail = await getProjectBySlug("sort-parent", "m-anish");
+  assert.ok(detail?.timeline);
+  const siblings = [
+    "sort-early",
+    "sort-tie-a",
+    "sort-tie-b",
+    "sort-late",
+    "sort-undated",
+  ];
+  assert.deepEqual(
+    detail.children.map((n) => n.project.id),
+    siblings
+  );
+  const expectedProjects = [
+    "sort-parent",
+    "sort-early",
+    "sort-grandchild",
+    ...siblings.slice(1),
+  ];
+  assert.deepEqual(
+    detail.timeline.bars.filter((b) => b.kind === "project").map((b) => b.id),
+    expectedProjects
+  );
+  assert.deepEqual(
+    detail.timeline.bars.map((b) => b.id),
+    [
+      "sort-parent",
+      "sort-early",
+      "sort-d1",
+      "sort-d2",
+      "sort-m1",
+      "sort-grandchild",
+      ...siblings.slice(1),
+    ]
+  );
+  const extras = (await getDivisionExtras())[divisionId];
+  for (const rows of [extras.timelineRows, extras.timelineLiveRows]) {
+    assert.deepEqual(
+      rows?.filter((r) => r.id.startsWith("sort-")).map((r) => r.id),
+      expectedProjects
+    );
+  }
+  assert.equal(
+    JSON.stringify(disk.readStore()),
+    before,
+    "ordering must never write dates, progress or row order to storage"
+  );
 });

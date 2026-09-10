@@ -719,12 +719,19 @@ export default async function ProjectDetailPage({
                         </span>
                         <ProjectBadges project={child} />
                       </div>
-                      {childRes.length > 0 ? (
-                        <p className="text-ink-muted mt-1.5 pl-6 text-sm">
-                          {childRes.length > 1 ? "PLs" : "PL"}:{" "}
-                          {childRes.map((r) => r.fullName).join(", ")}
+                      <div className="text-ink-muted mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 pl-6 text-sm">
+                        {childRes.length > 0 ? (
+                          <p>
+                            {childRes.length > 1 ? "PLs" : "PL"}:{" "}
+                            {childRes.map((r) => r.fullName).join(", ")}
+                          </p>
+                        ) : null}
+                        <p className="tabular-nums">
+                          {child.targetDate
+                            ? "Due " + formatDay(child.targetDate)
+                            : "No due date"}
                         </p>
-                      ) : null}
+                      </div>
                     </Link>
                   ))}
                 </div>

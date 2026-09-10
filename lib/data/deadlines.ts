@@ -36,6 +36,7 @@ import {
 import { readStore } from "@/lib/store/disk";
 import { preloadLiveStore } from "@/lib/store/request";
 import { projectTone, type GanttRow } from "@/lib/gantt";
+import { compareProjectDueDates } from "@/lib/project-order";
 import type { Member, Project, Team } from "@/lib/types";
 
 /** A project target date, or a deliverable due date. Same shape either way. */
@@ -317,8 +318,8 @@ async function getDeadlines(): Promise<DeadlinesView> {
  * be unset entirely and resolved through the parent. Grouping by `teamId`
  * directly is the documented way to make projects vanish from this page.
  *
- * Ordered by the tree, not by date — a child must render under its parent or
- * the indentation says nothing. Date order is what the list underneath is for.
+ * Siblings are ordered by due date, with undated projects last. Each child
+ * remains under its parent so the hierarchy and project groups stay intact.
  */
 function timelineFor(
   divisionId: string,
@@ -366,8 +367,8 @@ function timelineFor(
   const seen = new Set<string>();
 
   const walk = (parentId: string | null, depth: number) => {
-    const children = [...(byParent.get(parentId) ?? [])].sort((a, b) =>
-      (a.targetDate ?? "9999").localeCompare(b.targetDate ?? "9999")
+    const children = [...(byParent.get(parentId) ?? [])].sort(
+      compareProjectDueDates
     );
     for (const project of children) {
       // Cycle guard, same as everywhere else that walks this tree: `parent_id`
