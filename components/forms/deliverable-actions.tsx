@@ -96,6 +96,7 @@ export function DeliverableActions({
   const [rejecting, setRejecting] = useState(false);
 
   const { id, projectId, status } = deliverable;
+  const milestone = deliverable.kind === "milestone";
   const fields = { deliverableId: id, projectId };
 
   if (status === "done") {
@@ -117,7 +118,12 @@ export function DeliverableActions({
       it is NOT the same flag as `canSignOff`.
     */
     if (!canWithdrawSignOff) {
-      return <p className="text-ok-fg text-sm">Signed off{signedOn}.</p>;
+      return (
+        <p className="text-ok-fg text-sm">
+          {milestone ? "Reached" : "Signed off"}
+          {signedOn}.
+        </p>
+      );
     }
 
     if (rejecting) {
@@ -161,7 +167,10 @@ export function DeliverableActions({
 
     return (
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-ok-fg text-sm">Signed off{signedOn}.</p>
+        <p className="text-ok-fg text-sm">
+          {milestone ? "Reached" : "Signed off"}
+          {signedOn}.
+        </p>
         <button
           onClick={() => setRejecting(true)}
           className="text-ink-muted hover:text-risk-fg text-sm font-semibold"
@@ -291,7 +300,9 @@ export function DeliverableActions({
       <div className="rounded-tile border-line bg-surface border p-3">
         {/* Same header close as the project panel — see the note there. */}
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-ink text-sm font-bold">Editing this deliverable</p>
+          <p className="text-ink text-sm font-bold">
+            Editing this {milestone ? "milestone" : "deliverable"}
+          </p>
           <button
             type="button"
             onClick={() => setEditing(false)}
@@ -324,24 +335,28 @@ export function DeliverableActions({
                 className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
               />
             </label>
-
-            <label className="block">
-              <span className="text-ink mb-1 block text-sm font-semibold">
-                Owner
-              </span>
-              <select
-                name="ownerId"
-                defaultValue={deliverable.ownerId}
-                className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
-              >
-                {candidates.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
+            {!milestone ? (
+              <label className="block">
+                <span className="text-ink mb-1 block text-sm font-semibold">
+                  Owner
+                </span>
+                <select
+                  name="ownerId"
+                  defaultValue={deliverable.ownerId}
+                  className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+                >
+                  {candidates.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="text-ink-muted text-sm">
+                Project milestone · no owner
+              </p>
+            )}{" "}
             <label className="block">
               <span className="text-ink mb-1 block text-sm font-semibold">
                 Due date
@@ -384,13 +399,14 @@ export function DeliverableActions({
           <ActionButton
             action={deleteDeliverableAction}
             fields={fields}
-            label="Delete this deliverable"
+            label={
+              milestone ? "Delete this milestone" : "Delete this deliverable"
+            }
             pendingLabel="Deleting…"
             tone="danger"
           />
           <span className="text-ink-muted text-xs">
-            Signed-off work can&apos;t be deleted — it counts towards its
-            owner&apos;s record.
+            Completed items are kept as part of the project record.
           </span>
         </div>
       </div>
@@ -399,6 +415,23 @@ export function DeliverableActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {milestone && canSignOff ? (
+        openTodos > 0 ? (
+          <BlockedByChecklist
+            count={openTodos}
+            what="Mark reached"
+            why="Complete the checklist first."
+          />
+        ) : (
+          <ActionButton
+            action={confirmDeliverableAction}
+            fields={fields}
+            label="Mark reached"
+            pendingLabel="Saving…"
+            tone="primary"
+          />
+        )
+      ) : null}
       {isOwner ? (
         openTodos > 0 ? (
           <BlockedByChecklist
@@ -525,7 +558,9 @@ export function AddDeliverableForm({
   projectTargetDate,
   projectId,
   candidates,
+  kind = "deliverable",
 }: {
+  kind?: "deliverable" | "milestone";
   projectId: string;
   candidates: { id: string; fullName: string }[];
   /** Caps the due-date picker. Work can't be due after its project. */
@@ -540,7 +575,7 @@ export function AddDeliverableForm({
         className="rounded-tile border-line text-ink hover:bg-surface inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-semibold"
       >
         <Plus className="size-3.5" strokeWidth={2.5} />
-        Add deliverable
+        {kind === "milestone" ? "Add milestone" : "Add deliverable"}
       </button>
     );
   }
@@ -554,40 +589,54 @@ export function AddDeliverableForm({
       className="rounded-tile border-line bg-surface border p-3.5"
     >
       <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="kind" value={kind} />
 
       <label className="block">
         <span className="text-ink mb-1 block text-sm font-semibold">
-          What needs doing?
+          {kind === "milestone"
+            ? "What is the milestone?"
+            : "What needs doing?"}
         </span>
         <input
           type="text"
           name="title"
           required
-          placeholder="Spar load case 3 analysed and written up"
+          placeholder={
+            kind === "milestone"
+              ? "Design review complete"
+              : "Spar load case 3 analysed and written up"
+          }
           className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
         />
       </label>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
-            Owner
-          </span>
-          <select
-            name="ownerId"
-            required
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          >
-            {candidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.fullName}
-              </option>
-            ))}
-          </select>
-          <span className="text-ink-muted mt-1 block text-xs">
-            Exactly one. Anyone not on the project gets added.
-          </span>
-        </label>
+        {kind !== "milestone" ? (
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Owner
+            </span>
+            <select
+              name="ownerId"
+              required
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            >
+              {candidates.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.fullName}
+                </option>
+              ))}
+            </select>
+            <span className="text-ink-muted mt-1 block text-xs">
+              Exactly one. Anyone not on the project gets added.
+            </span>
+          </label>
+        ) : (
+          <p className="text-ink-muted text-sm">
+            A shared project checkpoint. No owner is assigned; a project lead
+            marks it reached.
+          </p>
+        )}
 
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">

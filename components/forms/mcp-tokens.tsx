@@ -50,9 +50,26 @@ export function McpTokens({
     otherwise arrive at the same trap.
   */
   const [minted, setMinted] = useState<string | null>(null);
+  const [draftScope, setDraftScope] = useState("read");
+  const [mintedScope, setMintedScope] = useState("read");
+  const [copyError, setCopyError] = useState(false);
   const [copied, setCopied] = useState<
     "token" | "command" | "connector" | null
   >(null);
+
+  async function copy(
+    value: string,
+    target: "token" | "command" | "connector"
+  ) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(target);
+      setCopyError(false);
+    } catch {
+      setCopied(null);
+      setCopyError(true);
+    }
+  }
 
   if (!canUse) {
     return (
@@ -72,9 +89,9 @@ export function McpTokens({
           {serverUrl}
         </code>
         <p className="text-ink-soft mt-2 text-sm">
-          Add this as an HTTP MCP server in Claude, with a token below as the
-          bearer credential. Your AI then sees exactly what you can see and can
-          do exactly what you can do — no more.
+          Connect Codex or Claude Code with a bearer token. ChatGPT and Claude
+          web can use a separate read-only personal URL. Available tools respect
+          your project permissions and the token scope.
         </p>
       </div>
 
@@ -135,6 +152,7 @@ export function McpTokens({
             const token = result.message.split("\n")[0].trim();
             if (!token.startsWith("skr_")) return;
             setMinted(token);
+            setMintedScope(draftScope);
             setCopied(null);
             setOpen(false);
           }}
@@ -147,7 +165,7 @@ export function McpTokens({
               type="text"
               name="name"
               required
-              placeholder="Claude on my laptop"
+              placeholder="Codex on my laptop or ChatGPT"
               className={FIELD}
             />
             <span className="text-ink-muted mt-1 block text-xs">
@@ -160,7 +178,12 @@ export function McpTokens({
             <span className="text-ink mb-1 block text-sm font-semibold">
               What may it do?
             </span>
-            <select name="scope" defaultValue="read" className={FIELD}>
+            <select
+              name="scope"
+              value={draftScope}
+              onChange={(e) => setDraftScope(e.target.value)}
+              className={FIELD}
+            >
               <option value="read">
                 Read only — ask questions, change nothing
               </option>
@@ -169,9 +192,8 @@ export function McpTokens({
               </option>
             </select>
             <span className="text-ink-muted mt-1 block text-xs">
-              Start read-only. An assistant that can only answer questions
-              can&apos;t get anything wrong, and you can make a second token
-              later.
+              Start read-only to prevent data changes. Review AI answers for
+              accuracy; you can make a separate write token later.
             </span>
           </label>
 
@@ -213,8 +235,7 @@ export function McpTokens({
             </code>
             <button
               onClick={() => {
-                void navigator.clipboard.writeText(minted);
-                setCopied("token");
+                void copy(minted, "token");
               }}
               className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
             >
@@ -236,10 +257,10 @@ export function McpTokens({
             </code>
             <button
               onClick={() => {
-                void navigator.clipboard.writeText(
-                  `claude mcp add --transport http skyrunners ${serverUrl} --header "Authorization: Bearer ${minted}"`
+                void copy(
+                  `claude mcp add --transport http skyrunners ${serverUrl} --header "Authorization: Bearer ${minted}"`,
+                  "command"
                 );
-                setCopied("command");
               }}
               className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
             >
@@ -252,7 +273,20 @@ export function McpTokens({
             </button>
           </div>
 
-          {/*
+          <p className="text-ink mt-4 text-sm font-bold">
+            Codex — add the server
+          </p>
+          <code className="border-line bg-card text-ink mt-2 block overflow-x-auto rounded-lg border p-3 text-xs whitespace-pre">{`codex mcp add skyrunners --url "${serverUrl}" --bearer-token-env-var SKYRUNNERS_MCP_TOKEN`}</code>
+          <p className="text-ink-muted mt-1.5 text-xs">
+            Set SKYRUNNERS_MCP_TOKEN to the token above in the environment used
+            to launch Codex, then restart Codex. Keep tokens out of source
+            control and shell history. Run codex mcp list to verify
+            configuration.
+          </p>
+          {mintedScope === "read" ? (
+            <>
+              {" "}
+              {/*
             The claude.ai path, and it needs a DIFFERENT URL rather than the same
             one plus a header.
 
@@ -266,46 +300,55 @@ export function McpTokens({
             read-only: Vercel logs request paths, so a credential that could change
             the club's data does not belong in one. See `lib/mcp/handler.ts`.
           */}
-          <p className="text-ink mt-4 text-sm font-bold">
-            claude.ai or the Claude app — paste this URL
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
-              {`${serverUrl}/${minted}`}
-            </code>
-            <button
-              onClick={() => {
-                void navigator.clipboard.writeText(`${serverUrl}/${minted}`);
-                setCopied("connector");
-              }}
-              className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
-            >
-              {copied === "connector" ? (
-                <Check className="size-4" />
-              ) : (
-                <Copy className="size-4" />
-              )}
-              {copied === "connector" ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <p className="text-ink-muted mt-1.5 text-xs">
-            Settings → Connectors → Add custom connector, and paste that. It can
-            answer anything about the club but{" "}
-            <span className="text-ink font-semibold">
-              cannot change anything
-            </span>{" "}
-            — the token is in the URL, and URLs end up in server logs, so this
-            one deliberately can&apos;t write. Use the Claude Code command above
-            for that.
-          </p>
+              <p className="text-ink mt-4 text-sm font-bold">
+                ChatGPT or Claude web — read-only personal URL
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="rounded-tile border-line bg-card text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+                  {`${serverUrl}/${minted}`}
+                </code>
+                <button
+                  onClick={() => {
+                    void copy(`${serverUrl}/${minted}`, "connector");
+                  }}
+                  className="rounded-tile border-line hover:bg-card text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+                >
+                  {copied === "connector" ? (
+                    <Check className="size-4" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                  {copied === "connector" ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <p className="text-ink-muted mt-1.5 text-xs">
+                In ChatGPT, enable Developer mode in Settings → Security and
+                login, then create an app from Plugins. Paste this personal URL
+                and choose No authentication (the URL already carries your
+                token). In Claude, add a custom connector. Keep this URL
+                private: anyone holding it can read through your account. Revoke
+                the token to disconnect it.
+              </p>
+            </>
+          ) : (
+            <p className="text-ink-muted mt-4 text-sm">
+              For ChatGPT or Claude web, create a separate read-only token.
+              Write tokens are accepted only in the Authorization header.
+            </p>
+          )}
+          {copyError ? (
+            <p role="alert" className="text-risk-fg mt-2 text-sm">
+              Could not copy. Select the text and copy it manually.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
       <p className="text-ink-muted flex items-start gap-2 text-xs">
         <Bot className="mt-0.5 size-3.5 shrink-0" />
         Risky and rare things stay on the website — deleting anything, changing
-        roles, archiving a division, or reading someone else&apos;s personal
-        record. Your AI will tell you to come here for those.
+        roles, archiving a division, or changing account access. Your AI will
+        tell you to come here for those.
       </p>
     </div>
   );

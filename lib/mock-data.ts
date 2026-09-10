@@ -2577,7 +2577,7 @@ export const events: ClubEvent[] = [
 // Derived helpers — these become SQL views later
 // ---------------------------------------------------------------------------
 
-export function getMember(id: string) {
+export function getMember(id: string | undefined) {
   return live().members.find((m) => m.id === id);
 }
 

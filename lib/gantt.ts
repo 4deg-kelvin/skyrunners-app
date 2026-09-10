@@ -95,7 +95,7 @@ export interface GanttRow {
    * happens at a time. Giving either a width would invent a duration the model
    * doesn't have.
    */
-  kind: "project" | "deliverable" | "event";
+  kind: "project" | "deliverable" | "milestone" | "event";
   /**
    * Dates this row is waiting on, from DECLARED dependencies.
    *

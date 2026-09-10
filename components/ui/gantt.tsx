@@ -1,491 +1,283 @@
 import Link from "next/link";
-
+import { GanttDependency } from "@/components/ui/gantt-dependency";
 import { markAnchor, type GanttChart, type GanttTone } from "@/lib/gantt";
+import { formatDay } from "@/lib/dates";
 
-/**
- * Where a mark's hover panel hangs from. `markAnchor` decides which; this only
- * spells it in Tailwind, so the threshold stays in one testable place.
- */
-const ANCHOR_CLASSES: Record<ReturnType<typeof markAnchor>, string> = {
+const ANCHOR_CLASSES = {
   start: "left-0",
   center: "left-1/2 -translate-x-1/2",
   end: "right-0",
 };
-
-/**
- * A read-only picture of dates that already exist.
- *
- * Not a critical-path Gantt — see the header of `lib/gantt.ts`. No
- * dependencies, no slack, nothing for a PL to maintain. It answers one
- * question the deadline list underneath can't: **do these land on top of each
- * other?** A list of six dates in date order does not show you that four of
- * them are the same fortnight in November.
- *
- * Pure CSS on a percentage grid, and a Server Component: there's no
- * interaction, so shipping a charting library — or any JavaScript — for
- * coloured rectangles would be paying a bundle for nothing.
- *
- * ---------------------------------------------------------------------------
- * One coordinate space, and it is NOT the row
- * ---------------------------------------------------------------------------
- *
- * Every percentage from `lib/gantt.ts` is a fraction of the **track** — the
- * area the bars are drawn in, which begins after the name column. Anything
- * that has to line up with a bar must be measured from the same origin.
- *
- * The today line and the month axis weren't, first time round. Both sat in a
- * full-width container, so a bar at 50% and the today line at 50% landed in
- * different places and the line drifted left by the whole width of the name
- * column. It read as "today is wrong" rather than "the chart is misaligned" —
- * and no test could catch it, because the numbers were right and the CSS was
- * wrong.
- *
- * So the name column's width is declared once, as a variable, and everything
- * aligned to a bar is inset by it plus the column gap. **Nothing here may use
- * a responsive width:** a name column that is one size on mobile and another
- * on desktop needs two different insets, and one of them is always wrong.
- */
-
-/*
-  ---------------------------------------------------------------------------
-  Colour means ONE thing: how the project is going.
-  ---------------------------------------------------------------------------
-
-  Green was previously both "on track" and "complete", and the darker section
-  inside each bar was progress — so a running project rendered as two shades of
-  green, meaning two different things, with nothing on screen saying so. The
-  honest reading of that chart was "why is half of it dark?".
-
-  Now:
-
-    complete      green    — finished, and the bar is solid
-    on track      blue     — running, nothing wrong
-    at risk       amber    — the PL flagged it, or it's past its target
-    blocked       red      — stopped
-    (a date)      grey     — deliverables and sessions, which have no health
-
-  Blue for in-progress rather than green is the whole fix: it frees green to
-  mean exactly one thing. There's a legend under every chart, because a colour
-  key nobody is shown is a colour key nobody reads correctly.
-*/
-const BAR_TONES: Record<GanttTone, string> = {
-  ok: "bg-info-fg/20 border-info-fg/45",
-  warn: "bg-warn-fg/25 border-warn-fg/50",
-  risk: "bg-risk-fg/25 border-risk-fg/55",
-  done: "bg-ok-fg/30 border-ok-fg/55",
-  neutral: "bg-ink-muted/15 border-ink-muted/30",
+const TONES: Record<
+  GanttTone,
+  { bar: string; fill: string; dot: string; label: string }
+> = {
+  ok: {
+    bar: "border-info-fg/50 bg-info-fg/15",
+    fill: "bg-info-fg/50",
+    dot: "bg-info-fg",
+    label: "On track",
+  },
+  warn: {
+    bar: "border-warn-fg/50 bg-warn-fg/15",
+    fill: "bg-warn-fg/50",
+    dot: "bg-warn-fg",
+    label: "At risk",
+  },
+  risk: {
+    bar: "border-risk-fg/50 bg-risk-fg/15",
+    fill: "bg-risk-fg/50",
+    dot: "bg-risk-fg",
+    label: "Blocked / overdue",
+  },
+  done: {
+    bar: "border-ok-fg/50 bg-ok-fg/20",
+    fill: "bg-ok-fg/55",
+    dot: "bg-ok-fg",
+    label: "Complete",
+  },
+  neutral: {
+    bar: "border-ink-muted/40 bg-ink-muted/10",
+    fill: "bg-ink-muted/35",
+    dot: "bg-ink-muted",
+    label: "Scheduled",
+  },
 };
+const day = (date: string) =>
+  formatDay(date, { month: "short", day: "numeric" });
 
-/**
- * The signed-off portion, drawn inside the bar.
- *
- * A darker shade of the SAME hue, with a hard edge on its right so it reads as
- * a fill level rather than as a second bar. Never a different colour: colour
- * is health here and nothing else, and a progress fill in another hue was
- * exactly what made this unreadable.
- */
-const FILL_TONES: Record<GanttTone, string> = {
-  ok: "bg-info-fg/45 border-info-fg/60",
-  warn: "bg-warn-fg/45 border-warn-fg/60",
-  risk: "bg-risk-fg/45 border-risk-fg/60",
-  done: "bg-ok-fg/55 border-ok-fg/70",
-  neutral: "bg-ink-muted/30 border-ink-muted/40",
-};
-
-const MARKER_TONES: Record<GanttTone, string> = {
-  ok: "bg-info-fg",
-  warn: "bg-warn-fg",
-  risk: "bg-risk-fg",
-  done: "bg-ok-fg",
-  neutral: "bg-ink-muted",
-};
-
-/** The key, in the order somebody scanning for trouble wants it. */
-const LEGEND: { tone: GanttTone; label: string }[] = [
-  { tone: "risk", label: "Blocked" },
-  { tone: "warn", label: "At risk" },
-  { tone: "ok", label: "On track" },
-  { tone: "done", label: "Complete" },
-];
-
-/** Must match the `gap-2` on each row. */
-const COLUMN_GAP = "0.5rem";
-
+/** Presentation only. All dates, bounds, progress and dependency marks come from
+ * buildGantt unchanged. The axis, grid and today line share the exact track inset.
+ * Fixed columns keep that coordinate system intact when the chart scrolls. */
 export function Gantt({
   chart,
-  /** Shown above the chart. Omit where the surrounding card already says it. */
   caption,
   compact = false,
 }: {
   chart: GanttChart;
   caption?: string;
-  /**
-   * Narrower name column, for the 320px sidebar on a project page.
-   *
-   * Not a different chart — the same geometry with less room for names. The
-   * division chart gets the full page width and can afford to spell them out.
-   */
   compact?: boolean;
 }) {
-  if (chart.bars.length === 0) return null;
-
-  /*
-    Compact STACKS the name above its bar; wide puts it in a column beside it.
-
-    Not a style preference. In the 320px project sidebar a side-by-side name
-    column has to be about 96px, which truncates "Layup Process Qualification"
-    to "Layup Proces..." — every row reads the same and the chart stops being
-    scannable, which is the only thing it was for. Stacking gives the name the
-    full width and the bar the full width, at the cost of one line per row.
-
-    Stacked means the track starts at 0, so the axis and today line need no
-    inset. That single value drives both layouts.
-  */
-  const nameWidth = compact ? "0rem" : "10rem";
-  /** Where the track starts. Everything aligned to a bar uses this. */
-  const trackInset = compact ? "0px" : `calc(${nameWidth} + ${COLUMN_GAP})`;
+  if (!chart.bars.length) return null;
+  const nameWidth = compact ? "12rem" : "var(--gantt-name)";
+  const minWidth = compact ? "36rem" : "43rem";
+  const ticks =
+    chart.ticks[0]?.leftPct > 3
+      ? [
+          {
+            label: formatDay(chart.windowStart, { month: "short" }),
+            leftPct: 0,
+          },
+          ...chart.ticks,
+        ]
+      : chart.ticks;
+  const hasBaseline = chart.bars.some((b) => b.baselineEndPct !== undefined);
+  const hasWaiting = chart.bars.some((b) => b.waitingOnMarks?.length);
 
   return (
-    <div className="w-full">
-      {caption ? (
-        <p className="text-ink-muted mb-2 text-xs">{caption}</p>
-      ) : null}
-
-      {/* Month axis, inset to the track. Months, because people schedule by
-          month — a tick reading "Oct 3" invites measuring rather than
-          glancing. */}
-      <div className="relative mb-1 h-4" style={{ marginLeft: trackInset }}>
-        {chart.ticks.map((t) => (
-          <span
-            key={`${t.label}-${t.leftPct}`}
-            className="text-ink-muted absolute -translate-x-1/2 text-[11px]"
-            style={{ left: `${t.leftPct}%` }}
-          >
-            {t.label}
-          </span>
-        ))}
-      </div>
-
-      <div className="relative">
-        {/*
-          Today, drawn once behind every row rather than per bar, and inset to
-          the track so it shares an origin with the bars.
-
-          Null when now falls outside the window, and then no line is drawn at
-          all: a marker pinned to the edge would claim today is the start or
-          end of the chart.
-        */}
-        {chart.todayPct !== null ? (
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 z-10"
-            style={{ left: trackInset }}
-            aria-hidden
-          >
+    <figure
+      className="w-full min-w-0 [--gantt-name:8.5rem] sm:[--gantt-name:15rem]"
+      aria-label={caption ?? "Project timeline"}
+    >
+      <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-ink-soft text-xs">
+          {caption ?? "Project dates, deliverables and milestones"}
+        </span>
+        <span className="text-ink-muted text-[11px] tabular-nums">
+          {day(chart.windowStart)} – {day(chart.windowEnd)} ·{" "}
+          {chart.windowEnd.slice(0, 4)}
+        </span>
+      </figcaption>
+      <div
+        className="border-line rounded-tile isolate max-h-[32rem] overflow-auto border"
+        tabIndex={0}
+        role="region"
+        aria-label="Timeline chart. Scroll horizontally to explore dates."
+      >
+        <div style={{ minWidth }}>
+          <div className="border-line bg-surface sticky top-0 z-40 flex h-12 border-b">
             <div
-              className="bg-cardinal-600/70 absolute inset-y-0 w-px"
-              style={{ left: `${chart.todayPct}%` }}
-            />
-          </div>
-        ) : null}
-
-        <div className={compact ? "space-y-2" : "space-y-1"}>
-          {chart.bars.map((bar) => (
-            <div
-              key={bar.id}
-              className={compact ? "" : "flex items-center gap-2"}
+              className="bg-surface border-line text-ink-muted sticky left-0 z-30 flex shrink-0 items-center border-r px-3 text-[11px] font-semibold tracking-wide uppercase"
+              style={{ width: nameWidth }}
             >
-              {/* Fixed width when beside the bar, never responsive — the axis
-                  and the today line are inset by exactly this value. */}
-              <div
-                className={`truncate ${
-                  compact ? "mb-0.5 text-[11px]" : "shrink-0 text-[13px]"
-                }`}
-                style={{
-                  width: compact ? undefined : nameWidth,
-                  paddingLeft: `${bar.depth * 10}px`,
-                }}
-                title={bar.name}
-              >
-                {bar.href ? (
-                  <Link
-                    href={bar.href}
-                    className="text-ink hover:text-cardinal-600 font-semibold"
-                  >
-                    {bar.name}
-                  </Link>
-                ) : (
-                  <span className="text-ink-soft">{bar.name}</span>
-                )}
-              </div>
-
-              <div
-                className={`bg-surface relative rounded-full ${
-                  compact ? "h-3.5 w-full" : "h-5 min-w-0 flex-1"
-                }`}
-              >
-                {bar.kind !== "project" || bar.widthPct === 0 ? (
-                  /*
-                    A point, not a span. Deliverables are a diamond (one owner,
-                    one due date, no duration); events are a round dot (a thing
-                    that happens at a time). Two shapes rather than two colours,
-                    because the tones already carry health and overloading them
-                    would make neither readable.
-                  */
+              Project / checkpoint
+            </div>
+            <div className="relative flex-1">
+              {ticks.map((t) => (
+                <span
+                  key={`${t.label}-${t.leftPct}`}
+                  className="border-line text-ink-soft absolute inset-y-0 border-l pt-2 pl-2 text-[11px] font-semibold"
+                  style={{ left: `${t.leftPct}%` }}
+                >
+                  {t.label}
+                </span>
+              ))}
+              {chart.todayPct !== null ? (
+                <span
+                  className="text-cardinal-600 absolute bottom-1 text-[10px] font-bold"
+                  style={{ left: `${chart.todayPct}%` }}
+                >
                   <span
-                    className={`absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 ${MARKER_TONES[bar.tone]} ${
-                      bar.kind === "event" ? "rounded-full" : "rotate-45"
-                    }`}
-                    style={{ left: `${bar.leftPct}%` }}
-                    title={
-                      bar.end
-                        ? `${bar.kind === "event" ? "" : "Due "}${bar.end}`
-                        : bar.name
-                    }
-                  />
-                ) : (
+                    className={`absolute bottom-0 ${ANCHOR_CLASSES[markAnchor(chart.todayPct)]}`}
+                  >
+                    Today
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="relative">
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0"
+              style={{ left: nameWidth }}
+              aria-hidden
+            >
+              {ticks.map((t, i) => (
+                <span
+                  key={`${t.label}-${t.leftPct}`}
+                  className={`border-line absolute inset-y-0 border-l ${i % 2 === 0 ? "bg-surface/60" : ""}`}
+                  style={{
+                    left: `${t.leftPct}%`,
+                    width: `${(ticks[i + 1]?.leftPct ?? 100) - t.leftPct}%`,
+                  }}
+                />
+              ))}
+              {chart.todayPct !== null ? (
+                <span
+                  className="border-cardinal-600/80 absolute inset-y-0 z-10 border-l border-dashed"
+                  style={{ left: `${chart.todayPct}%` }}
+                />
+              ) : null}
+            </div>
+            {chart.bars.map((bar) => {
+              const tone = TONES[bar.tone];
+              const point = bar.kind !== "project" || bar.widthPct === 0;
+              const progress =
+                bar.progress !== undefined
+                  ? Math.round(bar.progress * 100)
+                  : undefined;
+              const dates =
+                bar.kind === "project"
+                  ? `${bar.start ? day(bar.start) : "No start"} – ${bar.end ? day(bar.end) : "No target"}`
+                  : bar.end
+                    ? day(bar.end)
+                    : "No date";
+              const label = `${bar.name}. ${dates}. ${tone.label}${progress !== undefined ? `. ${progress}% complete` : ""}`;
+              return (
+                <div
+                  key={bar.id}
+                  className="border-line/70 hover:bg-info-fg/5 relative flex border-b last:border-b-0"
+                >
                   <div
-                    className={`absolute inset-y-0 overflow-hidden border ${BAR_TONES[bar.tone]} ${
-                      // Open edges where the date is unknown, so an undated
-                      // project doesn't draw a confident boundary nobody set.
-                      bar.hasStart ? "rounded-l-full" : ""
-                    } ${bar.hasEnd ? "rounded-r-full" : ""}`}
+                    className="bg-card border-line sticky left-0 z-20 flex shrink-0 flex-col justify-center border-r py-2 pr-3"
                     style={{
-                      left: `${bar.leftPct}%`,
-                      width: `${Math.max(bar.widthPct, 1.5)}%`,
+                      width: nameWidth,
+                      paddingLeft: `${12 + Math.min(bar.depth, 5) * 10}px`,
                     }}
-                    title={`${bar.start ?? "no start"} → ${bar.end ?? "no target"}`}
                   >
-                    {bar.progress !== undefined && bar.progress > 0 ? (
-                      /* Border-r so the fill level has a visible edge rather
-                         than fading into the rest of the bar. */
-                      <div
-                        className={`absolute inset-y-0 left-0 border-r ${FILL_TONES[bar.tone]}`}
-                        style={{ width: `${Math.round(bar.progress * 100)}%` }}
-                        title={`${Math.round(bar.progress * 100)}% of deliverables signed off`}
+                    <div className="flex items-start gap-1.5">
+                      <span
+                        aria-hidden
+                        className={`mt-1.5 size-1.5 shrink-0 ${tone.dot} ${bar.kind === "project" || bar.kind === "event" ? "rounded-full" : "rotate-45"}`}
                       />
-                    ) : null}
+                      {bar.href ? (
+                        <Link
+                          href={bar.href}
+                          title={bar.name}
+                          className="text-ink hover:text-cardinal-600 line-clamp-2 text-xs leading-snug font-semibold"
+                        >
+                          {bar.name}
+                        </Link>
+                      ) : (
+                        <span
+                          title={bar.name}
+                          className="text-ink-soft line-clamp-2 text-xs leading-snug"
+                        >
+                          {bar.name}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-ink-muted mt-1 pl-3 text-[10px] tabular-nums">
+                      {bar.kind === "milestone" ? "Milestone · " : ""}
+                      {dates}
+                      {progress !== undefined ? ` · ${progress}%` : ""}
+                    </span>
                   </div>
-                )}
-
-                {/*
-                  Where this originally landed, before it was pushed back.
-
-                  ---------------------------------------------------------------
-                  LAST in source order, and that is the bug fix
-                  ---------------------------------------------------------------
-
-                  This used to be rendered FIRST, with a comment claiming it sat
-                  "under the bar so the bar paints over it". That was exactly
-                  wrong: a project's baseline is by construction earlier than its
-                  current end and later than its start, so it falls INSIDE the
-                  bar's span — and the bar is an opaque later sibling, so it
-                  covered the marker completely. The feature looked broken because
-                  it was invisible.
-
-                  Absolutely-positioned siblings paint in source order, so being
-                  last is what puts it on top. No z-index needed, and none wanted:
-                  a z-index here would create a stacking context that the today
-                  line would then have to compete with.
-
-                  A hollow outline rather than a filled shape, because it is a date
-                  that no longer applies — an open diamond reads as "this used to
-                  be here" without competing with the real marker.
-
-                  `buildGantt` only returns a percentage when the date is genuinely
-                  inside the window, so there is nothing to clamp here: a marker on
-                  a date the chart doesn't cover would read as "due now", which is
-                  the one wrong thing it could say.
-                */}
-                {bar.baselineEndPct !== undefined ? (
-                  <span
-                    className="border-ink-soft absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border-[1.5px] bg-transparent"
-                    style={{ left: `${bar.baselineEndPct}%` }}
-                    title={`Originally due ${bar.baselineEnd} — pushed back since`}
-                  />
-                ) : null}
-
-                {/*
-                  What this row is WAITING ON — a declared dependency's date.
-
-                  ---------------------------------------------------------------
-                  Shape
-                  ---------------------------------------------------------------
-
-                  A vertical tick rather than a diamond, so it cannot be
-                  mistaken for a deliverable of this project's own, and an
-                  arrow is deliberately not drawn: a line between two distant
-                  rows is hard to follow, while a tick on your own bar is
-                  readable at a glance. When it sits to the RIGHT of the bar's
-                  end, that IS the date conflict, with no annotation needed.
-
-                  `buildGantt` drops marks outside the window rather than
-                  clamping them, for the same reason as the baseline above.
-
-                  ---------------------------------------------------------------
-                  The hover panel, and why it is CSS rather than JavaScript
-                  ---------------------------------------------------------------
-
-                  This started as a `title` attribute, and a native tooltip was
-                  not good enough for the one thing it had to do. It waits about
-                  a second before appearing, it cannot be styled, it is capped
-                  in width by the browser, and on a chart where the answer is
-                  "which of these twelve rows is late" a delay that long means
-                  people conclude there is no tooltip at all.
-
-                  So: a real panel, on `group-hover`, with **no JavaScript**.
-                  This file is a Server Component on purpose — see its header —
-                  and a hover panel is the one interaction CSS does completely.
-                  Making it a Client Component would ship a bundle for a chart
-                  of coloured rectangles, and it would stop working before
-                  hydration, which is exactly when somebody looking at a
-                  freshly-loaded page hovers.
-
-                  Three details that are load-bearing:
-
-                  1. **`z-20` sits on the WRAPPER, not the panel.** The wrapper
-                     carries `-translate-x-1/2`, and a transform creates a
-                     stacking context — so a `z-20` on the panel inside would be
-                     trapped in a context whose own z-index is `auto`, and the
-                     `z-10` today line would paint straight over it. The z-index
-                     has to be on whatever creates the context.
-                  2. **The panel's horizontal anchor depends on the mark's
-                     position.** Centred is right in the middle of the chart and
-                     wrong at the edges, where a centred panel hangs off the side
-                     of the card. Near 0% it aligns its left edge to the tick,
-                     near 100% its right edge — computed here from `pct`, which
-                     is free because this renders on the server.
-                  3. **`role="img"` + `aria-label` on the wrapper**, with the
-                     panel `aria-hidden`. The panel is `display: none` until
-                     hover, so a screen reader would never reach its text, and
-                     duplicating the sentence into an `sr-only` node would mean
-                     two copies to keep in step. `title` is gone precisely so
-                     the browser does not draw its own tooltip on top of ours.
-
-                  Touch has no hover, and that is fine rather than unhandled:
-                  every one of these links is also listed as text under
-                  "Waiting on" on the project page and in the edit panel, so the
-                  chart is the fast path and not the only one.
-                */}
-                {(bar.waitingOnMarks ?? []).map((mark) => {
-                  const label = mark.conflict
-                    ? `${bar.name} is waiting on ${mark.name}, which lands ${mark.date} — after ${bar.name} is itself due`
-                    : `${bar.name} is waiting on ${mark.name}, due ${mark.date}`;
-
-                  const anchor = ANCHOR_CLASSES[markAnchor(mark.pct)];
-
-                  return (
-                    <span
-                      key={`${mark.name}-${mark.pct}`}
+                  <div
+                    className={`relative min-w-0 flex-1 ${compact ? "min-h-14" : "min-h-16"}`}
+                  >
+                    <div
                       role="img"
                       aria-label={label}
-                      className="group absolute top-1/2 z-20 flex h-5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-                      style={{ left: `${mark.pct}%` }}
+                      className="absolute inset-0"
                     >
-                      <span
-                        aria-hidden="true"
-                        className={
-                          mark.conflict
-                            ? "bg-risk-fg h-4 w-[2px]"
-                            : "bg-ink-muted/70 h-3 w-[2px]"
-                        }
+                      {point ? (
+                        <span
+                          title={label}
+                          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${tone.dot} ${bar.kind === "event" ? "size-2.5 rounded-full" : bar.kind === "milestone" ? "border-card size-3.5 rotate-45 border-2 shadow-sm" : "size-2.5 rotate-45"}`}
+                          style={{ left: `${bar.leftPct}%` }}
+                        />
+                      ) : (
+                        <div
+                          title={label}
+                          className={`absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden border shadow-sm ${tone.bar} ${bar.hasStart ? "rounded-l-sm" : "border-l-0"} ${bar.hasEnd ? "rounded-r-sm" : "border-r-0"}`}
+                          style={{
+                            left: `${bar.leftPct}%`,
+                            width: `${bar.widthPct}%`,
+                          }}
+                        >
+                          {progress !== undefined && progress > 0 ? (
+                            <span
+                              className={`absolute inset-y-0 left-0 ${tone.fill}`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          ) : null}
+                        </div>
+                      )}
+                      {bar.baselineEndPct !== undefined ? (
+                        <span
+                          className="border-ink-soft absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border-[1.5px]"
+                          style={{ left: `${bar.baselineEndPct}%` }}
+                          title={`Originally due ${bar.baselineEnd} — pushed back since`}
+                        />
+                      ) : null}
+                    </div>
+                    {(bar.waitingOnMarks ?? []).map((mark, index) => (
+                      <GanttDependency
+                        key={mark.name + "-" + mark.pct + "-" + index}
+                        item={bar.name}
+                        {...mark}
                       />
-
-                      <span
-                        aria-hidden="true"
-                        className={`rounded-tile border-line bg-card text-ink pointer-events-none absolute bottom-full mb-1.5 hidden w-max max-w-48 border px-2 py-1.5 text-left text-[11px] leading-snug font-medium shadow-lg group-hover:block ${anchor}`}
-                      >
-                        <span className="text-ink-muted font-semibold">
-                          Waiting on
-                        </span>{" "}
-                        {mark.name}
-                        <span className="mt-0.5 block">
-                          {mark.conflict ? (
-                            <span className="text-risk-fg font-semibold">
-                              Lands {mark.date} — after {bar.name} is due
-                            </span>
-                          ) : (
-                            <span className="text-ink-muted">
-                              Due {mark.date}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                    ))}{" "}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-
-      {/*
-        The key.
-
-        Four colours and a fill level is more than anybody decodes by staring,
-        and the previous version shipped without one — which is most of why the
-        chart was confusing rather than merely dense.
-      */}
-      <div className="text-ink-muted mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[11px]">
-        {LEGEND.map(({ tone, label }) => (
-          <span key={tone} className="inline-flex items-center gap-1.5">
-            <span
-              className={`inline-block size-2.5 rounded-full border ${BAR_TONES[tone]}`}
-            />
-            {label}
+      <p className="text-ink-muted mt-2 text-[11px] sm:hidden">
+        Swipe across for dates; scroll down for more items.
+      </p>
+      <div className="text-ink-muted mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11px]">
+        {(["ok", "warn", "risk", "done"] as const).map((t) => (
+          <span key={t} className="inline-flex items-center gap-1.5">
+            <span className={`h-2 w-3 rounded-sm ${TONES[t].dot}`} />
+            {TONES[t].label}
           </span>
         ))}
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className={`inline-block h-2.5 w-4 overflow-hidden rounded-full border ${BAR_TONES.ok}`}
-          >
-            <span className={`block h-full w-1/2 border-r ${FILL_TONES.ok}`} />
-          </span>
-          Darker = work signed off
-        </span>
-        {/*
-          Only when something on this chart actually slipped.
-
-          A standing legend entry for a marker that isn't drawn teaches people to
-          ignore the key — the same reason the completions card on the dashboard
-          renders nothing rather than "0 completed".
-        */}
-        {chart.bars.some((b) => b.baselineEndPct !== undefined) ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="border-ink-muted/70 inline-block size-2 rotate-45 border" />
-            Original target
-          </span>
-        ) : null}
-
-        {/* Same rule: only keyed when at least one row actually has one. */}
-        {chart.bars.some((b) => b.waitingOnMarks?.length) ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="bg-ink-muted/70 inline-block h-3 w-[2px]" />
-            Waiting on
-          </span>
-        ) : null}
-        {chart.bars.some((b) => b.waitingOnMarks?.some((m) => m.conflict)) ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="bg-risk-fg inline-block h-4 w-[2px]" />
-            Waiting past its own date
-          </span>
-        ) : null}
+        <span>◆ Deliverable / milestone</span>
+        <span>Darker fill = progress</span>
+        {hasBaseline ? <span>◇ Original target</span> : null}
+        {hasWaiting ? <span>│ Waiting on · red = date conflict</span> : null}
       </div>
-
-      {/*
-        Say what was left out.
-
-        The project tree has no depth limit, so a division three levels deep
-        would quietly lose its bottom rows. A chart that looks complete and
-        isn't is worse than one that admits its limit.
-      */}
       {chart.hiddenCount > 0 ? (
-        <p className="text-ink-muted mt-2 text-xs">
-          {chart.hiddenCount} deeper sub-project
-          {chart.hiddenCount === 1 ? "" : "s"} not shown — open the project to
-          see {chart.hiddenCount === 1 ? "it" : "them"}.
+        <p className="text-ink-muted mt-2 text-[11px]">
+          {chart.hiddenCount}{" "}
+          {chart.hiddenCount === 1 ? "item has" : "items have"} no date or{" "}
+          {chart.hiddenCount === 1 ? "falls" : "fall"} outside this window.
         </p>
       ) : null}
-    </div>
+    </figure>
   );
 }

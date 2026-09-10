@@ -221,10 +221,13 @@ division — the same shape as the mock-data fallback in `docs/HANDOFF.md` §2.
 
 Argument order is `(actor, graph, projectId)` — the graph is always second.
 
-## Deliverables are the entire task model
+## Deliverables and milestones
 
-One flat list per project: **title, ONE owner, a due date, a status.** No sub-tasks, no
-critical path, no computed schedule.
+One flat list per project: deliverables have **title, ONE owner, a due date, a status**.
+Milestones (0057) share that list, date/history and dependency model but have **no owner**.
+A PL marks them reached. They count in project progress and completion checks, never
+in personal delivered work or assignment notifications. The item kind is immutable.
+No sub-tasks, no critical path, no computed schedule.
 
 That's deliberate. A schedule DERIVED from a dependency graph costs a PL an hour a week,
 and on a volunteer team whose availability swings with midterms it's wrong the day after

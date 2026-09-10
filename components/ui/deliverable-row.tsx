@@ -47,17 +47,27 @@ export function DeliverableRow({
             done && "line-through"
           )}
         >
+          {deliverable.kind === "milestone" ? (
+            <span className="text-info-fg mr-2" aria-hidden>
+              ◆
+            </span>
+          ) : null}
           {deliverable.title}
         </p>
         <div className="flex shrink-0 items-center gap-2">
           {overdue ? <Badge tone="risk">Overdue</Badge> : null}
           <Badge tone={DELIVERABLE_STATUS_TONES[deliverable.status]}>
-            {DELIVERABLE_STATUS_LABELS[deliverable.status]}
+            {deliverable.kind === "milestone" && done
+              ? "Reached"
+              : DELIVERABLE_STATUS_LABELS[deliverable.status]}
           </Badge>
         </div>
       </div>
 
       <div className="text-ink-muted mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        {deliverable.kind === "milestone" ? (
+          <span className="text-info-fg font-medium">Milestone · no owner</span>
+        ) : null}
         {showOwner && owner ? (
           <Link
             href={`/members/${owner.id}`}

@@ -1,45 +1,5 @@
-/**
- * The MCP JSON-RPC handler, shared by both ways in.
- *
- * ===========================================================================
- * Why there are two entry points
- * ===========================================================================
- *
- * `POST /api/mcp` with `Authorization: Bearer skr_…` is the real one, and it is
- * what Claude Code uses.
- *
- * `POST /api/mcp/<token>` exists because **claude.ai and the Claude desktop app
- * cannot send a custom header.** Their "add a custom connector" dialog takes a
- * URL and nothing else, so a server that only reads the Authorization header is
- * reachable from Claude Code and from nowhere else — which was the state of this
- * one, and the reason Anish asked for it to work in normal Claude.
- *
- * ---------------------------------------------------------------------------
- * The URL path is READ-ONLY, deliberately
- * ---------------------------------------------------------------------------
- *
- * A token in a URL is a materially worse secret than a token in a header, and the
- * specific reason is logging: Vercel records the request path of every request, so
- * a write credential pasted into a connector URL ends up sitting in the platform's
- * logs in plain text, readable by anybody with log access. A header does not.
- *
- * The club already accepts that trade for the calendar feed — see
- * `lib/calendar/feed-token.ts` — and the reason it is acceptable there is that the
- * feed can only ever READ one member's own event list. So the same rule applies
- * here: authenticate by URL and you get exactly the read half.
- *
- * This is a real limitation rather than a temporary one, and the honest fix is
- * OAuth, which is what claude.ai actually wants for a connector that writes. The
- * shape of that work is in `docs/MCP_SECURITY_REVIEW.md`. Until then a member who
- * wants an assistant that changes things uses Claude Code, where the header works
- * and the credential stays out of the URL.
- *
- * A write tool called over a URL-authenticated connection is refused with a
- * sentence explaining exactly this, rather than being hidden — a model that can't
- * see the tool tells the member the feature doesn't exist, which is worse than
- * telling them where it does.
- */
-
+/** Shared stateless MCP endpoint. Header tokens use their scope; URL tokens
+ * must be minted read-only, so a logged URL cannot reveal a write credential. */
 import { NextResponse } from "next/server";
 
 import { preloadLiveStore, withSuppliedClientStore } from "@/lib/store/request";
@@ -50,7 +10,14 @@ import { listResources, readResource } from "@/lib/mcp/resources";
 import { checkWriteBudget } from "@/lib/mcp/rate-limit";
 import { isRpcRequest } from "@/lib/mcp/rpc";
 
-const PROTOCOL_VERSION = "2024-11-05";
+import {
+  connectionScope,
+  negotiateVersion,
+  MCP_HEADERS,
+  readRpcText,
+  transportError,
+  validateArguments,
+} from "./transport";
 
 export interface RpcRequest {
   jsonrpc?: string;
@@ -60,11 +27,17 @@ export interface RpcRequest {
 }
 
 function result(id: RpcRequest["id"], value: unknown) {
-  return NextResponse.json({ jsonrpc: "2.0", id, result: value });
+  return NextResponse.json(
+    { jsonrpc: "2.0", id, result: value },
+    { headers: MCP_HEADERS }
+  );
 }
 
 function rpcError(id: RpcRequest["id"], code: number, message: string) {
-  return NextResponse.json({ jsonrpc: "2.0", id, error: { code, message } });
+  return NextResponse.json(
+    { jsonrpc: "2.0", id, error: { code, message } },
+    { headers: MCP_HEADERS }
+  );
 }
 
 /** A refusal the MODEL should read, as opposed to a protocol failure. */
@@ -96,35 +69,50 @@ export async function handleMcpRequest(
     makes strict clients drop the connection right after `initialize`, which
     presents as "the server connected then immediately disappeared".
   */
-  if (method.startsWith("notifications/")) {
-    return new Response(null, { status: 202 });
+  if (body.id === undefined) {
+    return new Response(null, { status: 202, headers: MCP_HEADERS });
   }
 
   if (method === "ping") return result(id, {});
 
   if (method === "initialize") {
     return result(id, {
-      protocolVersion: PROTOCOL_VERSION,
+      protocolVersion: negotiateVersion(body.params?.protocolVersion),
       capabilities: {
         tools: { listChanged: false },
         resources: { listChanged: false, subscribe: false },
       },
-      serverInfo: { name: "skyrunners", version: "1.0.0" },
+      serverInfo: { name: "skyrunners", version: "1.1.0" },
       instructions: viaUrl
-        ? `${SERVER_INSTRUCTIONS}\n\nThis connection is READ-ONLY because it authenticates with a token in the URL. You can answer any question about the club, but you cannot change anything. If the member asks you to, tell them: changes need Claude Code, where the token travels in a header instead — Settings on the website has the command.`
+        ? `${SERVER_INSTRUCTIONS}\n\nThis connection is READ-ONLY because it authenticates with a token in the URL. You can answer any question about the club, but you cannot change anything. If the member asks you to, tell them: changes need Codex or Claude Code, where the token travels in a header instead — Settings on the website has the command.`
         : SERVER_INSTRUCTIONS,
     });
   }
 
   // Everything past here needs a member.
-  const auth = await viewerFromToken(token);
+  let auth: Awaited<ReturnType<typeof viewerFromToken>>;
+  try {
+    auth = await viewerFromToken(token);
+  } catch (error) {
+    console.error("[mcp] authentication failed", error);
+    return rpcError(
+      id,
+      -32603,
+      "Could not verify the connection. Please try again."
+    );
+  }
+  if (auth.ok && connectionScope(auth.viewer.scope, viaUrl) === null) {
+    return rpcError(
+      id,
+      -32001,
+      "Personal connector URLs require a read-only token. Create a separate read-only token in Settings; use write tokens only in an Authorization header."
+    );
+  }
 
   /*
     A URL-authenticated connection is read-only however the token was minted.
 
-    Downgraded rather than refused: a member who happens to have made a write
-    token should still get a working read connector out of it, and the
-    `initialize` instructions above tell the model what it can and can't do.
+    Write-scoped URL tokens have already been refused above.
   */
   const scope: "read" | "write" =
     auth.ok && !viaUrl ? auth.viewer.scope : "read";
@@ -140,14 +128,18 @@ export async function handleMcpRequest(
       is a tool it will try, and "you can't do that" ten times is worse than
       never offering.
     */
-    const visible = TOOLS.filter(
-      (t) => !t.write || !auth.ok || scope === "write"
-    );
+    const visible = TOOLS.filter((t) => !t.write || scope === "write");
     return result(id, {
       tools: visible.map((t) => ({
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
+        annotations: {
+          readOnlyHint: !t.write,
+          destructiveHint: !!t.write,
+          idempotentHint: !t.write,
+          openWorldHint: true,
+        },
       })),
     });
   }
@@ -160,25 +152,28 @@ export async function handleMcpRequest(
   */
   if (method === "resources/list") {
     if (!auth.ok) return rpcError(id, -32001, auth.error);
-    const resources = await withSuppliedClientStore(
-      auth.viewer.client,
-      async () => {
-        await preloadLiveStore();
-        return listResources();
-      }
-    );
+    const resources = await loadResource(auth.viewer.client, async () => {
+      await preloadLiveStore();
+      return listResources();
+    });
+    if (resources === undefined)
+      return rpcError(id, -32603, "Resources are temporarily unavailable.");
     return result(id, { resources });
   }
 
   if (method === "resources/read") {
     if (!auth.ok) return rpcError(id, -32001, auth.error);
-    const uri = String(body.params?.uri ?? "");
+    if (typeof body.params?.uri !== "string")
+      return rpcError(id, -32602, "uri must be text.");
+    const uri = body.params.uri;
 
-    const text = await withSuppliedClientStore(auth.viewer.client, async () => {
+    const text = await loadResource(auth.viewer.client, async () => {
       await preloadLiveStore();
       return readResource(uri, auth.viewer);
     });
 
+    if (text === undefined)
+      return rpcError(id, -32603, "Resource is temporarily unavailable.");
     if (text === null) return rpcError(id, -32602, `No resource at "${uri}".`);
     return result(id, {
       contents: [{ uri, mimeType: "text/markdown", text }],
@@ -200,7 +195,7 @@ export async function handleMcpRequest(
     return toolError(
       id,
       viaUrl
-        ? `This connection is read-only, so it can't ${name.replace(/_/g, " ")}. It authenticates with a token in the URL, and a credential that can change things does not belong in a URL — the platform logs them. To make changes from an assistant, connect through Claude Code instead: Settings → Connect your AI on the website has the one-line command.`
+        ? `This connection is read-only, so it can't ${name.replace(/_/g, " ")}. It authenticates with a token in the URL, and a credential that can change things does not belong in a URL — the platform logs them. To make changes from an assistant, connect through Codex or Claude Code instead: Settings → Connect your AI on the website has the one-line command.`
         : `This token is read-only, so it can't ${name.replace(/_/g, " ")}. Make a write-scoped token in Settings on the website if you want to make changes from here.`
     );
   }
@@ -217,12 +212,14 @@ export async function handleMcpRequest(
     accident that happened, and it is not a boundary against a hostile token
     holder. The durable ceiling on empty projects lives in `createProject`.
   */
+  const args = body.params?.arguments ?? {};
+  const invalid = validateArguments(args, tool.inputSchema);
+  if (invalid) return rpcError(id, -32602, invalid);
+
   if (tool.write) {
     const budget = checkWriteBudget(viewer.tokenId);
     if (!budget.ok) return toolError(id, budget.message ?? "Too many changes.");
   }
-
-  const args = (body.params?.arguments ?? {}) as Record<string, unknown>;
 
   try {
     /*
@@ -244,7 +241,7 @@ export async function handleMcpRequest(
     */
     const text = await withSuppliedClientStore(viewer.client, async () => {
       await preloadLiveStore();
-      return tool.handler(args, viewer);
+      return tool.handler(args as Record<string, unknown>, viewer);
     });
     return toolOk(id, text);
   } catch (error) {
@@ -255,9 +252,11 @@ export async function handleMcpRequest(
       The model can relay it and the human gets something to report; a 500
       shows up in Claude as an opaque connector failure.
     */
-    const detail = error instanceof Error ? error.message : String(error);
     console.error(`[mcp] ${name} failed`, error);
-    return toolError(id, `That didn't work: ${detail}`);
+    return toolError(
+      id,
+      "The request could not be completed. Please try again or report the tool name to the app administrator."
+    );
   }
 }
 
@@ -266,7 +265,9 @@ export async function parseRpcBody(
   request: Request
 ): Promise<{ ok: true; body: RpcRequest } | { ok: false; response: Response }> {
   try {
-    const body: unknown = await request.json();
+    const invalidTransport = transportError(request);
+    if (invalidTransport) return { ok: false, response: invalidTransport };
+    const body: unknown = JSON.parse(await readRpcText(request));
     if (!isRpcRequest(body)) {
       return {
         ok: false,
@@ -274,10 +275,30 @@ export async function parseRpcBody(
       };
     }
     return { ok: true, body: body as RpcRequest };
-  } catch {
+  } catch (error) {
+    if (error instanceof RangeError)
+      return {
+        ok: false,
+        response: new Response("MCP request is too large.", {
+          status: 413,
+          headers: MCP_HEADERS,
+        }),
+      };
     return {
       ok: false,
       response: rpcError(null, -32700, "Parse error: body was not JSON."),
     };
+  }
+}
+
+async function loadResource<T>(
+  client: McpViewer["client"],
+  read: () => Promise<T>
+): Promise<T | undefined> {
+  try {
+    return await withSuppliedClientStore(client, read);
+  } catch (error) {
+    console.error("[mcp] resource failed", error);
+    return undefined;
   }
 }

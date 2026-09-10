@@ -10,7 +10,7 @@
 --
 -- Afterwards, verify from the repo with:  npm run db:check
 --
--- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql, 0046_catalogue_verifiers.sql, 0047_reporting_chain_comments.sql, 0048_views_respect_rls.sql, 0049_fix_work_logs_policy.sql, 0050_no_private_notes.sql, 0051_profile_write_guards.sql, 0052_inherited_project_authority.sql, 0053_rsvp_write_guard.sql, 0054_profiles_skills_default.sql
+-- Sources: 0001_core_schema.sql, 0002_deliverables_terms_commitment.sql, 0003_join_requests.sql, 0004_rls_policies.sql, 0005_profile_provisioning.sql, 0006_bootstrap_co_lead.sql, 0007_updates_artifacts_events.sql, 0008_migration_ledger_and_review_rls.sql, 0009_deliverable_signoff.sql, 0010_deliverable_signoff_columns.sql, 0011_second_co_lead.sql, 0012_capture_google_avatar.sql, 0013_write_gaps.sql, 0014_division_archive_and_project_notices.sql, 0015_help_requests.sql, 0016_update_entry_responses.sql, 0017_trainings_and_access.sql, 0018_calendar.sql, 0019_profile_delete_policy.sql, 0020_commitment_tiers.sql, 0021_backfill_project_start_dates.sql, 0022_delete_cascade_policies.sql, 0023_re_paused_notice.sql, 0024_event_rsvp_policies.sql, 0025_discord_user_id.sql, 0026_discord_verified.sql, 0027_checkin_reminders.sql, 0028_deliverable_todos.sql, 0029_checkin_late_notice.sql, 0030_discord_invite_url.sql, 0031_advisor_role.sql, 0032_project_advisors.sql, 0033_member_requests.sql, 0034_artifact_write_policies.sql, 0035_storage_buckets.sql, 0036_mcp_tokens.sql, 0037_daily_digest.sql, 0038_guide_blocks.sql, 0039_remove_hours.sql, 0040_deadline_changes.sql, 0041_calendar_feeds.sql, 0042_deliverable_deadline_changes.sql, 0043_recurring_events.sql, 0044_advisor_profiles.sql, 0045_work_log_replies.sql, 0046_catalogue_verifiers.sql, 0047_reporting_chain_comments.sql, 0048_views_respect_rls.sql, 0049_fix_work_logs_policy.sql, 0050_no_private_notes.sql, 0051_profile_write_guards.sql, 0052_inherited_project_authority.sql, 0053_rsvp_write_guard.sql, 0054_profiles_skills_default.sql, 0055_dependencies.sql, 0056_project_may_wait_on_deliverable.sql, 0057_project_milestones.sql
 
 
 -- ==========================================================================
@@ -6337,4 +6337,298 @@ on conflict (version) do nothing;
 
 -- ==========================================================================
 -- END 0054_profiles_skills_default.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0055_dependencies.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0055 — Dependencies: "this is waiting on that", declared and displayed
+-- ===========================================================================
+--
+-- The club asked for this on 2026-09-08. `docs/DECISIONS.md` and the header of
+-- `lib/gantt.ts` both reject a critical-path Gantt, so it is worth being exact
+-- about what this is and is not, because the difference is the reason it was
+-- allowed to exist.
+--
+-- **Rejected, and still rejected:** a schedule COMPUTED from a dependency
+-- graph. Slack, earliest-start, critical path, dates that reflow when one moves.
+-- On a volunteer team whose availability swings with midterms that is wrong the
+-- day after it is entered, and a wrong schedule is worse than none because
+-- people plan against it.
+--
+-- **This:** a row saying one thing waits on another, drawn where both appear.
+-- Nothing computes a date. Nothing blocks a sign-off. `lib/dependencies.ts`
+-- holds the reasoning in full and is the only place the rules live.
+--
+-- Four columns instead of two, and why
+-- -------------------------------------------------------------------------
+--
+-- Either end can be a project or a deliverable, which is the classic case for a
+-- polymorphic `(kind, id)` pair. That is refused here in favour of four
+-- nullable columns with REAL foreign keys, because the alternative has no
+-- referential integrity: nothing would stop a row pointing at a deleted
+-- project, and the app would then render a dependency on something that does
+-- not exist. `on delete cascade` means a deleted project or deliverable takes
+-- its links with it, which is the behaviour every reader can then assume.
+--
+-- The cost is two `num_nonnulls` checks instead of a NOT NULL, paid once here.
+--
+-- Which combinations are legal
+-- -------------------------------------------------------------------------
+--
+--   deliverable → deliverable    "my layup waits on your mould"
+--   project     → project        "load testing waits on the spar redesign"
+--   deliverable → project        "the coupon report waits on layup qualification"
+--
+-- `project → deliverable` is refused by a CHECK, not merely by the UI. A whole
+-- project waiting on one person's single task inverts the sizes: if a project
+-- genuinely hinges on one deliverable, either that deliverable belongs to the
+-- project or the two projects depend on each other.
+--
+-- Scope — siblings and ancestors — is NOT enforced here
+-- -------------------------------------------------------------------------
+--
+-- Deliberately. It needs a recursive walk of `projects.parent_id` on every
+-- write, and the app already computes the eligible list to build the picker
+-- (`eligibleProjectTargets`). Duplicating a tree walk in SQL buys a guard
+-- against a hand-crafted API call, at the price of two implementations of the
+-- same rule that will disagree the first time either is edited.
+--
+-- What IS enforced here is everything that cannot be fixed by a later edit: the
+-- shape, referential integrity, and no self-reference. A too-broad link is a
+-- visible mistake somebody can delete; a dangling one is a rendering bug.
+--
+-- Re-runnable.
+
+create table if not exists dependencies (
+  id uuid primary key default gen_random_uuid(),
+
+  -- The thing that is WAITING. Exactly one of these two is set.
+  dependent_project_id     uuid references projects (id) on delete cascade,
+  dependent_deliverable_id uuid references deliverables (id) on delete cascade,
+
+  -- The thing it waits ON. Exactly one of these two is set.
+  target_project_id     uuid references projects (id) on delete cascade,
+  target_deliverable_id uuid references deliverables (id) on delete cascade,
+
+  -- Optional one-line "why", written by whoever added it. The picker asks for
+  -- it but does not require it: a link with no note is still a true fact, and
+  -- demanding prose is how a control stops being used.
+  note text,
+
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+
+  constraint dependencies_one_dependent
+    check (num_nonnulls(dependent_project_id, dependent_deliverable_id) = 1),
+  constraint dependencies_one_target
+    check (num_nonnulls(target_project_id, target_deliverable_id) = 1),
+
+  -- No project → deliverable. See the header.
+  constraint dependencies_no_project_on_deliverable
+    check (dependent_project_id is null or target_deliverable_id is null),
+
+  -- Nothing waits on itself.
+  constraint dependencies_not_self check (
+    dependent_project_id is null
+    or target_project_id is null
+    or dependent_project_id <> target_project_id
+  ),
+  constraint dependencies_not_self_deliverable check (
+    dependent_deliverable_id is null
+    or target_deliverable_id is null
+    or dependent_deliverable_id <> target_deliverable_id
+  )
+);
+
+/*
+  One link per pair, in one direction.
+
+  A partial unique index rather than a table constraint, because the columns are
+  nullable and `unique` treats NULLs as distinct — so the plain constraint would
+  happily allow the same link twice. `coalesce` to a fixed sentinel makes the
+  four columns compare as one key.
+*/
+create unique index if not exists dependencies_unique_pair
+  on dependencies (
+    coalesce(dependent_project_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    coalesce(dependent_deliverable_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    coalesce(target_project_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    coalesce(target_deliverable_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
+
+-- Read paths: "what does this wait on" and "what waits on this". Both are used
+-- — the second is what lets a project page warn that somebody else is blocked
+-- on it, which is the half a PL cannot otherwise discover.
+create index if not exists dependencies_dependent_project_idx
+  on dependencies (dependent_project_id);
+create index if not exists dependencies_dependent_deliverable_idx
+  on dependencies (dependent_deliverable_id);
+create index if not exists dependencies_target_project_idx
+  on dependencies (target_project_id);
+create index if not exists dependencies_target_deliverable_idx
+  on dependencies (target_deliverable_id);
+
+comment on table dependencies is
+  'One thing waiting on another, declared by a PL and displayed. NOT a '
+  'critical path: nothing here computes a date and nothing blocks a sign-off. '
+  'See lib/dependencies.ts for the rules and docs/DECISIONS.md for why the '
+  'computed version stays rejected.';
+
+alter table dependencies enable row level security;
+
+-- Public to the club, like every other fact about a project. A dependency is
+-- part of the answer to "what is happening here".
+drop policy if exists dependencies_read on dependencies;
+create policy dependencies_read on dependencies
+  for select to authenticated
+  using (true);
+
+/*
+  Writes belong to the DEPENDENT side's PL, and only that side.
+
+  The asymmetry is the point: declaring "my work waits on yours" is a statement
+  about MY work, and needs no permission from you. The reverse — being able to
+  declare that somebody else's project waits on mine — would let anyone hang a
+  warning off a project they have nothing to do with.
+
+  `auth_is_re_for` walks the project tree since 0052, so a parent's PL and a
+  Division Lead both qualify. A deliverable's dependency is governed by its
+  project's PL rather than by the deliverable's owner: the PL shapes the
+  deliverables, and this is a statement about the shape of the work.
+*/
+drop policy if exists dependencies_write_dependent_side on dependencies;
+create policy dependencies_write_dependent_side on dependencies
+  for all to authenticated
+  using (
+    auth_is_co_lead()
+    or (
+      dependent_project_id is not null
+      and auth_is_re_for(dependent_project_id)
+    )
+    or (
+      dependent_deliverable_id is not null
+      and auth_is_re_for(
+        (select d.project_id from deliverables d
+          where d.id = dependencies.dependent_deliverable_id)
+      )
+    )
+  )
+  with check (
+    auth_is_co_lead()
+    or (
+      dependent_project_id is not null
+      and auth_is_re_for(dependent_project_id)
+    )
+    or (
+      dependent_deliverable_id is not null
+      and auth_is_re_for(
+        (select d.project_id from deliverables d
+          where d.id = dependencies.dependent_deliverable_id)
+      )
+    )
+  );
+
+insert into schema_migrations (version)
+values ('0055_dependencies')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0055_dependencies.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0056_project_may_wait_on_deliverable.sql
+-- ==========================================================================
+
+-- ===========================================================================
+-- 0056 — a project MAY wait on a single deliverable
+-- ===========================================================================
+--
+-- `0055` shipped three of the four shapes and refused the fourth with a CHECK:
+--
+--     dependencies_no_project_on_deliverable
+--         check (dependent_project_id is null or target_deliverable_id is null)
+--
+-- The argument was that a whole project waiting on one person's single task
+-- inverts the sizes, and that if a project genuinely hinges on one deliverable
+-- then the deliverable belongs to that project.
+--
+-- Real data disproved it within a day. "DroneHacks Surface Stuctures can't
+-- start until the course floor plan is signed off" is one sentence, the floor
+-- plan is one deliverable on a sibling project, and moving it would be a lie
+-- about who owns the work. The available workaround — wait on the whole sibling
+-- PROJECT — is strictly worse than the thing being refused: it warns against
+-- the project's target date rather than the deliverable's, so the dependency
+-- reads as landing weeks later than it does.
+--
+-- So the constraint goes and all four shapes are legal. What does NOT change is
+-- the thing that made the feature allowable in the first place: nothing here
+-- computes a date, and nothing here blocks work. See `lib/dependencies.ts`.
+--
+-- Nothing else needs touching. The four nullable columns, the one-dependent /
+-- one-target CHECKs, the self-link CHECKs, the partial unique index and the RLS
+-- policies were all written kind-agnostically; this combination was refused by
+-- this constraint alone.
+-- ===========================================================================
+
+alter table dependencies
+  drop constraint if exists dependencies_no_project_on_deliverable;
+
+comment on table dependencies is
+  'Declared "this waits on that" links. All four dependent/target kind combinations are legal as of 0056. Nothing derives a date from these and nothing blocks on them — they are displayed, and a date conflict is warned about. Scope (which rows may be linked) is enforced in lib/dependencies.ts, not here, because it depends on the project tree.';
+
+insert into schema_migrations (version)
+values ('0056_project_may_wait_on_deliverable')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0056_project_may_wait_on_deliverable.sql
+-- ==========================================================================
+
+
+-- ==========================================================================
+-- BEGIN 0057_project_milestones.sql
+-- ==========================================================================
+
+-- Project milestones share the deliverable date, history and dependency model.
+-- Existing deliverables retain their owner and their sign-off workflow.
+alter table deliverables add column if not exists kind text not null default 'deliverable';
+alter table deliverables alter column owner_id drop not null;
+alter table deliverables drop constraint if exists deliverables_kind_owner;
+alter table deliverables add constraint deliverables_kind_owner check (
+  (kind = 'deliverable' and owner_id is not null)
+  or (kind = 'milestone' and owner_id is null)
+);
+
+-- Changing the kind could erase personal credit or turn a checkpoint into an
+-- assignment. Creation chooses the kind; ordinary edits never change it.
+create or replace function deliverables_keep_kind()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.kind is distinct from old.kind then
+    raise exception 'An item cannot change between a deliverable and a milestone';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists deliverables_keep_kind on deliverables;
+create trigger deliverables_keep_kind before update on deliverables
+for each row execute function deliverables_keep_kind();
+
+comment on column deliverables.kind is
+  'deliverable: one owner; milestone: project checkpoint with no owner. Both participate in project progress and declared dependencies. Milestones never count toward personal delivered work.';
+
+insert into schema_migrations (version) values ('0057_project_milestones')
+on conflict (version) do nothing;
+
+
+-- ==========================================================================
+-- END 0057_project_milestones.sql
 -- ==========================================================================

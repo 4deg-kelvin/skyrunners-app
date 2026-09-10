@@ -27,6 +27,9 @@ before(async () => {
     create table teams (id uuid primary key, parent_id uuid, lead_id uuid);
     create table projects (id uuid primary key, parent_id uuid, team_id uuid, primary_re_id uuid);
     create table project_members (project_id uuid, member_id uuid, role text, left_at timestamptz);
+    create table deliverables (id uuid primary key default gen_random_uuid(), project_id uuid, owner_id uuid not null, title text, status text default 'open');
+    grant select, insert, update, delete on deliverables to authenticated;
+    alter table deliverables enable row level security;
     create table schema_migrations (version text primary key);
     create table events (id uuid primary key, created_by uuid, title text, attendee_ids uuid[], repeat_until date);
     grant select, update on events to authenticated;
@@ -64,9 +67,21 @@ before(async () => {
     "0051_profile_write_guards",
     "0052_inherited_project_authority",
     "0053_rsvp_write_guard",
+    "0057_project_milestones",
   ]) {
     await db.exec(sql(file));
     await db.exec(sql(file)); // Deployment retries must be safe.
+  }
+  for (const name of [
+    "deliverables_read",
+    "deliverables_manage",
+    "deliverables_owner_update",
+  ]) {
+    const definition = original.match(
+      new RegExp(`create policy ${name} on deliverables[\\s\\S]*?;`)
+    );
+    assert.ok(definition);
+    await db.exec(definition[0]);
   }
   await db.exec(
     "create trigger events_rsvp_guard before update on events for each row execute function events_rsvp_only_touches_attendance()"
@@ -77,7 +92,7 @@ after(async () => {
 });
 beforeEach(async () => {
   await db.exec(
-    "reset role; delete from profiles; delete from teams; delete from projects; delete from project_members; delete from events;"
+    "reset role; delete from deliverables; delete from profiles; delete from teams; delete from projects; delete from project_members; delete from events;"
   );
   for (const [name, id] of Object.entries(ids)) {
     await db.query("insert into profiles values ($1, $2, $3, $4, $5)", [
@@ -267,5 +282,69 @@ test("primary PLs qualify without a membership row; inactive PLs do not", async 
       )
     ).rows[0].allowed,
     false
+  );
+});
+
+test("milestone migration preserves existing ownership, rejects assignments and applies inherited RLS", async () => {
+  await db.query(
+    "insert into projects values ($1, null, null, $2), ($3, $1, null, null)",
+    [ids.co, ids.lead, ids.member]
+  );
+  await db.query(
+    "insert into deliverables (project_id,owner_id,title) values ($1,$2,'Owned work')",
+    [ids.member, ids.member]
+  );
+  await as("lead");
+  const milestone = await db.query<{ id: string }>(
+    "insert into deliverables (project_id,kind,title) values ($1,'milestone','Review') returning id",
+    [ids.member]
+  );
+  const id = milestone.rows[0].id;
+  await assert.rejects(
+    db.query("update deliverables set owner_id=$1 where id=$2", [
+      ids.member,
+      id,
+    ]),
+    /deliverables_kind_owner/
+  );
+  await assert.rejects(
+    db.exec(
+      "insert into deliverables (kind,title) values ('deliverable','No owner')"
+    ),
+    /deliverables_kind_owner|row-level security/
+  );
+  await assert.rejects(
+    db.query(
+      "update deliverables set kind='deliverable', owner_id=$1 where id=$2",
+      [ids.member, id]
+    ),
+    /cannot change between/
+  );
+  await as("member");
+  assert.equal(
+    (
+      await db.query(
+        "update deliverables set title='Tampered' where id=$1 returning id",
+        [id]
+      )
+    ).rows.length,
+    0
+  );
+  await assert.rejects(
+    db.query(
+      "insert into deliverables (project_id,kind,title) values ($1,'milestone','Unauthorized')",
+      [ids.member]
+    ),
+    /row-level security/
+  );
+  await as("lead");
+  assert.equal(
+    (
+      await db.query(
+        "update deliverables set status='done' where id=$1 returning id",
+        [id]
+      )
+    ).rows.length,
+    1
   );
 });

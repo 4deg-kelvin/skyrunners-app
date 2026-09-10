@@ -506,3 +506,17 @@ as though they existed: `v_project_rollup_dates` (recursive Gantt spans) and
 `v_open_projects` (the Find Work feed). `v_update_compliance` and `v_org_chain`
 are no longer wanted at all — check-in compliance and the reporting chain both
 went in 2026-08.
+
+## Project milestones (0057)
+
+`deliverables.kind` is `deliverable` (default for all existing rows) or `milestone`.
+A database check requires an owner for deliverables and requires `owner_id IS NULL`
+for milestones. A trigger prevents changing the kind after creation. Existing RLS
+still grants project leadership, including inherited leadership, the management
+rights; a member's owner policy grants no access to an unassigned milestone.
+
+Milestones reuse the existing status, due date, deadline-history, checklist and
+`dependencies` relationships. They count toward project progress and completion
+checks but never appear in a person's owned work or delivered count. No assignment
+notification or automatic project membership is generated. No dependency computes
+a date. Apply 0057 before deploying an app version that selects `deliverables.kind`.

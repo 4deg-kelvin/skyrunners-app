@@ -631,8 +631,11 @@ describe("your own work, two days out", () => {
   }
 
   function owner() {
-    return disk.readStore().deliverables.find((d) => d.status !== "done")!
-      .ownerId;
+    const id = disk
+      .readStore()
+      .deliverables.find((d) => d.status !== "done" && d.ownerId)?.ownerId;
+    assert.ok(id, "seed includes an owned, unfinished deliverable");
+    return id;
   }
 
   test("fires on exactly two days out", async () => {
@@ -690,7 +693,7 @@ describe("your own work, two days out", () => {
     const store = disk.readStore();
     const counts = new Map<string, number>();
     for (const d of store.deliverables) {
-      if (d.status !== "done")
+      if (d.status !== "done" && d.ownerId)
         counts.set(d.ownerId, (counts.get(d.ownerId) ?? 0) + 1);
     }
     const busy = [...counts.entries()].find(([, n]) => n >= 3)?.[0];
@@ -723,7 +726,7 @@ describe("your own work, two days out", () => {
       (d) =>
         d.projectId === project.id && d.ownerId !== pl && d.status !== "done"
     );
-    if (!notPl) return;
+    if (!notPl?.ownerId) return;
 
     await dueOn(notPl.ownerId, addDays(TODAY, digest.DUE_NUDGE_DAYS));
 

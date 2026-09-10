@@ -362,12 +362,15 @@ function dueAfterProject(
 export async function createDeliverable(input: {
   projectId: string;
   title: string;
-  ownerId: string;
+  kind?: "deliverable" | "milestone";
+  ownerId?: string;
   dueDate?: string;
 }): Promise<Result<Deliverable>> {
   const title = input.title.trim();
   if (!title) return fail("Give the deliverable a title.");
-  if (!input.ownerId) {
+  if (input.kind === "milestone" && input.ownerId)
+    return fail("Milestones cannot have an owner.");
+  if (input.kind !== "milestone" && !input.ownerId) {
     // Exactly one owner, always — shared ownership means nobody owns it.
     return fail("Every deliverable needs exactly one owner.");
   }
@@ -381,6 +384,7 @@ export async function createDeliverable(input: {
     id: newId("d"),
     projectId: input.projectId,
     title,
+    kind: input.kind ?? "deliverable",
     ownerId: input.ownerId,
     dueDate: input.dueDate || undefined,
     status: "open",
@@ -396,6 +400,8 @@ export async function createDeliverable(input: {
     if (tooLate) return fail<Deliverable>(tooLate);
 
     store.deliverables.push(deliverable);
+    // A checkpoint belongs to the project, never a person's workload.
+    if (!input.ownerId) return ok(deliverable);
 
     // Auto-add the owner to the project if they aren't on it.
     //
@@ -2185,6 +2191,9 @@ export async function updateDeliverable(input: {
       let one pre-existing violation freeze the row: renaming a deliverable
       would fail on a date the person never touched and can't see.
     */
+    if (deliverable.kind === "milestone" && input.ownerId) {
+      return fail<Deliverable>("Milestones cannot have an owner.");
+    }
     const newDue = input.dueDate || undefined;
     if (newDue !== deliverable.dueDate) {
       const tooLate = dueAfterProject(store, deliverable.projectId, newDue);

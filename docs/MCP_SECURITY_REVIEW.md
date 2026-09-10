@@ -94,8 +94,7 @@ it cannot send `Authorization` — so the server was reachable from Claude Code
 only, while Settings told people to "put Bearer <token> in the Authorization
 header", which is impossible in that UI.
 
-`POST /api/mcp/<token>` now accepts the token in the path and is **forced
-read-only**, whatever scope the token was minted with.
+`POST /api/mcp/<token>` requires a token minted **read-only**. Since the September 2026 hardening, write-scoped URL tokens are refused. Downgrading one request was insufficient: the same leaked token could otherwise be reused in an Authorization header. Revoke any write token previously copied into a personal URL.
 
 **Why read-only, specifically:** Vercel logs the path of every request. A token in
 a URL is therefore a credential sitting in plain text in the platform's logs,

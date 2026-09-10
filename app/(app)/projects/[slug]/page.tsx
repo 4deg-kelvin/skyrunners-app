@@ -229,7 +229,7 @@ export default async function ProjectDetailPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         {/*
           The whole trail, NOT `slice(0, -1)`.
@@ -309,7 +309,7 @@ export default async function ProjectDetailPage({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Status */}
           <Card>
             <CardBody>
@@ -484,7 +484,7 @@ export default async function ProjectDetailPage({
                   are.
                 */}
                 <StatTile
-                  label="Deliverables done"
+                  label="Work & milestones done"
                   value={`${progress.done} / ${progress.total}`}
                   hint={
                     /*
@@ -556,17 +556,25 @@ export default async function ProjectDetailPage({
             />
           ) : null}
 
-          {/* Deliverables — the whole task model, one flat list */}
+          {/* Deliverables and milestones share one list. */}
           <Card>
             <CardBody>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <SectionLabel>Deliverables</SectionLabel>
+                <SectionLabel>Deliverables &amp; milestones</SectionLabel>
                 {mayManage ? (
-                  <AddDeliverableForm
-                    projectId={project.id}
-                    candidates={assignableMembers}
-                    projectTargetDate={project.targetDate}
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    <AddDeliverableForm
+                      projectId={project.id}
+                      candidates={assignableMembers}
+                      projectTargetDate={project.targetDate}
+                    />
+                    <AddDeliverableForm
+                      kind="milestone"
+                      projectId={project.id}
+                      candidates={assignableMembers}
+                      projectTargetDate={project.targetDate}
+                    />
+                  </div>
                 ) : null}
               </div>
 
@@ -720,6 +728,102 @@ export default async function ProjectDetailPage({
                     </Link>
                   ))}
                 </div>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {view.timeline ? (
+            <Card className="h-fit">
+              <CardBody>
+                <SectionLabel>Timeline</SectionLabel>
+                <div className="mt-4">
+                  <Gantt
+                    chart={view.timeline}
+                    caption="Project dates and checkpoints. The red line marks today."
+                  />
+                </div>
+
+                {/*
+                  The schedule's history, directly under the chart that draws it.
+
+                  Here rather than in its own card because it explains the hollow
+                  markers a few pixels above — a "Deadline history" card further
+                  down the sidebar would be a list of dates with nothing to
+                  attach them to. Absent entirely when nothing has moved.
+                */}
+                {view.deadlineHistory.length > 0 ? (
+                  <div className="border-line mt-4 border-t pt-3">
+                    <p className="text-ink-muted text-[11px] font-semibold tracking-wide uppercase">
+                      Deadlines moved{" "}
+                      {view.deadlineHistory.length === 1
+                        ? "once"
+                        : `${view.deadlineHistory.length} times`}
+                    </p>
+
+                    <ul className="mt-2 space-y-2.5">
+                      {view.deadlineHistory.map(
+                        ({ change, actor, daysMoved, deliverableTitle }) => (
+                          <li key={change.id} className="text-xs">
+                            {/*
+                              Which thing moved. Absent for the project's own
+                              target, because "SkyBeta Kits" above the list
+                              already says that — and repeating it on every row
+                              would bury the deliverable rows that are the
+                              interesting ones.
+                            */}
+                            {deliverableTitle ? (
+                              <p className="text-cardinal-600 font-semibold">
+                                {deliverableTitle}
+                              </p>
+                            ) : null}
+                            <p className="text-ink font-semibold">
+                              {change.fromDate
+                                ? `${formatDay(change.fromDate)} → ${formatDay(change.toDate)}`
+                                : `Set to ${formatDay(change.toDate)}`}
+                              {daysMoved !== 0 ? (
+                                <span
+                                  className={
+                                    daysMoved > 0
+                                      ? "text-cardinal-600 font-normal"
+                                      : "text-ok-fg font-normal"
+                                  }
+                                >
+                                  {" · "}
+                                  {`${Math.abs(daysMoved)} ${
+                                    Math.abs(daysMoved) === 1 ? "day" : "days"
+                                  } ${daysMoved > 0 ? "later" : "earlier"}`}
+                                </span>
+                              ) : null}
+                            </p>
+                            {/*
+                              A move made through the full project editor carries
+                              no reason — only `changeProjectDeadline` requires
+                              one. Saying so is better than an empty line: it
+                              tells the reader the gap is a route somebody took,
+                              not data that went missing.
+                            */}
+                            {change.reason ? (
+                              <p className="text-ink-soft mt-0.5">
+                                {change.reason}
+                              </p>
+                            ) : (
+                              <p className="text-ink-muted mt-0.5 italic">
+                                No reason recorded — changed from Edit project.
+                              </p>
+                            )}
+                            <p className="text-ink-muted mt-0.5">
+                              {actor
+                                ? (actor.preferredName ?? actor.fullName)
+                                : "Someone"}
+                              {" · "}
+                              {formatDay(change.changedAt)}
+                            </p>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
               </CardBody>
             </Card>
           ) : null}
@@ -1077,116 +1181,7 @@ export default async function ProjectDetailPage({
         </div>
 
         {/* ---------------- Sidebar ---------------- */}
-        <div className="space-y-6">
-          {/*
-            This project's own timeline.
-
-            Scoped to this project: its span, its deliverables, its
-            sub-projects — and nothing above or beside it. The division chart
-            on /projects answers "how does the division's work stack up"; this
-            one answers "how does mine", which is the question somebody
-            standing on this page actually has.
-
-            Deliverables appear here and only here. On the division chart they
-            would bury five projects under a hundred diamonds.
-          */}
-          {view.timeline ? (
-            <Card className="h-fit">
-              <CardBody>
-                <SectionLabel>Timeline</SectionLabel>
-                <div className="mt-4">
-                  <Gantt
-                    chart={view.timeline}
-                    compact
-                    caption="Diamonds are deliverable due dates. The red line is today."
-                  />
-                </div>
-
-                {/*
-                  The schedule's history, directly under the chart that draws it.
-
-                  Here rather than in its own card because it explains the hollow
-                  markers a few pixels above — a "Deadline history" card further
-                  down the sidebar would be a list of dates with nothing to
-                  attach them to. Absent entirely when nothing has moved.
-                */}
-                {view.deadlineHistory.length > 0 ? (
-                  <div className="border-line mt-4 border-t pt-3">
-                    <p className="text-ink-muted text-[11px] font-semibold tracking-wide uppercase">
-                      Deadlines moved{" "}
-                      {view.deadlineHistory.length === 1
-                        ? "once"
-                        : `${view.deadlineHistory.length} times`}
-                    </p>
-
-                    <ul className="mt-2 space-y-2.5">
-                      {view.deadlineHistory.map(
-                        ({ change, actor, daysMoved, deliverableTitle }) => (
-                          <li key={change.id} className="text-xs">
-                            {/*
-                              Which thing moved. Absent for the project's own
-                              target, because "SkyBeta Kits" above the list
-                              already says that — and repeating it on every row
-                              would bury the deliverable rows that are the
-                              interesting ones.
-                            */}
-                            {deliverableTitle ? (
-                              <p className="text-cardinal-600 font-semibold">
-                                {deliverableTitle}
-                              </p>
-                            ) : null}
-                            <p className="text-ink font-semibold">
-                              {change.fromDate
-                                ? `${formatDay(change.fromDate)} → ${formatDay(change.toDate)}`
-                                : `Set to ${formatDay(change.toDate)}`}
-                              {daysMoved !== 0 ? (
-                                <span
-                                  className={
-                                    daysMoved > 0
-                                      ? "text-cardinal-600 font-normal"
-                                      : "text-ok-fg font-normal"
-                                  }
-                                >
-                                  {" · "}
-                                  {`${Math.abs(daysMoved)} ${
-                                    Math.abs(daysMoved) === 1 ? "day" : "days"
-                                  } ${daysMoved > 0 ? "later" : "earlier"}`}
-                                </span>
-                              ) : null}
-                            </p>
-                            {/*
-                              A move made through the full project editor carries
-                              no reason — only `changeProjectDeadline` requires
-                              one. Saying so is better than an empty line: it
-                              tells the reader the gap is a route somebody took,
-                              not data that went missing.
-                            */}
-                            {change.reason ? (
-                              <p className="text-ink-soft mt-0.5">
-                                {change.reason}
-                              </p>
-                            ) : (
-                              <p className="text-ink-muted mt-0.5 italic">
-                                No reason recorded — changed from Edit project.
-                              </p>
-                            )}
-                            <p className="text-ink-muted mt-0.5">
-                              {actor
-                                ? (actor.preferredName ?? actor.fullName)
-                                : "Someone"}
-                              {" · "}
-                              {formatDay(change.changedAt)}
-                            </p>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                ) : null}
-              </CardBody>
-            </Card>
-          ) : null}
-
+        <div className="min-w-0 space-y-6">
           {/*
             What's scheduled for this project.
 

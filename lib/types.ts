@@ -571,8 +571,9 @@ export interface Deliverable {
   id: string;
   projectId: string;
   title: string;
-  /** Required. Never null, never a list. */
-  ownerId: string;
+  /** Legacy rows are deliverables. Milestones share dates/dependencies, never an owner. */
+  kind?: "deliverable" | "milestone";
+  ownerId?: string;
   dueDate?: string;
   status: DeliverableStatus;
   /** When the OWNER marked it done. Not the same as being delivered. */

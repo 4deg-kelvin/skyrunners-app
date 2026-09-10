@@ -177,10 +177,14 @@ function deliverableLine(d: {
   title: string;
   status: string;
   dueDate?: string;
-  ownerId: string;
+  ownerId?: string;
+  kind?: string;
   blockerNote?: string;
 }): string {
-  const owner = getMember(d.ownerId)?.fullName ?? "unassigned";
+  const owner =
+    d.kind === "milestone"
+      ? "milestone, no owner"
+      : (getMember(d.ownerId)?.fullName ?? "unassigned");
   const bits = [d.status.replace("_", " "), owner];
   if (d.dueDate) bits.push(`due ${d.dueDate}`);
   if (d.blockerNote) bits.push(`blocked: ${d.blockerNote}`);
@@ -527,12 +531,24 @@ export const TOOLS: McpTool[] = [
         }
       }
 
-      out.push("", `## Deliverables (${view.deliverables.length})`);
+      out.push(
+        "",
+        `## Deliverables and milestones (${view.deliverables.length})`
+      );
       if (!view.deliverables.length) out.push("- None yet.");
       for (const row of view.deliverables) {
         out.push(deliverableLine(row.deliverable));
+        out.push(`  id: ${row.deliverable.id}`);
+        for (const dep of row.dependencies)
+          out.push(
+            `  Waiting on ${dep.targetName}${dep.targetDate ? ` (${dep.targetDate})` : ""}${dep.conflict ? " — date conflict" : ""}`
+          );
       }
 
+      for (const dep of view.dependencies)
+        out.push(
+          `Project waiting on ${dep.targetName}${dep.targetDate ? ` (${dep.targetDate})` : ""}${dep.conflict ? " — date conflict" : ""}`
+        );
       out.push("", `## People (${view.members.length})`);
       for (const m of view.members) {
         out.push(
@@ -928,6 +944,74 @@ export const TOOLS: McpTool[] = [
   },
 
   {
+    name: "add_waiting_on",
+    description:
+      "Declare a project, deliverable or milestone waiting on another item within the same top-level project tree. Nothing shifts dates or blocks completion. Supply exact item IDs from get_project for a deliverable or milestone; omit the item to use the whole project.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        item: { type: "string" },
+        target_project: { type: "string" },
+        target_item: { type: "string" },
+        note: { type: "string" },
+      },
+      ["project", "target_project"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      if (!can.manageDependency(viewer.actor, viewer.graph, project.id))
+        refuse("Only this project's leadership can change what it waits on.");
+      const targetProject = requireProject(str(args.target_project));
+      const item = str(args.item)
+        ? findDeliverable(project.id, str(args.item))
+        : undefined;
+      const target = str(args.target_item)
+        ? findDeliverable(targetProject.id, str(args.target_item))
+        : undefined;
+      ok(
+        await ops.addDependency({
+          dependentKind: item ? "deliverable" : "project",
+          dependentId: item?.id ?? project.id,
+          targetKind: target ? "deliverable" : "project",
+          targetId: target?.id ?? targetProject.id,
+          note: str(args.note) || undefined,
+          actorId: viewer.member.id,
+        })
+      );
+      return `${item?.title ?? project.name} now waits on ${target?.title ?? targetProject.name}. Dates are unchanged.`;
+    },
+  },
+  {
+    name: "create_milestone",
+    description:
+      "Add an unassigned project checkpoint. Milestones share dates, project progress and waiting-on links with deliverables, but never have an owner or count toward personal delivered work. Use sign_off_deliverable to mark one reached.",
+    write: true,
+    inputSchema: schema(
+      {
+        project: { type: "string" },
+        title: { type: "string" },
+        due_date: { type: "string", description: "YYYY-MM-DD" },
+      },
+      ["project", "title"]
+    ),
+    async handler(args, viewer) {
+      const project = requireProject(str(args.project));
+      if (!can.manageDeliverables(viewer.actor, viewer.graph, project.id))
+        refuse("Only this project's leadership can add milestones.");
+      const created = ok(
+        await ops.createDeliverable({
+          projectId: project.id,
+          title: str(args.title),
+          kind: "milestone",
+          dueDate: str(args.due_date) || undefined,
+        })
+      );
+      return `Created milestone "${created.title}" on ${project.name}, with no owner${created.dueDate ? `, due ${created.dueDate}` : ""}.`;
+    },
+  },
+
+  {
     name: "create_deliverable",
     description:
       "Add a unit of work to a project with one owner and a due date. This is how you assign work.",
@@ -972,7 +1056,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "update_deliverable",
     description:
-      "Change a deliverable's title, owner or due date. Find it with get_project first — takes the exact title.",
+      "Change a deliverable or milestone title or due date. Only deliverables may have an owner. Find it with get_project first — takes the exact title.",
     write: true,
     inputSchema: schema(
       {
@@ -1018,7 +1102,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "set_deliverable_status",
     description:
-      "Mark a deliverable open, in_progress or blocked. Blocking one DMs whoever has to clear it, so always include a note saying what's needed.",
+      "Mark a deliverable or milestone open, in_progress or blocked. Always include a note when blocking so the project leads can see what's needed.",
     write: true,
     inputSchema: schema(
       {
@@ -1046,7 +1130,7 @@ export const TOOLS: McpTool[] = [
       }
       if (status === "blocked" && !note) {
         refuse(
-          "Say what's blocking it. The note is what the PL gets DMed, and 'blocked' on its own tells them nothing."
+          "Say what's blocking it so the project leads can see what's needed; 'blocked' on its own tells them nothing."
         );
       }
 
@@ -1058,7 +1142,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "sign_off_deliverable",
     description:
-      "Confirm finished work as a PL. This is the one that counts toward the owner's record — the owner marking it done is only a request.",
+      "Confirm finished work or mark a milestone reached as a PL. Deliverables count toward their owner's record; milestones only count toward the project.",
     write: true,
     inputSchema: schema(
       { project: { type: "string" }, title: { type: "string" } },
@@ -1105,6 +1189,10 @@ export const TOOLS: McpTool[] = [
           ],
         },
         health: { type: "string", enum: ["on_track", "at_risk", "blocked"] },
+        start_date: {
+          type: "string",
+          description: "YYYY-MM-DD; empty clears it. Omit to preserve.",
+        },
         target_date: { type: "string", description: "YYYY-MM-DD" },
         description: { type: "string" },
       },
@@ -1135,7 +1223,10 @@ export const TOOLS: McpTool[] = [
           phase,
           health: (str(args.health) || project.health) as typeof project.health,
           // Resent unchanged; this tool exposes no start-date argument.
-          startDate: project.startDate,
+          startDate:
+            args.start_date === undefined
+              ? project.startDate
+              : str(args.start_date) || undefined,
           targetDate: str(args.target_date) || project.targetDate,
           actorId: viewer.member.id,
           today: today(),
@@ -1666,8 +1757,15 @@ function findDeliverable(projectId: string, title: string) {
   const all = projectDeliverables(projectId);
   const needle = title.toLowerCase();
 
-  const exact = all.find((d) => d.title.toLowerCase() === needle);
-  if (exact) return exact;
+  if (!needle) refuse("Give the item's ID or title.");
+  const byId = all.find((d) => d.id === title);
+  if (byId) return byId;
+  const exact = all.filter((d) => d.title.toLowerCase() === needle);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1)
+    refuse(
+      "Several items have that title. Call get_project and use the exact item ID."
+    );
 
   const loose = all.filter((d) => d.title.toLowerCase().includes(needle));
   if (loose.length === 1) return loose[0];

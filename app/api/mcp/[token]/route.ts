@@ -7,7 +7,7 @@
  *
  * claude.ai and the Claude desktop app cannot send a custom header. Their "add a
  * custom connector" dialog takes a URL and nothing else — so a server that reads
- * only `Authorization` is usable from Claude Code and from nowhere else, which is
+ * only `Authorization` is usable from Codex or Claude Code and from nowhere else, which is
  * exactly what Anish ran into.
  *
  * Everything here is delegated to `lib/mcp/handler.ts` with `viaUrl: true`, which
@@ -19,11 +19,12 @@
  * not an acceptable one for a credential that can change the club's data.
  *
  * So: read anything you can read, change nothing. Writes stay on the header route,
- * where Claude Code works today, and the proper answer for claude.ai is OAuth,
+ * where Codex or Claude Code works today, and the proper answer for claude.ai is OAuth,
  * scoped in `docs/MCP_SECURITY_REVIEW.md`.
  */
 
 import { NextResponse } from "next/server";
+import { MCP_HEADERS, transportError } from "@/lib/mcp/transport";
 
 import { handleMcpRequest, parseRpcBody } from "@/lib/mcp/handler";
 
@@ -48,14 +49,16 @@ export async function POST(
  * reachable by anybody who has the URL, and "that token is real" is not a fact to
  * hand out for free. The generic sentence is the same either way.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const invalid = transportError(request);
+  if (invalid) return invalid;
   return NextResponse.json(
     {
       name: "skyrunners-mcp",
       transport: "http",
       mode: "read-only",
-      hint: "This is an MCP endpoint, not a web page. Paste it into claude.ai → Settings → Connectors → Add custom connector. It can read the club but not change anything; for that, connect Claude Code with the command in Settings → Connect your AI.",
+      hint: "This is an MCP endpoint, not a web page. Paste it into claude.ai → Settings → Connectors → Add custom connector. It can read the club but not change anything; for that, connect Codex or Claude Code with the command in Settings → Connect your AI.",
     },
-    { status: 200 }
+    { status: 405, headers: { ...MCP_HEADERS, Allow: "POST" } }
   );
 }

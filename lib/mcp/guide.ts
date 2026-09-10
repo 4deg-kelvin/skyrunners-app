@@ -64,10 +64,15 @@ const HOW_THE_CLUB_WORKS = `# How SkyRunners works
 The app exists to fix three things: members can't find work without asking a
 Co-Lead, leaders can't see who's contributing, and progress doesn't flow up.
 
-**Deliverables are the whole task model.** One flat list per project: a title,
-ONE owner, a due date, a status. No sub-tasks, no dependencies, no critical
-path — deliberately. A dependency graph costs a PL an hour a week and is wrong
-the day after it's entered on a team whose availability swings with midterms.
+**Deliverables and milestones form one flat list per project.** A deliverable
+has a title, ONE owner, an optional due date and a status. A milestone is an
+unassigned project checkpoint, marked reached by a PL. Both count toward project
+progress; only owned deliverables count toward a member's delivered work.
+
+**Waiting-on links are notes about dependencies.** Projects, deliverables and
+milestones can wait on other work within the same top-level project tree. The
+existing scope rules reject self-links and cycles. Links warn on date conflicts,
+but never compute dates, reschedule work or prevent completion.
 
 **Phase and health are different fields.**
 - *Phase* is where a project is in its lifecycle: concept → requirements →
@@ -167,14 +172,18 @@ const WORKFLOWS = `# Common jobs
 \`create_deliverable\` with project, title, owner, due date. One owner — if the
 user names two people, that's two deliverables.
 
+**Add a milestone or dependency**
+\`create_milestone\` adds an unassigned project checkpoint. Use \`add_waiting_on\`
+with exact item IDs from \`get_project\` to link it to another milestone,
+deliverable or project. Use \`sign_off_deliverable\` to mark it reached as a PL.
+
 **Reassign or move a date**
 \`update_deliverable\`. Confirm first if it isn't the user's own work: somebody
 is planning around that date.
 
 **Something is stuck**
 \`set_deliverable_status\` with status "blocked" AND a note saying what's needed.
-The note is what gets DMed to whoever must clear it; "blocked" alone tells them
-nothing. This is the single most valuable thing to record promptly — a blocker
+The note is visible to the project leads; "blocked" alone tells them nothing. This is the single most valuable thing to record promptly — a blocker
 nobody hears about is the failure the whole app exists to prevent.
 
 **Weekly review as a PL**
@@ -189,7 +198,7 @@ you don't open is a project you know nothing about. The website flags any of
 yours with nothing logged in three weeks.
 
 **Finish something**
-Owner marks it done on the website or via \`set_deliverable_status\`; a PL then
+Owner marks it done on the website; a PL then
 \`sign_off_deliverable\`. To close a whole project, \`update_project\` with
 phase "complete" — it refuses if any sub-project is still open, and completing
 freezes the project's document record.
@@ -277,12 +286,12 @@ export const SERVER_INSTRUCTIONS = `SkyRunners — Stanford UAV project and memb
 Start with \`whoami\`, then \`catch_up\`. Call \`guide\` for how the club works, who can do what, or common workflows — do that before answering anything you're unsure of rather than guessing.
 
 Vocabulary that changes what you do:
-- A DELIVERABLE is one unit of work with ONE owner and a due date. That is the entire task model; there are no sub-tasks or dependencies.
+- A DELIVERABLE is one unit of work with ONE owner and an optional due date. A MILESTONE is an unassigned project checkpoint. Both appear on the timeline and support declared waiting-on links; no dates are computed from dependencies.
 - PHASE is where a project sits in its lifecycle. HEALTH is how it's going. Different fields.
 - Marking work done is a REQUEST; a PL signing it off is what counts.
 - PL authority inherits DOWN the project tree, and a Division Lead is a top PL over their whole division. **All authority comes from being a PL** — NOBODY REPORTS TO ANYBODY, and "Team Lead" is a title rather than a chain of command. Never tell a member to take something to their Lead.
 - A member reports by LOGGING WORK on a project. It is public, it lands in that project's feed, and the PL can reply. There is no check-in and no weekly report; the club removed those on 2026-08-24.
-- Blocking a deliverable requires a note — it's DMed to whoever must clear it.
+- Blocking a deliverable or milestone requires a note so project leads can see what must be cleared.
 
 Confirm with the user before reassigning someone else's work, moving a date others depend on, or marking anything complete. When logging work, record what they say they did rather than composing it for them.
 

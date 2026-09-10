@@ -877,10 +877,10 @@ export const can = {
     actor: Actor,
     graph: OrgGraph,
     projectId: string,
-    ownerId: string
+    ownerId: string | undefined
   ) =>
     isCoLead(actor) ||
-    isSelf(actor, ownerId) ||
+    (ownerId !== undefined && isSelf(actor, ownerId)) ||
     isREofOrAbove(actor, graph, projectId),
 
   /**

@@ -242,7 +242,8 @@ async function createDeliverableAction$impl(
   const result = await ops.createDeliverable({
     projectId,
     title,
-    ownerId,
+    ownerId: ownerId || undefined,
+    kind: formData.get("kind") === "milestone" ? "milestone" : "deliverable",
     dueDate: dueDate || undefined,
   });
 
@@ -257,11 +258,20 @@ async function createDeliverableAction$impl(
     explicitly — being given three at once is itself information, and three DMs
     say it more honestly than one saying "3 things".
   */
-  if (result.ok && result.value.ownerId !== viewer.member.id) {
+  if (
+    result.ok &&
+    result.value.ownerId &&
+    result.value.ownerId !== viewer.member.id
+  ) {
     notifyAssigned(result.value, viewer);
   }
 
-  return toResult(result, "Deliverable added.");
+  return toResult(
+    result,
+    formData.get("kind") === "milestone"
+      ? "Milestone added."
+      : "Deliverable added."
+  );
 }
 
 /**
@@ -276,11 +286,12 @@ function notifyAssigned(
     id: string;
     projectId: string;
     title: string;
-    ownerId: string;
+    ownerId?: string;
     dueDate?: string;
   },
   viewer: { member: { id: string; preferredName?: string; fullName: string } }
 ): void {
+  if (!deliverable.ownerId) return;
   const project = getProject(deliverable.projectId);
   notifyMember(
     deliverable.ownerId,
@@ -363,7 +374,11 @@ async function confirmDeliverableAction$impl(
     Not sent when the signer IS the owner: a Co-Lead signing off their own work
     does not need a DM about their own click.
   */
-  if (result.ok && result.value.ownerId !== viewer.member.id) {
+  if (
+    result.ok &&
+    result.value.ownerId &&
+    result.value.ownerId !== viewer.member.id
+  ) {
     const project = getProject(result.value.projectId);
     notifyMember(
       result.value.ownerId,
@@ -431,7 +446,11 @@ async function withdrawSignOffAction$impl(
     was withdrawn" without the reason leaves them nothing to do but go and ask —
     which is the dead end this app exists to remove.
   */
-  if (result.ok && result.value.ownerId !== viewer.member.id) {
+  if (
+    result.ok &&
+    result.value.ownerId &&
+    result.value.ownerId !== viewer.member.id
+  ) {
     const project = getProject(result.value.projectId);
     notifyMember(
       result.value.ownerId,
@@ -511,6 +530,7 @@ async function setDeliverableStatusAction$impl(
     result.ok &&
     deliverable?.status === "blocked" &&
     status !== "blocked" &&
+    deliverable.ownerId &&
     deliverable.ownerId !== viewer.member.id
   ) {
     const project = getProject(projectId);

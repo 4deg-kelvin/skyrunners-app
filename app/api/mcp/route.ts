@@ -42,6 +42,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { MCP_HEADERS, transportError } from "@/lib/mcp/transport";
 
 import { handleMcpRequest, parseRpcBody } from "@/lib/mcp/handler";
 import { tokenFromHeader } from "@/lib/mcp/tokens";
@@ -65,13 +66,15 @@ export async function POST(request: Request) {
  * for the SSE transport we don't implement. Both deserve a sentence rather
  * than a 404 or a hang.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const invalid = transportError(request);
+  if (invalid) return invalid;
   return NextResponse.json(
     {
       name: "skyrunners-mcp",
       transport: "http",
       hint: "This is an MCP endpoint, not a web page. Add it to your AI client as an HTTP MCP server with a token from Settings → Connect your AI. In claude.ai or the Claude desktop app, which can't send a header, use the personal URL shown there instead — that one is read-only.",
     },
-    { status: 200 }
+    { status: 405, headers: { ...MCP_HEADERS, Allow: "POST" } }
   );
 }

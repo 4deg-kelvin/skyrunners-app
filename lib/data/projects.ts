@@ -999,7 +999,7 @@ function projectTimeline(project: Project): GanttChart | null {
             : d.status === "blocked" || isOverdue(d)
               ? "risk"
               : "neutral",
-        kind: "deliverable",
+        kind: d.kind === "milestone" ? "milestone" : "deliverable",
         waitingOn: waitingOnFor("deliverable", d.id, d.dueDate),
       });
     }
