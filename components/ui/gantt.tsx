@@ -1,6 +1,16 @@
 import Link from "next/link";
 
-import type { GanttChart, GanttTone } from "@/lib/gantt";
+import { markAnchor, type GanttChart, type GanttTone } from "@/lib/gantt";
+
+/**
+ * Where a mark's hover panel hangs from. `markAnchor` decides which; this only
+ * spells it in Tailwind, so the threshold stays in one testable place.
+ */
+const ANCHOR_CLASSES: Record<ReturnType<typeof markAnchor>, string> = {
+  start: "left-0",
+  center: "left-1/2 -translate-x-1/2",
+  end: "right-0",
+};
 
 /**
  * A read-only picture of dates that already exist.
@@ -297,6 +307,10 @@ export function Gantt({
                 {/*
                   What this row is WAITING ON — a declared dependency's date.
 
+                  ---------------------------------------------------------------
+                  Shape
+                  ---------------------------------------------------------------
+
                   A vertical tick rather than a diamond, so it cannot be
                   mistaken for a deliverable of this project's own, and an
                   arrow is deliberately not drawn: a line between two distant
@@ -306,43 +320,99 @@ export function Gantt({
 
                   `buildGantt` drops marks outside the window rather than
                   clamping them, for the same reason as the baseline above.
-                */}
-                {/*
-                  A dependency date, as a tick on the row that is waiting.
 
-                  Two things here are not decoration:
+                  ---------------------------------------------------------------
+                  The hover panel, and why it is CSS rather than JavaScript
+                  ---------------------------------------------------------------
 
-                  1. The 2px line lives inside a 14px-wide TRANSPARENT parent.
-                     A 2px hover target is not a hover target — the tooltip was
-                     unreachable in practice, which reads as "there is no
-                     tooltip" rather than "you missed". The visible mark is
-                     unchanged; only the hit area grew.
-                  2. The tooltip names BOTH ends. "Waiting on X" alone assumes
-                     you know which row the pointer is on, and on a chart with
-                     a dozen rows at 12px apart that is exactly what you have
-                     lost by the time the tooltip appears.
+                  This started as a `title` attribute, and a native tooltip was
+                  not good enough for the one thing it had to do. It waits about
+                  a second before appearing, it cannot be styled, it is capped
+                  in width by the browser, and on a chart where the answer is
+                  "which of these twelve rows is late" a delay that long means
+                  people conclude there is no tooltip at all.
+
+                  So: a real panel, on `group-hover`, with **no JavaScript**.
+                  This file is a Server Component on purpose — see its header —
+                  and a hover panel is the one interaction CSS does completely.
+                  Making it a Client Component would ship a bundle for a chart
+                  of coloured rectangles, and it would stop working before
+                  hydration, which is exactly when somebody looking at a
+                  freshly-loaded page hovers.
+
+                  Three details that are load-bearing:
+
+                  1. **`z-20` sits on the WRAPPER, not the panel.** The wrapper
+                     carries `-translate-x-1/2`, and a transform creates a
+                     stacking context — so a `z-20` on the panel inside would be
+                     trapped in a context whose own z-index is `auto`, and the
+                     `z-10` today line would paint straight over it. The z-index
+                     has to be on whatever creates the context.
+                  2. **The panel's horizontal anchor depends on the mark's
+                     position.** Centred is right in the middle of the chart and
+                     wrong at the edges, where a centred panel hangs off the side
+                     of the card. Near 0% it aligns its left edge to the tick,
+                     near 100% its right edge — computed here from `pct`, which
+                     is free because this renders on the server.
+                  3. **`role="img"` + `aria-label` on the wrapper**, with the
+                     panel `aria-hidden`. The panel is `display: none` until
+                     hover, so a screen reader would never reach its text, and
+                     duplicating the sentence into an `sr-only` node would mean
+                     two copies to keep in step. `title` is gone precisely so
+                     the browser does not draw its own tooltip on top of ours.
+
+                  Touch has no hover, and that is fine rather than unhandled:
+                  every one of these links is also listed as text under
+                  "Waiting on" on the project page and in the edit panel, so the
+                  chart is the fast path and not the only one.
                 */}
-                {(bar.waitingOnMarks ?? []).map((mark) => (
-                  <span
-                    key={`${mark.name}-${mark.pct}`}
-                    className="absolute top-1/2 flex h-5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-                    style={{ left: `${mark.pct}%` }}
-                    title={
-                      mark.conflict
-                        ? `${bar.name} is waiting on ${mark.name}, which lands ${mark.date} — after ${bar.name} is itself due`
-                        : `${bar.name} is waiting on ${mark.name}, due ${mark.date}`
-                    }
-                  >
+                {(bar.waitingOnMarks ?? []).map((mark) => {
+                  const label = mark.conflict
+                    ? `${bar.name} is waiting on ${mark.name}, which lands ${mark.date} — after ${bar.name} is itself due`
+                    : `${bar.name} is waiting on ${mark.name}, due ${mark.date}`;
+
+                  const anchor = ANCHOR_CLASSES[markAnchor(mark.pct)];
+
+                  return (
                     <span
-                      aria-hidden="true"
-                      className={
-                        mark.conflict
-                          ? "bg-risk-fg h-4 w-[2px]"
-                          : "bg-ink-muted/70 h-3 w-[2px]"
-                      }
-                    />
-                  </span>
-                ))}
+                      key={`${mark.name}-${mark.pct}`}
+                      role="img"
+                      aria-label={label}
+                      className="group absolute top-1/2 z-20 flex h-5 w-3.5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                      style={{ left: `${mark.pct}%` }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={
+                          mark.conflict
+                            ? "bg-risk-fg h-4 w-[2px]"
+                            : "bg-ink-muted/70 h-3 w-[2px]"
+                        }
+                      />
+
+                      <span
+                        aria-hidden="true"
+                        className={`rounded-tile border-line bg-card text-ink pointer-events-none absolute bottom-full mb-1.5 hidden w-max max-w-48 border px-2 py-1.5 text-left text-[11px] leading-snug font-medium shadow-lg group-hover:block ${anchor}`}
+                      >
+                        <span className="text-ink-muted font-semibold">
+                          Waiting on
+                        </span>{" "}
+                        {mark.name}
+                        <span className="mt-0.5 block">
+                          {mark.conflict ? (
+                            <span className="text-risk-fg font-semibold">
+                              Lands {mark.date} — after {bar.name} is due
+                            </span>
+                          ) : (
+                            <span className="text-ink-muted">
+                              Due {mark.date}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}

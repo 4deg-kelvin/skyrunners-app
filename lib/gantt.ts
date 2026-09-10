@@ -487,3 +487,53 @@ export function projectTone(
   if (health === "at_risk" || pastTarget) return "warn";
   return "ok";
 }
+
+/**
+ * Which edge a hover panel on a mark should hang from.
+ *
+ * A panel centred on its mark is correct in the middle of the chart and wrong
+ * at the ends, where half of it lands outside the card and gets clipped by
+ * whatever is around the chart. Near the left edge it should align its own left
+ * edge to the mark and open rightwards, and the mirror at the right edge.
+ *
+ * Lives here rather than inline in `components/ui/gantt.tsx` for the same
+ * reason every other number in this file does: it is a geometry decision with a
+ * threshold somebody will want to tune, and a magic `22` buried in JSX is
+ * neither findable nor testable. The component maps these three values to
+ * classes and holds no arithmetic.
+ *
+ * ---------------------------------------------------------------------------
+ * Where 30 and 70 come from — MEASURED, not guessed
+ * ---------------------------------------------------------------------------
+ *
+ * The first version of this used 22 and 78, reasoned from nothing, and both
+ * were wrong. Measured against the real project-page sidebar, which is the
+ * narrowest place this chart renders:
+ *
+ *     card    320px      track   262px      panel   12rem / 192px
+ *
+ * A CENTRED panel needs half its width clear on each side, so the tick has to
+ * land inside a 128px window in the middle of a 320px card — 25.6% to 74.4% of
+ * the track. At 22% a centred panel hung 17px off the left edge of the card.
+ *
+ * The three safe ranges overlap, which is what makes a threshold possible at
+ * all:
+ *
+ *     start-aligned (opens right)  fits below 37.8%
+ *     centred                      fits 25.6% – 74.4%
+ *     end-aligned (opens left)     fits above 62.2%
+ *
+ * 30 and 70 sit inside both overlaps, so each has roughly 5% of slack before
+ * anything clips. On a WIDER card every range only grows, and edge-anchoring
+ * opens inward, so these thresholds cannot start overflowing on a bigger
+ * screen — they were chosen against the tightest case on purpose.
+ *
+ * **If the panel's `max-w` changes, re-measure.** The relationship is not
+ * intuitive: at 12rem in a 320px card, centring is unsafe across nearly half
+ * the chart.
+ */
+export function markAnchor(pct: number): "start" | "center" | "end" {
+  if (pct < 30) return "start";
+  if (pct > 70) return "end";
+  return "center";
+}

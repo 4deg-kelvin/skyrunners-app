@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import { test, describe } from "node:test";
 
-import { buildGantt, projectTone, type GanttRow } from "./gantt.ts";
+import { buildGantt, markAnchor, projectTone, type GanttRow } from "./gantt.ts";
 
 const TODAY = "2026-09-01";
 
@@ -534,5 +534,30 @@ describe("the baseline marker for a pushed deadline", () => {
         `${baselineEnd} -> ${p}`
       );
     }
+  });
+});
+
+describe("where a mark's hover panel hangs from", () => {
+  /*
+    A panel centred on its mark is right in the middle of the chart and wrong at
+    the ends, where half of it lands outside the card and gets clipped. Every
+    seeded dependency sits between 49% and 67%, so the two edge branches are
+    never exercised by running the app — which is exactly why they are pinned
+    here rather than left to be noticed by somebody on a narrow screen.
+  */
+  test("centres in the middle of the chart", () => {
+    assert.equal(markAnchor(50), "center");
+    assert.equal(markAnchor(30), "center", "the boundary itself centres");
+    assert.equal(markAnchor(70), "center");
+  });
+
+  test("opens rightwards near the left edge", () => {
+    assert.equal(markAnchor(0), "start");
+    assert.equal(markAnchor(29.9), "start");
+  });
+
+  test("opens leftwards near the right edge", () => {
+    assert.equal(markAnchor(100), "end");
+    assert.equal(markAnchor(70.1), "end");
   });
 });
