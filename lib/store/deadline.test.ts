@@ -293,6 +293,7 @@ describe("the history is the point", () => {
       description: project.description,
       phase: project.phase,
       health: project.health,
+      startDate: project.startDate,
       targetDate: to,
       openRoles: project.openRoles,
       actorId: MEMBER,
@@ -317,6 +318,7 @@ describe("the history is the point", () => {
       description: project.description,
       phase: project.phase,
       health: project.health,
+      startDate: project.startDate,
       targetDate: project.targetDate,
       openRoles: project.openRoles,
       actorId: MEMBER,
@@ -342,5 +344,97 @@ describe("the history is the point", () => {
     const gone = await ops.deleteProject(PROJECT);
     if (!gone.ok) return; // refused for an unrelated reason; nothing to assert
     assert.equal(history().length, 0);
+  });
+});
+
+describe("the start date is editable, and bounded", () => {
+  /*
+    Until 2026-09-09 there was no way to change this. `createProject`
+    defaulted it to the day somebody typed the project in and `updateProject`
+    did not accept one, so every project claimed to have started that
+    afternoon. The timeline draws its left edge from this date, so the error
+    was visible on every chart.
+  */
+  const edit = async (over: Record<string, unknown>) => {
+    const p = disk.readStore().projects.find((x) => x.id === PROJECT)!;
+    return ops.updateProject({
+      projectId: PROJECT,
+      name: p.name,
+      description: p.description,
+      phase: p.phase,
+      health: p.health,
+      startDate: p.startDate,
+      targetDate: p.targetDate,
+      openRoles: p.openRoles,
+      actorId: MEMBER,
+      today: TODAY,
+      ...over,
+    });
+  };
+
+  const startOf = () =>
+    disk.readStore().projects.find((x) => x.id === PROJECT)!.startDate;
+
+  test("moves backwards, for work the club had already been doing", async () => {
+    const r = await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+    assert.equal(startOf(), "2026-07-01");
+  });
+
+  test("moves forwards, for work that has not begun", async () => {
+    const r = await edit({ startDate: "2026-11-01", targetDate: "2026-12-01" });
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+    assert.equal(startOf(), "2026-11-01");
+  });
+
+  test("clears to empty", async () => {
+    await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
+    const r = await edit({ startDate: undefined, targetDate: "2026-12-01" });
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+    assert.equal(startOf(), undefined);
+  });
+
+  /*
+    `0001_core_schema.sql` carries
+        check (target_date is null or start_date is null
+               or target_date >= start_date)
+    so this has to be refused HERE, or demo mode accepts a row that fails on
+    INSERT against Postgres — a bug that only shows up in live mode.
+  */
+  test("a start after the target is refused, not clamped", async () => {
+    const r = await edit({ startDate: "2026-12-02", targetDate: "2026-12-01" });
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.match(r.error, /start date/i);
+    assert.notEqual(startOf(), "2026-12-02", "and nothing was written");
+  });
+
+  /*
+    Changing something else must not clear it. Three callers resend the whole
+    row to change one field, which is why `startDate` is a REQUIRED key on the
+    input even though the value may be undefined.
+  */
+  test("an unrelated edit preserves it", async () => {
+    await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
+    const r = await edit({ name: "Renamed" });
+    assert.equal(r.ok, true, r.ok ? "" : r.error);
+    assert.equal(startOf(), "2026-07-01");
+  });
+
+  test("moving the start writes no deadline history", async () => {
+    const before = history().length;
+    await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
+    assert.equal(
+      history().length,
+      before + 1,
+      "one row, for the TARGET move in the same save"
+    );
+
+    const after = history().length;
+    await edit({ startDate: "2026-06-01", targetDate: "2026-12-01" });
+    assert.equal(
+      history().length,
+      after,
+      "moving only the start is not a slip and is not recorded"
+    );
   });
 });

@@ -198,6 +198,39 @@ export function ProjectEditForm({
             </select>
           </label>
 
+          {/*
+            Start date, editable — it was not, until 2026-09-09.
+
+            `updateProject` did not accept one, so whatever `createProject`
+            defaulted to on the day somebody typed the project in was permanent.
+            The timeline's left edge is drawn from this, so a project entered
+            three weeks late drew three weeks of work that had not happened.
+
+            Pre-filled with the stored value and NOT with the parent's, unlike
+            the target date below. A sub-project's target genuinely cannot be
+            later than its parent's, so the parent's date is a real bound worth
+            suggesting; there is no equivalent rule for starting, and prep work
+            on a sub-task legitimately begins before its parent does. Suggesting
+            a date that no rule requires is how a default becomes a wrong
+            answer people accept.
+          */}
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Start date
+            </span>
+            <input
+              type="date"
+              name="startDate"
+              defaultValue={project.startDate ?? ""}
+              max={project.targetDate}
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
+            />
+            <span className="text-ink-muted mt-1 block text-xs">
+              When the work began, or begins. The timeline is drawn from this,
+              so a real date is worth more than the day it was entered.
+            </span>
+          </label>
+
           <label className="block">
             <span className="text-ink mb-1 block text-sm font-semibold">
               Target date

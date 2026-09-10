@@ -494,6 +494,21 @@ rendering an update must iterate `entries` and label each with its project.
    dated — and **only when the date actually moves**, so one pre-existing violation
    can't freeze every other edit on the project. An undated parent constrains nothing.
 
+   **This is about DUE dates only, and there is deliberately no start-date
+   equivalent.** A sub-project beginning before the thing it is part of is odd
+   rather than wrong — prep work on a sub-task legitimately starts first — so
+   the only start-date rule is the schema's own `projects_dates_ordered`
+   (`target_date >= start_date`), which `updateProject` refuses rather than
+   clamps. Start dates became editable on 2026-09-09; before that
+   `createProject` defaulted them to the day somebody typed the project in and
+   nothing could change it, which the timeline drew as fact.
+
+   **`updateProject` takes `startDate` as a REQUIRED key** whose value may be
+   `undefined`, unlike `targetDate` beside it. Three callers resend the whole
+   row to change one field — the phase control, the editor and the MCP tool —
+   and an optional key means forgetting it compiles and silently clears the
+   date. Same reasoning as `teamRows` on `buildOrgGraphFromRows`.
+
 12. **A view without `security_invoker = on` bypasses RLS, and PostgREST
    exposes it.** Write `create view x with (security_invoker = on) as ...` —
    every time. Without it the view reads its base tables as the OWNER, so the

@@ -1134,6 +1134,8 @@ export const TOOLS: McpTool[] = [
           description: str(args.description) || project.description,
           phase,
           health: (str(args.health) || project.health) as typeof project.health,
+          // Resent unchanged; this tool exposes no start-date argument.
+          startDate: project.startDate,
           targetDate: str(args.target_date) || project.targetDate,
           actorId: viewer.member.id,
           today: today(),

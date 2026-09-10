@@ -131,6 +131,43 @@ describe("the today marker", () => {
     );
     assert.equal(Math.round(c.todayPct!), 50);
   });
+
+  /*
+    A project that has NOT STARTED YET opens the chart at today.
+
+    This matters more now that a start date is something a PL sets rather than
+    whatever day they happened to create the project (2026-09-09). A project
+    planned for next month has its whole bar in the future, and a chart whose
+    left edge was that future start would have nowhere to put "now" — so the
+    one question people bring to a timeline, "where are we", would have no
+    answer on exactly the charts drawn for planning.
+
+    It falls out of `dates.push(utc(today))` rather than a special case, which
+    is why it is pinned here: the behaviour is load-bearing and the line that
+    produces it does not look like it.
+  */
+  test("a project starting in the future opens the window at today", () => {
+    const c = buildGantt(
+      [row({ start: "2026-10-01", end: "2026-11-15" })],
+      "2026-09-09"
+    );
+    assert.equal(c.windowStart, "2026-09-09", "window starts at today");
+    assert.equal(c.todayPct, 0, "today is the left edge");
+    assert.ok(
+      c.bars[0].leftPct > 0,
+      "and the bar is offset right, showing the wait before it begins"
+    );
+  });
+
+  test("a project already underway is untouched", () => {
+    const c = buildGantt(
+      [row({ start: "2026-08-01", end: "2026-11-15" })],
+      "2026-09-09"
+    );
+    assert.equal(c.windowStart, "2026-08-01", "still its own start");
+    assert.equal(c.bars[0].leftPct, 0);
+    assert.ok(c.todayPct! > 0 && c.todayPct! < 100);
+  });
 });
 
 describe("the depth cap is reported, never silent", () => {

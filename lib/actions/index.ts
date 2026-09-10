@@ -1142,6 +1142,7 @@ async function createProjectAction$impl(
     // always owns it initially, and a project with no PL is the one state the
     // model can't represent.
     primaryReId: String(formData.get("primaryReId") ?? "") || viewer.member.id,
+    startDate: String(formData.get("startDate") ?? "") || undefined,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     createdBy: viewer.member.id,
     today: today(),
@@ -1732,6 +1733,9 @@ async function setProjectPhaseAction$impl(
     description: current.description,
     phase,
     health: current.health,
+    // Resent unchanged. See the note on `startDate` in `updateProject`: this
+    // call rewrites the whole row, so omitting it would clear the date.
+    startDate: current.startDate,
     targetDate: current.targetDate,
     openRoles: current.openRoles,
     actorId: viewer.member.id,
@@ -1924,6 +1928,7 @@ async function updateProjectAction$impl(
     description: String(formData.get("description") ?? "") || undefined,
     phase,
     health,
+    startDate: String(formData.get("startDate") ?? "") || undefined,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
     openRoles: String(formData.get("openRoles") ?? "") || undefined,
     // From the session, never the form: the notice names who completed the

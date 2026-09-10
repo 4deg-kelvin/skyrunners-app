@@ -120,6 +120,37 @@ export function CreateProjectForm({
           </span>
         </label>
 
+        {/*
+          Start date, asked for rather than assumed.
+
+          `createProject` has taken a `startDate` since it was written and
+          nothing ever passed one, so every project claimed to have begun the
+          afternoon somebody typed it in. Wrong in both directions: work the
+          club has been running for a month reads as brand new, and work that
+          starts after finals reads as already underway — and the timeline draws
+          both from this date, so a wrong one is visibly wrong.
+
+          Left EMPTY by default rather than pre-filled with today. A blank field
+          is a question; today's date is an answer somebody has to notice is
+          wrong. `startDateFor` still falls back to today when it is left blank,
+          so nothing breaks and the old behaviour is what you get by skipping it.
+        */}
+        <label className="block">
+          <span className="text-ink mb-1 block text-sm font-semibold">
+            Start date{" "}
+            <span className="text-ink-muted font-normal">(optional)</span>
+          </span>
+          <input
+            type="date"
+            name="startDate"
+            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+          />
+          <span className="text-ink-muted mt-1 block text-xs">
+            When the work actually begins. Leave it empty for today — set it if
+            this started earlier, or hasn&apos;t started yet.
+          </span>
+        </label>
+
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">
             Target date{" "}

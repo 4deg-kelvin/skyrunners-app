@@ -2376,6 +2376,24 @@ export async function updateProject(input: {
   description?: string;
   phase: Project["phase"];
   health: Project["health"];
+  /**
+   * When the work actually begins. Editable, and allowed to be empty.
+   *
+   * Until 2026-09-09 this could not be changed at all: `createProject`
+   * defaulted it to the creation day and nothing ever passed anything else, so
+   * every project claimed to have started the afternoon somebody typed it in.
+   * That is wrong in both directions — work the club has been doing for a month,
+   * and work that starts after finals.
+   *
+   * **Required in the type, even though the value may be undefined**, and that
+   * asymmetry with `targetDate` beside it is deliberate. Three callers resend
+   * the whole row to change one field — the phase control, the full editor and
+   * the MCP tool — and an OPTIONAL key means forgetting it compiles and
+   * silently clears the date. Same reasoning as `teamRows` on
+   * `buildOrgGraphFromRows` in `lib/data/graph.ts`: when the failure mode of a
+   * missing argument is invisible, make the compiler ask for it.
+   */
+  startDate: string | undefined;
   targetDate?: string;
   openRoles?: string;
   /** Who is making the change. Needed to attribute the completion notice. */
@@ -2463,6 +2481,35 @@ export async function updateProject(input: {
     }
 
     /*
+      Start before target, because `0001_core_schema.sql` says so:
+
+          check (target_date is null or start_date is null
+                 or target_date >= start_date)
+
+      Refused rather than clamped. Clamping picks one of two dates the PL just
+      typed and silently discards the other, and they cannot tell which survived
+      — the same reason `startDateFor` on create is documented as carefully as it
+      is. Only checked when a date actually moves, for the reason above: a
+      pre-existing violation must not freeze every other edit on the project.
+
+      Deliberately NO rule about the parent's start date. CLAUDE.md §11 covers
+      due dates only, and a sub-project beginning before the thing it is part of
+      is odd rather than wrong — prep work on a sub-task often does start first.
+      Inventing a constraint the club never asked for is how an editor becomes
+      something people route around.
+    */
+    const newStart = input.startDate || undefined;
+    const startMoved = newStart !== project.startDate;
+
+    if ((startMoved || targetMoved) && newStart && newTarget) {
+      if (newTarget < newStart) {
+        return fail<Project>(
+          `The start date (${newStart}) is after the target date (${newTarget}). Move whichever one is wrong.`
+        );
+      }
+    }
+
+    /*
       A move through the full editor is recorded too, with no reason attached.
 
       `changeProjectDeadline` is the intended path and requires one. But if only
@@ -2488,6 +2535,7 @@ export async function updateProject(input: {
     project.description = input.description?.trim() || undefined;
     project.phase = input.phase;
     project.health = input.health;
+    project.startDate = newStart;
     project.targetDate = newTarget;
     project.openRoles = input.openRoles?.trim() || undefined;
 
