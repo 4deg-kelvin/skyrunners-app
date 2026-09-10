@@ -74,6 +74,24 @@ export function ProjectEditForm({
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [phase, setPhase] = useState(project.phase);
+  /*
+    The target date is CONTROLLED, unlike every other field here.
+
+    Not for validation — the server re-checks — but so the confirmation below
+    can appear the moment the date actually differs from the stored one, and
+    disappear again if you put it back. A `defaultValue` input cannot answer
+    "has this changed", so the check would have to happen on submit, which
+    means finding out after pressing Save.
+  */
+  const [targetDate, setTargetDate] = useState(project.targetDate ?? "");
+
+  /*
+    Moving an EXISTING date needs the tick; setting a first one or clearing it
+    does not. Mirrors `updateProject`'s condition exactly — if these drift, the
+    form asks for something the server ignores, or vice versa.
+  */
+  const movingAgreedDate =
+    !!project.targetDate && !!targetDate && targetDate !== project.targetDate;
 
   const blockedFromCompleting =
     phase === "complete" &&
@@ -254,7 +272,8 @@ export function ProjectEditForm({
             <input
               type="date"
               name="targetDate"
-              defaultValue={project.targetDate ?? parentTargetDate ?? ""}
+              value={targetDate || parentTargetDate || ""}
+              onChange={(e) => setTargetDate(e.target.value)}
               max={parentTargetDate}
               className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-sm"
             />
@@ -264,6 +283,39 @@ export function ProjectEditForm({
                   ? `Can't be after ${parentTargetDate} — the project above is due then.`
                   : `Filled in from the project above, which is due ${parentTargetDate}. Save to keep it, or pick an earlier date.`}
               </span>
+            ) : null}
+
+            {/*
+              Shown only once the date actually differs.
+
+              `updateProject` refuses an unacknowledged move, because
+              `0040_deadline_changes` requires a reason for a slip and this form
+              has nowhere to collect one. Rather than refuse outright — plenty of
+              dates on a young project are guesses nobody negotiated — the person
+              says which kind of change this is, and a correction records no
+              history. A real slip goes through the control named here, which
+              asks why and tells everyone up the tree.
+
+              An unticked checkbox posts NOTHING, so a missing key reads as "not
+              acknowledged" server-side. That is the safe default.
+            */}
+            {movingAgreedDate ? (
+              <label className="rounded-tile border-warn-fg/40 bg-warn-bg/40 mt-2 flex items-start gap-2 border px-3 py-2">
+                <input
+                  type="checkbox"
+                  name="deadlineNotAgreed"
+                  required
+                  className="mt-0.5 shrink-0"
+                />
+                <span className="text-ink text-xs">
+                  This date wasn&apos;t agreed with anyone — I&apos;m correcting
+                  it.{" "}
+                  <span className="text-ink-muted">
+                    If it was agreed, use Push back deadline instead so the
+                    change is recorded.
+                  </span>
+                </span>
+              </label>
             ) : null}
           </label>
 

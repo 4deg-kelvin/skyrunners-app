@@ -2404,6 +2404,15 @@ export async function updateProject(input: {
    */
   startDate: string | undefined;
   targetDate?: string;
+  /**
+   * The person asserting the current target was never agreed with anyone.
+   *
+   * Required to move an existing date through the editor; see the refusal
+   * below. Optional in the type because absent means "not acknowledged", which
+   * is the SAFE default here — the opposite of `startDate`, where a forgotten
+   * key would have silently destroyed data.
+   */
+  deadlineNotAgreed?: boolean;
   openRoles?: string;
   /** Who is making the change. Needed to attribute the completion notice. */
   actorId?: string;
@@ -2519,25 +2528,70 @@ export async function updateProject(input: {
     }
 
     /*
-      A move through the full editor is recorded too, with no reason attached.
+      MOVING an existing target belongs to `changeProjectDeadline`, not here.
 
-      `changeProjectDeadline` is the intended path and requires one. But if only
-      that path recorded history, a PL could move the date through this form
-      instead and the slip would leave no trace — a hole of exactly the shape
-      this repo keeps finding (see the `for update` RLS policy, and the dead
-      controls sweep). A row with an empty reason is worse history than a row
-      with a good one and far better than none, and the UI labels it as such.
+      -----------------------------------------------------------------------
+      What this replaced, and why it could never have worked
+      -----------------------------------------------------------------------
+
+      This used to write a `projectDeadlineChanges` row with `reason: ""`, on
+      the argument that a move through the editor leaving NO history was a hole
+      worth plugging with a bad row. It plugged nothing: `0040_deadline_changes`
+      declares
+
+          constraint deadline_reason_not_blank check (length(btrim(reason)) > 0)
+
+      so Postgres refused every one of those rows, and changing a deadline in
+      the editor failed with a raw constraint name. Worse, it failed HALFWAY —
+      the project's own date had already been written, so a second click
+      "worked" only because the date no longer moved and no history row was
+      attempted. A save that reports failure and half-succeeds is the worst
+      shape a write can have.
+
+      It went undetected because DEMO MODE HAS NO CONSTRAINTS. The disk store is
+      a JSON file, so `lib/store/deadline.test.ts` asserted `reason: ""` and
+      passed, green, while production rejected the same call. Any invariant that
+      lives only in SQL is invisible to these tests — that is the general
+      lesson, and it is why this now refuses in the operation, where both modes
+      see it.
+
+      Refusing rather than inventing a reason: `0040` is explicit that the
+      reason is the point ("a slipped date with no reason is the thing this
+      table exists to prevent"), and a system-authored "no reason given" is a
+      sentence nobody said. `changeProjectDeadline` collects a real one, handles
+      both directions, and is already on the project page for exactly the people
+      who can open this form.
+
+      Setting a FIRST date stays here, and clearing one does too. Neither is a
+      slip, neither writes history, and `changeProjectDeadline` refuses the
+      first case by design — see its own note.
+
+      -----------------------------------------------------------------------
+      The middle case: correcting a date nobody agreed to
+      -----------------------------------------------------------------------
+
+      A hard refusal was wrong too. Plenty of dates on a young project are
+      guesses, typos or defaults nobody negotiated, and sending those through a
+      flow built for announcing a slip — which DMs everyone up the project tree
+      — teaches people to route around it.
+
+      So the editor allows a move when the person explicitly states the date was
+      not agreed, and records NO history for it. That is not a loophole in
+      `0040`, it is the same carve-out `0040` already makes: setting a first
+      date is not a slip, and neither is correcting a number nobody planned
+      around. The assertion is the person's, made by ticking an unticked box
+      that names the alternative, so the history stays a record of real slips
+      instead of filling up with corrections.
+
+      Absent flag means "not acknowledged", and that is the safe default: a
+      caller that forgets it gets the refusal, not a silent unrecorded move.
     */
-    if (targetMoved && newTarget && project.targetDate && input.actorId) {
-      store.projectDeadlineChanges.push({
-        id: newId("pdc"),
-        projectId: project.id,
-        fromDate: project.targetDate,
-        toDate: newTarget,
-        reason: "",
-        changedById: input.actorId,
-        changedAt: new Date().toISOString(),
-      });
+    if (targetMoved && newTarget && project.targetDate) {
+      if (!input.deadlineNotAgreed) {
+        return fail<Project>(
+          `Already due ${project.targetDate}. If that was agreed, use "Push back deadline". If not, tick the box and save.`
+        );
+      }
     }
 
     project.name = name;

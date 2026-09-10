@@ -276,35 +276,71 @@ describe("the history is the point", () => {
     );
   });
 
-  test("a move through the full project editor is recorded too", async () => {
+  test("moving an established date through the editor needs the tick", async () => {
     /*
       The hole this closes. `changeProjectDeadline` requires a reason, so if only
       it recorded history a PL could move the date through the project editor
-      instead and the slip would leave no trace at all. A row with an empty
-      reason is worse history than a good one and far better than none, and the
-      UI labels it as such.
+      instead and the slip would leave no trace at all.
+
+      That plug was a row with `reason: ""`, and it could never work:
+      `0040_deadline_changes` has
+
+          check (length(btrim(reason)) > 0)
+
+      so Postgres refused every one, and changing a deadline in the editor
+      failed with a raw constraint name AFTER the project's own date had already
+      been written. A second click then "worked" because the date no longer
+      moved. This test passed the whole time, green, because DEMO MODE HAS NO
+      CONSTRAINTS — the store is a JSON file. Any invariant that lives only in
+      SQL is invisible here, which is the general lesson.
+
+      The editor now refuses an unacknowledged move and points at
+      `changeProjectDeadline`, which collects a real reason. A person may
+      instead state the date was never agreed, and that correction records no
+      history — the same carve-out `0040` already makes for a first date.
     */
     const project = disk.readStore().projects.find((p) => p.id === PROJECT)!;
     const to = shift(10);
 
-    const r = await ops.updateProject({
-      projectId: PROJECT,
-      name: project.name,
-      description: project.description,
-      phase: project.phase,
-      health: project.health,
-      startDate: project.startDate,
-      targetDate: to,
-      openRoles: project.openRoles,
-      actorId: MEMBER,
-      today: TODAY,
-    });
-    assert.equal(r.ok, true, r.ok ? "" : r.error);
+    const edit = (over: Record<string, unknown> = {}) =>
+      ops.updateProject({
+        projectId: PROJECT,
+        name: project.name,
+        description: project.description,
+        phase: project.phase,
+        health: project.health,
+        startDate: project.startDate,
+        targetDate: to,
+        openRoles: project.openRoles,
+        actorId: MEMBER,
+        today: TODAY,
+        ...over,
+      });
 
-    const rows = history();
-    assert.equal(rows.length, 1, "the editor must not bypass the history");
-    assert.equal(rows[0].toDate, to);
-    assert.equal(rows[0].reason, "", "no reason is available on that path");
+    // Unacknowledged: refused, and nothing written.
+    const refused = await edit();
+    assert.equal(refused.ok, false);
+    if (!refused.ok) assert.match(refused.error, /Push back deadline/);
+    assert.equal(
+      disk.readStore().projects.find((p) => p.id === PROJECT)!.targetDate,
+      project.targetDate,
+      "and the date did NOT move — this used to half-succeed"
+    );
+    assert.equal(history().length, 0);
+
+    // Acknowledged: allowed, and still no history, because the person has
+    // said this was a correction rather than a slip.
+    const ok = await edit({ deadlineNotAgreed: true });
+    assert.equal(ok.ok, true, ok.ok ? "" : ok.error);
+    assert.equal(
+      disk.readStore().projects.find((p) => p.id === PROJECT)!.targetDate,
+      to
+    );
+    assert.equal(
+      history().length,
+      0,
+      "a correction is not a slip and records none"
+    );
   });
 
   test("an unrelated edit writes no history", async () => {
@@ -368,6 +404,13 @@ describe("the start date is editable, and bounded", () => {
       openRoles: p.openRoles,
       actorId: MEMBER,
       today: TODAY,
+      /*
+        These cases move the TARGET date as a fixture, to exercise the start
+        date beside it. Moving an established target needs the acknowledgement
+        — see "moving an established date through the editor needs the tick"
+        above — so it is set here rather than in every call.
+      */
+      deadlineNotAgreed: true,
       ...over,
     });
   };
@@ -420,21 +463,22 @@ describe("the start date is editable, and bounded", () => {
     assert.equal(startOf(), "2026-07-01");
   });
 
-  test("moving the start writes no deadline history", async () => {
-    const before = history().length;
-    await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
-    assert.equal(
-      history().length,
-      before + 1,
-      "one row, for the TARGET move in the same save"
-    );
+  /*
+    The editor writes NO deadline history, for either date.
 
-    const after = history().length;
+    This asserted "one row, for the TARGET move in the same save" — the
+    blank-reason row Postgres was refusing all along. Now an acknowledged target
+    move is a correction and records nothing, and a start move never was a slip.
+    `changeProjectDeadline` remains the only writer of this table, which is what
+    keeps it a list of real slips.
+  */
+  test("the editor writes no deadline history, for either date", async () => {
+    assert.equal(history().length, 0, "nothing to begin with");
+
+    await edit({ startDate: "2026-07-01", targetDate: "2026-12-01" });
+    assert.equal(history().length, 0, "an acknowledged target correction");
+
     await edit({ startDate: "2026-06-01", targetDate: "2026-12-01" });
-    assert.equal(
-      history().length,
-      after,
-      "moving only the start is not a slip and is not recorded"
-    );
+    assert.equal(history().length, 0, "and a start-only move");
   });
 });

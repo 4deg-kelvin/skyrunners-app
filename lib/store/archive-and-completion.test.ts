@@ -1276,6 +1276,14 @@ async function setTarget(projectId: string, targetDate?: string) {
     openRoles: p.openRoles,
     actorId: "m-anish",
     today: TODAY,
+    /*
+      This helper exists to MOVE a target, which the editor now requires an
+      acknowledgement for. These tests are about the parent/child clash rule,
+      not that acknowledgement, so it is granted once here. Note the clash
+      check runs FIRST in `updateProject`, so a clash still reports as a clash
+      rather than as "tick the box" — the more specific error wins.
+    */
+    deadlineNotAgreed: true,
   });
 }
 
@@ -1375,6 +1383,8 @@ describe("work inside a project can't be due after the project", () => {
       targetDate: "2026-12-01",
       actorId: "m-anish",
       today: TODAY,
+      // Fixture: deliberately moving a target to build the illegal pair.
+      deadlineNotAgreed: true,
     });
     await ops.updateProject({
       projectId: "p-load-test",
@@ -1385,6 +1395,7 @@ describe("work inside a project can't be due after the project", () => {
       targetDate: "2026-12-01",
       actorId: "m-anish",
       today: TODAY,
+      deadlineNotAgreed: true,
     });
     // Now pull the parent in, bypassing the check by leaving the date alone…
     disk.readStore().projects.find((p) => p.id === "p-wing-spar")!.targetDate =

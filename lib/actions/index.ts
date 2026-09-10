@@ -1950,6 +1950,8 @@ async function updateProjectAction$impl(
     health,
     startDate: String(formData.get("startDate") ?? "") || undefined,
     targetDate: String(formData.get("targetDate") ?? "") || undefined,
+    // A ticked checkbox posts "on"; an unticked one posts nothing at all.
+    deadlineNotAgreed: formData.get("deadlineNotAgreed") !== null,
     openRoles: String(formData.get("openRoles") ?? "") || undefined,
     // From the session, never the form: the notice names who completed the
     // project, and that attribution has to be unforgeable.
