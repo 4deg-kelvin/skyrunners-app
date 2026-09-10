@@ -287,3 +287,25 @@ export function daysBetweenDays(from: string, to: string): number {
     Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
   return Math.round(ms / 86_400_000);
 }
+
+/**
+ * The later of two calendar days, ignoring any that are missing.
+ *
+ * Undefined only when both are. Compares as STRINGS, which is the rule for
+ * every date comparison in this app: `YYYY-MM-DD` sorts lexicographically the
+ * same way it sorts chronologically, and building two `Date`s to compare them
+ * is how a timezone gets involved in a question that has none.
+ *
+ * Exists for "a sub-project starts no earlier than the later of its parent's
+ * start and today" — the parent's date when the parent hasn't begun yet, today
+ * when it began months ago. That is a max, and writing it inline as a sort or a
+ * nested ternary at the call site is how it ends up untested.
+ */
+export function laterDay(
+  a: string | undefined,
+  b: string | undefined
+): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}

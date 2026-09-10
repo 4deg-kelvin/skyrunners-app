@@ -33,6 +33,7 @@ export function CreateProjectForm({
   defaultReId,
   parentId,
   parentTargetDate,
+  defaultStartDate,
   label = "New project",
 }: {
   parents: Option[];
@@ -47,6 +48,17 @@ export function CreateProjectForm({
    * picker so you find out before pressing the button rather than after.
    */
   parentTargetDate?: string;
+  /**
+   * What to pre-fill the start date with, for a sub-project.
+   *
+   * Computed on the SERVER as the later of the parent's start and today —
+   * `laterDay` in `lib/dates.ts`. Passed in already resolved rather than
+   * derived here from a `parentStartDate`, because "today" is a question about
+   * the club's timezone: this is a Client Component, so a `new Date()` here
+   * would answer it in the reader's browser, and the app is emphatic that
+   * dates go through `lib/dates.ts` for exactly that reason.
+   */
+  defaultStartDate?: string;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -130,10 +142,28 @@ export function CreateProjectForm({
           starts after finals reads as already underway — and the timeline draws
           both from this date, so a wrong one is visibly wrong.
 
-          Left EMPTY by default rather than pre-filled with today. A blank field
-          is a question; today's date is an answer somebody has to notice is
-          wrong. `startDateFor` still falls back to today when it is left blank,
-          so nothing breaks and the old behaviour is what you get by skipping it.
+          For a TOP-LEVEL project this is left EMPTY. A blank field is a
+          question; today's date is an answer somebody has to notice is wrong.
+          `startDateFor` still falls back to today when it is blank, so nothing
+          breaks and skipping the field gives the old behaviour.
+
+          A SUB-PROJECT gets a real suggestion, because there is one to make:
+          the later of its parent's start and today.
+
+            parent began in the PAST     -> today. The sub-project is being
+                                            created now; claiming it started
+                                            when its parent did would draw
+                                            weeks of work that never happened.
+            parent has NOT begun yet     -> the parent's start. Work inside a
+                                            project cannot get going before the
+                                            project does, so today would be the
+                                            wrong answer and visibly so on the
+                                            timeline.
+
+          Suggested, NOT enforced. `updateProject` deliberately carries no
+          parent/child start-date rule — see CLAUDE.md §11 — because prep work
+          on a sub-task legitimately begins before its parent, and this field
+          stays editable to say so.
         */}
         <label className="block">
           <span className="text-ink mb-1 block text-sm font-semibold">
@@ -143,11 +173,13 @@ export function CreateProjectForm({
           <input
             type="date"
             name="startDate"
+            defaultValue={defaultStartDate ?? ""}
             className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
           />
           <span className="text-ink-muted mt-1 block text-xs">
-            When the work actually begins. Leave it empty for today — set it if
-            this started earlier, or hasn&apos;t started yet.
+            {defaultStartDate
+              ? "The later of the project above's start and today. Change it if this really begins on another day."
+              : "When the work actually begins. Leave it empty for today — set it if this started earlier, or hasn't started yet."}
           </span>
         </label>
 

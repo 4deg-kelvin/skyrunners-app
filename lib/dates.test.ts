@@ -20,6 +20,7 @@ import {
   daysBetweenDays,
   formatDay,
   formatMoment,
+  laterDay,
   todayInClubTime,
 } from "./dates.ts";
 
@@ -149,5 +150,45 @@ describe("date arithmetic stays on calendar days", () => {
     assert.equal(daysBetweenDays("2026-08-12", "2026-08-09"), -3);
     assert.equal(daysBetweenDays("2026-03-05", "2026-03-12"), 7);
     assert.equal(daysBetweenDays("2026-08-09", "2026-08-09"), 0);
+  });
+});
+
+describe("the later of two days", () => {
+  /*
+    The rule behind a sub-project's suggested start date: no earlier than the
+    later of its parent's start and today. The parent's date when the parent has
+    not begun yet, today when it began months ago.
+
+    String comparison, deliberately — `YYYY-MM-DD` sorts lexicographically the
+    same way it sorts chronologically, and building two `Date`s to compare them
+    is how a timezone gets into a question that has none.
+  */
+  test("picks the later date", () => {
+    assert.equal(laterDay("2026-08-01", "2026-09-09"), "2026-09-09");
+    assert.equal(laterDay("2026-11-01", "2026-09-09"), "2026-11-01");
+  });
+
+  test("equal dates return that date", () => {
+    assert.equal(laterDay("2026-09-09", "2026-09-09"), "2026-09-09");
+  });
+
+  test("a missing side is ignored rather than treated as zero", () => {
+    // An undated parent must not drag the answer to the beginning of time.
+    assert.equal(laterDay(undefined, "2026-09-09"), "2026-09-09");
+    assert.equal(laterDay("2026-09-09", undefined), "2026-09-09");
+  });
+
+  test("undefined only when both are", () => {
+    assert.equal(laterDay(undefined, undefined), undefined);
+  });
+
+  /*
+    Years, not just days. A naive comparison on the day-of-month part alone
+    would call December 2026 earlier than January 2027, and both are plausible
+    dates for a club that runs across an academic year.
+  */
+  test("compares across year and month boundaries", () => {
+    assert.equal(laterDay("2026-12-31", "2027-01-01"), "2027-01-01");
+    assert.equal(laterDay("2026-09-30", "2026-10-01"), "2026-10-01");
   });
 });

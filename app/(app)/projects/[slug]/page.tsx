@@ -56,7 +56,12 @@ import {
   PROJECT_ROLE_LABELS,
 } from "@/lib/labels";
 import { can, isLeadership } from "@/lib/permissions";
-import { daysBetweenDays, formatDay } from "@/lib/dates";
+import {
+  daysBetweenDays,
+  formatDay,
+  laterDay,
+  todayInClubTime,
+} from "@/lib/dates";
 
 export default async function ProjectDetailPage({
   params,
@@ -401,6 +406,16 @@ export default async function ProjectDetailPage({
                       defaultReId={viewer.member.id}
                       parentId={project.id}
                       parentTargetDate={project.targetDate}
+                      /*
+                        Resolved HERE, not in the form. "Today" is a question
+                        about the club's timezone, and the form is a Client
+                        Component that would answer it in the reader's browser.
+                        See the note on `laterDay`.
+                      */
+                      defaultStartDate={laterDay(
+                        project.startDate,
+                        todayInClubTime()
+                      )}
                       label="Add a sub-project"
                     />
                   ) : null}
