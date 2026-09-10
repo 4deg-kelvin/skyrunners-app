@@ -617,6 +617,7 @@ export default async function ProjectDetailPage({
                       todos,
                       dependencies: deliverableDeps,
                       dependencyOptions: deliverableDepOptions,
+                      milestoneStage: stage,
                     }) => {
                       const isOwner = deliverable.ownerId === viewer.member.id;
                       return (
@@ -628,6 +629,7 @@ export default async function ProjectDetailPage({
                             deliverable={deliverable}
                             owner={owner}
                             overdue={overdue}
+                            milestoneStage={stage}
                           />
 
                           {/*

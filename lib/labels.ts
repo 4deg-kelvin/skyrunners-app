@@ -22,6 +22,7 @@ import type {
   TermKind,
   UpdateStatus,
 } from "./types";
+import type { MilestoneStage } from "./milestones";
 import type { BadgeTone } from "@/components/ui/badge";
 import type { CalendarClient } from "./calendar/feed-token";
 
@@ -392,3 +393,26 @@ export const ATTENTION_LABELS: Record<AttentionReason, string> = {
 // ---------------------------------------------------------------------------
 // When the next check-in is due
 // ---------------------------------------------------------------------------
+
+/**
+ * A milestone's stage, in words and in a badge tone.
+ *
+ * Separate from `DELIVERABLE_STATUS_LABELS` because the two vocabularies differ
+ * where it matters: a milestone is "Reached", not "Done", and it is never
+ * "Blocked" — there is no owner to be blocked. See `lib/milestones.ts`.
+ */
+export const MILESTONE_STAGE_LABELS: Record<MilestoneStage, string> = {
+  reached: "Reached",
+  awaiting: "Awaiting PL sign-off",
+  overdue: "Overdue",
+  active: "In progress",
+  waiting: "Not started",
+};
+
+export const MILESTONE_STAGE_TONES: Record<MilestoneStage, BadgeTone> = {
+  reached: "ok",
+  awaiting: "warn",
+  overdue: "risk",
+  active: "warn",
+  waiting: "neutral",
+};

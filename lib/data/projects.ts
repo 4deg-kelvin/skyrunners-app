@@ -46,6 +46,7 @@ import {
   rootProjectIdOf,
   type ResolvedDependency,
 } from "@/lib/dependencies";
+import { milestoneStage, type MilestoneStage } from "@/lib/milestones";
 import { signDocumentUrls } from "@/lib/supabase/storage";
 import type {
   DependencyEndKind,
@@ -266,6 +267,15 @@ export interface DeliverableRowData {
   dependencies: ResolvedDependency[];
   /** What this deliverable may wait on, for its picker. */
   dependencyOptions: DependencyOptions;
+  /**
+   * For a MILESTONE, which stage of the chain it is at. Undefined for a
+   * deliverable, which has an owner and therefore a real stored status.
+   *
+   * Derived here rather than in the row, because deciding it needs every other
+   * milestone on the project and a component is given one row. See
+   * `lib/milestones.ts`.
+   */
+  milestoneStage?: MilestoneStage;
 }
 
 /**
@@ -673,6 +683,15 @@ export async function getProjectBySlug(
       }),
       /** What this deliverable may wait on, for its picker. */
       dependencyOptions: dependencyOptionsFor("deliverable", d.id),
+      ...(d.kind === "milestone"
+        ? {
+            milestoneStage: milestoneStage(
+              d,
+              projectDeliverables(project.id),
+              today()
+            ),
+          }
+        : {}),
     })),
     artifacts: record.map((a) => ({
       artifact: a,
@@ -1020,12 +1039,25 @@ function projectTimeline(project: Project): GanttChart | null {
     colour deliberately: both mean "this needs a person today", and splitting
     them into two shades of urgent makes neither register.
   */
-  const deliverableTone = (d: Deliverable): GanttTone =>
-    d.status === "done"
+  const deliverableTone = (d: Deliverable): GanttTone => {
+    /*
+      A milestone has no owner, so it has no "blocked" and no owner-set
+      progress. Its colour comes from the same derived chain the row badge
+      uses, or the two would disagree about the same checkpoint.
+    */
+    if (d.kind === "milestone") {
+      const stage = milestoneStage(d, projectDeliverables(d.projectId), now);
+      if (stage === "reached") return "done";
+      if (stage === "overdue") return "risk";
+      if (stage === "active" || stage === "awaiting") return "warn";
+      return "neutral";
+    }
+    return d.status === "done"
       ? "done"
       : d.status === "blocked" || isOverdue(d)
         ? "risk"
         : "neutral";
+  };
 
   /** The tone a PROJECT row takes. Same call the row itself makes. */
   const toneOfProject = (project: Project): GanttTone =>

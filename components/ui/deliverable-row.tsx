@@ -2,7 +2,10 @@ import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
 
 import { Badge } from "./badge";
+import type { MilestoneStage } from "@/lib/milestones";
 import {
+  MILESTONE_STAGE_LABELS,
+  MILESTONE_STAGE_TONES,
   DELIVERABLE_STATUS_LABELS,
   DELIVERABLE_STATUS_TONES,
 } from "@/lib/labels";
@@ -23,12 +26,21 @@ export function DeliverableRow({
   overdue,
   showOwner = true,
   className,
+  milestoneStage,
 }: {
   deliverable: Deliverable;
   owner?: Member;
   overdue?: boolean;
   showOwner?: boolean;
   className?: string;
+  /**
+   * A milestone s derived stage, from the view model.
+   *
+   * Absent on a deliverable, and absent on callers that have not been given
+   * it — those fall back to the stored status, which is right for a
+   * deliverable and merely uninformative for a milestone.
+   */
+  milestoneStage?: MilestoneStage;
 }) {
   const done = deliverable.status === "done";
 
@@ -47,20 +59,38 @@ export function DeliverableRow({
             done && "line-through"
           )}
         >
+          {/*
+            A TRIANGLE, matching the timeline.
+
+            This was "◆", the same glyph the chart uses for a DELIVERABLE, so
+            the two surfaces disagreed about which shape meant which thing the
+            moment the chart gave milestones their own silhouette.
+          */}
           {deliverable.kind === "milestone" ? (
             <span className="text-info-fg mr-2" aria-hidden>
-              ◆
+              ▲
             </span>
           ) : null}
           {deliverable.title}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          {overdue ? <Badge tone="risk">Overdue</Badge> : null}
-          <Badge tone={DELIVERABLE_STATUS_TONES[deliverable.status]}>
-            {deliverable.kind === "milestone" && done
-              ? "Reached"
-              : DELIVERABLE_STATUS_LABELS[deliverable.status]}
-          </Badge>
+          {/*
+            A milestone's badge comes from its DERIVED stage, a deliverable's
+            from its stored status. The stage already folds "overdue" in, so
+            the separate Overdue badge would be a duplicate on those rows.
+          */}
+          {overdue && !milestoneStage ? (
+            <Badge tone="risk">Overdue</Badge>
+          ) : null}
+          {milestoneStage ? (
+            <Badge tone={MILESTONE_STAGE_TONES[milestoneStage]}>
+              {MILESTONE_STAGE_LABELS[milestoneStage]}
+            </Badge>
+          ) : (
+            <Badge tone={DELIVERABLE_STATUS_TONES[deliverable.status]}>
+              {DELIVERABLE_STATUS_LABELS[deliverable.status]}
+            </Badge>
+          )}
         </div>
       </div>
 

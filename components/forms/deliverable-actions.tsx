@@ -450,7 +450,18 @@ export function DeliverableActions({
         )
       ) : null}
 
-      {status === "open" ? (
+      {/*
+        Start / Unblock / I am blocked are the OWNER s controls, so a milestone
+        gets none of them.
+
+        A milestone is a checkpoint with a date and no owner: there is nobody to
+        start it and nobody to be blocked, so these were three buttons asking a
+        question that has no subject — and every milestone sat on "Not started"
+        for ever because no owner existed to move it off. Its stage is derived
+        from the chain instead (`lib/milestones.ts`), and the only thing anybody
+        records is that it was reached.
+      */}
+      {!milestone && status === "open" ? (
         <ActionButton
           action={setDeliverableStatusAction}
           fields={{ ...fields, status: "in_progress" }}
@@ -458,20 +469,22 @@ export function DeliverableActions({
         />
       ) : null}
 
-      {status === "blocked" ? (
-        <ActionButton
-          action={setDeliverableStatusAction}
-          fields={{ ...fields, status: "in_progress" }}
-          label="Unblock"
-        />
-      ) : (
-        <button
-          onClick={() => setBlocking(true)}
-          className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
-        >
-          I&apos;m blocked
-        </button>
-      )}
+      {!milestone ? (
+        status === "blocked" ? (
+          <ActionButton
+            action={setDeliverableStatusAction}
+            fields={{ ...fields, status: "in_progress" }}
+            label="Unblock"
+          />
+        ) : (
+          <button
+            onClick={() => setBlocking(true)}
+            className="rounded-tile border-line text-ink hover:bg-surface border px-3 py-1.5 text-sm font-semibold"
+          >
+            I&apos;m blocked
+          </button>
+        )
+      ) : null}
 
       {/*
         Edit rather than a bare Delete. Retitling and re-dating is the ordinary
