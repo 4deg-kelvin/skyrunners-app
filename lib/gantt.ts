@@ -107,7 +107,20 @@ export interface GanttRow {
    * Empty or absent for anything with no links, which is most rows. See
    * `lib/dependencies.ts`.
    */
-  waitingOn?: { name: string; date: string; conflict: boolean }[];
+  waitingOn?: {
+    name: string;
+    date: string;
+    conflict: boolean;
+    /**
+     * The tone of the row this points AT, so the mark matches it.
+     *
+     * Supplied by the caller rather than derived here, because deciding it
+     * needs the target row itself — its phase, health and status — and this
+     * module only ever sees dates. `lib/data/projects.ts` computes it with the
+     * same helpers the target row uses, which is what stops the two disagreeing.
+     */
+    tone: GanttTone;
+  }[];
 }
 
 export interface GanttBar extends GanttRow {
@@ -146,6 +159,8 @@ export interface GanttBar extends GanttRow {
     /** The awaited date itself, for the tooltip. */
     date: string;
     conflict: boolean;
+    /** The target row s tone. See `waitingOn` on `GanttRow`. */
+    tone: GanttTone;
   }[];
 }
 
@@ -391,6 +406,7 @@ export function buildGantt(
           name: w.name,
           date: w.date,
           conflict: w.conflict,
+          tone: w.tone,
         };
       })
       .filter((m): m is NonNullable<typeof m> => Boolean(m));

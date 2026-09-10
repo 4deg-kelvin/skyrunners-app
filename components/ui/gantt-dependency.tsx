@@ -11,12 +11,23 @@ export function GanttDependency({
   pct,
   conflict,
   item,
+  toneClass,
+  toneLabel,
 }: {
   name: string;
   date: string;
   pct: number;
   conflict?: boolean;
   item: string;
+  /**
+   * The background class of the row this points AT, so the tick matches it.
+   *
+   * Resolved by the chart, which owns the tone palette, rather than mapped
+   * again here — one copy of "risk is this red" is the point.
+   */
+  toneClass: string;
+  /** That tone in words, for the label. "Blocked / overdue", "At risk", … */
+  toneLabel: string;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [position, setPosition] = useState<{
@@ -65,7 +76,9 @@ export function GanttDependency({
           item +
           " is waiting on " +
           name +
-          ", due " +
+          " (" +
+          toneLabel +
+          "), due " +
           date +
           (conflict ? " — after this item's due date" : "")
         }
@@ -84,9 +97,22 @@ export function GanttDependency({
           if (event.key === "Escape") setPosition(null);
         }}
       >
+        {/*
+          COLOUR is the target's health; WIDTH is the date conflict.
+
+          Colour used to mean "date conflict", which wasted the one channel a
+          reader takes in without hovering: the useful thing about a pointer is
+          how the pointed-at work is going, and "the thing I am waiting for is
+          blocked" was invisible until you opened the other project.
+
+          The conflict signal is not dropped — it moved to thickness, which is
+          orthogonal to hue, so a blocked target that also lands late reads as
+          both at once. It is also in the panel in words, because a conflict is
+          a claim about two dates and needs a sentence.
+        */}
         <span
           aria-hidden
-          className={"h-7 w-0.5 " + (conflict ? "bg-risk-fg" : "bg-ink-muted")}
+          className={"h-7 " + (conflict ? "w-1" : "w-0.5") + " " + toneClass}
         />
       </button>
       {position
@@ -100,6 +126,9 @@ export function GanttDependency({
                 Waiting on
               </span>
               <span className="font-semibold break-words">{name}</span>
+              <span className="text-ink-muted block text-[10px] font-semibold">
+                {toneLabel}
+              </span>
               <span
                 className={
                   "mt-1 block " + (conflict ? "text-risk-fg" : "text-ink-muted")

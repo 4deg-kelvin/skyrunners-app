@@ -71,7 +71,12 @@ function daysWaitingOn(since: string): number {
 }
 import type { BreadcrumbNode } from "./my-work";
 import { preloadLiveStore } from "@/lib/store/request";
-import { buildGantt, projectTone, type GanttChart } from "@/lib/gantt";
+import {
+  buildGantt,
+  projectTone,
+  type GanttChart,
+  type GanttTone,
+} from "@/lib/gantt";
 import {
   isCoLead,
   leadsTeamAtOrAbove,
@@ -962,11 +967,73 @@ function projectTimeline(project: Project): GanttChart | null {
     })
       // A mark needs a date to sit on, and a finished target is not a wait.
       .filter((r) => r.targetDate && !r.targetDone)
-      .map((r) => ({
-        name: r.targetName,
-        date: r.targetDate!,
-        conflict: Boolean(r.conflict),
-      }));
+      .map((r) => {
+        /*
+          The mark carries the TARGET's colour, not its own status.
+
+          "Waiting on" is a pointer, so the useful thing to read off it is how
+          the pointed-at work is going: a red tick means the thing you are
+          waiting for is blocked or overdue, which is the one case a PL has to
+          act on and could not previously see without opening the other
+          project.
+
+          Colour used to mean "date conflict", and that signal has NOT been
+          dropped — it is in the hover panel in words, which is where it
+          belongs. A conflict is a claim about two dates and needs a sentence;
+          health is a single value and needs a colour.
+
+          Both branches call the SAME helper the target's own row calls, so a
+          mark and the row it points at cannot disagree. That is the entire
+          requirement.
+        */
+        const target =
+          r.targetKind === "project"
+            ? store.projects.find((x) => x.id === r.dependency.targetId)
+            : store.deliverables.find((x) => x.id === r.dependency.targetId);
+
+        let tone: GanttTone = "neutral";
+        if (target) {
+          tone =
+            r.targetKind === "project"
+              ? toneOfProject(target as Project)
+              : deliverableTone(target as Deliverable);
+        }
+
+        return {
+          name: r.targetName,
+          date: r.targetDate!,
+          conflict: Boolean(r.conflict),
+          tone,
+        };
+      });
+
+  /*
+    The tone a DELIVERABLE row takes.
+
+    Lifted out of the row literal on 2026-09-09 so a waiting-on mark can ask
+    the same question. The whole point of colouring a mark is that it matches
+    the row it points at, and two copies of this expression would drift.
+
+    Past its date is RED, not amber. A deliverable has one date and one owner —
+    there is no "slightly late". It is either done, or the date has gone and
+    somebody needs to either do it or move it. Blocked and overdue share the
+    colour deliberately: both mean "this needs a person today", and splitting
+    them into two shades of urgent makes neither register.
+  */
+  const deliverableTone = (d: Deliverable): GanttTone =>
+    d.status === "done"
+      ? "done"
+      : d.status === "blocked" || isOverdue(d)
+        ? "risk"
+        : "neutral";
+
+  /** The tone a PROJECT row takes. Same call the row itself makes. */
+  const toneOfProject = (project: Project): GanttTone =>
+    projectTone(
+      project.phase,
+      project.health,
+      !!project.targetDate && project.targetDate < now
+    );
 
   const addProject = (p: Project, depth: number) => {
     // `parent_id` is a plain column; a loop would hang the request rather than
@@ -993,11 +1060,7 @@ function projectTimeline(project: Project): GanttChart | null {
       */
       baselineEnd: baselineTargetDate(p.id),
       depth,
-      tone: projectTone(
-        p.phase,
-        p.health,
-        !!p.targetDate && p.targetDate < now
-      ),
+      tone: toneOfProject(p),
       progress: progress.total > 0 ? progress.fraction : undefined,
       kind: "project",
       waitingOn: waitingOnFor("project", p.id, p.targetDate),
@@ -1034,12 +1097,7 @@ function projectTimeline(project: Project): GanttChart | null {
           needs a person today", and splitting them into two shades of urgent
           makes neither register.
         */
-        tone:
-          d.status === "done"
-            ? "done"
-            : d.status === "blocked" || isOverdue(d)
-              ? "risk"
-              : "neutral",
+        tone: deliverableTone(d),
         kind: d.kind === "milestone" ? "milestone" : "deliverable",
         waitingOn: waitingOnFor("deliverable", d.id, d.dueDate),
       });

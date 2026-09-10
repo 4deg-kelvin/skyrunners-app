@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Check, Copy, UserPlus, X } from "lucide-react";
 
 import { ActionButton, ActionForm } from "./action-form";
 import {
@@ -30,10 +30,23 @@ import type { GlobalRole, MemberStatus } from "@/lib/types";
  */
 export function InviteMemberForm({
   canAppointLeadership,
+  joinUrl,
 }: {
   canAppointLeadership: boolean;
+  /**
+   * The sign-in page, absolute, for handing to somebody who isn't here yet.
+   *
+   * Built on the server with `appUrl` because that is where the host lives —
+   * `NEXT_PUBLIC_SITE_URL`, then Vercel's stable production domain. Deriving it
+   * from `window.location` would put a preview deployment's throwaway hostname
+   * into a link somebody pastes into Discord.
+   *
+   * **Deliberately NOT a token.** See the note beside the block that renders it.
+   */
+  joinUrl: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!open) {
     return (
@@ -48,103 +61,189 @@ export function InviteMemberForm({
   }
 
   return (
-    <ActionForm
-      action={inviteMemberAction}
-      submitLabel="Send invite"
-      submittingLabel="Inviting…"
-      resetOnSuccess
-      className="rounded-card border-line bg-card w-full border p-4"
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
-            Name
-          </span>
-          <input
-            type="text"
-            name="fullName"
-            required
-            placeholder="Jordan Reyes"
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          />
-        </label>
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
-            Stanford email
-          </span>
-          <input
-            type="email"
-            name="email"
-            required
-            placeholder="jreyes@stanford.edu"
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          />
-        </label>
+    <div className="rounded-card border-line bg-card w-full border p-4">
+      {/* Same header close as the project and deliverable panels. */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-ink text-sm font-bold">Add someone to the roster</p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-ink-muted hover:text-ink hover:bg-surface rounded-tile -mr-1 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold transition-colors"
+        >
+          <X className="size-3.5" />
+          Close
+        </button>
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
-            Phone <span className="text-ink-muted font-normal">(optional)</span>
-          </span>
-          <input
-            type="tel"
-            name="phone"
-            placeholder="(650) 555-0142"
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          />
-          <span className="text-ink-muted mt-1 block text-xs">
-            Shown instead of their email wherever people need to reach them.
-            They can change it later.
-          </span>
-        </label>
+      <ActionForm
+        action={inviteMemberAction}
+        submitLabel="Send invite"
+        submittingLabel="Inviting…"
+        resetOnSuccess
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Name
+            </span>
+            <input
+              type="text"
+              name="fullName"
+              required
+              placeholder="Jordan Reyes"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Stanford email
+            </span>
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="jreyes@stanford.edu"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            />
+          </label>
+        </div>
 
-        <label className="block">
-          <span className="text-ink mb-1 block text-sm font-semibold">
-            Role
-          </span>
-          <select
-            name="globalRole"
-            defaultValue="member"
-            className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
-          >
-            <option value="member">Member</option>
-            {/*
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Phone{" "}
+              <span className="text-ink-muted font-normal">(optional)</span>
+            </span>
+            <input
+              type="tel"
+              name="phone"
+              placeholder="(650) 555-0142"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            />
+            <span className="text-ink-muted mt-1 block text-xs">
+              Shown instead of their email wherever people need to reach them.
+              They can change it later.
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="text-ink mb-1 block text-sm font-semibold">
+              Role
+            </span>
+            <select
+              name="globalRole"
+              defaultValue="member"
+              className="rounded-tile border-line bg-card text-ink w-full border px-3 py-2 text-[15px]"
+            >
+              <option value="member">Member</option>
+              {/*
               Advisor is Co-Lead-gated with the leadership roles, even though it
               carries no authority. It's a standing outside seat at the club's
               whole record — every project, every check-in entry, every roster
               page — and who gets one is a Co-Lead's call, not a decision made
               in passing while inviting somebody.
             */}
-            {canAppointLeadership ? (
-              <>
-                <option value="advisor">Advisor</option>
-                <option value="lead">Team Lead</option>
-                <option value="co_lead">Co-Lead</option>
-              </>
+              {canAppointLeadership ? (
+                <>
+                  <option value="advisor">Advisor</option>
+                  <option value="lead">Team Lead</option>
+                  <option value="co_lead">Co-Lead</option>
+                </>
+              ) : null}
+            </select>
+            {!canAppointLeadership ? (
+              <span className="text-ink-muted mt-1 block text-xs">
+                Only a Co-Lead can invite someone as leadership.
+              </span>
             ) : null}
-          </select>
-          {!canAppointLeadership ? (
-            <span className="text-ink-muted mt-1 block text-xs">
-              Only a Co-Lead can invite someone as leadership.
-            </span>
-          ) : null}
-        </label>
+          </label>
+        </div>
+
+        <p className="text-ink-muted mt-3 mb-3 text-xs">
+          They appear on the roster straight away and become a real account the
+          first time they sign in with that address.
+        </p>
+      </ActionForm>
+
+      {/*
+        The other way in: a link, for when you do not want to type six people's
+        addresses.
+
+        ---------------------------------------------------------------------
+        Why this is NOT a tokenised invite link
+        ---------------------------------------------------------------------
+
+        It is the plain sign-in URL, shareable by anyone, and that is safe
+        because the gates are already there and are not this link:
+
+          1. Google OAuth accepts `@stanford.edu` only, checked again in
+             `lib/env.ts` and a third time by the `profiles_stanford_email`
+             CHECK. Forwarding this to somebody outside Stanford achieves
+             nothing.
+          2. A Stanford sign-in with no pre-created profile gets an INACTIVE
+             one — `handle_new_auth_user` in migration `0005` — so they land on
+             `/auth/inactive` and appear on this page under "waiting for
+             activation" until a Lead clicks. Following the link does not put
+             anybody on the roster.
+
+        So a token would add an expiry, a revocation path, an audit trail and a
+        bearer secret that leaks by being pasted into Discord, to guard a door
+        that is already locked twice. The honest version of "invite link" here
+        is "here is where to sign in", and the sentence below says what happens
+        next so nobody expects it to skip the review.
+
+        The one thing it genuinely changes: the invite form pre-creates the
+        profile, so an invited person is active the moment they first sign in.
+        Link arrivals wait for a click. That is a real difference and it is
+        stated rather than buried.
+      */}
+      <div className="border-line mt-4 border-t pt-3.5">
+        <p className="text-ink text-sm font-bold">Or send them this link</p>
+        <p className="text-ink-muted mt-1 text-xs">
+          They sign in with their Stanford account and show up here under people
+          waiting to be activated — one click and they&apos;re on. Use this for
+          a whole intake at once; use the form above when you want somebody
+          active the moment they first sign in.
+        </p>
+
+        {/*
+          A localhost link is a broken link, said out loud.
+
+          `appUrl` falls back to localhost when neither NEXT_PUBLIC_SITE_URL nor
+          Vercel s domain variables are set. Somebody would otherwise paste that
+          into Discord and wonder why nobody could open it — and the person who
+          can fix it is the one reading this panel.
+        */}
+        {joinUrl.startsWith("http://localhost") ? (
+          <p className="text-warn-fg mt-2 text-xs font-medium">
+            This link points at localhost, so it only works on this machine. Set
+            NEXT_PUBLIC_SITE_URL in the deployment and it becomes the real
+            address.
+          </p>
+        ) : null}
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <code className="rounded-tile border-line bg-surface text-ink min-w-0 flex-1 overflow-x-auto border px-3 py-2 text-xs">
+            {joinUrl}
+          </code>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(joinUrl);
+              setCopied(true);
+            }}
+            className="rounded-tile border-line hover:bg-surface text-ink inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm font-semibold transition-colors"
+          >
+            {copied ? (
+              <Check className="size-4" />
+            ) : (
+              <Copy className="size-4" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
       </div>
-
-      <p className="text-ink-muted mt-3 mb-3 text-xs">
-        They appear on the roster straight away and become a real account the
-        first time they sign in with that address.
-      </p>
-
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="text-ink-muted hover:text-ink ml-5 text-sm font-semibold"
-      >
-        Cancel
-      </button>
-    </ActionForm>
+    </div>
   );
 }
 

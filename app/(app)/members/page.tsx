@@ -14,6 +14,7 @@ import { getRoster } from "@/lib/data/members";
 import { getViewer } from "@/lib/data/viewer";
 import { ROLE_LABELS, ROLE_TONES } from "@/lib/labels";
 import { can, isCoLead } from "@/lib/permissions";
+import { appUrl } from "@/lib/urls";
 
 export default async function MembersPage() {
   const [roster, viewer] = await Promise.all([getRoster(), getViewer()]);
@@ -45,7 +46,14 @@ export default async function MembersPage() {
         description={`${roster.length} active members. Who's on what, and what they're cleared to use, is public.`}
         action={
           mayInvite ? (
-            <InviteMemberForm canAppointLeadership={mayAppointLeadership} />
+            <InviteMemberForm
+              canAppointLeadership={mayAppointLeadership}
+              /*
+                Built here, not in the form: `appUrl` reads the host out of the
+                environment, which only exists on the server.
+              */
+              joinUrl={appUrl("/login")}
+            />
           ) : undefined
         }
       />

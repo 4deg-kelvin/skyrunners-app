@@ -477,3 +477,99 @@ describe("the roster puts PLs first, then everyone alphabetically", () => {
     }
   });
 });
+
+describe("a waiting-on mark takes the colour of what it points at", () => {
+  /*
+    The requirement in one line: the tick's colour must MATCH the row it
+    references. Colour used to mean "date conflict", which spent the only
+    channel a reader takes in without hovering on the less useful of the two
+    facts — "the thing I am waiting for is blocked" was invisible until you
+    opened the other project.
+
+    Pinned here rather than trusted, because the failure is silent and the two
+    values are computed in different places: the row's tone on the row, the
+    mark's tone on whatever points at it. They agree only because both call the
+    same helper, and nothing else would notice if one stopped.
+  */
+  const setup = async (over: {
+    status?: string;
+    dueDate?: string;
+    health?: string;
+  }) => {
+    await disk.mutate((store) => {
+      const project = store.projects.find((p) => p.id === "p-wing-spar")!;
+      project.health = (over.health ?? project.health) as typeof project.health;
+
+      const target = store.deliverables.find((d) => d.id === "d-1")!;
+      if (over.status) target.status = over.status as typeof target.status;
+      if (over.dueDate) target.dueDate = over.dueDate;
+
+      // "Mass reduction options memo" already waits on "Spar FEA" in the seed
+      // (dep-2), so there is a real link to read the tone off.
+      return { ok: true as const, value: null };
+    });
+    const view = await getProjectBySlug("wing-spar-redesign", "m-anish");
+    const bars = view!.timeline!.bars;
+    const target = bars.find((b) => b.id === "d-1");
+    const marks = bars.flatMap((b) =>
+      (b.waitingOnMarks ?? []).filter((m) => m.name === target?.name)
+    );
+    return { targetTone: target?.tone, markTones: marks.map((m) => m.tone) };
+  };
+
+  test("a blocked target makes the tick risk-coloured", async () => {
+    const { targetTone, markTones } = await setup({ status: "blocked" });
+    assert.equal(targetTone, "risk");
+    assert.ok(
+      markTones.length > 0,
+      "the seeded dependency must produce a mark"
+    );
+    for (const tone of markTones) assert.equal(tone, "risk");
+  });
+
+  test("an overdue target is risk too, without anybody flagging it", async () => {
+    // Blocked and overdue share the colour deliberately: both mean "this needs
+    // a person today".
+    const { targetTone, markTones } = await setup({ dueDate: "2020-01-01" });
+    assert.equal(targetTone, "risk");
+    for (const tone of markTones) assert.equal(tone, "risk");
+  });
+
+  test("an ordinary target is neutral, matching its own row", async () => {
+    const { targetTone, markTones } = await setup({});
+    assert.ok(markTones.length > 0);
+    for (const tone of markTones) assert.equal(tone, targetTone);
+  });
+
+  /*
+    The invariant that actually matters, swept across the whole chart: every
+    mark's tone equals the tone of the row it names. A hand-written expectation
+    per case would pass just as happily against a copy of the rule that had
+    started to drift.
+  */
+  test("every mark on every row matches the row it names", async () => {
+    for (const slug of disk.readStore().projects.map((p) => p.slug)) {
+      const view = await getProjectBySlug(slug, "m-anish");
+      const bars = view?.timeline?.bars;
+      if (!bars) continue;
+
+      // A Map rather than a `find` inside the loop: `bars.find()` referring to
+      // `bars` while the callback's parameter type is still being inferred
+      // trips TS7022, and one pass is the right shape anyway.
+      const toneByName = new Map(bars.map((b) => [b.name, b.tone]));
+
+      for (const bar of bars) {
+        for (const mark of bar.waitingOnMarks ?? []) {
+          // A target outside this chart has no row to compare against; the
+          // tone still comes from the store, which the cases above cover.
+          if (!toneByName.has(mark.name)) continue;
+          assert.equal(
+            mark.tone,
+            toneByName.get(mark.name),
+            `${slug}: mark on ${bar.name} -> ${mark.name}`
+          );
+        }
+      }
+    }
+  });
+});

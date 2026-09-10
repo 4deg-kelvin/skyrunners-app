@@ -105,7 +105,34 @@ export function Gantt({
 }) {
   if (!chart.bars.length) return null;
   const nameWidth = compact ? "12rem" : "var(--gantt-name)";
-  const minWidth = compact ? "36rem" : "43rem";
+  /*
+    A floor on the track's width, on SMALL SCREENS ONLY.
+    ---------------------------------------------------------------------------
+
+    This was a flat `min-width` at every size, and on desktop it produced a
+    horizontal scrollbar for nothing. The mechanism is worth knowing because it
+    catches every scroll container with `overflow-auto` on both axes:
+
+      1. The chart is laid out at the container's full width.
+      2. Rows overflow vertically, so a vertical scrollbar appears — and on
+         Windows that is a real ~17px of reserved width, not an overlay.
+      3. The client width is now 17px smaller, but the inner div cannot shrink
+         below its `min-width`, so it overflows by 17px.
+      4. A horizontal scrollbar appears to scroll those 17px.
+
+    Measured at a 934px card: 918px of content in 918px of client, `overflowsBy`
+    zero — the bar was scrolling almost nothing, which is exactly why it looked
+    like a bug rather than a feature.
+
+    Below `sm` the floor is real and stays: 15rem of names plus a 40-day window
+    in ~180px of track is four pixels a day, and the markers are 18px wide. That
+    is what the "swipe across" hint underneath is for. Above `sm` the chart
+    sizes itself to the container and the whole window is always visible, which
+    is what a timeline is for.
+  */
+  const minWidthClass = compact
+    ? "min-w-[36rem] sm:min-w-0"
+    : "min-w-[43rem] sm:min-w-0";
   const ticks =
     chart.ticks[0]?.leftPct > 3
       ? [
@@ -133,13 +160,35 @@ export function Gantt({
           {chart.windowEnd.slice(0, 4)}
         </span>
       </figcaption>
+      {/*
+        Vertical scrolls; horizontal is CLIPPED above `sm`.
+
+        A point marker is positioned `left: X%` and pulled back by half its own
+        width with a transform. At `left: 100%` — which is every chart whose
+        last date belongs to a deliverable rather than a project span — the
+        transform makes it VISIBLE but its untransformed box still extends 9px
+        past the container, so `scrollWidth` grows by 9 and a horizontal
+        scrollbar appears to scroll nine pixels of nothing. Measured: 927 of
+        content in 918 of client, with the marker s visible edge already 7px
+        inside.
+
+        `clip` rather than `hidden` because it does not create a scroll
+        container at all, and rather than insetting the whole coordinate space
+        because that would have to be done identically to the axis, the grid,
+        the today line and every row or they stop lining up. Nothing is lost:
+        the pixels being clipped are the phantom half of a marker that is
+        already fully drawn.
+
+        Below `sm` the horizontal scroll is real and stays — see the
+        `min-w` note above, and the swipe hint underneath.
+      */}
       <div
-        className="border-line rounded-tile isolate max-h-[32rem] overflow-auto border"
+        className="border-line rounded-tile isolate max-h-[32rem] overflow-x-auto overflow-y-auto border sm:overflow-x-clip"
         tabIndex={0}
         role="region"
-        aria-label="Timeline chart. Scroll horizontally to explore dates."
+        aria-label="Timeline chart"
       >
-        <div style={{ minWidth }}>
+        <div className={minWidthClass}>
           <div className="border-line bg-surface sticky top-0 z-40 flex h-12 border-b">
             <div
               className="bg-surface border-line text-ink-muted sticky left-0 z-30 flex shrink-0 items-center border-r px-3 text-xs font-semibold tracking-wide uppercase"
@@ -291,7 +340,17 @@ export function Gantt({
                       <GanttDependency
                         key={mark.name + "-" + mark.pct + "-" + index}
                         item={bar.name}
-                        {...mark}
+                        name={mark.name}
+                        date={mark.date}
+                        pct={mark.pct}
+                        conflict={mark.conflict}
+                        /*
+                          The palette lives here, so the class is resolved here
+                          and handed over. The mark and the row it points at
+                          therefore read from one table.
+                        */
+                        toneClass={TONES[mark.tone].dot}
+                        toneLabel={TONES[mark.tone].label}
                       />
                     ))}{" "}
                   </div>
@@ -332,7 +391,18 @@ export function Gantt({
         </span>
         <span>Darker fill = progress</span>
         {hasBaseline ? <span>◇ Original target</span> : null}
-        {hasWaiting ? <span>│ Waiting on · red = date conflict</span> : null}
+        {hasWaiting ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="bg-ink-muted inline-block h-3 w-0.5" />
+            Waiting on — colour is its status
+          </span>
+        ) : null}
+        {chart.bars.some((b) => b.waitingOnMarks?.some((m) => m.conflict)) ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="bg-ink-muted inline-block h-3 w-1" />
+            Thicker = lands after this item is due
+          </span>
+        ) : null}
       </div>
       {chart.hiddenCount > 0 ? (
         <p className="text-ink-muted mt-2 text-xs">
