@@ -35,11 +35,12 @@ process.env.SKYRUNNERS_STORE_DIR = TEST_DIR;
 
 let disk: typeof import("../store/disk.ts");
 let getProjectTree: typeof import("./projects.ts").getProjectTree;
+let getProjectBySlug: typeof import("./projects.ts").getProjectBySlug;
 let mock: typeof import("../mock-data.ts");
 
 before(async () => {
   disk = await import("../store/disk.ts");
-  ({ getProjectTree } = await import("./projects.ts"));
+  ({ getProjectTree, getProjectBySlug } = await import("./projects.ts"));
   mock = await import("../mock-data.ts");
 });
 
@@ -355,4 +356,106 @@ test("sub-project lists and both Gantt charts share due-date order without separ
     before,
     "ordering must never write dates, progress or row order to storage"
   );
+});
+
+/** Any seeded member. The roster order does not depend on who is looking. */
+const VIEWER = "m-anish";
+
+describe("the roster puts PLs first, then everyone alphabetically", () => {
+  /*
+    The order used to be whatever the store handed back, which for Postgres is
+    not merely arbitrary but NOT STABLE — the same failure as the project tree
+    above, and it fails just as silently. Two of the seeded projects had a
+    plain member sitting above both of their PLs.
+
+    The rank deliberately matches `projectREs`, because the PL list and this
+    roster render on the same page and disagreeing about who comes first would
+    read as a bug.
+  */
+  const rankOf = (
+    row: { membership: { memberId: string; role: string } },
+    primaryReId?: string
+  ) =>
+    row.membership.memberId === primaryReId
+      ? 0
+      : row.membership.role === "re"
+        ? 1
+        : 2;
+
+  test("the primary PL is first, even when the store lists them third", async () => {
+    // Seeded as: Anish Bayya (member), Lena Fischer [PL], Amara Okonkwo [PL].
+    const view = await getProjectBySlug("gps-denied-navigation", VIEWER);
+    assert.ok(view);
+    assert.equal(view.members[0].member?.fullName, "Lena Fischer");
+    assert.equal(view.members[0].membership.memberId, view.project.primaryReId);
+  });
+
+  test("other PLs come next, above every plain member", async () => {
+    const view = await getProjectBySlug("gps-denied-navigation", VIEWER);
+    assert.ok(view);
+    assert.equal(view.members[1].member?.fullName, "Amara Okonkwo");
+    assert.equal(view.members[1].membership.role, "re");
+  });
+
+  test("everyone else is alphabetical by full name", async () => {
+    const view = await getProjectBySlug("wing-spar-redesign", VIEWER);
+    assert.ok(view);
+    const others = view.members
+      .filter((r) => rankOf(r, view.project.primaryReId) === 2)
+      .map((r) => r.member?.fullName ?? "");
+    // Seeded Noah, Elena, Nadia — insertion order, not alphabetical.
+    assert.deepEqual(others, [
+      "Elena Petrova",
+      "Nadia Haddad",
+      "Noah Bergström",
+    ]);
+    assert.ok(isSorted(others));
+  });
+
+  /*
+    Swept across every seeded project rather than asserting one list, because
+    the bug this replaces was a MISSING sort: a single hand-written expectation
+    passes just as happily against an accidental order that happens to match.
+  */
+  test("the rank never decreases, on any project", async () => {
+    const slugs = disk.readStore().projects.map((x) => x.slug);
+    let checked = 0;
+
+    for (const slug of slugs) {
+      const view = await getProjectBySlug(slug, VIEWER);
+      if (!view || view.members.length < 2) continue;
+      checked++;
+
+      for (let i = 1; i < view.members.length; i++) {
+        const a = view.members[i - 1];
+        const b = view.members[i];
+        const ra = rankOf(a, view.project.primaryReId);
+        const rb = rankOf(b, view.project.primaryReId);
+        assert.ok(ra <= rb, `${slug}: rank went ${ra} -> ${rb}`);
+        if (ra === rb) {
+          assert.ok(
+            (a.member?.fullName ?? "").localeCompare(
+              b.member?.fullName ?? ""
+            ) <= 0,
+            `${slug}: ${a.member?.fullName} before ${b.member?.fullName}`
+          );
+        }
+      }
+    }
+
+    assert.ok(checked >= 8, `only ${checked} projects had a roster to check`);
+  });
+
+  test("exactly one row can hold rank 0", async () => {
+    // Two "primary" rows would mean the badge on the page is lying about one
+    // of them, and the sort would be picking arbitrarily between the pair.
+    for (const slug of disk.readStore().projects.map((x) => x.slug)) {
+      const view = await getProjectBySlug(slug, VIEWER);
+      if (!view) continue;
+      const primaries = view.members.filter(
+        (r) => rankOf(r, view.project.primaryReId) === 0
+      );
+      assert.ok(primaries.length <= 1, `${slug} has ${primaries.length}`);
+    }
+  });
 });

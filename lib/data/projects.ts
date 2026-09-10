@@ -588,11 +588,52 @@ export async function getProjectBySlug(
     breadcrumb: projectBreadcrumb(project.id),
     division: divisionForProject(project.id),
     res: projectREs(project.id),
-    members: projectMembers(project.id).map((pm) => ({
-      membership: pm,
-      member: pm.member,
-      daysWorked: daysWorkedOnProject(pm.memberId, project.id),
-    })),
+    /*
+      PLs first, then everybody else alphabetically.
+
+      `projectMembers` returns rows in whatever order the store hands back,
+      which for Postgres is not merely arbitrary but NOT STABLE — two loads
+      could list the same roster differently, so finding a name meant reading
+      the card top to bottom every time. Same failure as the project tree, and
+      the reason `lib/data/projects.test.ts` exists at all: ordering never
+      throws and never looks broken, so only the person hunting for a name
+      notices.
+
+      The rank mirrors `projectREs` exactly, because the two lists sit on the
+      same page and disagreeing about who comes first would read as a bug:
+
+        0  the primary PL   — the go-to contact, and labelled as such
+        1  other PLs        — multiple per project is part of the model
+        2  everyone else
+
+      Ties break on `fullName`, and a membership whose member record is missing
+      sorts last on an empty string rather than crashing the comparator. That
+      row renders as "Unknown member", so putting it at the bottom is right.
+
+      Followers are NOT a separate tier, deliberately. The card shows the role
+      badge and not the commitment, so a follower is visually identical to a
+      contributor — inventing a rank the reader cannot see would make the order
+      look arbitrary again. If following ever gets its own badge, revisit this
+      together with the badge, not before.
+    */
+    members: projectMembers(project.id)
+      .map((pm) => ({
+        membership: pm,
+        member: pm.member,
+        daysWorked: daysWorkedOnProject(pm.memberId, project.id),
+      }))
+      .sort((a, b) => {
+        const rank = (r: typeof a) =>
+          r.membership.memberId === project.primaryReId
+            ? 0
+            : r.membership.role === "re"
+              ? 1
+              : 2;
+        return (
+          rank(a) - rank(b) ||
+          (a.member?.fullName ?? "").localeCompare(b.member?.fullName ?? "")
+        );
+      }),
     advisors: projectAdvisors(project.id),
     advisorChoices: advisorOptions()
       .filter(
