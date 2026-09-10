@@ -211,15 +211,40 @@ export function DependencyPicker({
               <option value="" disabled>
                 Pick one…
               </option>
-              {deliverableOptions.length ? (
-                <optgroup label="Deliverables">
-                  {deliverableOptions.map((d) => (
-                    <option key={d.id} value={`deliverable:${d.id}`}>
-                      {d.projectName
-                        ? `${d.title} — ${d.projectName}`
-                        : d.title}
-                    </option>
-                  ))}
+              {/*
+                Own work and other projects' work in SEPARATE groups.
+
+                `eligibleDeliverableTargets` already returns them in that order,
+                so this only draws the seam it created — but the seam is the
+                point. One "Deliverables" group with a dozen entries, four of
+                them unattributed and the rest carrying a project name, made the
+                reader infer the rule from the suffix; a heading states it.
+
+                The first group is empty whenever the dependent is a PROJECT,
+                since a project may not wait on its own deliverables, and an
+                empty `optgroup` renders as a stray heading — hence the length
+                checks rather than one map with a divider.
+              */}
+              {deliverableOptions.some((d) => !d.projectName) ? (
+                <optgroup label="On this project">
+                  {deliverableOptions
+                    .filter((d) => !d.projectName)
+                    .map((d) => (
+                      <option key={d.id} value={`deliverable:${d.id}`}>
+                        {d.title}
+                      </option>
+                    ))}
+                </optgroup>
+              ) : null}
+              {deliverableOptions.some((d) => d.projectName) ? (
+                <optgroup label="Deliverables elsewhere">
+                  {deliverableOptions
+                    .filter((d) => d.projectName)
+                    .map((d) => (
+                      <option key={d.id} value={`deliverable:${d.id}`}>
+                        {d.title} — {d.projectName}
+                      </option>
+                    ))}
                 </optgroup>
               ) : null}
               {projectOptions.length ? (

@@ -31,7 +31,10 @@ import { type DeliveredInputs } from "./delivered.ts";
 import { readStore } from "./store/disk.ts";
 import { todayInClubTime } from "./dates.ts";
 import { isLiveMode } from "./env.ts";
-import { compareProjectDueDates } from "./project-order.ts";
+import {
+  compareDeliverableDueDates,
+  compareProjectDueDates,
+} from "./project-order.ts";
 
 // ---------------------------------------------------------------------------
 // Club
@@ -2738,10 +2741,18 @@ export function projectBreadcrumb(projectId: string): {
 // Deliverables
 // ---------------------------------------------------------------------------
 
+/**
+ * A project s deliverables and milestones, earliest deadline first.
+ *
+ * Was `sortOrder` alone, which is the order somebody happened to add them in:
+ * a project page listed an item due the 20th above one due the 19th, in the
+ * card AND on the timeline, because both read this function. Ordering by the
+ * date is the whole point of having dates.
+ */
 export function projectDeliverables(projectId: string): Deliverable[] {
   return live()
     .deliverables.filter((d) => d.projectId === projectId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort(compareDeliverableDueDates);
 }
 
 /**

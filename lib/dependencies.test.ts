@@ -543,3 +543,68 @@ describe("the date conflict", () => {
     );
   });
 });
+
+describe("the picker groups its own project's work first", () => {
+  /*
+    The dependency dropdown listed every eligible deliverable in one flat
+    alphabetical run, so on a course with six sub-projects "Material selection
+    and BOM" on THIS project sat between two same-named items on siblings, and
+    the only way to tell them apart was the attribution suffix. The commonest
+    case by far — waiting on something on your own project — was scattered
+    through the list.
+  */
+  const PROJECTS = [
+    project("root"),
+    project("mine", "root"),
+    project("zebra", "root"),
+    project("apple", "root"),
+  ];
+
+  const DELIVERABLES = [
+    deliverable("z-own", "mine", { title: "Z on my own project" }),
+    deliverable("a-own", "mine", { title: "A on my own project" }),
+    deliverable("a-zebra", "zebra", { title: "A on zebra" }),
+    deliverable("a-apple", "apple", { title: "A on apple" }),
+    deliverable("b-apple", "apple", { title: "B on apple" }),
+  ];
+
+  const ids = (dependentId: string, homeProjectId: string) =>
+    eligibleDeliverableTargets({
+      dependentKind: "deliverable",
+      dependentId,
+      homeProjectId,
+      projects: PROJECTS,
+      deliverables: DELIVERABLES,
+    }).map((d) => d.id);
+
+  test("own project's deliverables come first, alphabetically", () => {
+    assert.deepEqual(ids("none", "mine").slice(0, 2), ["a-own", "z-own"]);
+  });
+
+  test("then the rest, grouped by project name", () => {
+    // apple before zebra, and apple's two stay contiguous.
+    assert.deepEqual(ids("none", "mine").slice(2), [
+      "a-apple",
+      "b-apple",
+      "a-zebra",
+    ]);
+  });
+
+  /*
+    A PROJECT dependent has no own-project group at all — it may not wait on its
+    own deliverables — so the whole list is the "elsewhere" group. The picker
+    hides the empty heading rather than drawing a stray one.
+  */
+  test("a project dependent gets no own-project group", () => {
+    const forProject = eligibleDeliverableTargets({
+      dependentKind: "project",
+      dependentId: "mine",
+      homeProjectId: "mine",
+      projects: PROJECTS,
+      deliverables: DELIVERABLES,
+    }).map((d) => d.id);
+    assert.equal(forProject.includes("a-own"), false);
+    assert.equal(forProject.includes("z-own"), false);
+    assert.deepEqual(forProject, ["a-apple", "b-apple", "a-zebra"]);
+  });
+});

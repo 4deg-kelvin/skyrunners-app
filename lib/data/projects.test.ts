@@ -332,14 +332,32 @@ test("sub-project lists and both Gantt charts share due-date order without separ
     detail.timeline.bars.filter((b) => b.kind === "project").map((b) => b.id),
     expectedProjects
   );
+  /*
+    CHANGED 2026-09-09: deliverables order by DUE DATE, not `sortOrder`.
+
+    This expectation used to read d1, d2, m1 — the order they were pushed — and
+    the fixture gives them deliberately disagreeing dates:
+
+        sort-d1  "First listed"   due 2026-08-14   sortOrder 0
+        sort-d2  "Second listed"  due 2026-08-10   sortOrder 1
+        sort-m1  "Checkpoint"     due 2026-08-12   sortOrder 2
+
+    So it pinned insertion order for the items INSIDE a project while the
+    projects themselves sorted by date. The club asked for the dates to win
+    here too — a card listing something due the 20th above one due the 19th,
+    and the timeline agreeing with it, is the complaint that prompted this.
+
+    The fixture is left exactly as it was, because dates that disagree with
+    insertion order are precisely what this now needs to prove.
+  */
   assert.deepEqual(
     detail.timeline.bars.map((b) => b.id),
     [
       "sort-parent",
       "sort-early",
-      "sort-d1",
       "sort-d2",
       "sort-m1",
+      "sort-d1",
       "sort-grandchild",
       ...siblings.slice(1),
     ]

@@ -262,9 +262,34 @@ export function eligibleDeliverableTargets(input: {
   );
   if (input.dependentKind === "deliverable") scope.add(input.homeProjectId);
 
+  /*
+    This project's own work first, then everywhere else, grouped by project.
+
+    A flat alphabetical list interleaved them, so "Material selection and BOM"
+    on this project sat between two same-named items on sibling projects and the
+    only way to tell them apart was the attribution suffix — on a course with
+    six sub-projects that is a list nobody reads, and the commonest case by far
+    (waiting on something on your own project) was scattered through it.
+
+    Within the "elsewhere" group the key is the project NAME rather than its id,
+    so the run of items under one project is contiguous AND the projects
+    themselves come in the order the picker's project list uses.
+  */
+  const nameOfProject = new Map(input.projects.map((p) => [p.id, p.name]));
+
   return input.deliverables
     .filter((d) => scope.has(d.projectId) && d.id !== input.dependentId)
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      const own = (d: Deliverable) =>
+        d.projectId === input.homeProjectId ? 0 : 1;
+      return (
+        own(a) - own(b) ||
+        (nameOfProject.get(a.projectId) ?? "").localeCompare(
+          nameOfProject.get(b.projectId) ?? ""
+        ) ||
+        a.title.localeCompare(b.title)
+      );
+    });
 }
 
 /** One end of a dependency, as an opaque key. */

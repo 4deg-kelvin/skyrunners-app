@@ -46,6 +46,51 @@ const TONES: Record<
 const day = (date: string) =>
   formatDay(date, { month: "short", day: "numeric" });
 
+/**
+ * One shape per kind of row, and they have to differ by SILHOUETTE.
+ *
+ * A milestone used to be a bigger, outlined version of the deliverable's
+ * diamond. At the size these render — 10 to 14 pixels — "same shape, slightly
+ * larger, thin ring" is not a distinction anybody makes without two of them
+ * side by side to compare, and the legend said "Deliverable / milestone" as a
+ * single entry, so there was nothing to compare against either.
+ *
+ * A triangle reads as different at a glance and at any size, which a square
+ * would not: rotated 45 degrees a square IS the diamond, and unrotated it is a
+ * diamond that looks misaligned rather than deliberate.
+ *
+ * `clip-path` rather than a border trick, because a CSS triangle built from
+ * borders cannot take a background colour — and the background is what carries
+ * health on this chart. The clip keeps `tone.dot` doing its job.
+ */
+const TRIANGLE = "[clip-path:polygon(50%_0%,100%_100%,0%_100%)]";
+
+/**
+ * The marker for a point row, sized for the track.
+ *
+ * Sizes are in PIXELS rather than Tailwind's scale, because a rotated square is
+ * not as wide as its box: at 45 degrees a 13px square measures 13 × √2 ≈ 18px
+ * corner to corner. Sizing the diamond and the triangle from the same number
+ * would make the diamond look half again bigger than the milestone it is
+ * supposed to rank below, so the box sizes are set to make the DRAWN widths
+ * match instead — 18px each.
+ *
+ * All three grew on 2026-09-09. At 10px the diamond was a speck on a 64px row,
+ * which is what made the whole chart read as small.
+ */
+function pointShape(kind: string): string {
+  if (kind === "event") return "size-3 rounded-full";
+  if (kind === "milestone") return `size-[18px] ${TRIANGLE}`;
+  return "size-[13px] rotate-45";
+}
+
+/** The same vocabulary at dot size, beside the row's name. */
+function dotShape(kind: string): string {
+  if (kind === "project" || kind === "event") return "rounded-full";
+  if (kind === "milestone") return TRIANGLE;
+  return "rotate-45";
+}
+
 /** Presentation only. All dates, bounds, progress and dependency marks come from
  * buildGantt unchanged. The axis, grid and today line share the exact track inset.
  * Fixed columns keep that coordinate system intact when the chart scrolls. */
@@ -83,7 +128,7 @@ export function Gantt({
         <span className="text-ink-soft text-xs">
           {caption ?? "Project dates, deliverables and milestones"}
         </span>
-        <span className="text-ink-muted text-[11px] tabular-nums">
+        <span className="text-ink-muted text-xs tabular-nums">
           {day(chart.windowStart)} – {day(chart.windowEnd)} ·{" "}
           {chart.windowEnd.slice(0, 4)}
         </span>
@@ -97,7 +142,7 @@ export function Gantt({
         <div style={{ minWidth }}>
           <div className="border-line bg-surface sticky top-0 z-40 flex h-12 border-b">
             <div
-              className="bg-surface border-line text-ink-muted sticky left-0 z-30 flex shrink-0 items-center border-r px-3 text-[11px] font-semibold tracking-wide uppercase"
+              className="bg-surface border-line text-ink-muted sticky left-0 z-30 flex shrink-0 items-center border-r px-3 text-xs font-semibold tracking-wide uppercase"
               style={{ width: nameWidth }}
             >
               Project / checkpoint
@@ -106,7 +151,7 @@ export function Gantt({
               {ticks.map((t) => (
                 <span
                   key={`${t.label}-${t.leftPct}`}
-                  className="border-line text-ink-soft absolute inset-y-0 border-l pt-2 pl-2 text-[11px] font-semibold"
+                  className="border-line text-ink-soft absolute inset-y-0 border-l pt-2 pl-2 text-xs font-semibold"
                   style={{ left: `${t.leftPct}%` }}
                 >
                   {t.label}
@@ -178,26 +223,26 @@ export function Gantt({
                     <div className="flex items-start gap-1.5">
                       <span
                         aria-hidden
-                        className={`mt-1.5 size-1.5 shrink-0 ${tone.dot} ${bar.kind === "project" || bar.kind === "event" ? "rounded-full" : "rotate-45"}`}
+                        className={`mt-1.5 shrink-0 ${tone.dot} ${dotShape(bar.kind)} ${bar.kind === "milestone" ? "size-2.5" : "size-2"}`}
                       />
                       {bar.href ? (
                         <Link
                           href={bar.href}
                           title={bar.name}
-                          className="text-ink hover:text-cardinal-600 line-clamp-2 text-xs leading-snug font-semibold"
+                          className="text-ink hover:text-cardinal-600 line-clamp-2 text-[13px] leading-snug font-semibold"
                         >
                           {bar.name}
                         </Link>
                       ) : (
                         <span
                           title={bar.name}
-                          className="text-ink-soft line-clamp-2 text-xs leading-snug"
+                          className="text-ink-soft line-clamp-2 text-[13px] leading-snug"
                         >
                           {bar.name}
                         </span>
                       )}
                     </div>
-                    <span className="text-ink-muted mt-1 pl-3 text-[10px] tabular-nums">
+                    <span className="text-ink-muted mt-1 pl-3 text-[11px] tabular-nums">
                       {bar.kind === "milestone" ? "Milestone · " : ""}
                       {dates}
                       {progress !== undefined ? ` · ${progress}%` : ""}
@@ -214,7 +259,7 @@ export function Gantt({
                       {point ? (
                         <span
                           title={label}
-                          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${tone.dot} ${bar.kind === "event" ? "size-2.5 rounded-full" : bar.kind === "milestone" ? "border-card size-3.5 rotate-45 border-2 shadow-sm" : "size-2.5 rotate-45"}`}
+                          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${tone.dot} ${pointShape(bar.kind)}`}
                           style={{ left: `${bar.leftPct}%` }}
                         />
                       ) : (
@@ -256,23 +301,41 @@ export function Gantt({
           </div>
         </div>
       </div>
-      <p className="text-ink-muted mt-2 text-[11px] sm:hidden">
+      <p className="text-ink-muted mt-2 text-xs sm:hidden">
         Swipe across for dates; scroll down for more items.
       </p>
-      <div className="text-ink-muted mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11px]">
+      <div className="text-ink-muted mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
         {(["ok", "warn", "risk", "done"] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
-            <span className={`h-2 w-3 rounded-sm ${TONES[t].dot}`} />
+            <span className={`h-2.5 w-3.5 rounded-sm ${TONES[t].dot}`} />
             {TONES[t].label}
           </span>
         ))}
-        <span>◆ Deliverable / milestone</span>
+        {/*
+          Two entries, and DRAWN rather than typed as "◆".
+
+          A literal glyph in the legend is a promise the chart cannot keep: it
+          is the reader's font at the reader's size, next to a shape this file
+          renders in CSS, and there is no triangle character that matches
+          `pointShape` at all. Building both from the same functions the rows
+          use means the key cannot drift from the thing it explains.
+        */}
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className={`bg-ink-muted size-3.5 ${dotShape("deliverable")}`}
+          />
+          Deliverable
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className={`bg-ink-muted size-4 ${dotShape("milestone")}`} />
+          Milestone
+        </span>
         <span>Darker fill = progress</span>
         {hasBaseline ? <span>◇ Original target</span> : null}
         {hasWaiting ? <span>│ Waiting on · red = date conflict</span> : null}
       </div>
       {chart.hiddenCount > 0 ? (
-        <p className="text-ink-muted mt-2 text-[11px]">
+        <p className="text-ink-muted mt-2 text-xs">
           {chart.hiddenCount}{" "}
           {chart.hiddenCount === 1 ? "item has" : "items have"} no date or{" "}
           {chart.hiddenCount === 1 ? "falls" : "fall"} outside this window.
