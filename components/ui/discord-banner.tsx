@@ -61,7 +61,7 @@ export function DiscordBanner({
             {!hasId
               ? "All club communication runs through Discord, and it's how you'll hear that you've been added to something. If you don't have it, install it first."
               : waitingOnUs
-                ? "Nothing for you to do. The club's bot isn't switched on yet, so we can't send the test message that confirms it works."
+                ? "Nothing for you to do. The club's bot isn't sending at the moment, so we can't send the test message that confirms it works."
                 : "We haven't proved a message actually reaches you — one click does it."}
           </span>
         </p>

@@ -12,7 +12,7 @@ import { DigestToggle } from "@/components/forms/digest-toggle";
 import { AddTermForm, EditTermForm } from "@/components/forms/term-admin";
 import { ClubIdentityForm } from "@/components/forms/club-identity";
 import { ThemeToggle } from "@/components/forms/theme-toggle";
-import { discordIsConfigured } from "@/lib/notify/discord";
+import { discordSendingEnabled } from "@/lib/notify/discord";
 import { listMyTokens } from "@/lib/mcp/store";
 import { myFeed } from "@/lib/calendar/store";
 import { appUrl } from "@/lib/urls";
@@ -169,7 +169,7 @@ export default async function SettingsPage() {
           <div className="mt-5">
             <ProfileForm
               member={viewer.member}
-              botLive={discordIsConfigured()}
+              botLive={discordSendingEnabled()}
               inviteUrl={identity.discordInviteUrl}
               // No Supabase in demo mode means no bucket to upload into.
               canUpload={!viewer.isDemo}

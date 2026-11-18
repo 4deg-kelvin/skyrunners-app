@@ -101,6 +101,37 @@ What exists already:
 send, no error, and nothing in the UI changes. Add the variable and it starts
 working with no deploy of app code.
 
+### ⏸ Currently PAUSED (2026-11-17)
+
+Discord notifications are switched off at the club's request. Nothing is
+broken, nothing was unconfigured, and no member needs to do anything — IDs stay
+saved and start working again the moment it resumes.
+
+The switch is `PAUSED_BY_DEFAULT` in `lib/notify/discord.ts`. Two ways to
+resume, and they do the same thing:
+
+- **No deploy:** set `DISCORD_PAUSED=false` in Vercel. Anything else — a blank
+  value, `off`, `no`, a typo — leaves it paused, deliberately: an unrecognised
+  value must never be read as "resume" and silently un-mute the club.
+- **In code:** flip `PAUSED_BY_DEFAULT` to `false`.
+
+Three things worth knowing about how it is built:
+
+- The check lives **inside `sendDiscordDM`**, not at its call sites, so every
+  sender is covered by one gate — the blocked-deliverable routing, the project
+  notices, the daily digest, and anything added later.
+- `discordIsConfigured()` still answers "is there a token", and the new
+  `discordSendingEnabled()` answers "would a message actually go out". The UI
+  and the cron ask the second one. Keeping them apart stops a pause from
+  looking like a missing setup in the logs or to a member.
+- The member-facing "send me a test DM" reports the problem as `paused` rather
+  than `not-configured`, because somebody told their setup is missing goes off
+  fixing something that is not broken.
+
+The send paths stay under test while paused: `lib/notify/discord.test.ts` lifts
+the pause the same way it supplies a token, so resuming is a flip rather than a
+leap, and a separate suite proves the pause itself leaks nothing.
+
 Two things to know about the behaviour:
 
 - Discord refuses a DM to somebody who **shares no server with the bot**, and

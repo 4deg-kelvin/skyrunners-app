@@ -14,6 +14,8 @@ import { test, describe, beforeEach, afterEach } from "node:test";
 
 import {
   discordIsConfigured,
+  discordPaused,
+  discordSendingEnabled,
   discordMessages,
   sendDiscordDM,
   verifyDiscordDM,
@@ -22,15 +24,27 @@ import {
 
 const realFetch = globalThis.fetch;
 const realToken = process.env.DISCORD_BOT_TOKEN;
+const realPause = process.env.DISCORD_PAUSED;
 
 beforeEach(() => {
   delete process.env.DISCORD_BOT_TOKEN;
+  /*
+    The club is PAUSED by default (see `discordPaused`), which would
+    short-circuit every send below and leave the whole delivery path untested
+    for as long as the pause lasts — so resuming would be a leap rather than a
+    flip. These tests therefore lift the pause explicitly, the same way they
+    already supply a token, and the suite at the bottom covers the pause
+    itself.
+  */
+  process.env.DISCORD_PAUSED = "false";
 });
 
 afterEach(() => {
   globalThis.fetch = realFetch;
   if (realToken === undefined) delete process.env.DISCORD_BOT_TOKEN;
   else process.env.DISCORD_BOT_TOKEN = realToken;
+  if (realPause === undefined) delete process.env.DISCORD_PAUSED;
+  else process.env.DISCORD_PAUSED = realPause;
 });
 
 describe("sending is optional at every step", () => {
@@ -405,5 +419,78 @@ describe("what each DM has to say", () => {
     const quoted = body.split("\n").filter((l) => l.startsWith("> "));
     assert.equal(quoted.length, 1);
     assert.match(quoted[0], /line one line two line three/);
+  });
+});
+
+describe("the pause", () => {
+  /*
+    The club asked for Discord to go quiet on 2026-11-17. The switch is
+    `PAUSED_BY_DEFAULT` in `discord.ts`, overridable with `DISCORD_PAUSED`.
+
+    Enforced inside `sendDiscordDM` rather than at its call sites, so that
+    every sender — blocked deliverables, project notices, the daily digest, and
+    anything written later — is covered by one check. These tests exist to make
+    sure the pause is real rather than merely declared, because a pause that
+    leaks is worse than none: nobody would be watching for the DMs it still
+    sent.
+  */
+  test("a paused club sends nothing, even with a token set", async () => {
+    process.env.DISCORD_PAUSED = "true";
+    process.env.DISCORD_BOT_TOKEN = "a-real-looking-token";
+
+    let called = false;
+    globalThis.fetch = (async () => {
+      called = true;
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch;
+
+    assert.equal(await sendDiscordDM("123456789", "hello"), false);
+    assert.equal(called, false, "no request should reach Discord at all");
+  });
+
+  test("the test DM says paused, not 'not set up'", async () => {
+    // Different problems need different answers: a member told their setup is
+    // missing goes off fixing something that is not broken.
+    process.env.DISCORD_PAUSED = "true";
+    process.env.DISCORD_BOT_TOKEN = "a-real-looking-token";
+
+    const result = await verifyDiscordDM("123456789", "hi");
+    assert.deepEqual(result, { ok: false, problem: "paused" });
+    assert.match(DISCORD_PROBLEM_MESSAGE.paused, /paused/i);
+  });
+
+  test("a token is still a token — the pause is a separate question", () => {
+    process.env.DISCORD_PAUSED = "true";
+    process.env.DISCORD_BOT_TOKEN = "a-real-looking-token";
+
+    assert.equal(discordIsConfigured(), true, "the club HAS a bot");
+    assert.equal(discordPaused(), true);
+    assert.equal(discordSendingEnabled(), false, "it just isn't sending");
+  });
+
+  test("no token and no pause still means nothing goes out", () => {
+    process.env.DISCORD_PAUSED = "false";
+    delete process.env.DISCORD_BOT_TOKEN;
+    assert.equal(discordSendingEnabled(), false);
+  });
+
+  test("lifting the pause needs no deploy, and no typo lifts it", () => {
+    process.env.DISCORD_BOT_TOKEN = "a-real-looking-token";
+
+    for (const off of ["false", "FALSE", "0"]) {
+      process.env.DISCORD_PAUSED = off;
+      assert.equal(discordPaused(), false, off);
+      assert.equal(discordSendingEnabled(), true, off);
+    }
+
+    /*
+      Anything else falls back to the default, which is PAUSED. That direction
+      matters: an unrecognised value must not be read as "resume", or a typo in
+      the dashboard silently un-mutes the club.
+    */
+    for (const noise of ["", "no", "off", "nope"]) {
+      process.env.DISCORD_PAUSED = noise;
+      assert.equal(discordPaused(), true, JSON.stringify(noise));
+    }
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { sendDailyDigests } from "@/lib/notify/send-digest";
-import { discordIsConfigured } from "@/lib/notify/discord";
+import { discordPaused, discordSendingEnabled } from "@/lib/notify/discord";
 import { todayInClubTime } from "@/lib/dates";
 
 /**
@@ -105,8 +105,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  if (!discordIsConfigured()) {
-    return NextResponse.json({ ok: true, skipped: "no Discord bot" });
+  /*
+    Asks "would anything go out" rather than "is a token set", so a pause
+    stops the digest at the top instead of running the whole build and
+    discarding every message at the send.
+  */
+  if (!discordSendingEnabled()) {
+    return NextResponse.json({
+      ok: true,
+      skipped: discordPaused()
+        ? "Discord notifications paused"
+        : "no Discord bot",
+    });
   }
 
   const today = todayInClubTime();

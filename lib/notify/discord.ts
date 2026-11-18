@@ -45,15 +45,69 @@
 
 const API = "https://discord.com/api/v10";
 
+/**
+ * ===========================================================================
+ * PAUSED — set to false to start sending again.
+ * ===========================================================================
+ *
+ * Paused 2026-11-17 at the club's request. Nothing else needs changing to
+ * resume: flip this one constant, and every path below comes back on.
+ *
+ * It sits here rather than in an env var because this is the switch somebody
+ * will want to find, and a constant in the file that does the sending is
+ * greppable and reviewable — an env var set in a dashboard is invisible to
+ * anybody reading the code, and the next person debugging "why did nobody get
+ * a DM" has nothing to find.
+ *
+ * The other route is still there and needs no deploy: clearing
+ * `DISCORD_BOT_TOKEN` in Vercel stops everything too, because `botToken()`
+ * returns null without it. That one is for an emergency; this one is for a
+ * deliberate quiet period.
+ */
+const PAUSED_BY_DEFAULT = true;
+
+/**
+ * Whether the club is currently quiet.
+ *
+ * Read through a function, not a bare constant, for two reasons:
+ *
+ *   - `DISCORD_PAUSED=false` in the deployment lifts the pause with NO DEPLOY,
+ *     the same way clearing `DISCORD_BOT_TOKEN` imposes one. Whoever wants the
+ *     DMs back does not have to wait for a code change.
+ *   - It keeps the sending logic testable. The tests below drive this exactly
+ *     as they already drive the token, so every path that runs when the club
+ *     is NOT paused stays covered — which is what makes resuming safe rather
+ *     than a leap.
+ */
+export function discordPaused(): boolean {
+  const override = process.env.DISCORD_PAUSED?.trim().toLowerCase();
+  if (override === "false" || override === "0") return false;
+  if (override === "true" || override === "1") return true;
+  return PAUSED_BY_DEFAULT;
+}
+
 /** Present only when the club has set the integration up. */
 function botToken(): string | null {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
   return token ? token : null;
 }
 
-/** Whether DMs are configured at all. Used to explain the UI honestly. */
+/** Whether a bot token exists at all. Says nothing about the pause. */
 export function discordIsConfigured(): boolean {
   return botToken() !== null;
+}
+
+/**
+ * Whether a message would actually go out right now.
+ *
+ * This is the question every caller and every bit of UI copy actually has —
+ * "is the bot live" — so it is what they ask, rather than
+ * `discordIsConfigured`, which answers the narrower "is a token set".
+ * Separating the two keeps the pause from masquerading as a missing setup in
+ * the logs or in anything written later.
+ */
+export function discordSendingEnabled(): boolean {
+  return !discordPaused() && discordIsConfigured();
 }
 
 async function call(
@@ -84,6 +138,16 @@ export async function sendDiscordDM(
   discordUserId: string | undefined,
   content: string
 ): Promise<boolean> {
+  /*
+    The pause is enforced HERE, not only at the call sites.
+
+    Every DM in the app funnels through this function, so one check covers the
+    blocked-deliverable routing, the project notices, the daily digest and
+    anything added later. Gating only the callers would mean the next feature
+    to send a DM quietly escapes the pause.
+  */
+  if (discordPaused()) return false;
+
   const token = botToken();
   if (!token || !discordUserId) return false;
 
@@ -411,6 +475,7 @@ ${opts.answeredBy} said: ${opts.response}`
  * settings blocked it, not that anything is broken.
  */
 export type DiscordProblem =
+  | "paused"
   | "not-configured"
   | "no-id"
   | "unknown-user"
@@ -419,6 +484,11 @@ export type DiscordProblem =
   | "unreachable";
 
 export const DISCORD_PROBLEM_MESSAGE: Record<DiscordProblem, string> = {
+  // Distinct from "not-configured" on purpose: the club HAS a bot, it is just
+  // quiet for now, and telling somebody their setup is missing would send them
+  // off fixing something that is not broken.
+  paused:
+    "Discord notifications are paused for the club at the moment, so there's nothing to test against. Your ID is saved and will work the moment they're switched back on.",
   "not-configured":
     "Discord isn't set up for the club yet, so there's nothing to connect to. Nothing for you to do.",
   "no-id": "Add your Discord ID first, then come back and connect.",
@@ -443,6 +513,8 @@ export async function verifyDiscordDM(
   discordUserId: string | undefined,
   content: string
 ): Promise<{ ok: true } | { ok: false; problem: DiscordProblem }> {
+  if (discordPaused()) return { ok: false, problem: "paused" };
+
   const token = botToken();
   if (!token) return { ok: false, problem: "not-configured" };
   if (!discordUserId) return { ok: false, problem: "no-id" };

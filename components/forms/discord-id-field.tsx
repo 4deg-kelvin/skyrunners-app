@@ -192,9 +192,9 @@ export function DiscordIdField({
         ) : null}
         {!botLive ? (
           <span>
-            The club&apos;s bot isn&apos;t switched on yet, so there&apos;s
-            nothing to test against — having the ID saved is your whole job, and
-            notifications start the day it goes live.{" "}
+            The club&apos;s bot isn&apos;t sending at the moment, so
+            there&apos;s nothing to test against — having the ID saved is your
+            whole job, and notifications reach you as soon as it is.{" "}
           </span>
         ) : (
           <span>

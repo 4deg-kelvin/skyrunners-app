@@ -7,7 +7,7 @@ import { getClubIdentity } from "@/lib/data/settings";
 import { DiscordBanner } from "@/components/ui/discord-banner";
 import { LogWorkBanner } from "@/components/ui/log-work-banner";
 import { daysBetweenDays, todayInClubTime } from "@/lib/dates";
-import { discordIsConfigured } from "@/lib/notify/discord";
+import { discordSendingEnabled } from "@/lib/notify/discord";
 import type { Metadata } from "next";
 import { isAdvisor, isLeadership } from "@/lib/permissions";
 
@@ -147,7 +147,7 @@ export default async function AppLayout({
       {!viewer.member.discordVerifiedAt && !isAdvisor(viewer.actor) ? (
         <DiscordBanner
           hasId={Boolean(viewer.member.discordUserId)}
-          botLive={discordIsConfigured()}
+          botLive={discordSendingEnabled()}
         />
       ) : null}
       {nudgeToLogWork && !isAdvisor(viewer.actor) ? <LogWorkBanner /> : null}

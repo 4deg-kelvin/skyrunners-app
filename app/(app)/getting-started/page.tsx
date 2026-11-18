@@ -21,7 +21,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { getClubIdentity } from "@/lib/data/settings";
 import { getViewer } from "@/lib/data/viewer";
-import { discordIsConfigured } from "@/lib/notify/discord";
+import { discordSendingEnabled } from "@/lib/notify/discord";
 
 export const metadata = {
   title: "New Member Resources",
@@ -76,7 +76,7 @@ export default async function GettingStartedPage() {
     somebody they aren't finished when there is no next step they can take is
     how a required section gets ignored.
   */
-  const canVerify = discordIsConfigured();
+  const canVerify = discordSendingEnabled();
   const connected = canVerify
     ? Boolean(viewer.member.discordVerifiedAt)
     : Boolean(viewer.member.discordUserId);
